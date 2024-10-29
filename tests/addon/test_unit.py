@@ -2924,12 +2924,6 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
         mocker.patch(
             "ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows
         )
-        mock_ms_timestamp_to_datetime = mocker.patch(
-            "ankihub.main.review_data._ms_timestamp_to_datetime"
-        )
-        mock_ms_timestamp_to_datetime.side_effect = lambda ts: datetime.fromtimestamp(
-            ts / 1000
-        )
 
         result = get_daily_review_data_since_last_sync(last_sync)
 
@@ -2969,7 +2963,6 @@ def test_get_daily_review_data_no_reviews(mocker, anki_session_with_addon_data):
     with anki_session_with_addon_data.profile_loaded():
         last_sync = datetime.now() - timedelta(days=2)
         mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=[])
-        mocker.patch("ankihub.main.review_data._ms_timestamp_to_datetime")
 
         result = get_daily_review_data_since_last_sync(last_sync)
 

@@ -98,12 +98,13 @@ def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
 def get_daily_review_data_since_last_sync(
     last_sync: datetime,
 ) -> List[DailyCardReviewSummaryData]:
-    """Filter revlog entries by the date of the last sync and the 'yesterday' date,
+    """Filter revlog entries between the date of the last sync and the end of yesterday
     group by days, and compile the data."""
-    yesterday = datetime.now() - timedelta(days=1)
+    end_of_yesterday = datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) - timedelta(microseconds=1)
     timestamp_last_sync_ms = int(datetime.timestamp(last_sync) * 1000)
-    timestamp_yesterday_ms = int(datetime.timestamp(yesterday) * 1000)
-
+    timestamp_end_of_yesterday = int(datetime.timestamp(end_of_yesterday) * 1000)
     rows = aqt.mw.col.db.all(
         """
         SELECT r.id, r.ease, r.time
@@ -112,7 +113,7 @@ def get_daily_review_data_since_last_sync(
         WHERE r.id BETWEEN ? AND ?
         """,
         timestamp_last_sync_ms,
-        timestamp_yesterday_ms,
+        timestamp_end_of_yesterday,
     )
 
     daily_reviews = defaultdict(list)
