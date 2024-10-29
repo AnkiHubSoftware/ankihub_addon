@@ -46,6 +46,7 @@ from .models import (
     ANKIHUB_DATETIME_FORMAT_STR,
     CardReviewData,
     ChangeNoteSuggestion,
+    DailyCardReviewSummary,
     Deck,
     DeckExtension,
     DeckExtensionUpdateChunk,
@@ -1276,6 +1277,19 @@ class AnkiHubClient:
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
+
+    def send_daily_card_review_summaries(
+        self, daily_card_review_summaries: List[DailyCardReviewSummary]
+    ) -> None:
+        for summary in daily_card_review_summaries:
+            response = self._send_request(
+                "POST",
+                API.ANKIHUB,
+                "/users/daily-card-review-summary/",
+                json=summary.to_dict(),
+            )
+            if response.status_code != 201:
+                raise AnkiHubHTTPError(response)
 
 
 class ThreadLocalSession:

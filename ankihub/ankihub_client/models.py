@@ -323,7 +323,7 @@ class CardReviewData(DataClassJSONMixinWithConfig):
 
 
 @dataclass
-class DailyCardReviewSummaryData(DataClassJSONMixinWithConfig):
+class DailyCardReviewSummary(DataClassJSONMixinWithConfig):
     review_session_date: date
     total_cards_studied: int = 0
     total_time_reviewing: int = 0

@@ -9,7 +9,7 @@ from anki import consts as anki_consts
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import CardReviewData
-from ..ankihub_client.models import DailyCardReviewSummaryData
+from ..ankihub_client.models import DailyCardReviewSummary
 from ..db import ankihub_db
 from ..settings import config
 
@@ -95,9 +95,9 @@ def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
     return datetime.fromtimestamp(timestamp / 1000)
 
 
-def get_daily_review_data_since_last_sync(
+def get_daily_review_summaries_since_last_sync(
     last_sync: datetime,
-) -> List[DailyCardReviewSummaryData]:
+) -> List[DailyCardReviewSummary]:
     """Filter revlog entries between the date of the last sync and the end of yesterday
     group by days, and compile the data."""
     end_of_yesterday = datetime.now().replace(
@@ -135,7 +135,7 @@ def get_daily_review_data_since_last_sync(
         total_cards_marked_as_easy = sum(1 for ease, _ in item if ease == 4)
 
         daily_card_review_data.append(
-            DailyCardReviewSummaryData(
+            DailyCardReviewSummary(
                 total_cards_studied=total_cards_studied,
                 total_time_reviewing=total_time_reviewing,
                 total_cards_marked_as_again=total_cards_marked_as_again,

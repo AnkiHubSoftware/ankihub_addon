@@ -31,12 +31,12 @@ from requests_mock import Mocker
 from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
-    DailyCardReviewSummaryData,
+    DailyCardReviewSummary,
     UserDeckExtensionRelation,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.main.review_data import get_daily_review_data_since_last_sync
+from ankihub.main.review_data import get_daily_review_summaries_since_last_sync
 from ankihub.settings import ANKIHUB_TEMPLATE_END_COMMENT, DatadogLogHandler
 
 from ..factories import (
@@ -2925,10 +2925,10 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
             "ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows
         )
 
-        result = get_daily_review_data_since_last_sync(last_sync)
+        result = get_daily_review_summaries_since_last_sync(last_sync)
 
         expected_data = [
-            DailyCardReviewSummaryData(
+            DailyCardReviewSummary(
                 total_cards_studied=2,
                 total_time_reviewing=70,
                 total_cards_marked_as_again=1,
@@ -2937,7 +2937,7 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
                 total_cards_marked_as_easy=0,
                 review_session_date=(last_sync).date(),
             ),
-            DailyCardReviewSummaryData(
+            DailyCardReviewSummary(
                 total_cards_studied=2,
                 total_time_reviewing=110,
                 total_cards_marked_as_again=0,
@@ -2964,6 +2964,6 @@ def test_get_daily_review_data_no_reviews(mocker, anki_session_with_addon_data):
         last_sync = datetime.now() - timedelta(days=2)
         mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=[])
 
-        result = get_daily_review_data_since_last_sync(last_sync)
+        result = get_daily_review_summaries_since_last_sync(last_sync)
 
         assert result == []
