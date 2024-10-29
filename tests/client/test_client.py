@@ -1797,6 +1797,7 @@ class TestSendDailyCardReviewSummaries:
         authorized_client_for_user_test2.send_daily_card_review_summaries(
             daily_card_review_summaries
         )
+        raise Exception("test")
 
 
 @pytest.mark.vcr
