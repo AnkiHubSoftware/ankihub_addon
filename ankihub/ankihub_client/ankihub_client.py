@@ -46,6 +46,7 @@ from .models import (
     ANKIHUB_DATETIME_FORMAT_STR,
     CardReviewData,
     ChangeNoteSuggestion,
+    DailyCardReviewSummary,
     Deck,
     DeckExtension,
     DeckExtensionUpdateChunk,
@@ -1273,6 +1274,18 @@ class AnkiHubClient:
             API.ANKIHUB,
             "/users/card-review-data/",
             json=[review.to_dict() for review in card_review_data],
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+    def send_daily_card_review_summaries(
+        self, daily_card_review_summaries: List[DailyCardReviewSummary]
+    ) -> None:
+        response = self._send_request(
+            "POST",
+            API.ANKIHUB,
+            "/users/daily-card-review-summary/",
+            json=[summary.to_dict() for summary in daily_card_review_summaries],
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
