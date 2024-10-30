@@ -95,12 +95,13 @@ def anki_session_with_addon_data(
         os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
         # Create temporary private config json file
-        with open(os.path.join(tmpdir, "private_config.json"), "w") as f:
-            f.write(json.dumps({}))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as temp_file:
+            temp_file.write(json.dumps({}).encode('utf-8'))
+            temp_file_path = temp_file.name
 
         config.setup_public_config_and_other_settings()
         config._private_config = PrivateConfig()
-        config._private_config_path = tmpdir + "/private_config.json"
+        config._private_config_path = temp_file_path
         setup_logger()
 
         mock_all_feature_flags_to_default_values()
@@ -112,6 +113,7 @@ def anki_session_with_addon_data(
             with anki_session.profile_loaded():
                 _profile_setup()
 
+        os.remove(temp_file_path)
         yield anki_session
 
 
