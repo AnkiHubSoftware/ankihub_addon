@@ -96,7 +96,7 @@ def anki_session_with_addon_data(
 
         # Create temporary private config json file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as temp_file:
-            temp_file.write(json.dumps({}).encode('utf-8'))
+            temp_file.write(json.dumps({}).encode("utf-8"))
             temp_file_path = temp_file.name
 
         config.setup_public_config_and_other_settings()
