@@ -1820,7 +1820,6 @@ class TestFeatureFlags:
         _feature_flags_update_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker):
-        # MockAddonQueryOp = mocker.patch("ankihub.feature_flags.AddonQueryOp")
         MockAnkiHubClient = mocker.patch("ankihub.feature_flags.AnkiHubClient")
         mock_logger = mocker.patch("ankihub.feature_flags.LOGGER")
         mock_config = mocker.patch("ankihub.feature_flags.config")
@@ -1828,15 +1827,8 @@ class TestFeatureFlags:
         mock_anki_hub_client = MockAnkiHubClient.return_value
         feature_flags_dict = {"flag1": True, "flag2": False}
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
-        # mock_addon_query_op = MockAddonQueryOp.return_value
-        # mock_addon_query_op.without_collection.return_value = mock_addon_query_op
 
         update_feature_flags_in_background()
-
-        # mock_addon_query_op.without_collection.assert_called_once()
-        # mock_addon_query_op.run_in_background.assert_called_once()
-
-        # mock_addon_query_op.success(mock_addon_query_op.op(None))
 
         mock_logger_expected_calls = [
             call.info("Feature flags", feature_flags=feature_flags_dict),
