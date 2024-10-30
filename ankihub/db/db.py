@@ -124,8 +124,11 @@ class _AnkiHubDB:
         skipped_notes = self._determine_notes_to_skip(
             notes_data, ankihub_did=ankihub_did
         )
+        nids_to_skip = set(note_data.anki_nid for note_data in skipped_notes)
         notes_data = [
-            note_data for note_data in notes_data if note_data not in skipped_notes
+            note_data
+            for note_data in notes_data
+            if note_data.anki_nid not in nids_to_skip
         ]
 
         upserted_notes: List[NoteInfo] = []
