@@ -148,20 +148,16 @@ def get_daily_review_summaries_since_last_sync(
     return daily_card_review_data
 
 
-def send_daily_review_summaries() -> None:
+def send_daily_review_summaries(last_summary_sent_date) -> None:
     """Send daily review summaries to the server."""
-    last_summary_sent_date = config.get_last_summary_sent_date()
-    if not last_summary_sent_date:
-        last_summary_sent_date = (
-            datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            - timedelta(microseconds=1)
-        ) - timedelta(days=1)
-
     daily_review_summaries = get_daily_review_summaries_since_last_sync(
         last_summary_sent_date
     )
     client = AnkiHubClient()
-    client.send_daily_card_review_summaries(daily_review_summaries)
+    if daily_review_summaries:
+        client.send_daily_card_review_summaries(daily_review_summaries)
+        LOGGER.info("Daily review summaries sent to AnkiHub.")
+    else:
+        LOGGER.info("No daily review summaries to send to AnkiHub.")
 
-    LOGGER.info("Daily review summaries sent to AnkiHub.")
     config.save_last_summary_sent_date(datetime.now())
