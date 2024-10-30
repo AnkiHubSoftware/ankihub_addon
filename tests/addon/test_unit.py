@@ -5,13 +5,12 @@ import sqlite3
 import tempfile
 import time
 import uuid
-from dataclasses import fields
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
 from textwrap import dedent
 from typing import Callable, Generator, List, Optional, Protocol, Tuple
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import aqt
 import pytest
@@ -36,7 +35,10 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.main.review_data import get_daily_review_summaries_since_last_sync
+from ankihub.main.review_data import (
+    get_daily_review_summaries_since_last_sync,
+    send_daily_review_summaries,
+)
 from ankihub.settings import ANKIHUB_TEMPLATE_END_COMMENT, DatadogLogHandler
 
 from ..factories import (
@@ -52,7 +54,6 @@ from ..fixtures import (  # type: ignore
     LatestInstanceTracker,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
-    SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     assert_datetime_equal_ignore_milliseconds,
     create_anki_deck,
@@ -76,7 +77,11 @@ from ankihub.ankihub_client import (
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
-from ankihub.feature_flags import _FeatureFlags, feature_flags
+from ankihub.feature_flags import (
+    _feature_flags_update_callbacks,
+    add_feature_flags_update_callback,
+    update_feature_flags_in_background,
+)
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -1810,23 +1815,39 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
 
 
 class TestFeatureFlags:
-    def test_with_default_values(
-        self,
-        mock_all_feature_flags_to_default_values: None,
-    ):
-        for field in fields(_FeatureFlags):
-            assert getattr(feature_flags, field.name) == field.default
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        _feature_flags_update_callbacks.clear()
 
-    def test_with_set_values(
-        self,
-        set_feature_flag_state: SetFeatureFlagState,
-    ):
-        for field in fields(_FeatureFlags):
-            set_feature_flag_state(field.name, False)
-            assert not getattr(feature_flags, field.name)
+    def test_update_feature_flags_in_background(self):
+        with patch("feature_flags.AddonQueryOp") as MockAddonQueryOp, patch(
+            "feature_flags.AnkiHubClient"
+        ) as MockAnkiHubClient, patch("feature_flags.LOGGER") as mock_logger, patch(
+            "feature_flags.config"
+        ) as mock_config:
 
-            set_feature_flag_state(field.name, True)
-            assert getattr(feature_flags, field.name)
+            mock_anki_hub_client = MockAnkiHubClient.return_value
+            feature_flags_dict = {"flag1": True, "flag2": False}
+            mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
+            mock_addon_query_op = MockAddonQueryOp.return_value
+
+            update_feature_flags_in_background()
+
+            mock_addon_query_op.without_collection.assert_called_once()
+            mock_addon_query_op.run_in_background.assert_called_once()
+
+            mock_addon_query_op.success(mock_addon_query_op.op(None))
+
+            mock_logger.info.assert_called_with("Set up feature flags.")
+            mock_config.set_feature_flags.assert_called_with()
+            mock_logger.info.assert_called_with(
+                "Feature flags", feature_flags=feature_flags_dict
+            )
+
+    def test_add_feature_flags_update_callback(self):
+        callback = MagicMock()
+        add_feature_flags_update_callback(callback)
+        assert callback in _feature_flags_update_callbacks
 
 
 class TestRetainNidsWithAHNoteType:
@@ -2725,6 +2746,7 @@ class TestDatadogLogHandler:
     def test_emit_and_flush(
         self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool
     ):
+        feature_flags = config.get_feature_flags()
         feature_flags["send_addon_logs_to_datadog"] = send_logs_to_datadog_feature_flag
 
         # Mock the requests.post call to always return a response with status code 202
@@ -2767,6 +2789,7 @@ class TestDatadogLogHandler:
             post_mock.assert_not_called()
 
     def test_periodic_flush(self, mocker):
+        feature_flags = config.get_feature_flags()
         feature_flags["send_addon_logs_to_datadog"] = True
 
         # Mock the requests.post call to always return a response with status code 202
@@ -2798,6 +2821,7 @@ class TestDatadogLogHandler:
         )
 
     def test_capacity_flush(self, mocker):
+        feature_flags = config.get_feature_flags()
         feature_flags["send_addon_logs_to_datadog"] = True
 
         # Create a DatadogLogHandler with a short flush interval and a LogRecord
@@ -2967,3 +2991,44 @@ def test_get_daily_review_data_no_reviews(mocker, anki_session_with_addon_data):
         result = get_daily_review_summaries_since_last_sync(last_sync)
 
         assert result == []
+
+
+def test_send_daily_review_summaries_with_data():
+    last_summary_sent_date = datetime.now() - timedelta(days=1)
+    mock_summary = MagicMock()
+    with patch("ankihub.main.review_data.config") as mock_config, patch(
+        "ankihub.main.review_data.AnkiHubClient"
+    ) as MockAnkiHubClient, patch(
+        "ankihub.main.review_data.get_daily_review_summaries_since_last_sync"
+    ) as mock_get_daily_review_summaries:
+
+        mock_get_daily_review_summaries.return_value = [mock_summary]
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        send_daily_review_summaries(last_summary_sent_date)
+
+        mock_get_daily_review_summaries.assert_called_once_with(last_summary_sent_date)
+        mock_anki_hub_client.send_daily_card_review_summaries.assert_called_once_with(
+            [mock_summary]
+        )
+        mock_config.save_last_summary_sent_date.assert_called_once()
+        assert mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now()
+
+
+def test_send_daily_review_summaries_without_data():
+    last_summary_sent_date = datetime.now() - timedelta(days=1)
+    with patch("ankihub.main.review_data.config") as mock_config, patch(
+        "ankihub.main.review_data.AnkiHubClient"
+    ) as MockAnkiHubClient, patch(
+        "ankihub.main.review_data.get_daily_review_summaries_since_last_sync"
+    ) as mock_get_daily_review_summaries:
+
+        mock_get_daily_review_summaries.return_value = []
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        send_daily_review_summaries(last_summary_sent_date)
+
+        mock_get_daily_review_summaries.assert_called_once_with(last_summary_sent_date)
+        mock_anki_hub_client.send_daily_card_review_summaries.assert_not_called()
+        mock_config.save_last_summary_sent_date.assert_called_once()
+        assert mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now()
