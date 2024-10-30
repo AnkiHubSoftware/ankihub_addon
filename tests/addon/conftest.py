@@ -82,7 +82,7 @@ def anki_session_with_addon_data(
     Instead the tests run the code in the ankihub folder of the repo.
     """
     from ankihub.entry_point import _profile_setup
-    from ankihub.settings import config, setup_logger
+    from ankihub.settings import PrivateConfig, config, setup_logger
 
     # Add the add-ons public config to Anki
     config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
@@ -94,7 +94,13 @@ def anki_session_with_addon_data(
         # Change the ankihub base path to a temporary folder to isolate the tests
         os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
+        # Create temporary private config json file
+        with open(os.path.join(tmpdir, "private_config.json"), "w") as f:
+            f.write(json.dumps({}))
+
         config.setup_public_config_and_other_settings()
+        config._private_config = PrivateConfig()
+        config._private_config_path = tmpdir + "/private_config.json"
         setup_logger()
 
         mock_all_feature_flags_to_default_values()
