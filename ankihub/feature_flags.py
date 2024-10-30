@@ -8,13 +8,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .gui.operations import AddonQueryOp
-
-# TODO: We should replace these values with values of a environment variable
-feature_flags = {
-    "show_flashcards_selector_button": False,
-    "chatbot": False,
-    "send_addon_logs_to_datadog": False,
-}
+from .settings import config
 
 # List of callbacks that are called when the feature flags are updated.
 # This can e.g. be used to update the UI once the feature flags are fetched.
@@ -42,9 +36,8 @@ def _setup_feature_flags() -> None:
     except (AnkiHubRequestException, AnkiHubHTTPError):
         pass
 
-    feature_flags = feature_flags_dict
-
-    LOGGER.info("Feature flags", feature_flags=feature_flags)
+    config.set_feature_flags(feature_flags_dict)
+    LOGGER.info("Feature flags", feature_flags=feature_flags_dict)
 
 
 def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
