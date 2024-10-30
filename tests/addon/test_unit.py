@@ -1820,10 +1820,10 @@ class TestFeatureFlags:
         _feature_flags_update_callbacks.clear()
 
     def test_update_feature_flags_in_background(self):
-        with patch("feature_flags.AddonQueryOp") as MockAddonQueryOp, patch(
-            "feature_flags.AnkiHubClient"
+        with patch("ankihub.feature_flags.AddonQueryOp") as MockAddonQueryOp, patch(
+            "ankihub.feature_flags.AnkiHubClient"
         ) as MockAnkiHubClient, patch("feature_flags.LOGGER") as mock_logger, patch(
-            "feature_flags.config"
+            "ankihub.feature_flags.config"
         ) as mock_config:
 
             mock_anki_hub_client = MockAnkiHubClient.return_value
