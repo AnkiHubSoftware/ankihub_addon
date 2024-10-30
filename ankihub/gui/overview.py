@@ -15,7 +15,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from .. import LOGGER
-from ..feature_flags import add_feature_flags_update_callback, feature_flags
+from ..feature_flags import add_feature_flags_update_callback
 from ..settings import config, url_flashcard_selector, url_flashcard_selector_embed
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
@@ -63,6 +63,7 @@ def _maybe_add_flashcard_selector_button() -> None:
     ):
         return
 
+    feature_flags = config.get_feature_flags()
     if not feature_flags.get("show_flashcards_selector_button", False):
         LOGGER.debug(
             "Feature flag to show flashcard selector button is disabled, not adding the button."

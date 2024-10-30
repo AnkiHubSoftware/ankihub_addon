@@ -18,7 +18,6 @@ from aqt.webview import WebContent
 from jinja2 import Template
 
 from ..db import ankihub_db
-from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
@@ -112,6 +111,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     if not isinstance(context, Reviewer):
         return
 
+    feature_flags = config.get_feature_flags()
     if not feature_flags.get("chatbot", False):
         return
 
@@ -151,6 +151,7 @@ def _ankihub_theme() -> str:
 
 
 def _notify_ankihub_ai_of_card_change(card: Card) -> None:
+    feature_flags = config.get_feature_flags()
     if not feature_flags.get("chatbot", False):
         return
 
@@ -162,6 +163,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
+    feature_flags = config.get_feature_flags()
     if not feature_flags.get("chatbot", False):
         return
 
@@ -170,6 +172,7 @@ def _remove_anking_button(_: Card) -> None:
 
 
 def _set_token_for_ankihub_ai_js() -> None:
+    feature_flags = config.get_feature_flags()
     if not feature_flags.get("chatbot", False):
         return
 

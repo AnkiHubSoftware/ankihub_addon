@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 from typing import Callable, List, Optional
 
@@ -14,7 +14,6 @@ from aqt.sync import get_sync_status
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
-from ...feature_flags import feature_flags
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
@@ -133,13 +132,21 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     )
 
     last_summary_sent_date = config.get_last_summary_sent_date()
+    if not last_summary_sent_date:
+        last_summary_sent_date = (
+            datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            - timedelta(microseconds=1)
+        ) - timedelta(days=1)
+
+    feature_flags = config.get_feature_flags()
     if (
         feature_flags.get("daily_card_review_summary", False)
         and last_summary_sent_date
         and last_summary_sent_date.date() < datetime.now().date()
     ):
         aqt.mw.taskman.run_in_background(
-            send_daily_review_summaries, on_done=_on_send_daily_review_summaries_done
+            lambda: send_daily_review_summaries(last_summary_sent_date),
+            on_done=_on_send_daily_review_summaries_done,
         )
 
     if config.schema_to_do_full_upload_for_once():
