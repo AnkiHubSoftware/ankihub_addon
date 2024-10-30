@@ -101,7 +101,7 @@ def anki_session_with_addon_data(
 
         config.setup_public_config_and_other_settings()
         config._private_config = PrivateConfig()
-        config._private_config_path = temp_file_path
+        config._private_config_path = Path(temp_file_path)
         setup_logger()
 
         mock_all_feature_flags_to_default_values()
