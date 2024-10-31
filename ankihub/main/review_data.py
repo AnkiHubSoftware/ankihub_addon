@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional, Tuple
 
 import aqt
@@ -96,14 +96,16 @@ def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
 
 
 def get_daily_review_summaries_since_last_sync(
-    last_sync: datetime,
+    last_sync: date,
 ) -> List[DailyCardReviewSummary]:
     """Filter revlog entries between the date of the last sync and the end of yesterday
     group by days, and compile the data."""
     end_of_yesterday = datetime.now().replace(
         hour=0, minute=0, second=0, microsecond=0
     ) - timedelta(microseconds=1)
-    timestamp_last_sync_ms = int(datetime.timestamp(last_sync) * 1000)
+    timestamp_last_sync_ms = int(
+        datetime.timestamp(datetime.combine(last_sync, datetime.min.time())) * 1000
+    )
     timestamp_end_of_yesterday = int(datetime.timestamp(end_of_yesterday) * 1000)
     rows = aqt.mw.col.db.all(
         """
@@ -148,7 +150,7 @@ def get_daily_review_summaries_since_last_sync(
     return daily_card_review_data
 
 
-def send_daily_review_summaries(last_summary_sent_date) -> None:
+def send_daily_review_summaries(last_summary_sent_date: date) -> None:
     """Send daily review summaries to the server."""
     daily_review_summaries = get_daily_review_summaries_since_last_sync(
         last_summary_sent_date
@@ -160,4 +162,4 @@ def send_daily_review_summaries(last_summary_sent_date) -> None:
     else:
         LOGGER.info("No daily review summaries to send to AnkiHub.")
 
-    config.save_last_summary_sent_date(datetime.now())
+    config.save_last_summary_sent_date(datetime.now().date())
