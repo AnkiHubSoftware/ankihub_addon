@@ -117,27 +117,6 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
     return set_feature_flag_state_inner
 
 
-class MockAllFeatureFlagsToDefaultValues(Protocol):
-    def __call__(self) -> None:
-        ...
-
-
-@pytest.fixture
-def mock_all_feature_flags_to_default_values(
-    monkeypatch: MonkeyPatch,
-) -> MockAllFeatureFlagsToDefaultValues:
-    def mock_all_feature_flags_to_default_values_inner() -> None:
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_feature_flags",
-            lambda *args, **kwargs: {},
-        )
-        # this is needed so that the feature flags are reloaded for the feature_flags singleton
-        _setup_feature_flags()
-
-    return mock_all_feature_flags_to_default_values_inner
-
-
 class ImportAHNote(Protocol):
     def __call__(
         self,

@@ -13,8 +13,9 @@ from pytest_anki.plugin import anki_running
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.ankihub_client.ankihub_client import AnkiHubClient
+
 from ..fixtures import (  # noqa F401
-    MockAllFeatureFlagsToDefaultValues,
     add_anki_note,
     ankihub_basic_note_type,
     import_ah_note,
@@ -22,7 +23,6 @@ from ..fixtures import (  # noqa F401
     import_ah_notes,
     install_ah_deck,
     latest_instance_tracker,
-    mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
     mock_message_box_with_cb,
     mock_show_dialog_with_cb,
@@ -71,7 +71,6 @@ def anki_session_with_addon_data(
     anki_session: AnkiSession,
     requests_mock: Mocker,
     monkeypatch: MonkeyPatch,
-    mock_all_feature_flags_to_default_values: MockAllFeatureFlagsToDefaultValues,  # noqa F811
 ) -> Generator[AnkiSession, None, None]:
     """Sets up a temporary anki base folder and a temporary ankihub base folder.
     This is a replacement for running the whole initialization process of the add-on
@@ -82,7 +81,7 @@ def anki_session_with_addon_data(
     Instead the tests run the code in the ankihub folder of the repo.
     """
     from ankihub.entry_point import _profile_setup
-    from ankihub.settings import PrivateConfig, config, setup_logger
+    from ankihub.settings import config, setup_logger
 
     # Add the add-ons public config to Anki
     config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
@@ -94,17 +93,8 @@ def anki_session_with_addon_data(
         # Change the ankihub base path to a temporary folder to isolate the tests
         os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
-        # Create temporary private config json file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as temp_file:
-            temp_file.write(json.dumps({}).encode("utf-8"))
-            temp_file_path = temp_file.name
-
         config.setup_public_config_and_other_settings()
-        config._private_config = PrivateConfig()
-        config._private_config_path = Path(temp_file_path)
         setup_logger()
-
-        mock_all_feature_flags_to_default_values()
 
         with monkeypatch.context() as m:
             # monkeypatch the uuid4 function to always return the same value so
@@ -113,8 +103,13 @@ def anki_session_with_addon_data(
             with anki_session.profile_loaded():
                 _profile_setup()
 
-        os.remove(temp_file_path)
+        _mock_all_feature_flags_to_default_values(monkeypatch)
+
         yield anki_session
+
+
+def _mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(AnkiHubClient, "get_feature_flags", lambda *args, **kwargs: {})
 
 
 @pytest.fixture

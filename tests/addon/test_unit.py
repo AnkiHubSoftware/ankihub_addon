@@ -2988,7 +2988,7 @@ def test_get_daily_review_data_no_reviews(mocker, anki_session_with_addon_data):
 
 
 def test_send_daily_review_summaries_with_data(mocker):
-    last_summary_sent_date = datetime.now() - timedelta(days=1)
+    last_summary_sent_date = (datetime.now() - timedelta(days=1)).date()
     mock_summary = MagicMock()
 
     mock_config = mocker.patch("ankihub.main.review_data.config")
@@ -3007,11 +3007,13 @@ def test_send_daily_review_summaries_with_data(mocker):
         [mock_summary]
     )
     mock_config.save_last_summary_sent_date.assert_called_once()
-    assert mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now()
+    assert (
+        mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now().date()
+    )
 
 
 def test_send_daily_review_summaries_without_data(mocker):
-    last_summary_sent_date = datetime.now() - timedelta(days=1)
+    last_summary_sent_date = (datetime.now() - timedelta(days=1)).date()
 
     mock_config = mocker.patch("ankihub.main.review_data.config")
     MockAnkiHubClient = mocker.patch("ankihub.main.review_data.AnkiHubClient")
@@ -3027,4 +3029,6 @@ def test_send_daily_review_summaries_without_data(mocker):
     mock_get_daily_review_summaries.assert_called_once_with(last_summary_sent_date)
     mock_anki_hub_client.send_daily_card_review_summaries.assert_not_called()
     mock_config.save_last_summary_sent_date.assert_called_once()
-    assert mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now()
+    assert (
+        mock_config.save_last_summary_sent_date.call_args[0][0] <= datetime.now().date()
+    )
