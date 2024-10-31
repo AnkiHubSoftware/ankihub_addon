@@ -15,7 +15,7 @@ import time
 import uuid
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
@@ -179,7 +179,7 @@ class PrivateConfig(DataClassJSONMixin):
     # used to determine whether to skip the full sync dialog
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
-    last_summary_sent_date: Optional[datetime] = None
+    last_summary_sent_date: Optional[date] = None
     feature_flags: dict = field(default_factory=dict)
 
 
@@ -280,7 +280,7 @@ class _Config:
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
-    def save_last_summary_sent_date(self, last_summary_sent_date: Optional[datetime]):
+    def save_last_summary_sent_date(self, last_summary_sent_date: Optional[date]):
         self._private_config.last_summary_sent_date = last_summary_sent_date
         self._update_private_config()
 
@@ -414,7 +414,7 @@ class _Config:
     def deck_extension_ids(self) -> List[int]:
         return list(self._private_config.deck_extensions.keys())
 
-    def get_last_summary_sent_date(self) -> Optional[datetime]:
+    def get_last_summary_sent_date(self) -> Optional[date]:
         return self._private_config.last_summary_sent_date
 
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
