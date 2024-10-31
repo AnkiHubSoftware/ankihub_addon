@@ -31,10 +31,13 @@ def update_feature_flags_in_background() -> None:
 
 def _setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
+    feature_flags_dict = {}
     try:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
-    except (AnkiHubRequestException, AnkiHubHTTPError):
-        pass
+    except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
+        LOGGER.error(f"Failed to fetch feature flags: {exc}. Using default values.")
+    else:
+        config.set_feature_flags(feature_flags_dict)
 
     config.set_feature_flags(feature_flags_dict)
     LOGGER.info("Feature flags", feature_flags=feature_flags_dict)
