@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 from functools import partial
 from typing import Callable, List, Optional
 
@@ -133,18 +133,12 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
 
     last_summary_sent_date = config.get_last_summary_sent_date()
     if not last_summary_sent_date:
-        last_summary_sent_date = (
-            (
-                datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                - timedelta(microseconds=1)
-            )
-            - timedelta(days=1)
-        ).date()
+        last_summary_sent_date = date.today() - timedelta(days=1)
 
     feature_flags = config.get_feature_flags()
     if (
         feature_flags.get("daily_card_review_summary", False)
-        and last_summary_sent_date < datetime.now().date()
+        and last_summary_sent_date < date.today()
     ):
         aqt.mw.taskman.run_in_background(
             lambda: send_daily_review_summaries(last_summary_sent_date),
