@@ -1791,7 +1791,19 @@ class TestSendDailyCardReviewSummaries:
         authorized_client_for_user_test1: AnkiHubClient,
     ) -> None:
         daily_card_review_summaries = [
-            DailyCardReviewSummary(review_session_date=date.today())
+            DailyCardReviewSummary(
+                review_session_date=date.today() - timedelta(days=1),
+                total_cards_studied=1,
+                total_cards_marked_as_again=1,
+                total_time_reviewing=5,
+            ),
+            DailyCardReviewSummary(
+                review_session_date=date.today(),
+                total_cards_studied=2,
+                total_cards_marked_as_again=1,
+                total_cards_marked_as_good=1,
+                total_time_reviewing=5,
+            ),
         ]
 
         authorized_client_for_user_test1.send_daily_card_review_summaries(
