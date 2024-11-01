@@ -15,7 +15,7 @@ import time
 import uuid
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
@@ -179,7 +179,7 @@ class PrivateConfig(DataClassJSONMixin):
     # used to determine whether to skip the full sync dialog
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
-    last_summary_sent_date: Optional[date] = None
+    last_sent_summary_date: Optional[date] = None
     feature_flags: dict = field(default_factory=dict)
 
 
@@ -280,8 +280,8 @@ class _Config:
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
-    def save_last_summary_sent_date(self, last_summary_sent_date: Optional[date]):
-        self._private_config.last_summary_sent_date = last_summary_sent_date
+    def save_last_sent_summary_date(self, last_summary_sent_date: Optional[date]):
+        self._private_config.last_sent_summary_date = last_summary_sent_date
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
@@ -414,8 +414,8 @@ class _Config:
     def deck_extension_ids(self) -> List[int]:
         return list(self._private_config.deck_extensions.keys())
 
-    def get_last_summary_sent_date(self) -> Optional[date]:
-        return self._private_config.last_summary_sent_date
+    def get_last_sent_summary_date(self) -> Optional[date]:
+        return self._private_config.last_sent_summary_date
 
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
         latest_update = (
@@ -906,6 +906,16 @@ class AnkiHubCommands(Enum):
 
 
 RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024
+
+# Daily review summaries are sent for days which were at least this many days ago.
+# We are sending the summaries for days in the past to give users time to sync their reviews
+# from other devices.
+DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES = 3
+
+
+def get_end_cutoff_date_for_sending_review_summaries() -> date:
+    return date.today() - timedelta(days=DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES)
+
 
 ANKI_VERSION_23_10_00 = 231000
 
