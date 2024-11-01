@@ -115,8 +115,8 @@ def get_daily_review_summaries_since_last_sync(
         JOIN cards as c ON r.cid = c.id
         WHERE r.id BETWEEN ? AND ?
         """,
-        datetime.timestamp(start_of_day_after_last_sent_summary_date) * 1000,
-        datetime.timestamp(timeframe_end) * 1000,
+        int(datetime.timestamp(start_of_day_after_last_sent_summary_date)) * 1000,
+        int(datetime.timestamp(timeframe_end)) * 1000,
     )
 
     daily_reviews = defaultdict(list)
