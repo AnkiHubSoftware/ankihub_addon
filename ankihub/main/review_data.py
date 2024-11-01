@@ -11,7 +11,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import CardReviewData
 from ..ankihub_client.models import DailyCardReviewSummary
 from ..db import ankihub_db
-from ..settings import config
+from ..settings import config, get_end_cutoff_date_for_sending_review_summaries
 
 
 def send_review_data() -> None:
@@ -96,17 +96,18 @@ def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
 
 
 def get_daily_review_summaries_since_last_sync(
-    last_sync: date,
+    last_sent_summary_date: date,
 ) -> List[DailyCardReviewSummary]:
     """Filter revlog entries between the date of the last sync and the end of yesterday
     group by days, and compile the data."""
-    end_of_yesterday = datetime.now().replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ) - timedelta(microseconds=1)
-    timestamp_last_sync_ms = int(
-        datetime.timestamp(datetime.combine(last_sync, datetime.min.time())) * 1000
+    start_of_day_after_last_sent_summary_date = datetime.combine(
+        last_sent_summary_date + timedelta(days=1), datetime.min.time()
     )
-    timestamp_end_of_yesterday = int(datetime.timestamp(end_of_yesterday) * 1000)
+    timeframe_end = datetime.combine(
+        get_end_cutoff_date_for_sending_review_summaries(),
+        datetime.max.time(),
+    )
+
     rows = aqt.mw.col.db.all(
         """
         SELECT r.id, r.ease, r.time
@@ -114,8 +115,8 @@ def get_daily_review_summaries_since_last_sync(
         JOIN cards as c ON r.cid = c.id
         WHERE r.id BETWEEN ? AND ?
         """,
-        timestamp_last_sync_ms,
-        timestamp_end_of_yesterday,
+        datetime.timestamp(start_of_day_after_last_sent_summary_date) * 1000,
+        datetime.timestamp(timeframe_end) * 1000,
     )
 
     daily_reviews = defaultdict(list)
