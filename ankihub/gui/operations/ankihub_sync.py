@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 from functools import partial
 from typing import Callable, List, Optional
 
@@ -17,7 +17,7 @@ from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
-from ...settings import config
+from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
 from ..utils import sync_with_ankiweb
@@ -170,17 +170,18 @@ def _on_send_review_data_done(future: Future) -> None:
 
 
 def _maybe_send_daily_review_summaries() -> None:
-    last_summary_sent_date = config.get_last_summary_sent_date()
-    if not last_summary_sent_date:
-        last_summary_sent_date = date.today() - timedelta(days=1)
+    last_sent_summary_date = config.get_last_sent_summary_date()
+    if not last_sent_summary_date:
+        last_sent_summary_date = (
+            get_end_cutoff_date_for_sending_review_summaries() - timedelta(days=1)
+        )
 
     feature_flags = config.get_feature_flags()
-    if (
-        feature_flags.get("daily_card_review_summary", False)
-        and last_summary_sent_date < date.today()
+    if feature_flags.get("daily_card_review_summary", False) and (
+        last_sent_summary_date < get_end_cutoff_date_for_sending_review_summaries()
     ):
         aqt.mw.taskman.run_in_background(
-            lambda: send_daily_review_summaries(last_summary_sent_date),
+            lambda: send_daily_review_summaries(last_sent_summary_date),
             on_done=_on_send_daily_review_summaries_done,
         )
 
@@ -188,6 +189,10 @@ def _maybe_send_daily_review_summaries() -> None:
 def _on_send_daily_review_summaries_done(future: Future) -> None:
     exception = future.exception()
     if not exception:
+        config.save_last_sent_summary_date(
+            get_end_cutoff_date_for_sending_review_summaries()
+        )
+
         LOGGER.info("Daily review summaries sent successfully")
         return
 
