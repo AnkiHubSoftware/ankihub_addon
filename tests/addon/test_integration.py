@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import uuid
 from concurrent.futures import Future
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep, time
 from typing import (
@@ -215,6 +215,7 @@ from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
+    DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -6361,3 +6362,63 @@ class TestAnkiHubAIInReviewer:
                 callback,
             )
         return callback.args[0] is not None
+
+
+class TestMaybeSendDailyReviewSummaries:
+    def test_review_summaries_are_sent_for_correct_dates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        add_anki_note: AddAnkiNote,
+    ):
+        set_feature_flag_state("daily_card_review_summary", True)
+
+        mocker.patch("ankihub.settings.DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES", 3)  # type: ignore
+
+        send_daily_card_review_summaries_mock = mocker.patch.object(
+            AnkiHubClient, "send_daily_card_review_summaries"
+        )
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_last_sent_summary_date(date.today() - timedelta(days=5))
+
+            on_send_daily_reviews_done_spy = mocker.spy(
+                ankihub_sync, "_on_send_daily_review_summaries_done"
+            )
+
+            # Add reviews for today and the last 5 days
+            review_dates = [
+                date.today() - timedelta(days=delta_days) for delta_days in range(6)
+            ]
+            note = add_anki_note()
+            for review_date in review_dates:
+                record_review_for_anki_nid(
+                    anki_nid=note.id,
+                    date_time=datetime.combine(review_date, datetime.min.time()),
+                )
+
+            # Run the function
+            ankihub_sync._maybe_send_daily_review_summaries()
+
+            qtbot.wait_until(lambda: on_send_daily_reviews_done_spy.called)
+
+            # Assert the client method was called with the correct review summaries.
+            # Summaries should be only sent for the dates that are:
+            # - > the last sent summary date
+            # - <= date.today() - deltatime(days=DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES)
+            send_daily_card_review_summaries_mock.assert_called_once()
+            review_summaries = send_daily_card_review_summaries_mock.call_args[0][0]
+            assert len(review_summaries) == 2
+
+            assert review_summaries[0].review_session_date == date.today() - timedelta(
+                days=4
+            )
+            assert review_summaries[1].review_session_date == date.today() - timedelta(
+                days=3
+            )
+
+            assert config.get_last_sent_summary_date() == date.today() - timedelta(
+                days=DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES
+            )
