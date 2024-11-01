@@ -12,7 +12,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2024-11-26T14:56:39.026958Z","token":"98b3a1ea6e551cfbc3be2aaf8322262a52dfe9ff12fba43b41ab18d93ad53ae2"}'
+      string: '{"expiry":"2024-11-29T11:09:39.790738Z","token":"917521cb74c597ac19ee301f9c4e2f53374b87bd803e803b80f82d002f2e3417"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -25,20 +25,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Tue, 29 Oct 2024 14:56:39 GMT
+      - Fri, 01 Nov 2024 11:09:39 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.12.3
       Server-Timing:
-      - TimerPanel_utime;dur=247.85699999999977;desc="User CPU time", TimerPanel_stime;dur=139.52399999999977;desc="System
-        CPU time", TimerPanel_total;dur=387.3809999999995;desc="Total CPU time", TimerPanel_total_time;dur=322.69483400159515;desc="Elapsed
-        time", SQLPanel_sql_time;dur=7.795634999638423;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=223.4279999999984;desc="User CPU time", TimerPanel_stime;dur=39.9269999999996;desc="System
+        CPU time", TimerPanel_total;dur=263.35499999999803;desc="Total CPU time",
+        TimerPanel_total_time;dur=228.688115001205;desc="Elapsed time", SQLPanel_sql_time;dur=4.840748997594346;desc="SQL
+        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Set-Cookie:
-      - csrftoken=dLPd0WlnUlx7SxlNVEqhd2l9oqONo2DR; expires=Tue, 28 Oct 2025 14:56:39
+      - csrftoken=UBaSDA5mfLExDtyIRJNw2kDImojTInj5; expires=Fri, 31 Oct 2025 11:09:39
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=7b355u25if93f8wel7nbb4frrem9qjvp; expires=Tue, 05 Nov 2024 14:56:39
+      - sessionid=9874jf39ue4w6aoio32eco7pelz06t12; expires=Fri, 08 Nov 2024 11:09:39
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, origin
@@ -47,49 +47,49 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - e374674c79b441f09f9074c7fe1f2046
+      - bce8c51aa42b4c32a95dddbe1ee68e18
     status:
       code: 200
       message: OK
 - request:
-    body: '{"review_session_date": "2024-10-29", "total_cards_studied": 0, "total_time_reviewing":
-      0, "total_cards_marked_as_again": 0, "total_cards_marked_as_hard": 0, "total_cards_marked_as_good":
-      0, "total_cards_marked_as_easy": 0}'
+    body: '[{"review_session_date": "2024-10-31", "total_cards_studied": 1, "total_time_reviewing":
+      5, "total_cards_marked_as_again": 1, "total_cards_marked_as_hard": 0, "total_cards_marked_as_good":
+      0, "total_cards_marked_as_easy": 0}, {"review_session_date": "2024-11-01", "total_cards_studied":
+      2, "total_time_reviewing": 5, "total_cards_marked_as_again": 1, "total_cards_marked_as_hard":
+      0, "total_cards_marked_as_good": 1, "total_cards_marked_as_easy": 0}]'
     headers:
       Accept:
       - application/json; version=18.0
       Authorization:
-      - Token 98b3a1ea6e551cfbc3be2aaf8322262a52dfe9ff12fba43b41ab18d93ad53ae2
+      - Token 917521cb74c597ac19ee301f9c4e2f53374b87bd803e803b80f82d002f2e3417
       Content-Length:
-      - '223'
+      - '450'
       Content-Type:
       - application/json
     method: POST
     uri: http://localhost:8000/api/users/daily-card-review-summary/
   response:
     body:
-      string: '{"total_cards_studied":0,"total_time_reviewing":0,"total_cards_marked_as_again":0,"total_cards_marked_as_hard":0,"total_cards_marked_as_good":0,"total_cards_marked_as_easy":0,"review_session_date":"2024-10-29"}'
+      string: ''
     headers:
       Allow:
       - POST, OPTIONS
       Content-Language:
       - en-us
       Content-Length:
-      - '210'
-      Content-Type:
-      - application/json
+      - '0'
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Tue, 29 Oct 2024 14:56:39 GMT
+      - Fri, 01 Nov 2024 11:09:39 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.12.3
       Server-Timing:
-      - TimerPanel_utime;dur=62.96799999999969;desc="User CPU time", TimerPanel_stime;dur=2.1849999999998815;desc="System
-        CPU time", TimerPanel_total;dur=65.15299999999957;desc="Total CPU time", TimerPanel_total_time;dur=72.02545699874463;desc="Elapsed
-        time", SQLPanel_sql_time;dur=2.175153000280261;desc="SQL 6 queries", CachePanel_total_time;dur=0.10115800068888348;desc="Cache
+      - TimerPanel_utime;dur=63.80399999999753;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=63.80399999999753;desc="Total CPU time", TimerPanel_total_time;dur=71.09370400030457;desc="Elapsed
+        time", SQLPanel_sql_time;dur=2.7229350016568787;desc="SQL 7 queries", CachePanel_total_time;dur=0.030675000743940473;desc="Cache
         2 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, origin
@@ -98,7 +98,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - abef50c7e6584bd195b496fa030bd23f
+      - 3554abe41aa74b1d83e514ef59fd5672
     status:
       code: 201
       message: Created
