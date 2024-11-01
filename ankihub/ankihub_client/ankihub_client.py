@@ -1281,15 +1281,14 @@ class AnkiHubClient:
     def send_daily_card_review_summaries(
         self, daily_card_review_summaries: List[DailyCardReviewSummary]
     ) -> None:
-        for summary in daily_card_review_summaries:
-            response = self._send_request(
-                "POST",
-                API.ANKIHUB,
-                "/users/daily-card-review-summary/",
-                json=summary.to_dict(),
-            )
-            if response.status_code != 201:
-                raise AnkiHubHTTPError(response)
+        response = self._send_request(
+            "POST",
+            API.ANKIHUB,
+            "/users/daily-card-review-summary/",
+            json=[summary.to_dict() for summary in daily_card_review_summaries],
+        )
+        if response.status_code != 201:
+            raise AnkiHubHTTPError(response)
 
 
 class ThreadLocalSession:
