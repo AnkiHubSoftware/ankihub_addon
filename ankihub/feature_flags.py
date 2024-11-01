@@ -1,6 +1,5 @@
 """Feature flags are used to enable/disable features on the client side. The flags are fetched from the server."""
 
-from dataclasses import asdict, dataclass, fields
 from typing import Callable, List
 
 import aqt
@@ -9,16 +8,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .gui.operations import AddonQueryOp
-
-
-@dataclass
-class _FeatureFlags:
-    show_flashcards_selector_button: bool = False
-    chatbot: bool = False
-    send_addon_logs_to_datadog: bool = False
-
-
-feature_flags = _FeatureFlags()
+from .settings import config
 
 # List of callbacks that are called when the feature flags are updated.
 # This can e.g. be used to update the UI once the feature flags are fetched.
@@ -41,33 +31,16 @@ def update_feature_flags_in_background() -> None:
 
 def _setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
-
-    if not fields(_FeatureFlags):
-        return
+    feature_flags_dict = {}
     try:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
-    except (AnkiHubRequestException, AnkiHubHTTPError) as e:
-        LOGGER.warning(
-            "Failed to fetch feature flags from the server, using default values.",
-            exc_info=e,
-        )
-        feature_flags_dict = {}
+    except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
+        LOGGER.error(f"Failed to fetch feature flags: {exc}. Using default values.")
+    else:
+        config.set_feature_flags(feature_flags_dict)
 
-    # Set the feature flags to the values fetched from the server or to the default values
-    for field in fields(_FeatureFlags):
-        try:
-            value = feature_flags_dict[field.name]
-        except KeyError:
-            setattr(feature_flags, field.name, field.default)
-            LOGGER.warning(
-                "No such feature flag found, using default value",
-                feature_flag=field.name,
-                default_value=field.default,
-            )
-        else:
-            setattr(feature_flags, field.name, value)
-
-    LOGGER.info("Feature flags", feature_flags=asdict(feature_flags))
+    config.set_feature_flags(feature_flags_dict)
+    LOGGER.info("Feature flags", feature_flags=feature_flags_dict)
 
 
 def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:

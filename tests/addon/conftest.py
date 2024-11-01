@@ -13,8 +13,9 @@ from pytest_anki.plugin import anki_running
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.ankihub_client.ankihub_client import AnkiHubClient
+
 from ..fixtures import (  # noqa F401
-    MockAllFeatureFlagsToDefaultValues,
     add_anki_note,
     ankihub_basic_note_type,
     import_ah_note,
@@ -22,7 +23,6 @@ from ..fixtures import (  # noqa F401
     import_ah_notes,
     install_ah_deck,
     latest_instance_tracker,
-    mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
     mock_message_box_with_cb,
     mock_show_dialog_with_cb,
@@ -71,7 +71,6 @@ def anki_session_with_addon_data(
     anki_session: AnkiSession,
     requests_mock: Mocker,
     monkeypatch: MonkeyPatch,
-    mock_all_feature_flags_to_default_values: MockAllFeatureFlagsToDefaultValues,  # noqa F811
 ) -> Generator[AnkiSession, None, None]:
     """Sets up a temporary anki base folder and a temporary ankihub base folder.
     This is a replacement for running the whole initialization process of the add-on
@@ -97,8 +96,6 @@ def anki_session_with_addon_data(
         config.setup_public_config_and_other_settings()
         setup_logger()
 
-        mock_all_feature_flags_to_default_values()
-
         with monkeypatch.context() as m:
             # monkeypatch the uuid4 function to always return the same value so
             # the profile data folder is always the same
@@ -106,7 +103,13 @@ def anki_session_with_addon_data(
             with anki_session.profile_loaded():
                 _profile_setup()
 
+        _mock_all_feature_flags_to_default_values(monkeypatch)
+
         yield anki_session
+
+
+def _mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(AnkiHubClient, "get_feature_flags", lambda *args, **kwargs: {})
 
 
 @pytest.fixture

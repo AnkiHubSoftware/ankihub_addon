@@ -14,8 +14,8 @@ import threading
 import time
 import uuid
 from copy import deepcopy
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
@@ -179,6 +179,8 @@ class PrivateConfig(DataClassJSONMixin):
     # used to determine whether to skip the full sync dialog
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
+    last_summary_sent_date: Optional[date] = None
+    feature_flags: dict = field(default_factory=dict)
 
 
 class _Config:
@@ -278,6 +280,10 @@ class _Config:
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
+    def save_last_summary_sent_date(self, last_summary_sent_date: Optional[date]):
+        self._private_config.last_summary_sent_date = last_summary_sent_date
+        self._update_private_config()
+
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
         self.deck_config(ankihub_did).subdecks_enabled = subdecks
         self._update_private_config()
@@ -299,6 +305,13 @@ class _Config:
             ankihub_did
         ).behavior_on_remote_note_deleted = note_delete_behavior
         self._update_private_config()
+
+    def set_feature_flags(self, feature_flags: Optional[dict]):
+        self._private_config.feature_flags = feature_flags
+        self._update_private_config()
+
+    def get_feature_flags(self) -> Optional[dict]:
+        return self._private_config.feature_flags
 
     def add_deck(
         self,
@@ -400,6 +413,9 @@ class _Config:
 
     def deck_extension_ids(self) -> List[int]:
         return list(self._private_config.deck_extensions.keys())
+
+    def get_last_summary_sent_date(self) -> Optional[date]:
+        return self._private_config.last_summary_sent_date
 
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
         latest_update = (
@@ -756,9 +772,9 @@ class DatadogLogHandler(logging.Handler):
         # flush is also called when the logging module shuts down when Anki is closing.
         # in_background=False is used to not create a new thread when the add-on is closing,
         # as this leads to an error in the shutdown, because at this point no new threads can be created.
-        from .feature_flags import feature_flags
+        feature_flags = config.get_feature_flags()
 
-        if not feature_flags.send_addon_logs_to_datadog:
+        if not feature_flags.get("send_addon_logs_to_datadog", False):
             with self.lock:
                 # Clear the buffer to prevent it from growing indefinitely.
                 self.buffer = []

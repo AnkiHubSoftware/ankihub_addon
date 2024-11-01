@@ -1,5 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
+from datetime import date, timedelta
 from functools import partial
 from typing import Callable, List, Optional
 
@@ -14,7 +15,7 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
-from ...main.review_data import send_review_data
+from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
@@ -130,6 +131,8 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
         send_review_data, on_done=_on_send_review_data_done
     )
 
+    _maybe_send_daily_review_summaries()
+
     if config.schema_to_do_full_upload_for_once():
         # Sync with AnkiWeb to resolve the pending full upload immediately.
         # Otherwise, Anki's Sync button will be red, and clicking it will trigger a full upload.
@@ -163,6 +166,42 @@ def _on_send_review_data_done(future: Future) -> None:
     else:
         LOGGER.error(  # pragma: no cover
             "Failed to send review data.", exc_info=exception
+        )
+
+
+def _maybe_send_daily_review_summaries() -> None:
+    last_summary_sent_date = config.get_last_summary_sent_date()
+    if not last_summary_sent_date:
+        last_summary_sent_date = date.today() - timedelta(days=1)
+
+    feature_flags = config.get_feature_flags()
+    if (
+        feature_flags.get("daily_card_review_summary", False)
+        and last_summary_sent_date < date.today()
+    ):
+        aqt.mw.taskman.run_in_background(
+            lambda: send_daily_review_summaries(last_summary_sent_date),
+            on_done=_on_send_daily_review_summaries_done,
+        )
+
+
+def _on_send_daily_review_summaries_done(future: Future) -> None:
+    exception = future.exception()
+    if not exception:
+        LOGGER.info("Daily review summaries sent successfully")
+        return
+
+    # CollectionNotOpen is raised by Anki when trying to access the collection when it is closed.
+    # This happens e.g. when the sync is triggered by the user closing Anki. Then the task for sending review data
+    # starts and tries to access the collection, but it is already closed. We can ignore this error.
+    if "CollectionNotOpen" in str(exception):  # pragma: no cover
+        LOGGER.warning(
+            "Failed to send review summaries because the collection is closed.",
+            exc_info=exception,
+        )
+    else:
+        LOGGER.error(  # pragma: no cover
+            "Failed to send review summaries data.", exc_info=exception
         )
 
 
