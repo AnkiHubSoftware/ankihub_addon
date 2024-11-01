@@ -188,6 +188,8 @@ def _maybe_send_daily_review_summaries() -> None:
 def _on_send_daily_review_summaries_done(future: Future) -> None:
     exception = future.exception()
     if not exception:
+        config.save_last_summary_sent_date(date.today())
+
         LOGGER.info("Daily review summaries sent successfully")
         return
 

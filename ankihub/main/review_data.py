@@ -161,5 +161,3 @@ def send_daily_review_summaries(last_summary_sent_date: date) -> None:
         LOGGER.info("Daily review summaries sent to AnkiHub.")
     else:
         LOGGER.info("No daily review summaries to send to AnkiHub.")
-
-    config.save_last_summary_sent_date(date.today())
