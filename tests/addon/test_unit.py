@@ -1690,7 +1690,10 @@ class TestErrorHandling:
         ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_value=AnkiHubHTTPError(
-                response=Mock(status_code=406, reason=OUTDATED_CLIENT_RESPONSE_DETAIL)
+                response=Mock(
+                    status_code=406,
+                    json=lambda: {"detail": OUTDATED_CLIENT_RESPONSE_DETAIL},
+                )
             ),
             tb=None,
         )
