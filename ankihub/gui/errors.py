@@ -57,7 +57,7 @@ os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 # This prevents Sentry from trying to run a git command to infer the version.
 os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 
-OUTDATED_CLIENT_ERROR_REASON = "Outdated client, please update the AnkiHub add-on."
+OUTDATED_CLIENT_RESPONSE_DETAIL = "Outdated client"
 
 
 def setup_error_handler():
@@ -327,16 +327,22 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
 
         AnkiHubLogin.display_login()
         return True
-    elif (
-        response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
-    ):
-        if ask_user(
-            "The AnkiHub add-on needs to be updated to continue working.<br>"
-            "Do you want to open the add-on update dialog now?",
-            parent=aqt.mw,
-        ):
-            check_and_prompt_for_updates_on_main_window()
-        return True
+    elif response.status_code == 406:
+        try:
+            response_data = response.json()
+        except ValueError:
+            return False
+
+        if response_data.get("detail") == OUTDATED_CLIENT_RESPONSE_DETAIL:
+            if ask_user(
+                "The AnkiHub add-on needs to be updated to continue working.<br>"
+                "Do you want to open the add-on update dialog now?",
+                parent=aqt.mw,
+            ):
+                check_and_prompt_for_updates_on_main_window()
+            return True
+        else:
+            return False
 
     try:
         response_data = response.json()
@@ -577,15 +583,10 @@ def _upload_logs(key: str) -> str:
 
 def _on_upload_logs_failure(exc: Exception) -> None:
     if isinstance(exc, AnkiHubHTTPError):
-        from .errors import OUTDATED_CLIENT_ERROR_REASON
-
         # Don't report outdated client errors that happen when uploading logs,
         # because they are handled by the add-on when they happen in other places
         # and we don't want to see them in Sentry.
-        if exc.response.status_code == 401 or (
-            exc.response.status_code == 406
-            and exc.response.reason == OUTDATED_CLIENT_ERROR_REASON
-        ):
+        if exc.response.status_code == 401 or exc.response.status_code == 406:
             return
         _report_exception(exc)
     else:
