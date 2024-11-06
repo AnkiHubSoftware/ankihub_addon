@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
 import pytest
-from coverage.exceptions import DataError
+from coverage.exceptions import DataError  # type: ignore
 from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_anki.plugin import anki_running
