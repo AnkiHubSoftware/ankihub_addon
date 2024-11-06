@@ -1819,7 +1819,9 @@ class TestFeatureFlags:
     def setup(self):
         _feature_flags_update_callbacks.clear()
 
-    def test_update_feature_flags_in_background(self, mocker):
+    def test_update_feature_flags_in_background(
+        self, mocker: MockerFixture, qtbot: QtBot
+    ):
         MockAnkiHubClient = mocker.patch("ankihub.feature_flags.AnkiHubClient")
         mock_logger = mocker.patch("ankihub.feature_flags.LOGGER")
         mock_config = mocker.patch("ankihub.feature_flags.config")
@@ -1834,7 +1836,8 @@ class TestFeatureFlags:
             call.info("Feature flags", feature_flags=feature_flags_dict),
             call.info("Set up feature flags."),
         ]
-        assert len(mock_logger.info.mock_calls) == 2
+        qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 2)
+
         mock_logger.assert_has_calls(mock_logger_expected_calls, any_order=True)
         mock_config.set_feature_flags.assert_called_with(feature_flags_dict)
 
