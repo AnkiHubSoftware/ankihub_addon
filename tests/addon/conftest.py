@@ -151,6 +151,5 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 
 
 def pytest_set_filtered_exceptions() -> List[Exception]:
-    """Tests which raise one of these will be retried by pytest-restry."""
-
+    """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
