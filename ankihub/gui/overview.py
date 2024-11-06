@@ -16,7 +16,7 @@ from jinja2 import Template
 
 from .. import LOGGER
 from ..feature_flags import add_feature_flags_update_callback
-from ..settings import config, url_flashcard_selector, url_flashcard_selector_embed
+from ..settings import url_flashcard_selector
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
@@ -57,18 +57,18 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
 
     ah_did = get_ah_did_of_deck_or_ancestor_deck(aqt.mw.col.decks.current()["id"])
-    if (
-        not config.deck_config(ah_did)
-        or not config.deck_config(ah_did).has_note_embeddings
-    ):
-        return
+    # if (
+    #     not config.deck_config(ah_did)
+    #     or not config.deck_config(ah_did).has_note_embeddings
+    # ):
+    #     return
 
-    feature_flags = config.get_feature_flags()
-    if not feature_flags.get("show_flashcards_selector_button", False):
-        LOGGER.debug(
-            "Feature flag to show flashcard selector button is disabled, not adding the button."
-        )
-        return
+    # feature_flags = config.get_feature_flags()
+    # if not feature_flags.get("show_flashcards_selector_button", False):
+    #     LOGGER.debug(
+    #         "Feature flag to show flashcard selector button is disabled, not adding the button."
+    #     )
+    #     return
 
     overview_web: AnkiWebView = aqt.mw.overview.web
     kwargs_json = json.dumps({"deck_id": str(ah_did)}).replace('"', '\\"')
@@ -162,7 +162,8 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         super()._setup_ui()
 
     def _get_embed_url(self) -> str:
-        return url_flashcard_selector_embed(self.ah_did)
+        # TODO Change this back to the flashcard selector url
+        return "https://www.boardsbeyond.com/login"
 
     def _get_non_embed_url(self) -> str:
         return url_flashcard_selector(self.ah_did)
