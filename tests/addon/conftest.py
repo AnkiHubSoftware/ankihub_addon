@@ -4,9 +4,10 @@ import shutil
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import pytest
+from coverage.exceptions import DataError  # type: ignore
 from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_anki.plugin import anki_running
@@ -147,3 +148,8 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
     monkeypatch.setattr(
         "ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", False
     )
+
+
+def pytest_set_filtered_exceptions() -> List[Exception]:
+    """Tests which raise one of these will be retried by pytest-retry."""
+    return [DataError]
