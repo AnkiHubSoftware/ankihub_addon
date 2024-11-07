@@ -84,7 +84,7 @@ from ankihub.feature_flags import (
 )
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
-    OUTDATED_CLIENT_ERROR_REASON,
+    OUTDATED_CLIENT_RESPONSE_DETAIL,
     _contains_path_to_this_addon,
     _normalize_url,
     _try_handle_exception,
@@ -1690,7 +1690,10 @@ class TestErrorHandling:
         ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_value=AnkiHubHTTPError(
-                response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
+                response=Mock(
+                    status_code=406,
+                    json=lambda: {"detail": OUTDATED_CLIENT_RESPONSE_DETAIL},
+                )
             ),
             tb=None,
         )
@@ -1722,9 +1725,7 @@ class TestUploadLogs:
             # The exception should not be reported for these two specific cases
             (AnkiHubHTTPError(response=Mock(status_code=401)), False),
             (
-                AnkiHubHTTPError(
-                    response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
-                ),
+                AnkiHubHTTPError(response=Mock(status_code=406)),
                 False,
             ),
             # The exception should be reported in all other cases
