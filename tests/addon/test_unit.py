@@ -1717,7 +1717,7 @@ class TestErrorHandling:
             ),
         ],
     )
-    def test_handle_connection_error(self, exception: str, mocker: MockerFixture):
+    def test_handle_connection_error(self, exception: Exception, mocker: MockerFixture):
         show_tooltip_mock = mocker.patch("ankihub.gui.errors.show_tooltip")
         handled = _try_handle_exception(
             exc_value=exception,
