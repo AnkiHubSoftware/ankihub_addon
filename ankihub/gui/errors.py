@@ -254,31 +254,25 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-    if isinstance(exc_value, AnkiHubRequestException):
-        if isinstance(
-            exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
-        ):
-            if "[Errno -2] Name or service not known" in str(
-                exc_value.original_exception
-            ):
-                show_tooltip(
-                    "🚧 AnkiHub is undergoing routine maintenance. "
-                    "Please visit ankihub.net/status and check your email for details.",
-                    period=5000,
-                )
-            elif "[Errno -3] Temporary failure in name resolution" in str(
-                exc_value.original_exception
-            ):
-                show_tooltip(
-                    "🔌 No Internet Connection detected. Please check your internet connection and try again.",
-                    period=5000,
-                )
-            else:
-                show_tooltip(
-                    "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                    period=5000,
-                )
-            return True
+    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
+        error_message = str(exc_value)
+        if "[Errno -2] Name or service not known" in error_message:
+            show_tooltip(
+                "🚧 AnkiHub is undergoing routine maintenance. "
+                "Please visit ankihub.net/status and check your email for details.",
+                period=5000,
+            )
+        elif "[Errno -3] Temporary failure in name resolution" in error_message:
+            show_tooltip(
+                "🔌 No Internet Connection detected. Please check your internet connection and try again.",
+                period=5000,
+            )
+        else:
+            show_tooltip(
+                "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+                period=5000,
+            )
+        return True
 
     if _is_memory_full_error(exc_value):
         show_error_dialog(
