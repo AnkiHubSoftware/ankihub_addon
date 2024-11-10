@@ -6372,6 +6372,7 @@ class TestAnkiHubAIInReviewer:
 
 
 class TestMaybeSendDailyReviewSummaries:
+    @fixture
     def initialize_review_data(
         self, anki_session_with_addon_data: AnkiSession, add_anki_note: AddAnkiNote
     ):
