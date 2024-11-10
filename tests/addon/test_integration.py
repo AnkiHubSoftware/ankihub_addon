@@ -29,7 +29,15 @@ from zipfile import ZipFile
 import aqt
 import pytest
 from anki.cards import Card, CardId
-from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
+from anki.consts import (
+    QUEUE_TYPE_NEW,
+    QUEUE_TYPE_SUSPENDED,
+    REVLOG_CRAM,
+    REVLOG_LRN,
+    REVLOG_RELRN,
+    REVLOG_RESCHED,
+    REVLOG_REV,
+)
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
@@ -6364,8 +6372,7 @@ class TestAnkiHubAIInReviewer:
 
 
 class TestMaybeSendDailyReviewSummaries:
-    @pytest.fixture(autouse=True)
-    def setup(
+    def initialize_review_data(
         self, anki_session_with_addon_data: AnkiSession, add_anki_note: AddAnkiNote
     ):
         # Add reviews for today and the last 5 days
@@ -6392,6 +6399,7 @@ class TestMaybeSendDailyReviewSummaries:
     )
     def test_review_summaries_are_sent_for_correct_dates(
         self,
+        initialize_review_data: None,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         qtbot: QtBot,
@@ -6421,7 +6429,7 @@ class TestMaybeSendDailyReviewSummaries:
             ankihub_sync._maybe_send_daily_review_summaries()
 
             if not expected_summary_day_deltas:
-                qtbot.wait(500)
+                qtbot.wait(300)
                 send_daily_card_review_summaries_mock.assert_not_called()
                 assert config.get_last_sent_summary_date() == date.today() - timedelta(
                     days=expected_new_last_sent_summary_day_delta
@@ -6448,4 +6456,67 @@ class TestMaybeSendDailyReviewSummaries:
                 for review_summary, delta_days in zip(
                     review_summaries, expected_summary_day_deltas
                 )
+            )
+
+    def test_reschedules_are_ignored(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        add_anki_note: AddAnkiNote,
+    ):
+        set_feature_flag_state("daily_card_review_summary", True)
+
+        mocker.patch("ankihub.settings.DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES", 1)  # type: ignore
+
+        send_daily_card_review_summaries_mock = mocker.patch.object(
+            AnkiHubClient, "send_daily_card_review_summaries"
+        )
+
+        revlog_types = [
+            REVLOG_LRN,
+            REVLOG_RESCHED,
+            REVLOG_REV,
+            REVLOG_RELRN,
+            REVLOG_CRAM,
+        ]
+
+        with anki_session_with_addon_data.profile_loaded():
+            last_sent_summary_date = date.today() - timedelta(days=10)
+            config.save_last_sent_summary_date(last_sent_summary_date)
+
+            # Add revlog entry for each revlog type.
+            # Each entry is for a different day so that they can be identified later on in the test.
+            dates = [
+                last_sent_summary_date + timedelta(days=i)
+                for i in range(1, len(revlog_types) + 1)
+            ]
+            revlog_type_to_date = {
+                revlog_type: date_ for revlog_type, date_ in zip(revlog_types, dates)
+            }
+            for revlog_type, date_ in revlog_type_to_date.items():
+                note = add_anki_note()
+                record_review_for_anki_nid(
+                    anki_nid=note.id,
+                    date_time=datetime.combine(date_, datetime.min.time()),
+                    revlog_type=revlog_type,
+                )
+
+            ankihub_sync._maybe_send_daily_review_summaries()
+
+            qtbot.wait_until(send_daily_card_review_summaries_mock.assert_called_once)
+
+            # Assert the client method was called with the correct review summaries.
+            # There should be a review summary for every day, except for the reschedule entry.
+            # because reschedules are ignored.
+            review_summaries = send_daily_card_review_summaries_mock.call_args[0][0]
+            assert len(review_summaries) == len(revlog_types) - 1
+
+            dates_from_summaries = [
+                summary.review_session_date for summary in review_summaries
+            ]
+            assert all(
+                (date_ in dates_from_summaries) == (revlog_type != REVLOG_RESCHED)
+                for revlog_type, date_ in revlog_type_to_date.items()
             )
