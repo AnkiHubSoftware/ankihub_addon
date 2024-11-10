@@ -6517,7 +6517,9 @@ class TestMaybeSendDailyReviewSummaries:
             dates_from_summaries = [
                 summary.review_session_date for summary in review_summaries
             ]
-            assert all(
-                (date_ in dates_from_summaries) == (revlog_type != REVLOG_RESCHED)
+            expected_dates = [
+                date_
                 for revlog_type, date_ in revlog_type_to_date.items()
-            )
+                if revlog_type != REVLOG_RESCHED
+            ]
+            assert dates_from_summaries == expected_dates
