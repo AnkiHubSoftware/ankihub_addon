@@ -4456,6 +4456,7 @@ class TestSyncWithAnkiHub:
                 else not any(is_ankihub_note_type)
             )
 
+    @pytest.mark.qt_no_exception_capture
     def test_sync_updates_api_version_on_last_sync(
         self,
         anki_session_with_addon_data: AnkiSession,
