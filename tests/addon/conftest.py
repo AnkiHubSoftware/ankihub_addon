@@ -14,8 +14,6 @@ from pytest_anki.plugin import anki_running
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.ankihub_client import AnkiHubClient
-
 from ..fixtures import (  # noqa F401
     add_anki_note,
     ankihub_basic_note_type,
@@ -33,6 +31,12 @@ from ..fixtures import (  # noqa F401
     next_deterministic_uuid,
     set_feature_flag_state,
 )
+
+# workaround for vscode test discovery not using pytest.ini which sets this env var
+# has to be set before importing ankihub
+os.environ["SKIP_INIT"] = "1"
+
+from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 
 REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 

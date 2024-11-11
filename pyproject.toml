@@ -31,6 +31,8 @@ check_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
+  'ankihub.media_import.*',
+  'ankihub.media_export.*',
   'structlog.*',
   'mashumaro.*',
   'ankihub.gui.ankiaddonconfig.*',

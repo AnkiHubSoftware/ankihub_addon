@@ -111,12 +111,14 @@ def get_daily_review_summaries_since_last_sync(
     rows = aqt.mw.col.db.all(
         """
         SELECT r.id, r.ease, r.time
-        FROM revlog as r
-        JOIN cards as c ON r.cid = c.id
+        FROM revlog AS r
+        JOIN cards AS c ON r.cid = c.id
         WHERE r.id BETWEEN ? AND ?
+        AND r.type != ?
         """,
         int(datetime.timestamp(start_of_day_after_last_sent_summary_date)) * 1000,
         int(datetime.timestamp(timeframe_end)) * 1000,
+        anki_consts.REVLOG_RESCHED,
     )
 
     daily_reviews = defaultdict(list)

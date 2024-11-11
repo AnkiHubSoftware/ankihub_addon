@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock
 import aqt
 import pytest
 from anki.cards import CardId
+from anki.consts import REVLOG_LRN
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
@@ -690,17 +691,21 @@ def latest_instance_tracker(mocker: MockerFixture) -> LatestInstanceTracker:
 
 
 def record_review_for_anki_nid(
-    anki_nid: NoteId, date_time: Optional[datetime] = None
+    anki_nid: NoteId,
+    date_time: Optional[datetime] = None,
+    revlog_type: int = REVLOG_LRN,
 ) -> None:
     """Adds a review for the note with the given anki_nid at the given date_time."""
     if date_time is None:
         date_time = datetime.now()
 
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
-    record_review(cid, int(date_time.timestamp() * 1000))
+    record_review(cid, int(date_time.timestamp() * 1000), revlog_type=revlog_type)
 
 
-def record_review(cid: CardId, review_time_ms: int) -> None:
+def record_review(
+    cid: CardId, review_time_ms: int, revlog_type: int = REVLOG_LRN
+) -> None:
     aqt.mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         # the revlog table stores the timestamp in milliseconds
@@ -712,7 +717,7 @@ def record_review(cid: CardId, review_time_ms: int) -> None:
         1,
         1,
         1,
-        0,
+        revlog_type,
     )
 
 
