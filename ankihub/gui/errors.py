@@ -3,6 +3,7 @@
 import dataclasses
 import os
 import re
+import socket
 import sys
 import tempfile
 import time
@@ -254,31 +255,19 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-    if isinstance(exc_value, AnkiHubRequestException):
-        if isinstance(
-            exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
-        ):
-            if "[Errno -2] Name or service not known" in str(
-                exc_value.original_exception
-            ):
-                show_tooltip(
-                    "🚧 AnkiHub is undergoing routine maintenance. "
-                    "Please visit ankihub.net/status and check your email for details.",
-                    period=5000,
-                )
-            elif "[Errno -3] Temporary failure in name resolution" in str(
-                exc_value.original_exception
-            ):
-                show_tooltip(
-                    "🔌 No Internet Connection detected. Please check your internet connection and try again.",
-                    period=5000,
-                )
-            else:
-                show_tooltip(
-                    "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                    period=5000,
-                )
-            return True
+    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
+        if not _is_internet_available():
+            show_tooltip(
+                "🔌 No Internet Connection detected. Please check your internet connection and try again.",
+                period=5000,
+            )
+        else:
+            show_tooltip(
+                "🚧 AnkiHub is undergoing routine maintenance. "
+                "Please visit ankihub.net/status and check your email for details.",
+                period=5000,
+            )
+        return True
 
     if _is_memory_full_error(exc_value):
         show_error_dialog(
@@ -316,6 +305,15 @@ def _try_handle_exception(
         return True
 
     return False
+
+
+def _is_internet_available():
+    try:
+        # Connect to 8.8.8.8 (Google DNS) with a timeout of 3 seconds
+        socket.create_connection(("8.8.8.8", 53), timeout=3)
+        return True
+    except OSError:
+        return False
 
 
 def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:

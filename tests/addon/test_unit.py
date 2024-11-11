@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import aqt
 import pytest
+import requests
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
@@ -27,7 +28,10 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
+from ankihub.ankihub_client.ankihub_client import (
+    DEFAULT_API_URL,
+    AnkiHubRequestException,
+)
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
@@ -35,6 +39,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
+from ankihub.gui.exceptions import DeckDownloadAndInstallError
 from ankihub.main.review_data import (
     get_daily_review_summaries_since_last_sync,
     send_daily_review_summaries,
@@ -1699,6 +1704,27 @@ class TestErrorHandling:
         )
         assert handled
         ask_user_mock.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "exception",
+        [
+            ConnectionError(),
+            requests.exceptions.ConnectionError(),
+            # wrapped connection erros should be handled as well
+            AnkiHubRequestException(original_exception=ConnectionError()),
+            DeckDownloadAndInstallError(
+                original_exception=ConnectionError(), ankihub_did=uuid.uuid4()
+            ),
+        ],
+    )
+    def test_handle_connection_error(self, exception: Exception, mocker: MockerFixture):
+        show_tooltip_mock = mocker.patch("ankihub.gui.errors.show_tooltip")
+        handled = _try_handle_exception(
+            exc_value=exception,
+            tb=None,
+        )
+        assert handled
+        show_tooltip_mock.assert_called_once()
 
 
 def test_show_error_dialog(
