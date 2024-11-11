@@ -4470,6 +4470,7 @@ class TestSyncWithAnkiHub:
 
         assert config._private_config.api_version_on_last_sync == API_VERSION
 
+    @pytest.mark.qt_no_exception_capture
     @pytest.mark.parametrize(
         "is_for_anking_deck",
         [True, False],
