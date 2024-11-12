@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Tuple
+from typing import Any, Callable, Tuple
 
 import aqt
 from anki.cards import Card
@@ -14,6 +14,7 @@ from aqt.gui_hooks import (
     reviewer_will_end,
 )
 from aqt.reviewer import Reviewer
+from aqt.webview import AnkiWebView, AnkiWebPage
 from aqt.theme import theme_manager
 from aqt.webview import WebContent
 from jinja2 import Template
@@ -196,6 +197,31 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
     """Wraps the given JavaScript code to only run if the AnkiHub AI object is defined."""
     return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
+class AuthTokenUrlRequestInterceptor(aqt.QWebEngineUrlRequestInterceptor):
+    def interceptRequest(self, info: aqt.QWebEngineUrlRequestInfo):
+        url = info.requestUrl()
+        if url.host() == "localhost" and url.port() == 8000:
+            info.setHttpHeader(b"Authorization", b"Token " + config.token().encode())
+
+class PrivateWebPage(AnkiWebPage):
+    def __init__(self, profile: aqt.QWebEngineProfile, onBridgeCmd: Callable[[str], Any]):
+        aqt.QWebEnginePage.__init__(self, profile, None)
+        self._onBridgeCmd = onBridgeCmd
+        self._setupBridge()
+        self.open_links_externally = False
+        self.featurePermissionRequested.connect(self.handlePermissionRequested)
+
+    @aqt.pyqtSlot(aqt.QUrl, aqt.QWebEnginePage.Feature)
+    def handlePermissionRequested(self, securityOrigin: aqt.QUrl, feature: aqt.QWebEnginePage.Feature) -> None:
+        if feature == aqt.QWebEnginePage.Feature.Notifications:
+            self.setFeaturePermission(
+                securityOrigin,
+                feature,
+                aqt.QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+            )
+        else:
+            super().featurePermissionRequested(securityOrigin, feature)
+
 class _SplitScreenWebViewManager:
     def __init__(self, reviewer: Reviewer):
         self.reviewer = reviewer
@@ -220,16 +246,22 @@ class _SplitScreenWebViewManager:
         profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
         # Create the main web view
-        self.web_view = aqt.QWebEngineView()
+        self.web_view = AnkiWebView()
         self.web_view.setPage(aqt.QWebEnginePage(profile, self.web_view))
         self.web_view.setHtml("<button>Hello</button>")
 
         # Create the inner web view
-        self.web_view_inner = aqt.QWebEngineView()
-        self.web_view_inner.setPage(aqt.QWebEnginePage(profile, self.web_view_inner))
+        self.web_view_inner = AnkiWebView()
+        self.web_view_inner.setPage(PrivateWebPage(profile, self.web_view_inner._onBridgeCmd))
         self.web_view_inner.settings().setAttribute(aqt.QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        # self.web_view_inner.setUrl(aqt.QUrl("https://app.ankihub.net"))
-        self.web_view_inner.setUrl(aqt.QUrl("https://www.boardsbeyond.com/video/step-1-p/enzymes"))
+        self.web_view_inner.setUrl(aqt.QUrl("http://localhost:8000/ai/test"))
+        
+        # Interceptor that will add the token to the request
+        interceptor = AuthTokenUrlRequestInterceptor(self.web_view_inner)
+        self.web_view_inner.page().profile().setUrlRequestInterceptor(interceptor)
+        
+        # Update content in the page accessed by the inner web view
+        self.web_view_inner.page().loadFinished.connect(self._add_listeners)
 
         # self.web_view_inner.setSizePolicy(aqt.QSizePolicy(aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed))
 
@@ -281,12 +313,23 @@ class _SplitScreenWebViewManager:
 
     def reload_web_view_inner(self):
         if self.web_view_inner:
-            # self.web_view_inner.setUrl(aqt.QUrl("https://app.ankihub.net"))
             self.web_view_inner.setUrl(aqt.QUrl("https://www.boardsbeyond.com/video/step-1-p/enzymes"))
 
     def change_web_view_html(self):
         if self.web_view:
             self.web_view.setHtml("<button>New Content</button>")
+            
+    def _add_listeners(self):
+        self.web_view_inner.page().runJavaScript(
+            """
+            let button = document.getElementById('integration-go-to-next-url');
+            if (button) {
+                button.addEventListener('click', function() {
+                    pycmd('go_to_next_url')
+                });
+            }
+            """
+        )
 
 
 web_view_manager = None
@@ -325,6 +368,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     # TODO define the message as a constant
     elif message == "my_button_clicked":
         _toggle_split_screen_webview(context)
+        return (True, None)
+    
+    elif message == "go_to_next_url":
+        web_view_manager.reload_web_view_inner()
         return (True, None)
     
     return handled
