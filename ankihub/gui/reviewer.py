@@ -369,14 +369,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         AnkiHubLogin.display_login()
 
         return (True, None)
-
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
 
         return (True, None)
-
     elif message == OPEN_SPLIT_SCREEN_PYCMD:
         assert isinstance(context, Reviewer), context
         _toggle_split_screen_webview(context)
