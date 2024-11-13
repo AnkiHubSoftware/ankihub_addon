@@ -1,7 +1,8 @@
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Callable
 
 from anki.utils import is_mac
+from aqt import QSizePolicy, QSplitter, QWebEnginePage, QWebEngineProfile, Qt, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QCloseEvent,
@@ -18,11 +19,12 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.utils import openLink
-from aqt.webview import AnkiWebView
+from aqt.webview import AnkiWebView, AnkiWebPage
 
 from .. import LOGGER
 from ..settings import config
 from .utils import using_qt5
+from aqt.reviewer import Reviewer
 
 
 class AlwaysOnTopOfParentDialog(QDialog):
@@ -248,3 +250,131 @@ class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
 
         if config.app_url in info.requestUrl().toString():
             info.setHttpHeader(b"Authorization", b"Token " + token.encode())
+
+class PrivateWebPage(AnkiWebPage):
+    def __init__(self, profile: QWebEngineProfile, onBridgeCmd: Callable[[str], Any]):
+        QWebEnginePage.__init__(self, profile, None)
+        self._onBridgeCmd = onBridgeCmd
+        self._setupBridge()
+        self.open_links_externally = False
+        self.featurePermissionRequested.connect(self.handlePermissionRequested)
+
+    @pyqtSlot(QUrl, QWebEnginePage.Feature)
+    def handlePermissionRequested(self, securityOrigin: QUrl, feature: QWebEnginePage.Feature) -> None:
+        if feature == QWebEnginePage.Feature.Notifications:
+            self.setFeaturePermission(
+                securityOrigin,
+                feature,
+                QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+            )
+        else:
+            super().featurePermissionRequested(securityOrigin, feature)
+            
+
+class SplitScreenWebViewManager:
+    def __init__(self, reviewer: Reviewer):
+        self.reviewer = reviewer
+        self.splitter = None
+        self.splitter_inner = None
+        self.webview = None
+        self.webview_inner = None
+        self.is_inner_visible = False
+
+    def create_webviews(self):
+        parent_widget = self.reviewer.mw
+
+        if parent_widget is None:
+            raise ValueError("Reviewer does not have a parent widget to hold the splitter.")
+
+        self.splitter = QSplitter()
+        
+        # Create a QWebEngineProfile with persistent storage
+        profile = QWebEngineProfile("AnkiHubProfile", parent_widget)
+        profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+        # Create the main web view
+        self.webview = AnkiWebView()
+        self.webview.setPage(QWebEnginePage(profile, self.webview))
+        # TODO: Replace this with tabs and their style
+        self.webview.setHtml("<button>Hello</button>")
+
+        # Create the inner web view
+        self.webview_inner = AnkiWebView()
+        self.webview_inner.setPage(PrivateWebPage(profile, self.webview_inner._onBridgeCmd))
+        self.webview_inner.setUrl(QUrl("http://localhost:8000/ai/test"))
+        
+        # Interceptor that will add the token to the request
+        interceptor = AuthenticationRequestInterceptor(self.webview_inner)
+        self.webview_inner.page().profile().setUrlRequestInterceptor(interceptor)
+        
+        # Update content in the page accessed by the inner web view
+        self.webview_inner.page().loadFinished.connect(self._add_listeners)
+
+        # Create a vertical splitter for the inner web views 
+        self.splitter_inner = QSplitter(Qt.Orientation.Vertical)
+        self.splitter_inner.addWidget(self.webview)
+        self.splitter_inner.addWidget(self.webview_inner)
+        self.splitter_inner.setSizes([600, 10000])
+        self.splitter_inner.setHandleWidth(0)
+
+        # Assuming parent_widget is a QWidget or has a layout to add the splitter
+        layout = parent_widget.layout()
+        if layout is None:
+            layout = QVBoxLayout(parent_widget)
+            parent_widget.setLayout(layout)
+        
+        layout.addWidget(self.splitter)
+        self.splitter.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding))
+        
+        widget_index = parent_widget.mainLayout.indexOf(self.reviewer.web)
+        parent_widget.mainLayout.removeWidget(self.reviewer.web)
+
+        self.splitter.addWidget(self.reviewer.web)
+        self.splitter.addWidget(self.splitter_inner)
+        self.splitter.setCollapsible(0, False)
+        self.splitter.setCollapsible(1, False)
+        self.splitter.setSizes([10000, 10000])
+
+        parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
+        self.is_inner_visible = True
+
+    def toggle_inner_webviews(self):
+        if self.is_inner_visible:
+            self.hide_inner_webviews()
+        else:
+            self.show_inner_webviews()
+        
+    def show_inner_webviews(self):
+        if not self.is_inner_visible:
+            self.splitter_inner.show()
+            self.is_inner_visible = True
+            self.reload_webview_inner()
+            self.change_webview_html()
+        
+    def hide_inner_webviews(self):
+        if self.is_inner_visible:
+            self.splitter_inner.hide()
+            self.is_inner_visible = False
+
+    def reload_webview_inner(self):
+        if self.webview_inner:
+            self.webview_inner.setUrl(QUrl("https://www.boardsbeyond.com/video/step-1-p/enzymes"))
+
+    def change_webview_html(self):
+        if self.webview:
+            self.webview.setHtml("<button>New Content</button>")
+            
+    def _add_listeners(self):
+        self.webview_inner.page().runJavaScript(
+            """
+            let button = document.getElementById('integration-go-to-next-url');
+            if (button) {
+                button.addEventListener('click', function() {
+                    pycmd('go_to_next_url')
+                });
+            }
+            """
+        )
+
+
+split_screen_webview_manager = None
