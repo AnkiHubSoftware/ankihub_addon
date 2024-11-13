@@ -17,6 +17,8 @@ from aqt.theme import theme_manager
 from aqt.webview import WebContent
 from jinja2 import Template
 
+from ankihub.gui.webview import SplitScreenWebViewManager, split_screen_webview_manager
+
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..settings import config
@@ -30,6 +32,7 @@ REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button
 
 AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
+OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 
 
 def setup():
@@ -38,6 +41,7 @@ def setup():
 
     if not using_qt5():
         webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
+        webview_will_set_content.append(_add_split_screen_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -145,6 +149,20 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     web_content.body += f"<script>{js}</script>"
 
 
+def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
+    """Injects the AnkiHub AI JavaScript into the reviewer web content."""
+
+    if not isinstance(context, Reviewer):
+        return
+
+    # feature_flags = config.get_feature_flags()
+    # if not feature_flags.get("mh_integration", False):
+    #     return
+
+    # TODO: Replace this with the buttons defined in BUILD-822 
+    web_content.body += f"<button onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>Toggle Split Screen</button>"
+
+
 def _ankihub_theme() -> str:
     """Returns the theme that AnkiHub should use based on the current Anki theme."""
     return "dark" if theme_manager.night_mode else "light"
@@ -185,6 +203,14 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
     return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
 
+def _toggle_split_screen_webview(reviewer: Reviewer):
+    global split_screen_webview_manager
+    if split_screen_webview_manager is None:
+        split_screen_webview_manager = SplitScreenWebViewManager(reviewer)
+        split_screen_webview_manager.create_webviews()
+    else:
+        split_screen_webview_manager.toggle_inner_webviews()
+
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == AI_INVALID_AUTH_TOKEN_PYCMD:
@@ -192,10 +218,17 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         AnkiHubLogin.display_login()
 
         return (True, None)
+    
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
+
+        return (True, None)
+    
+    elif message == OPEN_SPLIT_SCREEN_PYCMD:
+        assert isinstance(context, Reviewer), context
+        _toggle_split_screen_webview(context)
 
         return (True, None)
     return handled
