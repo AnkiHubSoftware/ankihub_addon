@@ -17,10 +17,9 @@ from aqt.theme import theme_manager
 from aqt.webview import WebContent
 from jinja2 import Template
 
-from ankihub.gui.webview import SplitScreenWebViewManager, split_screen_webview_manager
-
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
+from ..gui.webview import SplitScreenWebViewManager, split_screen_webview_manager
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
@@ -150,8 +149,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
 
 
 def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
-    """Injects the AnkiHub AI JavaScript into the reviewer web content."""
-
+    """Injects the togle of the split screen webview into the reviewer web content."""
     if not isinstance(context, Reviewer):
         return
 
@@ -159,7 +157,7 @@ def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
     # if not feature_flags.get("mh_integration", False):
     #     return
 
-    # TODO: Replace this with the buttons defined in BUILD-822 
+    # TODO: Replace this with the buttons defined in BUILD-822
     web_content.body += f"<button onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>Toggle Split Screen</button>"
 
 
@@ -206,10 +204,15 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
 def _toggle_split_screen_webview(reviewer: Reviewer):
     global split_screen_webview_manager
     if split_screen_webview_manager is None:
-        split_screen_webview_manager = SplitScreenWebViewManager(reviewer)
-        split_screen_webview_manager.create_webviews()
+        # TODO: Replace with the actual URLs
+        urls_list = [
+            {"url": "https://www.google.com", "title": "Google"},
+            {"url": "https://www.bing.com", "title": "Bing"},
+        ]
+        split_screen_webview_manager = SplitScreenWebViewManager(reviewer, urls_list)
     else:
         split_screen_webview_manager.toggle_inner_webviews()
+
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
@@ -218,17 +221,20 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         AnkiHubLogin.display_login()
 
         return (True, None)
-    
+
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
 
         return (True, None)
-    
+
     elif message == OPEN_SPLIT_SCREEN_PYCMD:
         assert isinstance(context, Reviewer), context
         _toggle_split_screen_webview(context)
 
+        return (True, None)
+    elif message == "go_to_next_url":
+        print("CHANGE URL")
         return (True, None)
     return handled
