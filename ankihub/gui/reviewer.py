@@ -26,6 +26,7 @@ from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noq
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
+from .webview import SplitScreenWebViewManager
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
@@ -270,21 +271,23 @@ def _add_buttons_to_reviewer_web_content(web_content: WebContent, context):
     ):
         return
 
-    # template_vars = {
-    #     "KNOX_TOKEN": config.token(),
-    #     "APP_URL": config.app_url,
-    #     "ENDPOINT_PATH": "ai/chatbot",
-    #     "QUERY_PARAMETERS": "is_on_anki=true",
-    #     "THEME": _ankihub_theme(),
-    # }
-    # js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
+    template_vars = {
+        "KNOX_TOKEN": config.token(),
+        "APP_URL": config.app_url,
+        "ENDPOINT_PATH": "ai/chatbot",
+        "QUERY_PARAMETERS": "is_on_anki=true",
+        "THEME": _ankihub_theme(),
+    }
+    ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
+    web_content.body += f"<script>{ankihub_ai_js}</script>"
 
     template_vars = {
         "THEME": _ankihub_theme(),
     }
-    js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(template_vars)
-
-    web_content.body += f"<script>{js}</script>"
+    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+        template_vars
+    )
+    web_content.body += f"<script>{reivewer_button_js}</script>"
 
 
 def _add_split_screen_toggle_button_to_reviewer_web_content(
@@ -386,8 +389,11 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         assert isinstance(context, Reviewer), context
         kwargs = parse_js_message_kwargs(message)
         button_name = kwargs.get("buttonName")
-        is_active = kwargs.get("isActive")
-        print(button_name, is_active)
+        # is_active = kwargs.get("isActive")
+
+        if button_name == "chatbot":
+            js = _wrap_with_ankihubAI_check("ankihubAI.toggleIframe();")
+            context.web.eval(js)
 
         return (True, None)
     elif message == OPEN_SPLIT_SCREEN_PYCMD:

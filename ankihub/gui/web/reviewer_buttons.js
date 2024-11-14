@@ -8,7 +8,7 @@ class AnkiHubReviewerButtons {
             { name: "b&b", iconPath: "/_b&b_icon.svg", active: false, tooltip: null },
             {
                 name: "chatbot", iconPath: "/_robot_icon.svg", active: false,
-                tooltip: "Learn more about this flashcard topic or explore related cards."
+                tooltip: "Learn more about this flashcard topic<br>or explore related cards."
             },
         ]
 
