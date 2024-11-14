@@ -24,18 +24,20 @@ from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..settings import config
-from .js_message_handling import VIEW_NOTE_PYCMD
+from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
+REVIEWER_BUTTONS_JS_PATH = Path(__file__).parent / "web/reviewer_buttons.js"
 REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 MH_INTEGRATION_TABS_TEMPLATE_PATH = (
     Path(__file__).parent / "web/mh_integration_tabs.html"
 )
 
 AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 
@@ -173,6 +175,7 @@ def setup():
         webview_will_set_content.append(
             _add_split_screen_toggle_button_to_reviewer_web_content
         )
+        webview_will_set_content.append(_add_buttons_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -241,9 +244,7 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context):
-    """Injects the AnkiHub AI JavaScript into the reviewer web content."""
-
+def _add_buttons_to_reviewer_web_content(web_content: WebContent, context):
     if not isinstance(context, Reviewer):
         return
 
@@ -269,14 +270,19 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     ):
         return
 
+    # template_vars = {
+    #     "KNOX_TOKEN": config.token(),
+    #     "APP_URL": config.app_url,
+    #     "ENDPOINT_PATH": "ai/chatbot",
+    #     "QUERY_PARAMETERS": "is_on_anki=true",
+    #     "THEME": _ankihub_theme(),
+    # }
+    # js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
+
     template_vars = {
-        "KNOX_TOKEN": config.token(),
-        "APP_URL": config.app_url,
-        "ENDPOINT_PATH": "ai/chatbot",
-        "QUERY_PARAMETERS": "is_on_anki=true",
         "THEME": _ankihub_theme(),
     }
-    js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
+    js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(template_vars)
 
     web_content.body += f"<script>{js}</script>"
 
@@ -362,6 +368,7 @@ def _close_split_screen_webview():
         split_screen_webview_manager.close_split_screen()
 
 
+
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == AI_INVALID_AUTH_TOKEN_PYCMD:
@@ -373,6 +380,14 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
+
+        return (True, None)
+    elif message.startswith(REVIEWER_BUTTON_TOGGLED_PYCMD):
+        assert isinstance(context, Reviewer), context
+        kwargs = parse_js_message_kwargs(message)
+        button_name = kwargs.get("buttonName")
+        is_active = kwargs.get("isActive")
+        print(button_name, is_active)
 
         return (True, None)
     elif message == OPEN_SPLIT_SCREEN_PYCMD:
