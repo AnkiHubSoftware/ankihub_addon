@@ -31,6 +31,7 @@ from .webview import SplitScreenWebViewManager
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
+ANKIHUB_AI_OLD_JS_PATH = Path(__file__).parent / "web/ankihub_ai_old.js"
 REVIEWER_BUTTONS_JS_PATH = Path(__file__).parent / "web/reviewer_buttons.js"
 REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 MH_INTEGRATION_TABS_TEMPLATE_PATH = (
@@ -250,7 +251,7 @@ def _add_buttons_to_reviewer_web_content(web_content: WebContent, context):
         return
 
     feature_flags = config.get_feature_flags()
-    if not feature_flags.get("chatbot", False):
+    if not (feature_flags.get("sidebar") or feature_flags.get("chatbot")):
         return
 
     reviewer: Reviewer = context
@@ -271,23 +272,30 @@ def _add_buttons_to_reviewer_web_content(web_content: WebContent, context):
     ):
         return
 
-    template_vars = {
+    ah_ai_template_vars = {
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
         "QUERY_PARAMETERS": "is_on_anki=true",
         "THEME": _ankihub_theme(),
     }
-    ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
-    web_content.body += f"<script>{ankihub_ai_js}</script>"
+    if feature_flags.get("sidebar"):
+        ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
+            ah_ai_template_vars
+        )
+        web_content.body += f"<script>{ankihub_ai_js}</script>"
 
-    template_vars = {
-        "THEME": _ankihub_theme(),
-    }
-    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
-        template_vars
-    )
-    web_content.body += f"<script>{reivewer_button_js}</script>"
+        reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+            {
+                "THEME": _ankihub_theme(),
+            }
+        )
+        web_content.body += f"<script>{reivewer_button_js}</script>"
+    else:
+        ankihub_ai_old_js = Template(ANKIHUB_AI_OLD_JS_PATH.read_text()).render(
+            ah_ai_template_vars
+        )
+        web_content.body += f"<script>{ankihub_ai_old_js}</script>"
 
 
 def _add_split_screen_toggle_button_to_reviewer_web_content(
