@@ -264,7 +264,7 @@ class PrivateWebPage(AnkiWebPage):
         self._onBridgeCmd = onBridgeCmd
         self._setupBridge()
         self.open_links_externally = False
-        self.featurePermissionRequested.connect(self.handlePermissionRequested)
+        qconnect(self.featurePermissionRequested, self.handlePermissionRequested)
 
     @pyqtSlot(QUrl, QWebEnginePage.Feature)
     def handlePermissionRequested(
