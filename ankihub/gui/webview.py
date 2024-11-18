@@ -277,7 +277,7 @@ class PrivateWebPage(AnkiWebPage):
                 QWebEnginePage.PermissionPolicy.PermissionGrantedByUser,
             )
         else:
-            super().featurePermissionRequested(securityOrigin, feature)
+            self.setFeaturePermission(securityOrigin, feature, QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
 
 
 class SplitScreenWebViewManager:
