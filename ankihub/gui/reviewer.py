@@ -19,7 +19,10 @@ from jinja2 import Template
 
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
-from ..gui.webview import SplitScreenWebViewManager, split_screen_webview_manager
+from ..gui.webview import (  # noqa: F401
+    SplitScreenWebViewManager,
+    split_screen_webview_manager,
+)
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
@@ -153,9 +156,9 @@ def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
     if not isinstance(context, Reviewer):
         return
 
-    # feature_flags = config.get_feature_flags()
-    # if not feature_flags.get("mh_integration", False):
-    #     return
+    feature_flags = config.get_feature_flags()
+    if not feature_flags.get("mh_integration", False):
+        return
 
     # TODO: Replace this with the buttons defined in BUILD-822
     web_content.body += f"<button onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>Toggle Split Screen</button>"
@@ -233,8 +236,5 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         assert isinstance(context, Reviewer), context
         _toggle_split_screen_webview(context)
 
-        return (True, None)
-    elif message == "go_to_next_url":
-        print("CHANGE URL")
         return (True, None)
     return handled
