@@ -376,10 +376,17 @@ class SplitScreenWebViewManager:
 
         # JavaScript to inject the header into the loaded page
         js_code = f"""
+            var wrapper = document.createElement('div');
+            while (document.body.firstChild) {{
+                wrapper.appendChild(document.body.firstChild);
+            }}
+            document.body.appendChild(wrapper);
+
             function selectTab(element) {{
                 document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('selected'));
                 element.classList.add('selected');
             }}
+
             var header = document.createElement('div');
             header.innerHTML = `{html_template}`;
             document.body.insertBefore(header, document.body.firstChild);
