@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from anki.utils import is_mac
 from aqt import QSizePolicy, QSplitter, QWebEnginePage, QWebEngineProfile, pyqtSlot
@@ -283,8 +283,8 @@ class PrivateWebPage(AnkiWebPage):
 class SplitScreenWebViewManager:
     def __init__(self, reviewer: Reviewer, urls_list):
         self.reviewer = reviewer
-        self.splitter = None
-        self.webview = None
+        self.splitter: Optional[QSplitter] = None
+        self.webview: Optional[AnkiWebView] = None
         self.current_active_url = urls_list[0]["url"]
         self.is_webview_visible = False
         self.urls_list = urls_list
@@ -399,4 +399,4 @@ class SplitScreenWebViewManager:
             self.current_active_url = url
 
 
-split_screen_webview_manager = None
+split_screen_webview_manager: Optional[SplitScreenWebViewManager] = None
