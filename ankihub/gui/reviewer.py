@@ -209,7 +209,10 @@ def _toggle_split_screen_webview(reviewer: Reviewer):
     if split_screen_webview_manager is None:
         # TODO: Replace with the actual URLs
         urls_list = [
-            {"url": "https://www.google.com", "title": "Google"},
+            {
+                "url": "https://www.google.com",
+                "title": "Google",
+            },
             {"url": "https://www.bing.com", "title": "Bing"},
         ]
         split_screen_webview_manager = SplitScreenWebViewManager(reviewer, urls_list)
