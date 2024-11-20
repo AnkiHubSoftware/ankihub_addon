@@ -111,8 +111,10 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     if not isinstance(context, Reviewer):
         return
 
-    feature_flags = config.get_feature_flags()
-    if not feature_flags.get("chatbot", False):
+    if not config.get_feature_flags().get("chatbot", False):
+        return
+
+    if not config.public_config.get("show_chatbot_in_reviewer"):
         return
 
     reviewer: Reviewer = context
