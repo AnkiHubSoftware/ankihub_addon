@@ -41,7 +41,7 @@ INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
-LOAD_URL_IN_SIDEBAR_WEBVIEW = "load_url_in_sidebar_webview"
+LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 
 
 class SplitScreenWebViewManager:
@@ -376,7 +376,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             split_screen_webview_manager.toggle_split_screen()
 
         return (True, None)
-    elif message.startswith(LOAD_URL_IN_SIDEBAR_WEBVIEW):
+    elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         split_screen_webview_manager.set_webview_url(kwargs["url"])
 

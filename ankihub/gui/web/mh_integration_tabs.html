@@ -114,7 +114,7 @@
     {% for tab in tabs %}
         <div
             class="webview-tab {% if current_active_tab_url == tab.url %}selected{% endif %}"
-            onclick="selectTab(this); pycmd('load_url_in_sidebar_webview { &quot;url&quot;: &quot;{{ tab.url }}&quot; }')"
+            onclick="selectTab(this); pycmd('ankihub_load_url_in_sidebar { &quot;url&quot;: &quot;{{ tab.url }}&quot; }')"
             data-tab="{{ tab.url }}"
         >
             {{ tab.title }}
