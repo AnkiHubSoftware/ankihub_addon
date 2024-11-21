@@ -4,8 +4,8 @@ class AnkiHubReviewerButtons {
         this.theme = "{{ THEME }}";
 
         this.buttonsData = [
-            { name: "fa4", iconPath: "/_fa4_icon.svg", active: false, tooltip: null },
             { name: "b&b", iconPath: "/_b&b_icon.svg", active: false, tooltip: null },
+            { name: "fa4", iconPath: "/_fa4_icon.svg", active: false, tooltip: null },
             {
                 name: "chatbot", iconPath: "/_chatbot_icon.svg", active: false,
                 tooltip: "Learn more about this flashcard topic<br>or explore related cards."
@@ -22,7 +22,12 @@ class AnkiHubReviewerButtons {
         this.buttonsData.forEach((buttonData, buttonIdx) => {
             const buttonElement = document.createElement("button");
             buttonElement.id = `ankihub-${buttonData.name}-button`;
-            this.setButtonStyle(buttonElement, buttonData.iconPath, buttonIdx === 0);
+            this.setButtonStyle(
+                buttonElement,
+                buttonData.iconPath,
+                buttonIdx === 0,
+                buttonIdx === this.buttonsData.length - 1
+            );
 
             if (buttonData.tooltip) {
                 this.addTooltip(buttonElement, buttonData.tooltip);
@@ -70,20 +75,25 @@ class AnkiHubReviewerButtons {
         pycmd(`ankihub_reviewer_button_toggled ${args}`);
     }
 
-    setButtonStyle(button, iconPath, isTopButton) {
+    setButtonStyle(button, iconPath, isTopButton, isBottomButton) {
         button.style.width = "48px";
         button.style.height = "48px";
-
+        button.style.boxSizing = "border-box";
+        button.style.padding = "4px";
         button.style.margin = "0px";
-        button.style.borderRadius = isTopButton ? "8px 0px 0px 0px" : "0px";
-        button.style.border = "none";
-        button.style.borderBottom = "1px solid #C7D2FE";
-
+        button.style.border = "1px solid #A5B4FC";
+        if (isBottomButton) {
+            button.style.borderRadius = "0px 0px 0px 8px";
+        } else if (isTopButton) {
+            button.style.borderRadius = "8px 0px 0px 0px";
+        } else {
+            button.style.borderRadius = "0px";
+        }
         button.style.backgroundImage = `url('${iconPath}')`;
         button.style.backgroundSize = "cover";
         button.style.backgroundPosition = "center";
         button.style.backgroundRepeat = "no-repeat";
-        button.style.backgroundColor = "#ffffff";
+        button.style.backgroundColor = "#F9FAFB";
 
         button.style.cursor = "pointer";
     }
