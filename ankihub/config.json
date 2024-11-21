@@ -3,6 +3,7 @@
     "report_errors": true,
     "sync_hotkey": "Ctrl+Shift+h",
     "auto_sync": "on_ankiweb_sync",
+    "show_chatbot_in_reviewer": true,
     "debug_level_logs": false,
     "use_staging": false
 }

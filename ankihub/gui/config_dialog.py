@@ -6,6 +6,7 @@ so mw ends up being None in ankiaddonconfig.window.
 By doing the import inside the function we make sure that aqt.mw is set up when we import ankiaddonconfig.window
 during normal execution.
 (We access mw using aqt.mw across the codebase to prevent this problem.)"""
+
 from typing import cast
 
 from ..settings import config
@@ -51,6 +52,15 @@ def _general_tab(conf_window) -> None:
     )
     tab.hseparator()
     tab.space(8)
+
+    feature_flags = config.get_feature_flags()
+    if feature_flags.get("chatbot", False):
+        tab.text("Reviewer", bold=True)
+        tab.checkbox(
+            key="show_chatbot_in_reviewer",
+            description="Show AnkiHub AI chatbot in the reviewer",
+        )
+        tab.space(8)
 
     tab.text("Debug", bold=True)
     tab.checkbox("report_errors", "Report errors")
