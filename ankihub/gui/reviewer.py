@@ -174,7 +174,7 @@ def setup():
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
-        webview_will_set_content.append(_add_sidebar_and_sidebar_buttons)
+        webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -243,7 +243,7 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_sidebar_and_sidebar_buttons(web_content: WebContent, context):
+def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if not isinstance(context, Reviewer):
         return
 
