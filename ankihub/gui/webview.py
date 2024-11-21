@@ -1,7 +1,8 @@
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Callable
 
 from anki.utils import is_mac
+from aqt import QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QCloseEvent,
@@ -18,7 +19,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.utils import openLink
-from aqt.webview import AnkiWebView
+from aqt.webview import AnkiWebPage, AnkiWebView
 
 from .. import LOGGER
 from ..settings import config
@@ -248,3 +249,34 @@ class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
 
         if config.app_url in info.requestUrl().toString():
             info.setHttpHeader(b"Authorization", b"Token " + token.encode())
+
+
+class CustomWebPage(AnkiWebPage):
+    """
+    AnkiWebPage which grants the `Notifications` feature permission.
+    """
+
+    def __init__(self, profile: QWebEngineProfile, onBridgeCmd: Callable[[str], Any]):
+        QWebEnginePage.__init__(self, profile, None)
+        self._onBridgeCmd = onBridgeCmd
+        self._setupBridge()
+        self.open_links_externally = False
+        qconnect(self.featurePermissionRequested, self.handlePermissionRequested)  # type: ignore
+
+    @pyqtSlot(QUrl, QWebEnginePage.Feature)
+    def handlePermissionRequested(
+        self, securityOrigin: QUrl, feature: QWebEnginePage.Feature
+    ) -> None:
+        # Without this logging into Boards and Beyond doesn't work.
+        if feature == QWebEnginePage.Feature.Notifications:
+            self.setFeaturePermission(
+                securityOrigin,
+                feature,
+                QWebEnginePage.PermissionPolicy.PermissionGrantedByUser,
+            )
+        else:
+            self.setFeaturePermission(
+                securityOrigin,
+                feature,
+                QWebEnginePage.PermissionPolicy.PermissionDeniedByUser,
+            )
