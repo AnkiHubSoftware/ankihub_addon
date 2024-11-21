@@ -3,9 +3,17 @@ class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
 
+        this.colorButtonLight = "#F9FAFB";
+        this.colorButtonSelectedLight = "#C7D2FE";
+        this.colorButtonBorderLight = "#A5B4FC";
+
+        this.colorButtonDark = "#030712";
+        this.colorButtonSelectedDark = "#3730A3";
+        this.colorButtonBorderDark = "#4338CA";
+
         this.buttonsData = [
             { name: "b&b", iconPath: "/_b&b_icon.svg", active: false, tooltip: null },
-            { name: "fa4", iconPath: "/_fa4_icon.svg", active: false, tooltip: null },
+            { name: "fa4", iconPath: "/_fa4_icon.svg", iconPathDarkTheme: "/_fa4_icon_dark_theme.svg", active: false, tooltip: null },
             {
                 name: "chatbot", iconPath: "/_chatbot_icon.svg", active: false,
                 tooltip: "Learn more about this flashcard topic<br>or explore related cards."
@@ -24,7 +32,10 @@ class AnkiHubReviewerButtons {
             buttonElement.id = `ankihub-${buttonData.name}-button`;
             this.setButtonStyle(
                 buttonElement,
-                buttonData.iconPath,
+                (
+                    this.theme == "dark" && buttonData.iconPathDarkTheme ?
+                        buttonData.iconPathDarkTheme : buttonData.iconPath
+                ),
                 buttonIdx === 0,
                 buttonIdx === this.buttonsData.length - 1
             );
@@ -69,7 +80,13 @@ class AnkiHubReviewerButtons {
 
     setButtonState(buttonData, buttonElement, active) {
         buttonData.active = active;
-        buttonElement.style.backgroundColor = active ? "#C7D2FE" : "#ffffff";
+        if (active) {
+            buttonElement.style.backgroundColor = this.theme == "light" ? this.colorButtonSelectedLight : this.colorButtonSelectedDark;
+
+        } else {
+            buttonElement.style.backgroundColor = this.theme == "light" ? this.colorButtonLight : this.colorButtonDark;
+        }
+
 
         const args = `{"buttonName": "${buttonData.name}", "isActive": "${buttonData.active}"}`
         pycmd(`ankihub_reviewer_button_toggled ${args}`);
@@ -81,7 +98,8 @@ class AnkiHubReviewerButtons {
         button.style.boxSizing = "border-box";
         button.style.padding = "4px";
         button.style.margin = "0px";
-        button.style.border = "1px solid #A5B4FC";
+        button.style.border = "1px solid";
+        button.style.borderColor = this.theme == "light" ? this.colorButtonBorderLight : this.colorButtonBorderDark;
         if (isBottomButton) {
             button.style.borderRadius = "0px 0px 0px 8px";
         } else if (isTopButton) {
@@ -93,7 +111,7 @@ class AnkiHubReviewerButtons {
         button.style.backgroundSize = "cover";
         button.style.backgroundPosition = "center";
         button.style.backgroundRepeat = "no-repeat";
-        button.style.backgroundColor = "#F9FAFB";
+        button.style.backgroundColor = this.theme == "light" ? this.colorButtonLight : this.colorButtonDark;
 
         button.style.cursor = "pointer";
     }
