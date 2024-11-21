@@ -345,7 +345,6 @@ def _wrap_with_reviewer_buttons_check(js: str) -> str:
 
 
 def _close_split_screen_webview():
-    global split_screen_webview_manager
     if split_screen_webview_manager:
         split_screen_webview_manager.close_split_screen()
 
