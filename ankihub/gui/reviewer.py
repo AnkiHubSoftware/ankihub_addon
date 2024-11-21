@@ -170,7 +170,9 @@ def setup():
 
     if not using_qt5():
         webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
-        webview_will_set_content.append(_add_split_screen_to_reviewer_web_content)
+        webview_will_set_content.append(
+            _add_split_screen_toggle_button_to_reviewer_web_content
+        )
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -279,8 +281,10 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     web_content.body += f"<script>{js}</script>"
 
 
-def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
-    """Injects the togle of the split screen webview into the reviewer web content."""
+def _add_split_screen_toggle_button_to_reviewer_web_content(
+    web_content: WebContent, context
+):
+    """Injects the toggle of the split screen webview into the reviewer web content."""
     if not isinstance(context, Reviewer):
         return
 
@@ -289,7 +293,11 @@ def _add_split_screen_to_reviewer_web_content(web_content: WebContent, context):
         return
 
     # TODO: Replace this with the buttons defined in BUILD-822
-    web_content.body += f"<button onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>Toggle Split Screen</button>"
+    web_content.body += f"""
+        <button id='split-screen-toggle-button' onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>
+            Toggle Split Screen
+        </button>
+    """
 
 
 def _ankihub_theme() -> str:
