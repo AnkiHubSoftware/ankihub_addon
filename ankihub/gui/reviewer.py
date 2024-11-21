@@ -2,13 +2,15 @@
 
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import aqt
+import aqt.webview
 from anki.cards import Card
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
+    reviewer_will_end,
     webview_did_receive_js_message,
     webview_will_set_content,
 )
@@ -17,12 +19,10 @@ from aqt.theme import theme_manager
 from aqt.webview import WebContent
 from jinja2 import Template
 
+from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
-from ..gui.webview import (  # noqa: F401
-    SplitScreenWebViewManager,
-    split_screen_webview_manager,
-)
+from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
@@ -31,10 +31,137 @@ VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
+MH_INTEGRATION_TABS_TEMPLATE_PATH = (
+    Path(__file__).parent / "web/mh_integration_tabs.html"
+)
 
 AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
+
+
+class SplitScreenWebViewManager:
+    def __init__(self, reviewer: Reviewer, urls_list):
+        self.reviewer = reviewer
+        self.splitter: Optional[aqt.QSplitter] = None
+        self.webview: Optional[aqt.webview.AnkiWebView] = None
+        self.current_active_url = urls_list[0]["url"]
+        self.is_webview_visible = False
+        self.urls_list = urls_list
+        self._setup_webview()
+
+    def _setup_webview(self):
+        parent_widget = self.reviewer.mw
+
+        if parent_widget is None:
+            raise ValueError(
+                "Reviewer does not have a parent widget to hold the splitter."
+            )
+
+        self.splitter = aqt.QSplitter()
+
+        # Create a QWebEngineProfile with persistent storage
+        profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
+        profile.setHttpUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
+        )
+
+        # Create the main web view
+        self.webview = aqt.webview.AnkiWebView()
+        self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
+        self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
+        self.webview.set_bridge_command(self._on_bridge_cmd, self)
+
+        # Interceptor that will add the token to the request
+        interceptor = AuthenticationRequestInterceptor(self.webview)
+        self.webview.page().profile().setUrlRequestInterceptor(interceptor)
+
+        layout = parent_widget.layout()
+        if layout is None:
+            layout = aqt.QVBoxLayout(parent_widget)
+            parent_widget.setLayout(layout)
+
+        layout.addWidget(self.splitter)
+        self.splitter.setSizePolicy(
+            aqt.QSizePolicy(
+                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Expanding
+            )
+        )
+
+        widget_index = parent_widget.mainLayout.indexOf(self.reviewer.web)
+        parent_widget.mainLayout.removeWidget(self.reviewer.web)
+
+        self.splitter.addWidget(self.reviewer.web)
+        self.splitter.addWidget(self.webview)
+        self.splitter.setCollapsible(0, False)
+        self.splitter.setCollapsible(1, False)
+        self.splitter.setSizes([10000, 10000])
+
+        parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
+        self.is_webview_visible = True
+        aqt.qconnect(self.webview.loadFinished, self._inject_header)
+
+    def toggle_split_screen(self):
+        if self.is_webview_visible:
+            self.close_split_screen()
+        else:
+            self.open_split_screen()
+
+    def open_split_screen(self):
+        if not self.is_webview_visible:
+            self.webview.show()
+            self.is_webview_visible = True
+
+    def close_split_screen(self):
+        if self.is_webview_visible:
+            self.webview.hide()
+            self.is_webview_visible = False
+
+    def _on_bridge_cmd(self, cmd: str) -> None:
+        cmd_name = cmd.split("::")[0]
+        args = cmd.split("::")[1].split(",")
+        if cmd_name == "updateWebviewWithURL":
+            self._update_webview_url(args[0])
+
+    def _inject_header(self, ok: bool):
+        if not ok:
+            LOGGER.error("Failed to load page.")  # pragma: no cover
+            return  # pragma: no cover
+
+        html_template = Template(MH_INTEGRATION_TABS_TEMPLATE_PATH.read_text()).render(
+            {
+                "tabs": self.urls_list,
+                "current_active_tab_url": self.current_active_url,
+                "page_title": "Boards&Beyond viewer",
+            }
+        )
+
+        # JavaScript to inject the header into the loaded page
+        js_code = f"""
+            var wrapper = document.createElement('div');
+            while (document.body.firstChild) {{
+                wrapper.appendChild(document.body.firstChild);
+            }}
+            document.body.appendChild(wrapper);
+
+            function selectTab(element) {{
+                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('selected'));
+                element.classList.add('selected');
+            }}
+
+            var header = document.createElement('div');
+            header.innerHTML = `{html_template}`;
+            document.body.insertBefore(header, document.body.firstChild);
+        """
+        self.webview.eval(js_code)
+
+    def _update_webview_url(self, url):
+        if self.webview:
+            self.webview.setUrl(aqt.QUrl(url))
+            self.current_active_url = url
+
+
+split_screen_webview_manager: Optional[SplitScreenWebViewManager] = None
 
 
 def setup():
@@ -50,6 +177,7 @@ def setup():
         reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
+    reviewer_will_end.append(_close_split_screen_webview)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
@@ -217,7 +345,13 @@ def _toggle_split_screen_webview(reviewer: Reviewer):
         ]
         split_screen_webview_manager = SplitScreenWebViewManager(reviewer, urls_list)
     else:
-        split_screen_webview_manager.toggle_inner_webviews()
+        split_screen_webview_manager.toggle_split_screen()
+
+
+def _close_split_screen_webview():
+    global split_screen_webview_manager
+    if split_screen_webview_manager:
+        split_screen_webview_manager.close_split_screen()
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
