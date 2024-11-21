@@ -112,7 +112,11 @@
 </div>
 <nav class="webview-tabs">
     {% for tab in tabs %}
-        <div class="webview-tab {% if current_active_tab_url == tab.url %}selected{% endif %}" onclick="selectTab(this); pycmd('updateWebviewWithURL::{{ tab.url }}')" data-tab="{{ tab.url }}">
+        <div
+            class="webview-tab {% if current_active_tab_url == tab.url %}selected{% endif %}"
+            onclick="selectTab(this); pycmd('load_url_in_sidebar_webview { &quot;url&quot;: &quot;{{ tab.url }}&quot; }')"
+            data-tab="{{ tab.url }}"
+        >
             {{ tab.title }}
         </div>
     {% endfor %}

@@ -41,6 +41,7 @@ AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
+LOAD_URL_IN_SIDEBAR_WEBVIEW = "load_url_in_sidebar_webview"
 
 
 class SplitScreenWebViewManager:
@@ -123,10 +124,9 @@ class SplitScreenWebViewManager:
             self.is_webview_visible = False
 
     def _on_bridge_cmd(self, cmd: str) -> None:
-        cmd_name = cmd.split("::")[0]
-        args = cmd.split("::")[1].split(",")
-        if cmd_name == "updateWebviewWithURL":
-            self._update_webview_url(args[0])
+        if cmd.startswith(LOAD_URL_IN_SIDEBAR_WEBVIEW):
+            kwargs = parse_js_message_kwargs(cmd)
+            self._update_webview_url(kwargs["url"])
 
     def _inject_header(self, ok: bool):
         if not ok:
