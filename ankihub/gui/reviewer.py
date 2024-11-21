@@ -26,7 +26,6 @@ from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noq
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
-from .webview import SplitScreenWebViewManager
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
@@ -173,11 +172,12 @@ def setup():
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
-        webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
+        webview_will_set_content.append(
+            _add_buttons_and_ankihub_ai_to_reviewer_web_content
+        )
         webview_will_set_content.append(
             _add_split_screen_toggle_button_to_reviewer_web_content
         )
-        webview_will_set_content.append(_add_buttons_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -246,7 +246,9 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_buttons_to_reviewer_web_content(web_content: WebContent, context):
+def _add_buttons_and_ankihub_ai_to_reviewer_web_content(
+    web_content: WebContent, context
+):
     if not isinstance(context, Reviewer):
         return
 
@@ -377,7 +379,6 @@ def _close_split_screen_webview():
     global split_screen_webview_manager
     if split_screen_webview_manager:
         split_screen_webview_manager.close_split_screen()
-
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
