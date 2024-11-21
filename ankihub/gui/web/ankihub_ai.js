@@ -83,7 +83,7 @@ class AnkiHubAI {
         this.authenticated = false;
         this.knoxToken = null;
         this.noteIdOfChatbot = null;
-        pycmd("ankihub_ai_invalid_auth_token");
+        pycmd("ankihub_invalid_auth_token");
     }
 
     showIframe() {

@@ -92,6 +92,15 @@ class AnkiHubReviewerButtons {
         pycmd(`ankihub_reviewer_button_toggled ${args}`);
     }
 
+    unselectAllButtons() {
+        for (const buttonData of this.buttonsData) {
+            if (buttonData.active) {
+                const buttonElement = this.getButtonElement(buttonData.name);
+                this.setButtonState(buttonData, buttonElement, false);
+            }
+        }
+    }
+
     setButtonStyle(button, iconPath, isTopButton, isBottomButton) {
         button.style.width = "48px";
         button.style.height = "48px";
