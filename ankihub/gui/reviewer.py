@@ -75,6 +75,10 @@ class SplitScreenWebViewManager:
         self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
         self.webview.set_bridge_command(self._on_bridge_cmd, self)
 
+        self.is_webview_visible = False
+        self.webview.hide()
+        aqt.qconnect(self.webview.loadFinished, self._inject_header)
+
         # Interceptor that will add the token to the request
         interceptor = AuthenticationRequestInterceptor(self.webview)
         self.webview.page().profile().setUrlRequestInterceptor(interceptor)
@@ -101,8 +105,6 @@ class SplitScreenWebViewManager:
         self.splitter.setSizes([10000, 10000])
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
-        self.is_webview_visible = True
-        aqt.qconnect(self.webview.loadFinished, self._inject_header)
 
     def toggle_split_screen(self):
         if self.is_webview_visible:
@@ -172,12 +174,7 @@ def setup():
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
-        webview_will_set_content.append(
-            _add_buttons_and_ankihub_ai_to_reviewer_web_content
-        )
-        webview_will_set_content.append(
-            _add_split_screen_toggle_button_to_reviewer_web_content
-        )
+        webview_will_set_content.append(_add_sidebar_and_sidebar_buttons)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
@@ -246,32 +243,15 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_buttons_and_ankihub_ai_to_reviewer_web_content(
-    web_content: WebContent, context
-):
+def _add_sidebar_and_sidebar_buttons(web_content: WebContent, context):
     if not isinstance(context, Reviewer):
         return
 
     feature_flags = config.get_feature_flags()
-    if not (feature_flags.get("sidebar") or feature_flags.get("chatbot")):
+    if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    reviewer: Reviewer = context
-    ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
-    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(
-        reviewer.card.note().mid
-    )
-    ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
-        aqt.mw.col.decks.current()["id"]
-    )
-    ah_dids = {ah_did_of_note, ah_did_of_deck, *ah_dids_of_note_type} - {None}
-    if not any(
-        (
-            (deck_config := config.deck_config(ah_did))
-            and deck_config.has_note_embeddings
-        )
-        for ah_did in ah_dids
-    ):
+    if not _related_ah_deck_has_note_embeddings(context):
         return
 
     ah_ai_template_vars = {
@@ -281,7 +261,19 @@ def _add_buttons_and_ankihub_ai_to_reviewer_web_content(
         "QUERY_PARAMETERS": "is_on_anki=true",
         "THEME": _ankihub_theme(),
     }
-    if feature_flags.get("sidebar"):
+    if feature_flags.get("mh_integration"):
+        global split_screen_webview_manager
+        if not split_screen_webview_manager:
+            # TODO: Replace with the actual URLs
+            urls_list = [
+                {
+                    "url": "https://www.google.com",
+                    "title": "Google",
+                },
+                {"url": "https://www.bing.com", "title": "Bing"},
+            ]
+            split_screen_webview_manager = SplitScreenWebViewManager(context, urls_list)
+
         ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
             ah_ai_template_vars
         )
@@ -300,23 +292,22 @@ def _add_buttons_and_ankihub_ai_to_reviewer_web_content(
         web_content.body += f"<script>{ankihub_ai_old_js}</script>"
 
 
-def _add_split_screen_toggle_button_to_reviewer_web_content(
-    web_content: WebContent, context
-):
-    """Injects the toggle of the split screen webview into the reviewer web content."""
-    if not isinstance(context, Reviewer):
-        return
-
-    feature_flags = config.get_feature_flags()
-    if not feature_flags.get("mh_integration", False):
-        return
-
-    # TODO: Replace this with the buttons defined in BUILD-822
-    web_content.body += f"""
-        <button id='split-screen-toggle-button' onclick='pycmd(\"{OPEN_SPLIT_SCREEN_PYCMD}\")'>
-            Toggle Split Screen
-        </button>
-    """
+def _related_ah_deck_has_note_embeddings(reviewer: Reviewer) -> bool:
+    ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
+    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(
+        reviewer.card.note().mid
+    )
+    ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
+        aqt.mw.col.decks.current()["id"]
+    )
+    ah_dids = {ah_did_of_note, ah_did_of_deck, *ah_dids_of_note_type} - {None}
+    return any(
+        (
+            (deck_config := config.deck_config(ah_did))
+            and deck_config.has_note_embeddings
+        )
+        for ah_did in ah_dids
+    )
 
 
 def _ankihub_theme() -> str:
@@ -359,22 +350,6 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
     return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
 
-def _toggle_split_screen_webview(reviewer: Reviewer):
-    global split_screen_webview_manager
-    if split_screen_webview_manager is None:
-        # TODO: Replace with the actual URLs
-        urls_list = [
-            {
-                "url": "https://www.google.com",
-                "title": "Google",
-            },
-            {"url": "https://www.bing.com", "title": "Bing"},
-        ]
-        split_screen_webview_manager = SplitScreenWebViewManager(reviewer, urls_list)
-    else:
-        split_screen_webview_manager.toggle_split_screen()
-
-
 def _close_split_screen_webview():
     global split_screen_webview_manager
     if split_screen_webview_manager:
@@ -403,11 +378,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if button_name == "chatbot":
             js = _wrap_with_ankihubAI_check("ankihubAI.toggleIframe();")
             context.web.eval(js)
-
-        return (True, None)
-    elif message == OPEN_SPLIT_SCREEN_PYCMD:
-        assert isinstance(context, Reviewer), context
-        _toggle_split_screen_webview(context)
+        else:
+            split_screen_webview_manager.toggle_split_screen()
 
         return (True, None)
     return handled
