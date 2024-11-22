@@ -4621,6 +4621,7 @@ def test_uninstalling_deck_removes_related_deck_extension_from_config(
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
 
 
+@pytest.mark.qt_no_exception_capture
 class TestAutoSync:
     def test_with_on_ankiweb_sync_config_option(
         self,
