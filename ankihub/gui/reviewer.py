@@ -93,10 +93,13 @@ class SplitScreenWebViewManager:
             )
         )
 
-        widget_index = parent_widget.mainLayout.indexOf(self.reviewer.web)
-        parent_widget.mainLayout.removeWidget(self.reviewer.web)
-
-        self.splitter.addWidget(self.reviewer.web)
+        widget = self.reviewer.web
+        # For compatibility with other add-ons that add a side panel too (e.g. AMBOSS)
+        if isinstance(self.reviewer.web.parentWidget(), aqt.QSplitter):
+            widget = self.reviewer.web.parentWidget()
+        widget_index = parent_widget.mainLayout.indexOf(widget)
+        parent_widget.mainLayout.removeWidget(widget)
+        self.splitter.addWidget(widget)
         self.splitter.addWidget(self.webview)
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
