@@ -48,7 +48,9 @@ class SplitScreenWebViewManager:
     def __init__(self, reviewer: Reviewer, urls_list):
         self.reviewer = reviewer
         self.splitter: Optional[aqt.QSplitter] = None
+        self.container: Optional[aqt.QWidget] = None
         self.webview: Optional[aqt.webview.AnkiWebView] = None
+        self.header_webview: Optional[aqt.webview.AnkiWebView] = None
         self.current_active_url = urls_list[0]["url"]
         self.urls_list = urls_list
         self._setup_webview()
@@ -62,6 +64,9 @@ class SplitScreenWebViewManager:
             )
 
         self.splitter = aqt.QSplitter()
+        self.container = aqt.QWidget()
+        container_layout = aqt.QVBoxLayout()
+        self.container.setLayout(container_layout)
 
         # Create a QWebEngineProfile with persistent storage
         profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
@@ -69,13 +74,20 @@ class SplitScreenWebViewManager:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
         )
 
-        # Create the main web view
+        # Create the web views
         self.webview = aqt.webview.AnkiWebView()
         self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
         self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
-
-        self.webview.hide()
+        self.header_webview = aqt.webview.AnkiWebView()
+        self.header_webview.setSizePolicy(
+            aqt.QSizePolicy(
+                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
+            )
+        )
         aqt.qconnect(self.webview.loadFinished, self._inject_header)
+        container_layout.addWidget(self.header_webview)
+        container_layout.addWidget(self.webview)
+        self.container.hide()
 
         # Interceptor that will add the token to the request
         interceptor = AuthenticationRequestInterceptor(self.webview)
@@ -100,7 +112,7 @@ class SplitScreenWebViewManager:
         widget_index = parent_widget.mainLayout.indexOf(widget)
         parent_widget.mainLayout.removeWidget(widget)
         self.splitter.addWidget(widget)
-        self.splitter.addWidget(self.webview)
+        self.splitter.addWidget(self.container)
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
         self.splitter.setSizes([10000, 10000])
@@ -108,23 +120,22 @@ class SplitScreenWebViewManager:
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
     def toggle_split_screen(self):
-        if self.webview.isVisible():
+        if self.container.isVisible():
             self.close_split_screen()
         else:
             self.open_split_screen()
 
     def open_split_screen(self):
-        if not self.webview.isVisible():
-            self.webview.show()
+        if not self.container.isVisible():
+            self.container.show()
 
     def close_split_screen(self):
-        self.webview.hide()
+        self.container.hide()
 
     def _inject_header(self, ok: bool):
         if not ok:
             LOGGER.error("Failed to load page.")  # pragma: no cover
             return  # pragma: no cover
-
         html_template = Template(MH_INTEGRATION_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
@@ -132,25 +143,8 @@ class SplitScreenWebViewManager:
                 "page_title": "Boards&Beyond viewer",
             }
         )
-
-        # JavaScript to inject the header into the loaded page
-        js_code = f"""
-            var wrapper = document.createElement('div');
-            while (document.body.firstChild) {{
-                wrapper.appendChild(document.body.firstChild);
-            }}
-            document.body.appendChild(wrapper);
-
-            function selectTab(element) {{
-                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('selected'));
-                element.classList.add('selected');
-            }}
-
-            var header = document.createElement('div');
-            header.innerHTML = `{html_template}`;
-            document.body.insertBefore(header, document.body.firstChild);
-        """
-        self.webview.eval(js_code)
+        self.header_webview.setHtml(html_template)
+        self.header_webview.adjustHeightToFit()
 
     def set_webview_url(self, url):
         if self.webview:
