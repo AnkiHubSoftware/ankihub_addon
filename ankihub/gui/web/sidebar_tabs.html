@@ -78,6 +78,12 @@
         flex-shrink: 0;
     }
 </style>
+<script>
+    function selectTab(element) {
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('selected'));
+        element.classList.add('selected');
+    }
+</script>
 <div class="webview-browser-bar">
     <div class="button-container">
         <button disabled>
