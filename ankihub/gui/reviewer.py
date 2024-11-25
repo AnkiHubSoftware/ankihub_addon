@@ -87,6 +87,7 @@ class SplitScreenWebViewManager:
         aqt.qconnect(self.webview.loadFinished, self._inject_header)
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.webview)
+        self.header_webview.adjustSize()
         self.container.hide()
 
         # Interceptor that will add the token to the request
