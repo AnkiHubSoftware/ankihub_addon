@@ -65,6 +65,7 @@ class SplitScreenWebViewManager:
         self.container = aqt.QWidget()
         container_layout = aqt.QVBoxLayout()
         container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
         self.container.setLayout(container_layout)
 
         # Create a QWebEngineProfile with persistent storage
