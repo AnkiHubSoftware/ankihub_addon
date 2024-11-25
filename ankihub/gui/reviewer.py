@@ -33,9 +33,7 @@ ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 ANKIHUB_AI_OLD_JS_PATH = Path(__file__).parent / "web/ankihub_ai_old.js"
 REVIEWER_BUTTONS_JS_PATH = Path(__file__).parent / "web/reviewer_buttons.js"
 REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
-MH_INTEGRATION_TABS_TEMPLATE_PATH = (
-    Path(__file__).parent / "web/mh_integration_tabs.html"
-)
+SIDEBAR_TABS_TEMPLATE_PATH = Path(__file__).parent / "web/sidebar_tabs.html"
 
 INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
@@ -137,7 +135,7 @@ class SplitScreenWebViewManager:
         if not ok:
             LOGGER.error("Failed to load page.")  # pragma: no cover
             return  # pragma: no cover
-        html_template = Template(MH_INTEGRATION_TABS_TEMPLATE_PATH.read_text()).render(
+        html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
                 "current_active_tab_url": self.current_active_url,
