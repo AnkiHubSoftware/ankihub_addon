@@ -34,6 +34,9 @@ ANKIHUB_AI_OLD_JS_PATH = Path(__file__).parent / "web/ankihub_ai_old.js"
 REVIEWER_BUTTONS_JS_PATH = Path(__file__).parent / "web/reviewer_buttons.js"
 REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 SIDEBAR_TABS_TEMPLATE_PATH = Path(__file__).parent / "web/sidebar_tabs.html"
+NO_URLS_EMPTY_STATE_TEMPLATE_PATH = (
+    Path(__file__).parent / "web/mh_no_urls_empty_state.html"
+)
 
 INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
@@ -43,13 +46,13 @@ LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 
 
 class SplitScreenWebViewManager:
-    def __init__(self, reviewer: Reviewer, urls_list):
+    def __init__(self, reviewer: Reviewer, urls_list=[]):
         self.reviewer = reviewer
         self.splitter: Optional[aqt.QSplitter] = None
         self.container: Optional[aqt.QWidget] = None
         self.webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_url = urls_list[0]["url"]
+        self.current_active_url = urls_list[0]["url"] if urls_list else None
         self.urls_list = urls_list
         self._setup_webview()
 
@@ -76,23 +79,36 @@ class SplitScreenWebViewManager:
 
         # Create the web views
         self.webview = aqt.webview.AnkiWebView()
-        self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
-        self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
+        # Interceptor that will add the token to the request
+        interceptor = AuthenticationRequestInterceptor(self.webview)
+
+        if not self.urls_list:
+            empty_state_html_template = Template(
+                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
+            ).render(
+                {
+                    "theme": _ankihub_theme(),
+                    "current_selected_button": "boards_and_beyond",
+                }
+            )
+            self.webview.setHtml(empty_state_html_template)
+        else:
+            self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
+            self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
+            self.webview.page().profile().setUrlRequestInterceptor(interceptor)
+
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
             aqt.QSizePolicy(
                 aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
             )
         )
+
         aqt.qconnect(self.webview.loadFinished, self._inject_header)
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.webview)
         self.header_webview.adjustSize()
         self.container.hide()
-
-        # Interceptor that will add the token to the request
-        interceptor = AuthenticationRequestInterceptor(self.webview)
-        self.webview.page().profile().setUrlRequestInterceptor(interceptor)
 
         layout = parent_widget.layout()
         if layout is None:
@@ -142,6 +158,7 @@ class SplitScreenWebViewManager:
                 "tabs": self.urls_list,
                 "current_active_tab_url": self.current_active_url,
                 "page_title": "Boards&Beyond viewer",
+                "theme": _ankihub_theme(),
             }
         )
         self.header_webview.setHtml(html_template)
