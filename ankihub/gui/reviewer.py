@@ -88,6 +88,7 @@ class SplitScreenWebViewManager:
             ).render(
                 {
                     "theme": _ankihub_theme(),
+                    # TODO: Change this depending on the button that was toggled
                     "current_selected_button": "boards_and_beyond",
                 }
             )
