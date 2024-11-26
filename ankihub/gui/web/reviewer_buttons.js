@@ -5,17 +5,31 @@ class AnkiHubReviewerButtons {
 
         this.colorButtonLight = "#F9FAFB";
         this.colorButtonSelectedLight = "#C7D2FE";
-        this.colorButtonBorderLight = "#A5B4FC";
+        this.colorButtonBorderLight = "#D1D5DB";
 
         this.colorButtonDark = "#030712";
         this.colorButtonSelectedDark = "#3730A3";
-        this.colorButtonBorderDark = "#4338CA";
+        this.colorButtonBorderDark = "#4b5563";
 
         this.buttonsData = [
-            { name: "b&b", iconPath: "/_b&b_icon.svg", active: false, tooltip: null },
-            { name: "fa4", iconPath: "/_fa4_icon.svg", iconPathDarkTheme: "/_fa4_icon_dark_theme.svg", active: false, tooltip: null },
             {
-                name: "chatbot", iconPath: "/_chatbot_icon.svg", active: false,
+                name: "b&b",
+                iconPath: "/_b&b_icon.svg",
+                iconPathDarkTheme: "/_b&b_icon_dark_theme.svg",
+                active: false,
+                tooltip: null,
+            },
+            {
+                name: "fa4",
+                iconPath: "/_fa4_icon.svg",
+                iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
+                active: false,
+                tooltip: null
+            },
+            {
+                name: "chatbot",
+                iconPath: "/_chatbot_icon.svg",
+                active: false,
                 tooltip: "Learn more about this flashcard topic<br>or explore related cards."
             },
         ]
