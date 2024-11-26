@@ -1,0 +1,65 @@
+<style>
+    * {
+        box-sizing: border-box;
+        padding: 0;
+        margin: 0;
+    }
+    .empty-state-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        background-color: #f9fafb;
+        height: 100%;
+    }
+    .dark .empty-state-container {
+        background-color: #030712;
+    }
+    .empty-state-center-content {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 1px solid #d1d5db;
+        height: 6rem;
+    }
+    .dark .empty-state-center-content {
+        border-bottom: 1px solid #374151;
+    }
+    .empty-state-title {
+        font-size: 1.5rem;
+        font-weight: 300;
+        color: #4F46E5;
+        margin-top: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .dark .empty-state-title {
+        color: #818CF8;
+    }
+    .empty-state-message {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: #4b5563;
+    }
+    .dark .empty-state-message {
+        color: #9ca3af;
+    }
+</style>
+<div class="{% if theme == 'dark' %}dark{% endif %}">
+    <div class="empty-state-container">
+        <div class="empty-state-center-content">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M29 20C33.9706 20 38 15.9706 38 11C38 10.0357 37.8483 9.10676 37.5676 8.23582C37.3585 7.58734 36.5468 7.45366 36.0651 7.93544L30.6805 13.32C30.4197 13.5808 30.0336 13.6833 29.6932 13.5415C28.2343 12.9339 27.0668 11.767 26.4584 10.3086C26.3163 9.96806 26.4187 9.58177 26.6797 9.32085L32.0653 3.93519C32.5471 3.45343 32.4134 2.64183 31.765 2.43272C30.8938 2.15176 29.9646 2 29 2C24.0294 2 20 6.02944 20 11C20 11.1957 20.0062 11.3899 20.0185 11.5824C20.1301 13.3284 19.7635 15.1971 18.4195 16.3171L3.96035 28.3664C2.7182 29.4015 2 30.9349 2 32.5518C2 35.5608 4.43924 38 7.4482 38C9.06512 38 10.5985 37.2818 11.6336 36.0397L23.6829 21.5805C24.8029 20.2365 26.6716 19.8699 28.4176 19.9815C28.6101 19.9938 28.8043 20 29 20ZM10 32C10 33.1046 9.10457 34 8 34C6.89543 34 6 33.1046 6 32C6 30.8954 6.89543 30 8 30C9.10457 30 10 30.8954 10 32Z"
+                fill="{% if theme == 'dark' %}#818cf8{% else %}#4f46e5{% endif %}"/>
+                <path d="M29 23C29.3462 23 29.6889 22.9853 30.0277 22.9566L37.5356 30.4645C39.4882 32.4172 39.4882 35.583 37.5356 37.5356C35.583 39.4882 32.4172 39.4882 30.4645 37.5356L21.6432 28.7143L25.9876 23.5011C26.091 23.377 26.2827 23.2262 26.6714 23.1105C27.0756 22.9902 27.6099 22.936 28.2263 22.9754C28.4825 22.9917 28.7405 23 29 23Z"
+                fill="{% if theme == 'dark' %}#818cf8{% else %}#4f46e5{% endif %}"/>
+                <path d="M12.0001 9.17164L16.6611 13.8327C16.6054 13.9125 16.5499 13.9699 16.4989 14.0124L13.5999 16.4283L9.17164 12.0001H6.6181C6.23933 12.0001 5.89306 11.7861 5.72367 11.4473L2.3224 4.64473C2.1299 4.25974 2.20536 3.79477 2.50972 3.49041L3.49041 2.50972C3.79477 2.20536 4.25974 2.1299 4.64473 2.3224L11.4473 5.72367C11.7861 5.89306 12.0001 6.23933 12.0001 6.6181V9.17164Z"
+                fill="{% if theme == 'dark' %}#818cf8{% else %}#4f46e5{% endif %}"/>
+            </svg>
+            <h1 class="empty-state-title">Work in progress</h1>
+        </div>
+        <p class="empty-state-message">We are still working on extra material for this flashcard. You can find more <strong>{% if current_selected_button == 'boards_and_beyond' %}Boards&Beyond{% else %}First AID Forward{% endif %}</strong> content on other notes.</p>
+    </div>
+</div>
