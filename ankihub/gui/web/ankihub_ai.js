@@ -94,6 +94,7 @@ class AnkiHubAI {
     hideIframe() {
         this.iframe.style.display = "none";
         this.iframeVisible = false;
+        window.ankihubReviewerButtons.unselectAllButtons(false);
     }
 
     cardChanged(noteId) {
