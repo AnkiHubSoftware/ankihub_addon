@@ -176,7 +176,7 @@ class AnkiHubReviewerButtons {
 
     setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
         tooltip.style.position = "absolute";
-        tooltip.style.right = "93px";
+        tooltip.style.right = "60px";
         tooltip.style.zIndex = "1000";
         tooltip.style.fontSize = "medium";
         tooltip.style.borderRadius = "5px";
