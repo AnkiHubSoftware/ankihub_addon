@@ -92,7 +92,7 @@ class AnkiHubReviewerButtons {
         buttonContainer.style.flexDirection = "column";
     }
 
-    setButtonState(buttonData, buttonElement, active) {
+    setButtonState(buttonData, buttonElement, active, sendToPython = true) {
         buttonData.active = active;
         if (active) {
             buttonElement.style.backgroundColor = this.theme == "light" ? this.colorButtonSelectedLight : this.colorButtonSelectedDark;
@@ -101,16 +101,17 @@ class AnkiHubReviewerButtons {
             buttonElement.style.backgroundColor = this.theme == "light" ? this.colorButtonLight : this.colorButtonDark;
         }
 
-
-        const args = `{"buttonName": "${buttonData.name}", "isActive": "${buttonData.active}"}`
-        pycmd(`ankihub_reviewer_button_toggled ${args}`);
+        if(sendToPython) {
+            const args = `{"buttonName": "${buttonData.name}", "isActive": "${buttonData.active}"}`;
+            pycmd(`ankihub_reviewer_button_toggled ${args}`);
+        }
     }
 
-    unselectAllButtons() {
+    unselectAllButtons(sendToPython = true) {
         for (const buttonData of this.buttonsData) {
             if (buttonData.active) {
                 const buttonElement = this.getButtonElement(buttonData.name);
-                this.setButtonState(buttonData, buttonElement, false);
+                this.setButtonState(buttonData, buttonElement, false, sendToPython);
             }
         }
     }
