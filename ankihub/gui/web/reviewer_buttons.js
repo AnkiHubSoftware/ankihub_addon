@@ -17,20 +17,20 @@ class AnkiHubReviewerButtons {
                 iconPath: "/_b&b_icon.svg",
                 iconPathDarkTheme: "/_b&b_icon_dark_theme.svg",
                 active: false,
-                tooltip: null,
+                tooltip: "Boards & Beyond",
             },
             {
                 name: "fa4",
                 iconPath: "/_fa4_icon.svg",
                 iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
                 active: false,
-                tooltip: null
+                tooltip: "First Aid Forward"
             },
             {
                 name: "chatbot",
                 iconPath: "/_chatbot_icon.svg",
                 active: false,
-                tooltip: "Learn more about this flashcard topic<br>or explore related cards."
+                tooltip: "AI Chatbot"
             },
         ]
 
