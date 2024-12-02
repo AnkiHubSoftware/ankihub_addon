@@ -24,7 +24,11 @@ from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..settings import config
-from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
+from .js_message_handling import (
+    ANKIHUB_UPSELL,
+    VIEW_NOTE_PYCMD,
+    parse_js_message_kwargs,
+)
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -370,13 +374,13 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     if message == INVALID_AUTH_TOKEN_PYCMD:
         _handle_invalid_auth_token()
 
-        return (True, None)
+        return True, None
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
 
-        return (True, None)
+        return True, None
     elif message.startswith(REVIEWER_BUTTON_TOGGLED_PYCMD):
         assert isinstance(context, Reviewer), context
         kwargs = parse_js_message_kwargs(message)
@@ -390,12 +394,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # depending on the button that was toggled
             split_screen_webview_manager.toggle_split_screen()
 
-        return (True, None)
+        return True, None
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         split_screen_webview_manager.set_webview_url(kwargs["url"])
 
-        return (True, None)
+        return True, None
+    elif message == ANKIHUB_UPSELL:
+        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
+        context.web.eval(js)
+        return True, None
 
     return handled
 
