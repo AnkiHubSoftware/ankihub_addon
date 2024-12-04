@@ -145,12 +145,6 @@ class SplitScreenWebViewManager:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def toggle_split_screen(self):
-        if self.container.isVisible():
-            self.close_split_screen()
-        else:
-            self.open_split_screen()
-
     def open_split_screen(self):
         if not self.container.isVisible():
             self.container.show()
@@ -392,14 +386,21 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         assert isinstance(context, Reviewer), context
         kwargs = parse_js_message_kwargs(message)
         button_name = kwargs.get("buttonName")
+        is_active = kwargs.get("isActive")
 
         if button_name == "chatbot":
-            js = _wrap_with_ankihubAI_check("ankihubAI.toggleIframe();")
+            if is_active:
+                js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
+            else:
+                js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
             context.web.eval(js)
         else:
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
-            split_screen_webview_manager.toggle_split_screen()
+            if is_active:
+                split_screen_webview_manager.open_split_screen()
+            else:
+                split_screen_webview_manager.close_split_screen()
 
         return True, None
     elif message == CLOSE_SIDEBAR_PYCMD:
