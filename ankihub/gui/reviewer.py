@@ -291,6 +291,8 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
             {
                 "THEME": _ankihub_theme(),
+                "BOARDS_AND_BEYOND_RESOURCE_COUNT": 1,
+                "FIRST_AID_RESOURCE_COUNT": 2,
             }
         )
         web_content.body += f"<script>{reivewer_button_js}</script>"
