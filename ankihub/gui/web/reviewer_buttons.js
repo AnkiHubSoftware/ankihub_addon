@@ -18,7 +18,6 @@ class AnkiHubReviewerButtons {
                 iconPathDarkTheme: "/_b&b_icon_dark_theme.svg",
                 active: false,
                 tooltip: "Boards & Beyond",
-                resourceCount: Number.parseInt("{{ BOARDS_AND_BEYOND_RESOURCE_COUNT }}"),
             },
             {
                 name: "fa4",
@@ -26,7 +25,6 @@ class AnkiHubReviewerButtons {
                 iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
                 active: false,
                 tooltip: "First Aid Forward",
-                resourceCount: Number.parseInt("{{ FIRST_AID_RESOURCE_COUNT }}"),
             },
             {
                 name: "chatbot",
@@ -59,9 +57,10 @@ class AnkiHubReviewerButtons {
             if (buttonData.tooltip) {
                 this.addTooltip(buttonElement, buttonData.tooltip);
             }
-            if(buttonData.resourceCount) {
+            if(buttonData.name !== "chatbot") {
+                // Delay until button is rendered for positioning
                 document.addEventListener("DOMContentLoaded", () => {
-                    this.addResourceCountIndicator(buttonElement, buttonData.resourceCount);
+                    this.addResourceCountIndicator(buttonElement, buttonData.name);
                 });
             }
 
@@ -233,10 +232,10 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
-    addResourceCountIndicator(button, resourceCount) {
+    addResourceCountIndicator(button, buttonName) {
         const indicator = document.createElement("div");
         indicator.classList.add("ankihub-reviewer-button-resource-count");
-        indicator.innerHTML = resourceCount;
+        indicator.dataset.button = buttonName;
         this.setResourceCountIndicatorStyles(button, indicator);
         document.body.appendChild(indicator);
     }
@@ -277,6 +276,20 @@ class AnkiHubReviewerButtons {
             }
         `;
         document.head.appendChild(style);
+    }
+
+    updateResourceCounts(bbCount, faCount) {
+        for(const indicator of document.getElementsByClassName("ankihub-reviewer-button-resource-count")) {
+            if(indicator.dataset.button === "b&b") {
+                indicator.innerHTML = bbCount;
+                const visibility = bbCount ? "visible" : "hidden";
+                indicator.style.visibility = visibility;
+            } else if(indicator.dataset.button === "fa4") {
+                indicator.innerHTML = faCount;
+                const visibility = faCount ? "visible" : "hidden";
+                indicator.style.visibility = visibility;
+            }
+        }
     }
 }
 

@@ -188,6 +188,7 @@ def setup():
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
+        reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
 
     webview_did_receive_js_message.append(_on_js_message)
     reviewer_will_end.append(_close_split_screen_webview)
@@ -291,8 +292,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
             {
                 "THEME": _ankihub_theme(),
-                "BOARDS_AND_BEYOND_RESOURCE_COUNT": 1,
-                "FIRST_AID_RESOURCE_COUNT": 2,
             }
         )
         web_content.body += f"<script>{reivewer_button_js}</script>"
@@ -333,6 +332,16 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
+    aqt.mw.reviewer.web.eval(js)
+
+
+def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
+    note = card.note()
+    bb_count = len([tag for tag in note.tags if "v12::#b&b" in tag.lower()])
+    fa_count = len([tag for tag in note.tags if "v12::#firstaid" in tag])
+    js = _wrap_with_reviewer_buttons_check(
+        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
+    )
     aqt.mw.reviewer.web.eval(js)
 
 
