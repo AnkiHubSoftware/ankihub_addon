@@ -24,7 +24,7 @@ class AnkiHubReviewerButtons {
                 iconPath: "/_fa4_icon.svg",
                 iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
                 active: false,
-                tooltip: "First Aid Forward"
+                tooltip: "First Aid Forward",
             },
             {
                 name: "chatbot",
@@ -57,6 +57,12 @@ class AnkiHubReviewerButtons {
             if (buttonData.tooltip) {
                 this.addTooltip(buttonElement, buttonData.tooltip);
             }
+            if(buttonData.name !== "chatbot") {
+                // Delay until button is rendered for positioning
+                document.addEventListener("DOMContentLoaded", () => {
+                    this.addResourceCountIndicator(buttonElement, buttonData.name);
+                });
+            }
 
             buttonElement.onclick = () => {
                 // Deactivate all other buttons when a button is activated
@@ -77,6 +83,7 @@ class AnkiHubReviewerButtons {
         })
 
         document.body.appendChild(buttonContainer);
+        this.injectResourceCountIndicatorStylesheet();
     }
 
     getButtonElement(buttonName) {
@@ -225,6 +232,67 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
+    addResourceCountIndicator(button, buttonName) {
+        const indicator = document.createElement("div");
+        indicator.classList.add("ankihub-reviewer-button-resource-count");
+        indicator.dataset.button = buttonName;
+        this.setResourceCountIndicatorStyles(button, indicator);
+        document.body.appendChild(indicator);
+    }
+
+    setResourceCountIndicatorStyles(button, indicator) {
+        indicator.style.position = "absolute";
+        indicator.style.right = "48px";
+        indicator.style.zIndex = "999";
+        indicator.style.fontFamily = "Merriweather sans-serif";
+        indicator.style.fontSize = "12px";
+        indicator.style.fontWeight = "800";
+        indicator.style.height = "18px";
+        indicator.style.width = "16px";
+        indicator.style.borderRadius = "20px 0 0 20px";
+        indicator.style.display = "flex";
+        indicator.style.alignItems = "center";
+        indicator.style.justifyContent = "center";
+
+        const buttonRect = button.getBoundingClientRect();
+        const indicatorTop = buttonRect.top + 5;
+        indicator.style.top = `${indicatorTop}px`;
+    }
+
+    injectResourceCountIndicatorStylesheet() {
+        const style = document.createElement("style");
+        style.innerHTML = `
+            :root {
+                --primary-600: #4F46E5;
+                --primary-400: #818CF8;
+            }
+
+            .ankihub-reviewer-button-resource-count {
+                background-color: var(--primary-600);
+                color: white;
+            }
+
+            .night-mode .ankihub-reviewer-button-resource-count {
+                background-color: var(--primary-400);
+                color: black;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    updateResourceCounts(bbCount, faCount) {
+        for(const indicator of document.getElementsByClassName("ankihub-reviewer-button-resource-count")) {
+            if(indicator.dataset.button === "b&b") {
+                indicator.innerHTML = bbCount;
+                const visibility = bbCount ? "visible" : "hidden";
+                indicator.style.visibility = visibility;
+            } else if(indicator.dataset.button === "fa4") {
+                indicator.innerHTML = faCount;
+                const visibility = faCount ? "visible" : "hidden";
+                indicator.style.visibility = visibility;
+            }
+        }
+    }
 }
 
 window.ankihubReviewerButtons = new AnkiHubReviewerButtons();
