@@ -242,16 +242,18 @@ class AnkiHubReviewerButtons {
 
     setResourceCountIndicatorStyles(button, indicator) {
         indicator.style.position = "absolute";
-        indicator.style.right = "10px";
+        indicator.style.right = "48px";
         indicator.style.zIndex = "999";
-        indicator.style.fontSize = "small";
-        indicator.style.borderRadius = "5px";
-        indicator.style.textAlign = "left";
-        indicator.style.fontWeight = "bold";
-        indicator.style.padding = "8px";
-        indicator.style.height = "12px";
-        indicator.style.width = "48px";
-        indicator.style.borderRadius = "92px";
+        indicator.style.fontFamily = "Merriweather sans-serif";
+        indicator.style.fontSize = "12px";
+        indicator.style.fontWeight = "800";
+        indicator.style.height = "18px";
+        indicator.style.width = "16px";
+        indicator.style.borderRadius = "20px 0 0 20px";
+        indicator.style.display = "flex";
+        indicator.style.alignItems = "center";
+        indicator.style.justifyContent = "center";
+
         const buttonRect = button.getBoundingClientRect();
         const indicatorTop = buttonRect.top + 5;
         indicator.style.top = `${indicatorTop}px`;
