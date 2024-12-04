@@ -58,6 +58,7 @@ class SplitScreenWebViewManager:
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
         self.current_active_url = urls_list[0]["url"] if urls_list else None
         self.urls_list = urls_list
+        self.original_mw_min_width = aqt.mw.minimumWidth()
         self._setup_webview()
 
     def _setup_webview(self):
@@ -83,6 +84,7 @@ class SplitScreenWebViewManager:
 
         # Create the web views
         self.webview = aqt.webview.AnkiWebView()
+        self.webview.setMinimumWidth(self.original_mw_min_width)
         # Interceptor that will add the token to the request
         interceptor = AuthenticationRequestInterceptor(self.webview)
 
@@ -150,9 +152,11 @@ class SplitScreenWebViewManager:
     def open_split_screen(self):
         if not self.container.isVisible():
             self.container.show()
+            aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
 
     def close_split_screen(self):
         self.container.hide()
+        aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
     def _inject_header(self, ok: bool):
         if not ok:
