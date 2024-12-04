@@ -338,7 +338,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
     bb_count = len([tag for tag in note.tags if "v12::#b&b" in tag.lower()])
-    fa_count = len([tag for tag in note.tags if "v12::#firstaid" in tag])
+    fa_count = len([tag for tag in note.tags if "v12::#firstaid" in tag.lower()])
     js = _wrap_with_reviewer_buttons_check(
         "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
     )
