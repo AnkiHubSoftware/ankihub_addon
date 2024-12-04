@@ -44,6 +44,7 @@ NO_URLS_EMPTY_STATE_TEMPLATE_PATH = (
 
 INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
+CLOSE_SIDEBAR_PYCMD = "ankihub_close_sidebar"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
@@ -400,6 +401,13 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
             split_screen_webview_manager.toggle_split_screen()
+
+        return True, None
+    elif message == CLOSE_SIDEBAR_PYCMD:
+        js = _wrap_with_reviewer_buttons_check(
+            "ankihubReviewerButtons.unselectAllButtons()"
+        )
+        aqt.mw.reviewer.web.eval(js)
 
         return True, None
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
