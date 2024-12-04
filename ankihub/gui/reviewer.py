@@ -280,10 +280,13 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
             # TODO: Replace with the actual URLs
             urls_list = [
                 {
-                    "url": "https://www.google.com",
-                    "title": "Google",
+                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/asdf/",
+                    "title": "Heart",
                 },
-                {"url": "https://www.bing.com", "title": "Bing"},
+                {
+                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/foo/",
+                    "title": "Heart Failure",
+                },
             ]
             split_screen_webview_manager = SplitScreenWebViewManager(context, urls_list)
 
