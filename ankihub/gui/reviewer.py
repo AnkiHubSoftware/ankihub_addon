@@ -7,6 +7,7 @@ from typing import Any, Optional, Tuple
 import aqt
 import aqt.webview
 from anki.cards import Card
+from anki.notes import Note
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -265,7 +266,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    if not _related_ah_deck_has_note_embeddings(context):
+    if not _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
         return
 
     ah_ai_template_vars = {
@@ -309,11 +310,9 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         web_content.body += f"<script>{ankihub_ai_old_js}</script>"
 
 
-def _related_ah_deck_has_note_embeddings(reviewer: Reviewer) -> bool:
-    ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
-    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(
-        reviewer.card.note().mid
-    )
+def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
+    ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(note.mid)
     ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
         aqt.mw.col.decks.current()["id"]
     )
