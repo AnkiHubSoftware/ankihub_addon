@@ -66,19 +66,6 @@ class AnkiHubAI {
         return iframe;
     }
 
-    toggleIframe() {
-        if (!this.knoxToken) {
-            this.invalidateSessionAndPromptToLogin()
-            return;
-        }
-        if (!this.iframeVisible) {
-            this.maybeUpdateIframeSrc();
-            this.showIframe();
-        } else {
-            this.hideIframe();
-        }
-    }
-
     invalidateSessionAndPromptToLogin() {
         this.authenticated = false;
         this.knoxToken = null;
@@ -87,14 +74,27 @@ class AnkiHubAI {
     }
 
     showIframe() {
+        if (this.iframeVisible) {
+            return
+        }
+
+        if (!this.knoxToken) {
+            this.invalidateSessionAndPromptToLogin()
+            return;
+        }
+        this.maybeUpdateIframeSrc();
+
         this.iframe.style.display = "block";
         this.iframeVisible = true;
     }
 
     hideIframe() {
+        if (!this.iframeVisible) {
+            return
+        }
         this.iframe.style.display = "none";
         this.iframeVisible = false;
-        window.ankihubReviewerButtons.unselectAllButtons(false);
+        window.ankihubReviewerButtons.setButtonStateByName("chatbot", false);
     }
 
     cardChanged(noteId) {
@@ -138,8 +138,8 @@ class AnkiHubAI {
         iframe.style.maxHeight = `${parentWindowHeight - 95}px`;
 
         iframe.style.position = "fixed"
-        iframe.style.bottom = "85px"
-        iframe.style.right = "20px"
+        iframe.style.bottom = "10px"
+        iframe.style.right = "60px"
 
         iframe.style.border = "none"
         iframe.style.borderRadius = "10px"
