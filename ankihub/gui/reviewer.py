@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+from enum import Enum
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Optional, Tuple
@@ -24,7 +25,8 @@ from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
-from ..settings import config
+from ..main.utils import mh_tag_to_resource_title_and_slug
+from ..settings import config, url_mh_integrations_preview
 from .js_message_handling import (
     ANKIHUB_UPSELL,
     VIEW_NOTE_PYCMD,
@@ -51,15 +53,32 @@ OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 
 
+class ResourceType(Enum):
+    BOARDS_AND_BEYOND = "b&b"
+    FIRST_AID = "fa4"
+
+
+RESOURCE_TYPE_TO_TAG_PART = {
+    ResourceType.BOARDS_AND_BEYOND: "#b&b",
+    ResourceType.FIRST_AID: "#firstaid",
+}
+
+RESOURCE_TYPE_TO_DISPLAY_NAME = {
+    ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond",
+    ResourceType.FIRST_AID: "First Aid",
+}
+
+
 class SplitScreenWebViewManager:
-    def __init__(self, reviewer: Reviewer, urls_list=[]):
+    def __init__(self, reviewer: Reviewer):
         self.reviewer = reviewer
         self.splitter: Optional[aqt.QSplitter] = None
         self.container: Optional[aqt.QWidget] = None
         self.webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_url = urls_list[0]["url"] if urls_list else None
-        self.urls_list = urls_list
+        self.current_active_url: Optional[str] = None
+        self.urls_list = None
+        self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self._setup_webview()
 
@@ -79,8 +98,8 @@ class SplitScreenWebViewManager:
         self.container.setLayout(container_layout)
 
         # Create a QWebEngineProfile with persistent storage
-        profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
-        profile.setHttpUserAgent(
+        self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
+        self.profile.setHttpUserAgent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
         )
 
@@ -88,23 +107,7 @@ class SplitScreenWebViewManager:
         self.webview = aqt.webview.AnkiWebView()
         self.webview.setMinimumWidth(self.original_mw_min_width)
         # Interceptor that will add the token to the request
-        interceptor = AuthenticationRequestInterceptor(self.webview)
-
-        if not self.urls_list:
-            empty_state_html_template = Template(
-                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
-            ).render(
-                {
-                    "theme": _ankihub_theme(),
-                    # TODO: Change this depending on the button that was toggled
-                    "current_selected_button": "boards_and_beyond",
-                }
-            )
-            self.webview.setHtml(empty_state_html_template)
-        else:
-            self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
-            self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
-            self.webview.page().profile().setUrlRequestInterceptor(interceptor)
+        self.interceptor = AuthenticationRequestInterceptor(self.webview)
 
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
@@ -145,6 +148,25 @@ class SplitScreenWebViewManager:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
+    def update_tabs(self, urls_list, resource_type: ResourceType) -> None:
+        self.urls_list = urls_list
+        self.resource_type = resource_type
+
+        if not urls_list:
+            empty_state_html_template = Template(
+                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
+            ).render(
+                {
+                    "theme": _ankihub_theme(),
+                    "resource_type": resource_type.value,
+                }
+            )
+            self.webview.setHtml(empty_state_html_template)
+        else:
+            self.webview.setPage(CustomWebPage(self.profile, self.webview._onBridgeCmd))
+            self.webview.page().profile().setUrlRequestInterceptor(self.interceptor)
+            self.set_webview_url(urls_list[0]["url"])
+
     def open_split_screen(self):
         if not self.container.isVisible():
             self.container.show()
@@ -155,14 +177,14 @@ class SplitScreenWebViewManager:
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
     def _inject_header(self, ok: bool):
-        if not ok:
-            LOGGER.error("Failed to load page.")  # pragma: no cover
-            return  # pragma: no cover
+        if not ok:  # pragma: no cover
+            LOGGER.error("Failed to load page.")
+            return
         html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
                 "current_active_tab_url": self.current_active_url,
-                "page_title": "Boards&Beyond viewer",
+                "page_title": f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
                 "theme": _ankihub_theme(),
             }
         )
@@ -185,10 +207,10 @@ def setup():
     if not using_qt5():
         webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+        reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
-        reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
 
     webview_did_receive_js_message.append(_on_js_message)
     reviewer_will_end.append(_close_split_screen_webview)
@@ -274,18 +296,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if feature_flags.get("mh_integration"):
         global split_screen_webview_manager
         if not split_screen_webview_manager:
-            # TODO: Replace with the actual URLs
-            urls_list = [
-                {
-                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/asdf/",
-                    "title": "Heart",
-                },
-                {
-                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/foo/",
-                    "title": "Heart Failure",
-                },
-            ]
-            split_screen_webview_manager = SplitScreenWebViewManager(context, urls_list)
+            split_screen_webview_manager = SplitScreenWebViewManager(context)
 
         ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
             ah_ai_template_vars
@@ -381,6 +392,30 @@ def _close_split_screen_webview():
         split_screen_webview_manager.close_split_screen()
 
 
+def _update_sidebar_urls(resource_type: ResourceType) -> None:
+    if not split_screen_webview_manager:
+        return
+
+    tags = aqt.mw.reviewer.card.note().tags
+    resource_tags = [
+        tag
+        for tag in tags
+        if f"_v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}" in tag.lower()
+    ]
+    resource_title_slug_pairs = [
+        title_and_slug
+        for tag in resource_tags
+        if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
+    ]
+
+    resource_urls_list = [
+        {"title": title, "url": url_mh_integrations_preview(slug)}
+        for title, slug in resource_title_slug_pairs
+    ]
+
+    split_screen_webview_manager.update_tabs(resource_urls_list, resource_type)
+
+
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == INVALID_AUTH_TOKEN_PYCMD:
@@ -410,6 +445,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # depending on the button that was toggled
             if is_active:
                 split_screen_webview_manager.open_split_screen()
+                resource_type = ResourceType(button_name)
+                _update_sidebar_urls(resource_type)
             else:
                 split_screen_webview_manager.close_split_screen()
 
