@@ -116,7 +116,7 @@ class SplitScreenWebViewManager:
             )
         )
 
-        aqt.qconnect(self.webview.loadFinished, self._inject_header)
+        aqt.qconnect(self.webview.loadFinished, self._log_if_page_load_filaed)
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.webview)
         self.header_webview.adjustSize()
@@ -152,34 +152,26 @@ class SplitScreenWebViewManager:
         self.urls_list = urls_list
         self.resource_type = resource_type
 
-        if not urls_list:
+        self._update_content_webview()
+        self._update_header_webview()
+
+    def _update_content_webview(self):
+        if not self.urls_list:
             empty_state_html_template = Template(
                 NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
             ).render(
                 {
                     "theme": _ankihub_theme(),
-                    "resource_type": resource_type.value,
+                    "resource_type": self.resource_type.value,
                 }
             )
             self.webview.setHtml(empty_state_html_template)
         else:
             self.webview.setPage(CustomWebPage(self.profile, self.webview._onBridgeCmd))
             self.webview.page().profile().setUrlRequestInterceptor(self.interceptor)
-            self.set_webview_url(urls_list[0]["url"])
+            self.set_webview_url(self.urls_list[0]["url"])
 
-    def open_split_screen(self):
-        if not self.container.isVisible():
-            self.container.show()
-            aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
-
-    def close_split_screen(self):
-        self.container.hide()
-        aqt.mw.setMinimumWidth(self.original_mw_min_width)
-
-    def _inject_header(self, ok: bool):
-        if not ok:  # pragma: no cover
-            LOGGER.error("Failed to load page.")
-            return
+    def _update_header_webview(self):
         html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
@@ -190,6 +182,20 @@ class SplitScreenWebViewManager:
         )
         self.header_webview.setHtml(html_template)
         self.header_webview.adjustHeightToFit()
+
+    def open_split_screen(self):
+        if not self.container.isVisible():
+            self.container.show()
+            aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
+
+    def close_split_screen(self):
+        self.container.hide()
+        aqt.mw.setMinimumWidth(self.original_mw_min_width)
+
+    def _log_if_page_load_filaed(self, ok: bool):
+        if not ok:  # pragma: no cover
+            LOGGER.error("Failed to load page.")
+            return
 
     def set_webview_url(self, url):
         if self.webview:
