@@ -150,6 +150,7 @@ from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
+    mh_tag_to_resource_title_and_slug,
     mids_of_notes,
     note_type_with_updated_templates,
     retain_nids_with_ah_note_type,
@@ -3052,3 +3053,28 @@ def test_send_daily_review_summaries_without_data(mocker):
 
     mock_get_daily_review_summaries.assert_called_once_with(last_summary_sent_date)
     mock_anki_hub_client.send_daily_card_review_summaries.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "tag, expected_title, expected_slug",
+    [
+        (
+            "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia",
+            "Ammonia",
+            "step1-bb-biochem-amino_acids-ammonia",
+        ),
+        (
+            "#AK_Step2_v12::#FirstAid::14_Pulm::16_Nose_and_Throat::01_Rhinitis",
+            "Rhinitis",
+            "step2-fa-pulm-nose_and_throat-rhinitis",
+        ),
+        ("invalid_tag", None, None),
+    ],
+)
+def test_mh_tag_to_resource_title_and_slug(
+    tag: str, expected_title: str, expected_slug: str
+):
+    if expected_title is None:
+        assert mh_tag_to_resource_title_and_slug(tag) is None
+    else:
+        assert mh_tag_to_resource_title_and_slug(tag) == (expected_title, expected_slug)
