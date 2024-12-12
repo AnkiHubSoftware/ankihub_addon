@@ -320,38 +320,40 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    if not _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
-        return
-
-    ah_ai_template_vars = {
-        "KNOX_TOKEN": config.token(),
-        "APP_URL": config.app_url,
-        "ENDPOINT_PATH": "ai/chatbot",
-        "QUERY_PARAMETERS": "is_on_anki=true",
-        "THEME": _ankihub_theme(),
-    }
     if feature_flags.get("mh_integration"):
-        global sidebar_manager
-        if not sidebar_manager:
-            sidebar_manager = ReviewerSidebar(context)
-            sidebar_manager.set_on_auth_failure_hook(_handle_auth_failure)
+        ankihub_ai_js_path = ANKIHUB_AI_JS_PATH
+    else:
+        ankihub_ai_js_path = ANKIHUB_AI_OLD_JS_PATH
 
-        ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
-            ah_ai_template_vars
-        )
-        web_content.body += f"<script>{ankihub_ai_js}</script>"
-
-        reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+    # TODO This condition is not placed correctly. It should be used to
+    # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
+    # The consquence of the current implementation is that the chatbot icon is shown for notes it
+    # shouldn't be shown for and (maybe) isn't shown for notes it should be shown for in some cases.
+    # However, we don't have to fix it for the old chatbot implementation, because we will switch
+    # to a new one soon. For the new implementation, we should implement the correct logic.
+    if _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
+        ankihub_ai_js = Template(ankihub_ai_js_path.read_text()).render(
             {
+                "KNOX_TOKEN": config.token(),
+                "APP_URL": config.app_url,
+                "ENDPOINT_PATH": "ai/chatbot",
+                "QUERY_PARAMETERS": "is_on_anki=true",
                 "THEME": _ankihub_theme(),
             }
         )
-        web_content.body += f"<script>{reivewer_button_js}</script>"
-    else:
-        ankihub_ai_old_js = Template(ANKIHUB_AI_OLD_JS_PATH.read_text()).render(
-            ah_ai_template_vars
-        )
-        web_content.body += f"<script>{ankihub_ai_old_js}</script>"
+        web_content.body += f"<script>{ankihub_ai_js}</script>"
+
+    global sidebar_manager
+    if not sidebar_manager:
+        sidebar_manager = ReviewerSidebar(context)
+        sidebar_manager.set_on_auth_failure_hook(_handle_auth_failure)
+
+    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+        {
+            "THEME": _ankihub_theme(),
+        }
+    )
+    web_content.body += f"<script>{reivewer_button_js}</script>"
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
