@@ -116,7 +116,7 @@ class SplitScreenWebViewManager:
             )
         )
 
-        aqt.qconnect(self.webview.loadFinished, self._log_if_page_load_filaed)
+        aqt.qconnect(self.webview.loadFinished, self._log_if_page_load_failed)
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.webview)
         self.header_webview.adjustSize()
@@ -148,9 +148,11 @@ class SplitScreenWebViewManager:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def update_tabs(self, urls_list, resource_type: ResourceType) -> None:
+    def update_tabs(
+        self, urls_list, resource_type: Optional[ResourceType] = None
+    ) -> None:
         self.urls_list = urls_list
-        self.resource_type = resource_type
+        self.resource_type = resource_type if resource_type else self.resource_type
 
         self._update_content_webview()
         self._update_header_webview()
@@ -188,11 +190,14 @@ class SplitScreenWebViewManager:
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
 
+    def is_sidebar_open(self):
+        return self.container.isVisible()
+
     def close_split_screen(self):
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def _log_if_page_load_filaed(self, ok: bool):
+    def _log_if_page_load_failed(self, ok: bool):
         if not ok:  # pragma: no cover
             LOGGER.error("Failed to load page.")
             return
@@ -214,6 +219,7 @@ def setup():
         webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
+        reviewer_did_show_question.append(_notify_sidebar_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
@@ -398,7 +404,12 @@ def _close_split_screen_webview():
         split_screen_webview_manager.close_split_screen()
 
 
-def _update_sidebar_urls(resource_type: ResourceType) -> None:
+def _notify_sidebar_of_card_change(_: Card) -> None:
+    if split_screen_webview_manager and split_screen_webview_manager.is_sidebar_open():
+        _update_sidebar_tabs_based_on_tags(split_screen_webview_manager.resource_type)
+
+
+def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
     if not split_screen_webview_manager:
         return
 
@@ -452,7 +463,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             if is_active:
                 split_screen_webview_manager.open_split_screen()
                 resource_type = ResourceType(button_name)
-                _update_sidebar_urls(resource_type)
+                _update_sidebar_tabs_based_on_tags(resource_type)
             else:
                 split_screen_webview_manager.close_split_screen()
 
