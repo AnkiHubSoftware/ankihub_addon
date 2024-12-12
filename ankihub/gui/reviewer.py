@@ -3,7 +3,7 @@
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 import aqt
 import aqt.webview
@@ -69,12 +69,12 @@ RESOURCE_TYPE_TO_DISPLAY_NAME = {
 }
 
 
-class SplitScreenWebViewManager:
+class ReviewerSidebar:
     def __init__(self, reviewer: Reviewer):
         self.reviewer = reviewer
         self.splitter: Optional[aqt.QSplitter] = None
         self.container: Optional[aqt.QWidget] = None
-        self.webview: Optional[aqt.webview.AnkiWebView] = None
+        self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
         self.current_active_url: Optional[str] = None
         self.urls_list = None
@@ -105,12 +105,12 @@ class SplitScreenWebViewManager:
         )
 
         # Create the web views
-        self.webview = aqt.webview.AnkiWebView()
-        self.webview.setMinimumWidth(self.original_mw_min_width)
+        self.content_webview = aqt.webview.AnkiWebView()
+        self.content_webview.setMinimumWidth(self.original_mw_min_width)
         # Interceptor that will add the token to the request
-        self.interceptor = AuthenticationRequestInterceptor(self.webview)
+        self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
 
-        aqt.qconnect(self.webview.loadFinished, self._on_page_loaded)
+        aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
 
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
@@ -120,7 +120,7 @@ class SplitScreenWebViewManager:
         )
 
         container_layout.addWidget(self.header_webview)
-        container_layout.addWidget(self.webview)
+        container_layout.addWidget(self.content_webview)
         self.header_webview.adjustSize()
         self.container.hide()
 
@@ -137,7 +137,7 @@ class SplitScreenWebViewManager:
         )
 
         widget = self.reviewer.web
-        # For compatibility with other add-ons that add a side panel too (e.g. AMBOSS)
+        # For compatibility with other add-ons that add a sidebar too (e.g. AMBOSS)
         if isinstance(self.reviewer.web.parentWidget(), aqt.QSplitter):
             widget = self.reviewer.web.parentWidget()
         widget_index = parent_widget.mainLayout.indexOf(widget)
@@ -169,11 +169,15 @@ class SplitScreenWebViewManager:
                     "resource_type": self.resource_type.value,
                 }
             )
-            self.webview.setHtml(empty_state_html_template)
+            self.content_webview.setHtml(empty_state_html_template)
         else:
-            self.webview.setPage(CustomWebPage(self.profile, self.webview._onBridgeCmd))
-            self.webview.page().profile().setUrlRequestInterceptor(self.interceptor)
-            self.set_webview_url(self.urls_list[0]["url"])
+            self.content_webview.setPage(
+                CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+            )
+            self.content_webview.page().profile().setUrlRequestInterceptor(
+                self.interceptor
+            )
+            self.set_content_url(self.urls_list[0]["url"])
 
     def _update_header_webview(self):
         html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
@@ -187,7 +191,7 @@ class SplitScreenWebViewManager:
         self.header_webview.setHtml(html_template)
         self.header_webview.adjustHeightToFit()
 
-    def open_split_screen(self):
+    def open_sidebar(self):
         if not config.token():
             self._handle_auth_failure()
 
@@ -198,13 +202,13 @@ class SplitScreenWebViewManager:
     def is_sidebar_open(self):
         return self.container.isVisible()
 
-    def close_split_screen(self):
+    def close_sidebar(self):
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def set_webview_url(self, url) -> None:
-        if self.webview:
-            self.webview.setUrl(aqt.QUrl(url))
+    def set_content_url(self, url) -> None:
+        if self.content_webview:
+            self.content_webview.setUrl(aqt.QUrl(url))
             self.current_active_url = url
 
     def _on_page_loaded(self, ok: bool) -> None:
@@ -217,7 +221,7 @@ class SplitScreenWebViewManager:
             else:
                 LOGGER.error("Failed to load page.")
 
-        self.webview.evalWithCallback(
+        self.content_webview.evalWithCallback(
             "document.body.innerHTML", check_auth_failure_callback
         )
 
@@ -229,7 +233,7 @@ class SplitScreenWebViewManager:
             self.on_auth_failure_hook()
 
 
-split_screen_webview_manager: Optional[SplitScreenWebViewManager] = None
+sidebar_manager: Optional[ReviewerSidebar] = None
 
 
 def setup():
@@ -246,7 +250,7 @@ def setup():
         reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
-    reviewer_will_end.append(_close_split_screen_webview)
+    reviewer_will_end.append(_close_sidebar_if_exists)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
@@ -327,10 +331,10 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         "THEME": _ankihub_theme(),
     }
     if feature_flags.get("mh_integration"):
-        global split_screen_webview_manager
-        if not split_screen_webview_manager:
-            split_screen_webview_manager = SplitScreenWebViewManager(context)
-            split_screen_webview_manager.set_on_auth_failure_hook(_handle_auth_failure)
+        global sidebar_manager
+        if not sidebar_manager:
+            sidebar_manager = ReviewerSidebar(context)
+            sidebar_manager.set_on_auth_failure_hook(_handle_auth_failure)
 
         ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
             ah_ai_template_vars
@@ -381,16 +385,6 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
-def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
-    note = card.note()
-    bb_count = len([tag for tag in note.tags if "v12::#b&b" in tag.lower()])
-    fa_count = len([tag for tag in note.tags if "v12::#firstaid" in tag.lower()])
-    js = _wrap_with_reviewer_buttons_check(
-        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
-    )
-    aqt.mw.reviewer.web.eval(js)
-
-
 def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
@@ -421,26 +415,32 @@ def _wrap_with_reviewer_buttons_check(js: str) -> str:
     return f"if (typeof ankihubReviewerButtons !== 'undefined') {{ {js} }}"
 
 
-def _close_split_screen_webview():
-    if split_screen_webview_manager:
-        split_screen_webview_manager.close_split_screen()
+def _close_sidebar_if_exists():
+    if sidebar_manager:
+        sidebar_manager.close_sidebar()
 
 
 def _notify_sidebar_of_card_change(_: Card) -> None:
-    if split_screen_webview_manager and split_screen_webview_manager.is_sidebar_open():
-        _update_sidebar_tabs_based_on_tags(split_screen_webview_manager.resource_type)
+    if sidebar_manager and sidebar_manager.is_sidebar_open():
+        _update_sidebar_tabs_based_on_tags(sidebar_manager.resource_type)
+
+
+def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
+    note = card.note()
+    bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
+    fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
+    js = _wrap_with_reviewer_buttons_check(
+        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
+    )
+    aqt.mw.reviewer.web.eval(js)
 
 
 def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
-    if not split_screen_webview_manager:
+    if not sidebar_manager:
         return
 
     tags = aqt.mw.reviewer.card.note().tags
-    resource_tags = [
-        tag
-        for tag in tags
-        if f"_v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}" in tag.lower()
-    ]
+    resource_tags = _get_resource_tags(tags, resource_type)
     resource_title_slug_pairs = [
         title_and_slug
         for tag in resource_tags
@@ -452,7 +452,13 @@ def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
         for title, slug in resource_title_slug_pairs
     ]
 
-    split_screen_webview_manager.update_tabs(resource_urls_list, resource_type)
+    sidebar_manager.update_tabs(resource_urls_list, resource_type)
+
+
+def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
+    """Get all (v12) tags matching a specific resource type."""
+    search_pattern = f"v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}".lower()
+    return {tag for tag in tags if search_pattern in tag.lower()}
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
@@ -483,15 +489,15 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
             if is_active:
-                split_screen_webview_manager.open_split_screen()
+                sidebar_manager.open_sidebar()
                 resource_type = ResourceType(button_name)
                 _update_sidebar_tabs_based_on_tags(resource_type)
             else:
-                split_screen_webview_manager.close_split_screen()
+                sidebar_manager.close_sidebar()
 
         return True, None
     elif message == CLOSE_SIDEBAR_PYCMD:
-        split_screen_webview_manager.close_split_screen()
+        sidebar_manager.close_sidebar()
 
         js = _wrap_with_reviewer_buttons_check(
             "ankihubReviewerButtons.unselectAllButtons()"
@@ -501,7 +507,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return True, None
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
-        split_screen_webview_manager.set_webview_url(kwargs["url"])
+        sidebar_manager.set_content_url(kwargs["url"])
 
         return True, None
     elif message == ANKIHUB_UPSELL:
@@ -513,8 +519,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
 
 def _handle_auth_failure():
-    if split_screen_webview_manager:
-        split_screen_webview_manager.close_split_screen()
+    if sidebar_manager:
+        sidebar_manager.close_sidebar()
 
     js = _wrap_with_reviewer_buttons_check(
         "ankihubReviewerButtons.unselectAllButtons()"
