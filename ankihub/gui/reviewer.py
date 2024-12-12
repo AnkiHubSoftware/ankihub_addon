@@ -453,6 +453,7 @@ def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
         {"title": title, "url": url_mh_integrations_preview(slug)}
         for title, slug in resource_title_slug_pairs
     ]
+    resource_urls_list = sorted(resource_urls_list, key=lambda x: x["title"])
 
     sidebar_manager.update_tabs(resource_urls_list, resource_type)
 
