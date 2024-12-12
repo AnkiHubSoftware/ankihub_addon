@@ -3,7 +3,7 @@
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import aqt
 import aqt.webview
@@ -80,9 +80,10 @@ class SplitScreenWebViewManager:
         self.urls_list = None
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
-        self._setup_webview()
+        self.on_auth_failure_hook: Callable = None
+        self._setup_ui()
 
-    def _setup_webview(self):
+    def _setup_ui(self):
         parent_widget = self.reviewer.mw
 
         if parent_widget is None:
@@ -109,6 +110,8 @@ class SplitScreenWebViewManager:
         # Interceptor that will add the token to the request
         self.interceptor = AuthenticationRequestInterceptor(self.webview)
 
+        aqt.qconnect(self.webview.loadFinished, self._on_page_loaded)
+
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
             aqt.QSizePolicy(
@@ -116,7 +119,6 @@ class SplitScreenWebViewManager:
             )
         )
 
-        aqt.qconnect(self.webview.loadFinished, self._log_if_page_load_failed)
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.webview)
         self.header_webview.adjustSize()
@@ -186,6 +188,9 @@ class SplitScreenWebViewManager:
         self.header_webview.adjustHeightToFit()
 
     def open_split_screen(self):
+        if not config.token():
+            self._handle_auth_failure()
+
         if not self.container.isVisible():
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
@@ -197,15 +202,31 @@ class SplitScreenWebViewManager:
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def _log_if_page_load_failed(self, ok: bool):
-        if not ok:  # pragma: no cover
-            LOGGER.error("Failed to load page.")
-            return
-
-    def set_webview_url(self, url):
+    def set_webview_url(self, url) -> None:
         if self.webview:
             self.webview.setUrl(aqt.QUrl(url))
             self.current_active_url = url
+
+    def _on_page_loaded(self, ok: bool) -> None:
+        if ok:
+            return
+
+        def check_auth_failure_callback(value: str) -> None:
+            if value.strip().endswith("Invalid token"):
+                self._handle_auth_failure()
+            else:
+                LOGGER.error("Failed to load page.")
+
+        self.webview.evalWithCallback(
+            "document.body.innerHTML", check_auth_failure_callback
+        )
+
+    def set_on_auth_failure_hook(self, hook: Callable) -> None:
+        self.on_auth_failure_hook = hook
+
+    def _handle_auth_failure(self) -> None:
+        if self.on_auth_failure_hook:
+            self.on_auth_failure_hook()
 
 
 split_screen_webview_manager: Optional[SplitScreenWebViewManager] = None
@@ -309,6 +330,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         global split_screen_webview_manager
         if not split_screen_webview_manager:
             split_screen_webview_manager = SplitScreenWebViewManager(context)
+            split_screen_webview_manager.set_on_auth_failure_hook(_handle_auth_failure)
 
         ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
             ah_ai_template_vars
@@ -436,7 +458,7 @@ def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == INVALID_AUTH_TOKEN_PYCMD:
-        _handle_invalid_auth_token()
+        _handle_auth_failure()
 
         return True, None
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
@@ -469,6 +491,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return True, None
     elif message == CLOSE_SIDEBAR_PYCMD:
+        split_screen_webview_manager.close_split_screen()
+
         js = _wrap_with_reviewer_buttons_check(
             "ankihubReviewerButtons.unselectAllButtons()"
         )
@@ -488,7 +512,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     return handled
 
 
-def _handle_invalid_auth_token():
+def _handle_auth_failure():
+    if split_screen_webview_manager:
+        split_screen_webview_manager.close_split_screen()
+
     js = _wrap_with_reviewer_buttons_check(
         "ankihubReviewerButtons.unselectAllButtons()"
     )
