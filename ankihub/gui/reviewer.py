@@ -233,7 +233,7 @@ class ReviewerSidebar:
             self.on_auth_failure_hook()
 
 
-sidebar_manager: Optional[ReviewerSidebar] = None
+reviewer_sidebar: Optional[ReviewerSidebar] = None
 
 
 def setup():
@@ -343,10 +343,10 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         )
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
-    global sidebar_manager
-    if not sidebar_manager:
-        sidebar_manager = ReviewerSidebar(context)
-        sidebar_manager.set_on_auth_failure_hook(_handle_auth_failure)
+    global reviewer_sidebar
+    if not reviewer_sidebar:
+        reviewer_sidebar = ReviewerSidebar(context)
+        reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
     reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
         {
@@ -418,13 +418,13 @@ def _wrap_with_reviewer_buttons_check(js: str) -> str:
 
 
 def _close_sidebar_if_exists():
-    if sidebar_manager:
-        sidebar_manager.close_sidebar()
+    if reviewer_sidebar:
+        reviewer_sidebar.close_sidebar()
 
 
 def _notify_sidebar_of_card_change(_: Card) -> None:
-    if sidebar_manager and sidebar_manager.is_sidebar_open():
-        _update_sidebar_tabs_based_on_tags(sidebar_manager.resource_type)
+    if reviewer_sidebar and reviewer_sidebar.is_sidebar_open():
+        _update_sidebar_tabs_based_on_tags(reviewer_sidebar.resource_type)
 
 
 def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
@@ -438,7 +438,7 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
 
 
 def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
-    if not sidebar_manager:
+    if not reviewer_sidebar:
         return
 
     tags = aqt.mw.reviewer.card.note().tags
@@ -455,7 +455,7 @@ def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
     ]
     resource_urls_list = list(sorted(resource_urls_list, key=lambda x: x["title"]))
 
-    sidebar_manager.update_tabs(resource_urls_list, resource_type)
+    reviewer_sidebar.update_tabs(resource_urls_list, resource_type)
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
@@ -492,15 +492,15 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
             if is_active:
-                sidebar_manager.open_sidebar()
+                reviewer_sidebar.open_sidebar()
                 resource_type = ResourceType(button_name)
                 _update_sidebar_tabs_based_on_tags(resource_type)
             else:
-                sidebar_manager.close_sidebar()
+                reviewer_sidebar.close_sidebar()
 
         return True, None
     elif message == CLOSE_SIDEBAR_PYCMD:
-        sidebar_manager.close_sidebar()
+        reviewer_sidebar.close_sidebar()
 
         js = _wrap_with_reviewer_buttons_check(
             "ankihubReviewerButtons.unselectAllButtons()"
@@ -510,7 +510,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return True, None
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
-        sidebar_manager.set_content_url(kwargs["url"])
+        reviewer_sidebar.set_content_url(kwargs["url"])
 
         return True, None
     elif message == ANKIHUB_UPSELL:
@@ -522,8 +522,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
 
 def _handle_auth_failure():
-    if sidebar_manager:
-        sidebar_manager.close_sidebar()
+    if reviewer_sidebar:
+        reviewer_sidebar.close_sidebar()
 
     js = _wrap_with_reviewer_buttons_check(
         "ankihubReviewerButtons.unselectAllButtons()"
