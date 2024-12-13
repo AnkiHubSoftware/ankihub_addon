@@ -134,7 +134,7 @@
 </style>
 <script>
     function selectTab(element) {
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('selected'));
+        document.querySelectorAll('.webview-tab').forEach(tab => tab.classList.remove('selected'));
         element.classList.add('selected');
     }
 </script>
@@ -156,7 +156,6 @@
             </button>
         </div>
     </div>
-    {% if tabs %}
     <nav class="webview-tabs">
         {% for tab in tabs %}
         <div class="webview-tab {% if current_active_tab_url == tab.url %}selected{% endif %}"
@@ -166,5 +165,4 @@
         </div>
         {% endfor %}
     </nav>
-    {% endif %}
 </div>

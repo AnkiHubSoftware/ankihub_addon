@@ -657,3 +657,29 @@ def is_tag_in_list(tag: str, tags: List[str]) -> bool:
 
 def collection_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
+
+
+def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
+    """Converts a McGrawHill tag to a title and URL for the MH resource preview.
+
+    Example:
+    #AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia
+    -> ('Ammonia', 'step1-bb-biochem-amino_acids-ammonia')
+    """
+    try:
+        step = int(re.match(r"#AK_Step(\d+)_v12::", tag, re.IGNORECASE).group(1))
+        resource_type_str = re.search(r"_v12::#(.+?)::", tag, re.IGNORECASE).group(1)
+        resource_slug_str = {"B&B": "bb", "FirstAid": "fa"}[resource_type_str]
+        path = re.sub(r".+_v12::#.+?::", "", tag, re.IGNORECASE)
+        path_parts = path.split("::")
+        path_parts = [part.lower() for part in path_parts]
+        cleaned_path_parts = [re.sub(r"\d+_", "", part) for part in path_parts]
+        slug = f"step{step}-{resource_slug_str}-{'-'.join(cleaned_path_parts)}"
+
+        title = cleaned_path_parts[-1].replace("_", " ")
+        title = " ".join([word.capitalize() for word in title.split()])
+    except (KeyError, AttributeError, IndexError):
+        # We want to ignore any tags that don't match the expected format
+        return None
+
+    return title, slug
