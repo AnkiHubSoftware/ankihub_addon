@@ -273,7 +273,11 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     }
     if feature_flags.get("mh_integration"):
         global split_screen_webview_manager
-        if not split_screen_webview_manager:
+        is_anking_deck = (
+            ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
+            == config.anking_deck_id
+        )
+        if not split_screen_webview_manager and is_anking_deck:
             # TODO: Replace with the actual URLs
             urls_list = [
                 {
@@ -295,10 +299,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
             {
                 "THEME": _ankihub_theme(),
-                "IS_ANKING_DECK": ankihub_db.ankihub_did_for_anki_nid(
-                    aqt.mw.reviewer.card.note().id
-                )
-                == config.anking_deck_id,
+                "IS_ANKING_DECK": is_anking_deck,
             }
         )
         web_content.body += f"<script>{reivewer_button_js}</script>"
