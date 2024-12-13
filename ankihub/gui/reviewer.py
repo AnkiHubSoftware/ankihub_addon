@@ -295,6 +295,10 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
             {
                 "THEME": _ankihub_theme(),
+                "IS_ANKING_DECK": ankihub_db.ankihub_did_for_anki_nid(
+                    aqt.mw.reviewer.card.note().id
+                )
+                == config.anking_deck_id,
             }
         )
         web_content.body += f"<script>{reivewer_button_js}</script>"

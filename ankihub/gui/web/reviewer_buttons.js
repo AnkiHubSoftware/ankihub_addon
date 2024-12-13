@@ -2,6 +2,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
+        this.isAnKingDeck = "{{ IS_ANKING_DECK }}" === "True";
 
         this.colorButtonLight = "#F9FAFB";
         this.colorButtonSelectedLight = "#C7D2FE";
@@ -42,6 +43,9 @@ class AnkiHubReviewerButtons {
         this.setButtonContainerStyle(buttonContainer);
 
         this.buttonsData.forEach((buttonData, buttonIdx) => {
+            if(!this.isAnKingDeck && buttonData.name !== "chatbot") {
+                return;
+            }
             const buttonElement = document.createElement("button");
             buttonElement.id = `ankihub-${buttonData.name}-button`;
             this.setButtonStyle(
