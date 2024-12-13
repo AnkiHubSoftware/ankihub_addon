@@ -344,13 +344,18 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
     global reviewer_sidebar
-    if not reviewer_sidebar:
+    is_anking_deck = (
+        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
+        == config.anking_deck_id
+    )
+    if not reviewer_sidebar and is_anking_deck:
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
     reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
         {
             "THEME": _ankihub_theme(),
+            "IS_ANKING_DECK": is_anking_deck,
         }
     )
     web_content.body += f"<script>{reivewer_button_js}</script>"
