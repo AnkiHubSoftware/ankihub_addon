@@ -1,8 +1,9 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Optional, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 import aqt
 import aqt.webview
@@ -24,7 +25,8 @@ from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
-from ..settings import config
+from ..main.utils import mh_tag_to_resource_title_and_slug
+from ..settings import config, url_mh_integrations_preview
 from .js_message_handling import (
     ANKIHUB_UPSELL,
     VIEW_NOTE_PYCMD,
@@ -51,19 +53,37 @@ OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 
 
-class SplitScreenWebViewManager:
-    def __init__(self, reviewer: Reviewer, urls_list=[]):
+class ResourceType(Enum):
+    BOARDS_AND_BEYOND = "b&b"
+    FIRST_AID = "fa4"
+
+
+RESOURCE_TYPE_TO_TAG_PART = {
+    ResourceType.BOARDS_AND_BEYOND: "#b&b",
+    ResourceType.FIRST_AID: "#firstaid",
+}
+
+RESOURCE_TYPE_TO_DISPLAY_NAME = {
+    ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond",
+    ResourceType.FIRST_AID: "First Aid",
+}
+
+
+class ReviewerSidebar:
+    def __init__(self, reviewer: Reviewer):
         self.reviewer = reviewer
         self.splitter: Optional[aqt.QSplitter] = None
         self.container: Optional[aqt.QWidget] = None
-        self.webview: Optional[aqt.webview.AnkiWebView] = None
+        self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_url = urls_list[0]["url"] if urls_list else None
-        self.urls_list = urls_list
+        self.current_active_url: Optional[str] = None
+        self.urls_list = None
+        self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
-        self._setup_webview()
+        self.on_auth_failure_hook: Callable = None
+        self._setup_ui()
 
-    def _setup_webview(self):
+    def _setup_ui(self):
         parent_widget = self.reviewer.mw
 
         if parent_widget is None:
@@ -79,32 +99,18 @@ class SplitScreenWebViewManager:
         self.container.setLayout(container_layout)
 
         # Create a QWebEngineProfile with persistent storage
-        profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
-        profile.setHttpUserAgent(
+        self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
+        self.profile.setHttpUserAgent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
         )
 
         # Create the web views
-        self.webview = aqt.webview.AnkiWebView()
-        self.webview.setMinimumWidth(self.original_mw_min_width)
+        self.content_webview = aqt.webview.AnkiWebView()
+        self.content_webview.setMinimumWidth(self.original_mw_min_width)
         # Interceptor that will add the token to the request
-        interceptor = AuthenticationRequestInterceptor(self.webview)
+        self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
 
-        if not self.urls_list:
-            empty_state_html_template = Template(
-                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
-            ).render(
-                {
-                    "theme": _ankihub_theme(),
-                    # TODO: Change this depending on the button that was toggled
-                    "current_selected_button": "boards_and_beyond",
-                }
-            )
-            self.webview.setHtml(empty_state_html_template)
-        else:
-            self.webview.setPage(CustomWebPage(profile, self.webview._onBridgeCmd))
-            self.webview.setUrl(aqt.QUrl(self.urls_list[0]["url"]))
-            self.webview.page().profile().setUrlRequestInterceptor(interceptor)
+        aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
 
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
@@ -113,9 +119,8 @@ class SplitScreenWebViewManager:
             )
         )
 
-        aqt.qconnect(self.webview.loadFinished, self._inject_header)
         container_layout.addWidget(self.header_webview)
-        container_layout.addWidget(self.webview)
+        container_layout.addWidget(self.content_webview)
         self.header_webview.adjustSize()
         self.container.hide()
 
@@ -132,7 +137,7 @@ class SplitScreenWebViewManager:
         )
 
         widget = self.reviewer.web
-        # For compatibility with other add-ons that add a side panel too (e.g. AMBOSS)
+        # For compatibility with other add-ons that add a sidebar too (e.g. AMBOSS)
         if isinstance(self.reviewer.web.parentWidget(), aqt.QSplitter):
             widget = self.reviewer.web.parentWidget()
         widget_index = parent_widget.mainLayout.indexOf(widget)
@@ -145,37 +150,90 @@ class SplitScreenWebViewManager:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def open_split_screen(self):
-        if not self.container.isVisible():
-            self.container.show()
-            aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
+    def update_tabs(
+        self, urls_list, resource_type: Optional[ResourceType] = None
+    ) -> None:
+        self.urls_list = urls_list
+        self.resource_type = resource_type if resource_type else self.resource_type
 
-    def close_split_screen(self):
-        self.container.hide()
-        aqt.mw.setMinimumWidth(self.original_mw_min_width)
+        self._update_content_webview()
+        self._update_header_webview()
 
-    def _inject_header(self, ok: bool):
-        if not ok:
-            LOGGER.error("Failed to load page.")  # pragma: no cover
-            return  # pragma: no cover
+    def _update_content_webview(self):
+        if not self.urls_list:
+            empty_state_html_template = Template(
+                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
+            ).render(
+                {
+                    "theme": _ankihub_theme(),
+                    "resource_type": self.resource_type.value,
+                }
+            )
+            self.content_webview.setHtml(empty_state_html_template)
+        else:
+            self.content_webview.setPage(
+                CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+            )
+            self.content_webview.page().profile().setUrlRequestInterceptor(
+                self.interceptor
+            )
+            self.set_content_url(self.urls_list[0]["url"])
+
+    def _update_header_webview(self):
         html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
                 "current_active_tab_url": self.current_active_url,
-                "page_title": "Boards&Beyond viewer",
+                "page_title": f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
                 "theme": _ankihub_theme(),
             }
         )
         self.header_webview.setHtml(html_template)
         self.header_webview.adjustHeightToFit()
 
-    def set_webview_url(self, url):
-        if self.webview:
-            self.webview.setUrl(aqt.QUrl(url))
+    def open_sidebar(self):
+        if not config.token():
+            self._handle_auth_failure()
+
+        if not self.container.isVisible():
+            self.container.show()
+            aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
+
+    def is_sidebar_open(self):
+        return self.container.isVisible()
+
+    def close_sidebar(self):
+        self.container.hide()
+        aqt.mw.setMinimumWidth(self.original_mw_min_width)
+
+    def set_content_url(self, url) -> None:
+        if self.content_webview:
+            self.content_webview.setUrl(aqt.QUrl(url))
             self.current_active_url = url
 
+    def _on_page_loaded(self, ok: bool) -> None:
+        if ok:
+            return
 
-split_screen_webview_manager: Optional[SplitScreenWebViewManager] = None
+        def check_auth_failure_callback(value: str) -> None:
+            if value.strip().endswith("Invalid token"):
+                self._handle_auth_failure()
+            else:
+                LOGGER.error("Failed to load page.")
+
+        self.content_webview.evalWithCallback(
+            "document.body.innerHTML", check_auth_failure_callback
+        )
+
+    def set_on_auth_failure_hook(self, hook: Callable) -> None:
+        self.on_auth_failure_hook = hook
+
+    def _handle_auth_failure(self) -> None:
+        if self.on_auth_failure_hook:
+            self.on_auth_failure_hook()
+
+
+reviewer_sidebar: Optional[ReviewerSidebar] = None
 
 
 def setup():
@@ -185,13 +243,14 @@ def setup():
     if not using_qt5():
         webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+        reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
+        reviewer_did_show_question.append(_notify_sidebar_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
-        reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
 
     webview_did_receive_js_message.append(_on_js_message)
-    reviewer_will_end.append(_close_split_screen_webview)
+    reviewer_will_end.append(_close_sidebar_if_exists)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
@@ -261,48 +320,40 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    if not _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
-        return
-
-    ah_ai_template_vars = {
-        "KNOX_TOKEN": config.token(),
-        "APP_URL": config.app_url,
-        "ENDPOINT_PATH": "ai/chatbot",
-        "QUERY_PARAMETERS": "is_on_anki=true",
-        "THEME": _ankihub_theme(),
-    }
     if feature_flags.get("mh_integration"):
-        global split_screen_webview_manager
-        if not split_screen_webview_manager:
-            # TODO: Replace with the actual URLs
-            urls_list = [
-                {
-                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/asdf/",
-                    "title": "Heart",
-                },
-                {
-                    "url": f"{config.app_url}/integrations/mcgraw-hill/preview/foo/",
-                    "title": "Heart Failure",
-                },
-            ]
-            split_screen_webview_manager = SplitScreenWebViewManager(context, urls_list)
+        ankihub_ai_js_path = ANKIHUB_AI_JS_PATH
+    else:
+        ankihub_ai_js_path = ANKIHUB_AI_OLD_JS_PATH
 
-        ankihub_ai_js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(
-            ah_ai_template_vars
-        )
-        web_content.body += f"<script>{ankihub_ai_js}</script>"
-
-        reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+    # TODO This condition is not placed correctly. It should be used to
+    # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
+    # The consquence of the current implementation is that the chatbot icon is shown for notes it
+    # shouldn't be shown for and (maybe) isn't shown for notes it should be shown for in some cases.
+    # However, we don't have to fix it for the old chatbot implementation, because we will switch
+    # to a new one soon. For the new implementation, we should implement the correct logic.
+    if _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
+        ankihub_ai_js = Template(ankihub_ai_js_path.read_text()).render(
             {
+                "KNOX_TOKEN": config.token(),
+                "APP_URL": config.app_url,
+                "ENDPOINT_PATH": "ai/chatbot",
+                "QUERY_PARAMETERS": "is_on_anki=true",
                 "THEME": _ankihub_theme(),
             }
         )
-        web_content.body += f"<script>{reivewer_button_js}</script>"
-    else:
-        ankihub_ai_old_js = Template(ANKIHUB_AI_OLD_JS_PATH.read_text()).render(
-            ah_ai_template_vars
-        )
-        web_content.body += f"<script>{ankihub_ai_old_js}</script>"
+        web_content.body += f"<script>{ankihub_ai_js}</script>"
+
+    global reviewer_sidebar
+    if not reviewer_sidebar:
+        reviewer_sidebar = ReviewerSidebar(context)
+        reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
+
+    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+        {
+            "THEME": _ankihub_theme(),
+        }
+    )
+    web_content.body += f"<script>{reivewer_button_js}</script>"
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -336,16 +387,6 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
-def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
-    note = card.note()
-    bb_count = len([tag for tag in note.tags if "v12::#b&b" in tag.lower()])
-    fa_count = len([tag for tag in note.tags if "v12::#firstaid" in tag.lower()])
-    js = _wrap_with_reviewer_buttons_check(
-        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
-    )
-    aqt.mw.reviewer.web.eval(js)
-
-
 def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
@@ -376,15 +417,57 @@ def _wrap_with_reviewer_buttons_check(js: str) -> str:
     return f"if (typeof ankihubReviewerButtons !== 'undefined') {{ {js} }}"
 
 
-def _close_split_screen_webview():
-    if split_screen_webview_manager:
-        split_screen_webview_manager.close_split_screen()
+def _close_sidebar_if_exists():
+    if reviewer_sidebar:
+        reviewer_sidebar.close_sidebar()
+
+
+def _notify_sidebar_of_card_change(_: Card) -> None:
+    if reviewer_sidebar and reviewer_sidebar.is_sidebar_open():
+        _update_sidebar_tabs_based_on_tags(reviewer_sidebar.resource_type)
+
+
+def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
+    note = card.note()
+    bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
+    fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
+    js = _wrap_with_reviewer_buttons_check(
+        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
+    )
+    aqt.mw.reviewer.web.eval(js)
+
+
+def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
+    if not reviewer_sidebar:
+        return
+
+    tags = aqt.mw.reviewer.card.note().tags
+    resource_tags = _get_resource_tags(tags, resource_type)
+    resource_title_slug_pairs = [
+        title_and_slug
+        for tag in resource_tags
+        if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
+    ]
+
+    resource_urls_list = [
+        {"title": title, "url": url_mh_integrations_preview(slug)}
+        for title, slug in resource_title_slug_pairs
+    ]
+    resource_urls_list = list(sorted(resource_urls_list, key=lambda x: x["title"]))
+
+    reviewer_sidebar.update_tabs(resource_urls_list, resource_type)
+
+
+def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
+    """Get all (v12) tags matching a specific resource type."""
+    search_pattern = f"v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}".lower()
+    return {tag for tag in tags if search_pattern in tag.lower()}
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == INVALID_AUTH_TOKEN_PYCMD:
-        _handle_invalid_auth_token()
+        _handle_auth_failure()
 
         return True, None
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
@@ -409,12 +492,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
             if is_active:
-                split_screen_webview_manager.open_split_screen()
+                reviewer_sidebar.open_sidebar()
+                resource_type = ResourceType(button_name)
+                _update_sidebar_tabs_based_on_tags(resource_type)
             else:
-                split_screen_webview_manager.close_split_screen()
+                reviewer_sidebar.close_sidebar()
 
         return True, None
     elif message == CLOSE_SIDEBAR_PYCMD:
+        reviewer_sidebar.close_sidebar()
+
         js = _wrap_with_reviewer_buttons_check(
             "ankihubReviewerButtons.unselectAllButtons()"
         )
@@ -423,7 +510,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return True, None
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
-        split_screen_webview_manager.set_webview_url(kwargs["url"])
+        reviewer_sidebar.set_content_url(kwargs["url"])
 
         return True, None
     elif message == ANKIHUB_UPSELL:
@@ -434,7 +521,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     return handled
 
 
-def _handle_invalid_auth_token():
+def _handle_auth_failure():
+    if reviewer_sidebar:
+        reviewer_sidebar.close_sidebar()
+
     js = _wrap_with_reviewer_buttons_check(
         "ankihubReviewerButtons.unselectAllButtons()"
     )

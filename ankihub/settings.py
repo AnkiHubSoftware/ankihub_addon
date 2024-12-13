@@ -875,6 +875,9 @@ url_flashcard_selector_embed = (
     lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed?is_on_anki=true"
 )  # noqa: E731
 url_plans_page = lambda: f"{config.app_url}/memberships/plans/"  # noqa: E731
+url_mh_integrations_preview = (
+    lambda resource_slug: f"{config.app_url}/integrations/mcgraw-hill/preview/{resource_slug}"
+)  # noqa: E731
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
