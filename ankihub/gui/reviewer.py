@@ -391,7 +391,7 @@ def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
     feature_flags = config.get_feature_flags()
-    if not feature_flags.get("chatbot", False):
+    if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
     js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
