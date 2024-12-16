@@ -344,10 +344,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
     global reviewer_sidebar
-    is_anking_deck = (
-        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
-        == config.anking_deck_id
-    )
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
@@ -355,7 +351,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
         {
             "THEME": _ankihub_theme(),
-            "IS_ANKING_DECK": is_anking_deck,
         }
     )
     web_content.body += f"<script>{reivewer_button_js}</script>"
@@ -436,8 +431,19 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
     bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
+
+    is_anking_deck = (
+        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
+        == config.anking_deck_id
+    )
     js = _wrap_with_reviewer_buttons_check(
-        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
+        f"""
+        ankihubReviewerButtons.updateButtons(
+            {bb_count},
+            {fa_count},
+            {'true' if is_anking_deck else 'false'},
+        );
+        """
     )
     aqt.mw.reviewer.web.eval(js)
 
