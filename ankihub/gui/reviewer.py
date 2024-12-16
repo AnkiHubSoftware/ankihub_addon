@@ -110,6 +110,11 @@ class ReviewerSidebar:
         # Interceptor that will add the token to the request
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
 
+        self.content_webview.setPage(
+            CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+        )
+        self.content_webview.page().profile().setUrlRequestInterceptor(self.interceptor)
+
         aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
 
         self.header_webview = aqt.webview.AnkiWebView()
@@ -161,22 +166,8 @@ class ReviewerSidebar:
 
     def _update_content_webview(self):
         if not self.urls_list:
-            empty_state_html_template = Template(
-                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
-            ).render(
-                {
-                    "theme": _ankihub_theme(),
-                    "resource_type": self.resource_type.value,
-                }
-            )
-            self.content_webview.setHtml(empty_state_html_template)
+            self.set_content_url(None)
         else:
-            self.content_webview.setPage(
-                CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
-            )
-            self.content_webview.page().profile().setUrlRequestInterceptor(
-                self.interceptor
-            )
             self.set_content_url(self.urls_list[0]["url"])
 
     def _update_header_webview(self):
@@ -207,9 +198,23 @@ class ReviewerSidebar:
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
     def set_content_url(self, url) -> None:
-        if self.content_webview:
+        self.current_active_url = url
+
+        if not self.content_webview:
+            return
+
+        if url:
             self.content_webview.setUrl(aqt.QUrl(url))
-            self.current_active_url = url
+        else:
+            empty_state_html_template = Template(
+                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
+            ).render(
+                {
+                    "theme": _ankihub_theme(),
+                    "resource_type": self.resource_type.value,
+                }
+            )
+            self.content_webview.setHtml(empty_state_html_template)
 
     def _on_page_loaded(self, ok: bool) -> None:
         if ok:
