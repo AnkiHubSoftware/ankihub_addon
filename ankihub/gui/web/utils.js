@@ -70,7 +70,8 @@ function setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
             color: white;
         }
 
-        .night-mode .ankihub-tooltip {
+        .night-mode .ankihub-tooltip,
+        .dark .ankihub-tooltip {
             background-color: var(--neutral-200);
             color: black;
         }
@@ -80,7 +81,8 @@ function setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
             color: var(--neutral-800);
         }
 
-        .night-mode .ankihub-tooltip-arrow {
+        .night-mode .ankihub-tooltip-arrow,
+        .dark .ankihub-tooltip-arrow {
             border-color: var(--neutral-200);
             color: var(--neutral-200);
         }

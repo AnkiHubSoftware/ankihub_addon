@@ -1,3 +1,4 @@
+<html class="{{ theme }}">
 <style>
     * {
         box-sizing: border-box;
@@ -44,7 +45,7 @@
         color: #9ca3af;
     }
 </style>
-<div class="{% if theme == 'dark' %}dark{% endif %}">
+<div>
     <div class="empty-state-container">
         <div class="empty-state-center-content">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -55,3 +56,5 @@
         <p class="empty-state-message">😅 Unfortunately, there is no extra material linked to this card. Keep studying to find more <strong>{% if resource_type == 'b&b' %}Boards&Beyond{% else %}First AID Forward{% endif %}</strong> content on other notes.</p>
     </div>
 </div>
+
+</html>
