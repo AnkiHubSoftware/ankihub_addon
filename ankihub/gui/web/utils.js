@@ -1,5 +1,5 @@
 
-function addTooltip(element, tooltipText) {
+function addTooltip(button, tooltipText) {
     const tooltip = document.createElement("div");
     tooltip.classList.add("ankihub-tooltip");
     tooltip.innerHTML = tooltipText;
@@ -10,42 +10,36 @@ function addTooltip(element, tooltipText) {
 
     this.setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow);
 
-    element.addEventListener("mouseover", () => {
-        // Append tooltip to the body to get accurate dimensions
-        document.body.appendChild(tooltip);
+    button.addEventListener("mouseover", () => {
+        if (button.hasAttribute("disabled")) {
+            return;
+        }
 
         // Get positions and dimensions
-        const elementRect = element.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
         const tooltipRect = tooltip.getBoundingClientRect();
 
-        // Calculate element vertical center
-        const elementCenter = elementRect.top + (elementRect.height / 2);
+        // Calculate button vertical center
+        const buttonCenter = buttonRect.top + (buttonRect.height / 2);
 
         // Center tooltip using its height
         const tooltipOffset = tooltipRect.height / 2;
-        const tooltipTop = elementCenter - tooltipOffset - 4;
+        const tooltipTop = buttonCenter - tooltipOffset;
 
         // Position and show tooltip
         tooltip.style.top = `${tooltipTop}px`;
-        tooltip.style.right = `${elementRect.width + 10}px`;
+        tooltip.style.left = `${buttonRect.left - tooltipRect.width - 10}px`;
         tooltip.style.visibility = 'visible';
-
-        // Remove tooltip from body after positioning
-        document.body.removeChild(tooltip);
-        element.appendChild(tooltip);
     });
 
-    element.addEventListener("mouseout", function () {
+    button.addEventListener("mouseout", function () {
         tooltip.style.visibility = 'hidden';
     });
 
-    element.style.position = 'relative';
-    element.appendChild(tooltip);
+    document.body.appendChild(tooltip);
 }
-
 function setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
     tooltip.style.position = "absolute";
-    tooltip.style.right = "100%";
     tooltip.style.zIndex = "1000";
     tooltip.style.fontSize = "medium";
     tooltip.style.borderRadius = "5px";

@@ -368,7 +368,10 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
+    env = Environment(
+        loader=FileSystemLoader(str(REVIEWER_BUTTONS_JS_PATH.parent)),
+    )
+    reivewer_button_js = env.get_template("reviewer_buttons.js").render(
         {
             "THEME": _ankihub_theme(),
         }
