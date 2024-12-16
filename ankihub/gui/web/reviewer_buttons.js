@@ -42,10 +42,11 @@ class AnkiHubReviewerButtons {
         const buttonContainer = document.createElement("div");
         this.setButtonContainerStyle(buttonContainer);
 
-        this.buttonsData.forEach((buttonData, buttonIdx) => {
-            if(!this.isAnKingDeck && buttonData.name !== "chatbot") {
-                return;
-            }
+        const filteredButtonsData = this.buttonsData.filter(buttonData =>
+            this.isAnKingDeck || buttonData.name === "chatbot"
+        );
+
+        filteredButtonsData.forEach((buttonData, buttonIdx) => {
             const buttonElement = document.createElement("button");
             buttonElement.id = `ankihub-${buttonData.name}-button`;
             this.setButtonStyle(
@@ -55,13 +56,13 @@ class AnkiHubReviewerButtons {
                         buttonData.iconPathDarkTheme : buttonData.iconPath
                 ),
                 buttonIdx === 0,
-                buttonIdx === this.buttonsData.length - 1
+                buttonIdx === filteredButtonsData.length - 1
             );
 
             if (buttonData.tooltip) {
                 this.addTooltip(buttonElement, buttonData.tooltip);
             }
-            if(buttonData.name !== "chatbot") {
+            if (buttonData.name !== "chatbot") {
                 // Delay until button is rendered for positioning
                 document.addEventListener("DOMContentLoaded", () => {
                     this.addResourceCountIndicator(buttonElement, buttonData.name);
@@ -143,7 +144,9 @@ class AnkiHubReviewerButtons {
         button.style.margin = "0px";
         button.style.border = "1px solid";
         button.style.borderColor = this.theme == "light" ? this.colorButtonBorderLight : this.colorButtonBorderDark;
-        if (isBottomButton) {
+        if (isTopButton && isBottomButton) {
+            button.style.borderRadius = "8px 0px 0px 8px";
+        } else if (isBottomButton) {
             button.style.borderRadius = "0px 0px 0px 8px";
         } else if (isTopButton) {
             button.style.borderRadius = "8px 0px 0px 0px";
@@ -293,12 +296,12 @@ class AnkiHubReviewerButtons {
     }
 
     updateResourceCounts(bbCount, faCount) {
-        for(const indicator of document.getElementsByClassName("ankihub-reviewer-button-resource-count")) {
-            if(indicator.dataset.button === "b&b") {
+        for (const indicator of document.getElementsByClassName("ankihub-reviewer-button-resource-count")) {
+            if (indicator.dataset.button === "b&b") {
                 indicator.innerHTML = bbCount;
                 const visibility = bbCount ? "visible" : "hidden";
                 indicator.style.visibility = visibility;
-            } else if(indicator.dataset.button === "fa4") {
+            } else if (indicator.dataset.button === "fa4") {
                 indicator.innerHTML = faCount;
                 const visibility = faCount ? "visible" : "hidden";
                 indicator.style.visibility = visibility;
