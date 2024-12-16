@@ -37,7 +37,7 @@ from .web.templates import (
     get_empty_state_html,
     get_header_webview_html,
     get_remove_anking_button_js,
-    get_reviewer_button_js,
+    get_reviewer_buttons_js,
 )
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -360,7 +360,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = get_reviewer_button_js(theme=_ankihub_theme())
+    reivewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
     web_content.body += f"<script>{reivewer_button_js}</script>"
 
 

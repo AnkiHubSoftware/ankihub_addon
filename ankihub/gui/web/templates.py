@@ -41,7 +41,7 @@ def get_ankihub_ai_js(
     )
 
 
-def get_reviewer_button_js(theme: str) -> str:
+def get_reviewer_buttons_js(theme: str) -> str:
     return web_env.get_template("reviewer_buttons.js").render({"THEME": theme})
 
 
