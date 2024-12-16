@@ -181,6 +181,13 @@ class ReviewerSidebar:
                 "theme": _ankihub_theme(),
             }
         )
+
+        # This prevents empty state below the header when there are no tabs.
+        # adjustHeightToFit only works for making the height bigger, not smaller.
+        # So we first set the height to 44px (height of the header without tabs),
+        # then set the html content, and then adjust the height to fit the content.
+        self.header_webview.setFixedHeight(44)
+
         self.header_webview.setHtml(html_template)
         self.header_webview.adjustHeightToFit()
 
