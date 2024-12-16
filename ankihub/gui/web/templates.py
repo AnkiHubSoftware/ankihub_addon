@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 TEMPLATES_PATH = (pathlib.Path(__file__).parent).absolute()
 
-web_env = Environment(
+env = Environment(
     loader=FileSystemLoader(TEMPLATES_PATH), autoescape=select_autoescape()
 )
 
@@ -12,7 +12,7 @@ web_env = Environment(
 def get_header_webview_html(
     urls_list, current_active_tab_url: str, page_title: str, theme: str
 ) -> str:
-    return web_env.get_template("sidebar_tabs.html").render(
+    return env.get_template("sidebar_tabs.html").render(
         {
             "tabs": urls_list,
             "current_active_tab_url": current_active_tab_url,
@@ -30,7 +30,7 @@ def get_ankihub_ai_js(
     query_parameters: str,
     theme: str,
 ) -> str:
-    return web_env.get_template(template_name).render(
+    return env.get_template(template_name).render(
         {
             "KNOX_TOKEN": knox_token,
             "APP_URL": app_url,
@@ -42,14 +42,14 @@ def get_ankihub_ai_js(
 
 
 def get_reviewer_buttons_js(theme: str) -> str:
-    return web_env.get_template("reviewer_buttons.js").render({"THEME": theme})
+    return env.get_template("reviewer_buttons.js").render({"THEME": theme})
 
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
-    return web_env.get_template("mh_no_urls_empty_state.html").render(
+    return env.get_template("mh_no_urls_empty_state.html").render(
         {"theme": theme, "resource_type": resource_type}
     )
 
 
 def get_remove_anking_button_js() -> str:
-    return web_env.get_template("remove_anking_button.js").render()
+    return env.get_template("remove_anking_button.js").render()
