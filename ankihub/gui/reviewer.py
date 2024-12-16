@@ -348,7 +348,7 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
         == config.anking_deck_id
     )
-    if not reviewer_sidebar and is_anking_deck:
+    if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
