@@ -208,6 +208,8 @@ class ReviewerSidebar:
         if not self.content_webview:
             return
 
+        self._update_content_webview_theme()
+
         if url:
             self.content_webview.setUrl(aqt.QUrl(url))
         else:
@@ -216,6 +218,11 @@ class ReviewerSidebar:
                 resource_type=self.resource_type.value,
             )
             self.content_webview.setHtml(html)
+
+    def _update_content_webview_theme(self):
+        self.content_webview.eval(
+            f"localStorage.setItem('theme', '{_ankihub_theme()}');"
+        )
 
     def _on_page_loaded(self, ok: bool) -> None:
         if ok:
