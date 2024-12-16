@@ -147,7 +147,7 @@ class AnkiHubReviewerButtons {
 
     setElementsContainerStyle(elementsContainer) {
         elementsContainer.style.position = "fixed";
-        elementsContainer.style.bottom = "28px";
+        elementsContainer.style.bottom = "0px";
         elementsContainer.style.right = "0px";
         elementsContainer.style.zIndex = "9999";
         elementsContainer.style.display = "flex";
