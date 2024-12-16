@@ -18,6 +18,7 @@ from aqt.gui_hooks import (
 )
 from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
+from aqt.utils import openLink
 from aqt.webview import WebContent
 from jinja2 import Template
 
@@ -51,6 +52,7 @@ CLOSE_SIDEBAR_PYCMD = "ankihub_close_sidebar"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
+OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD = "ankihub_open_sidebar_content_in_browser"
 
 
 class ResourceType(Enum):
@@ -76,7 +78,7 @@ class ReviewerSidebar:
         self.container: Optional[aqt.QWidget] = None
         self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_url: Optional[str] = None
+        self.current_active_tab_url: Optional[str] = None
         self.urls_list = None
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
@@ -174,7 +176,7 @@ class ReviewerSidebar:
         html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
             {
                 "tabs": self.urls_list,
-                "current_active_tab_url": self.current_active_url,
+                "current_active_tab_url": self.current_active_tab_url,
                 "page_title": f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
                 "theme": _ankihub_theme(),
             }
@@ -197,8 +199,11 @@ class ReviewerSidebar:
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def set_content_url(self, url) -> None:
-        self.current_active_url = url
+    def get_content_url(self) -> Optional[str]:
+        return self.content_webview.url().toString()
+
+    def set_content_url(self, url: Optional[str]) -> None:
+        self.current_active_tab_url = url
 
         if not self.content_webview:
             return
@@ -527,6 +532,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         reviewer_sidebar.set_content_url(kwargs["url"])
+
+        return True, None
+    elif message == OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD:
+        url = reviewer_sidebar.get_content_url()
+        if url:
+            openLink(url)
 
         return True, None
     elif message == ANKIHUB_UPSELL:
