@@ -1,0 +1,95 @@
+
+function addTooltip(element, tooltipText) {
+    const tooltip = document.createElement("div");
+    tooltip.classList.add("ankihub-tooltip");
+    tooltip.innerHTML = tooltipText;
+
+    const tooltipArrow = document.createElement("div");
+    tooltipArrow.classList.add("ankihub-tooltip-arrow");
+    tooltip.appendChild(tooltipArrow);
+
+    this.setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow);
+
+    element.addEventListener("mouseover", () => {
+        // Append tooltip to the body to get accurate dimensions
+        document.body.appendChild(tooltip);
+
+        // Get positions and dimensions
+        const elementRect = element.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+
+        // Calculate element vertical center
+        const elementCenter = elementRect.top + (elementRect.height / 2);
+
+        // Center tooltip using its height
+        const tooltipOffset = tooltipRect.height / 2;
+        const tooltipTop = elementCenter - tooltipOffset - 4;
+
+        // Position and show tooltip
+        tooltip.style.top = `${tooltipTop}px`;
+        tooltip.style.right = `${elementRect.width + 10}px`;
+        tooltip.style.visibility = 'visible';
+
+        // Remove tooltip from body after positioning
+        document.body.removeChild(tooltip);
+        element.appendChild(tooltip);
+    });
+
+    element.addEventListener("mouseout", function () {
+        tooltip.style.visibility = 'hidden';
+    });
+
+    element.style.position = 'relative';
+    element.appendChild(tooltip);
+}
+
+function setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
+    tooltip.style.position = "absolute";
+    tooltip.style.right = "100%";
+    tooltip.style.zIndex = "1000";
+    tooltip.style.fontSize = "medium";
+    tooltip.style.borderRadius = "5px";
+    tooltip.style.textAlign = "center";
+    tooltip.style.padding = "10px";
+    tooltip.style.visibility = "hidden";
+    tooltip.style.whiteSpace = "nowrap";
+
+    tooltipArrow.style.position = "absolute";
+    tooltipArrow.style.top = "50%";
+    tooltipArrow.style.right = "-6px";
+    tooltipArrow.style.marginTop = "-4px";
+    tooltipArrow.style.width = "0";
+    tooltipArrow.style.height = "0";
+    tooltipArrow.style.borderLeft = "6px solid";
+    tooltipArrow.style.borderTop = "6px solid transparent";
+    tooltipArrow.style.borderBottom = "6px solid transparent";
+
+    const style = document.createElement("style");
+    style.innerHTML = `
+        :root {
+            --neutral-200: #e5e5e5;
+            --neutral-800: #1f2937;
+        }
+
+        .ankihub-tooltip {
+            background-color: var(--neutral-800);
+            color: white;
+        }
+
+        .night-mode .ankihub-tooltip {
+            background-color: var(--neutral-200);
+            color: black;
+        }
+
+        .ankihub-tooltip-arrow {
+            border-color: var(--neutral-800);
+            color: var(--neutral-800);
+        }
+
+        .night-mode .ankihub-tooltip-arrow {
+            border-color: var(--neutral-200);
+            color: var(--neutral-200);
+        }
+    `;
+    document.head.appendChild(style);
+}

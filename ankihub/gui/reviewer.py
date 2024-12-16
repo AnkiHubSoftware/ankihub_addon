@@ -20,7 +20,7 @@ from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
 from aqt.utils import openLink
 from aqt.webview import WebContent
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, Template
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -173,7 +173,10 @@ class ReviewerSidebar:
             self.set_content_url(self.urls_list[0]["url"])
 
     def _update_header_webview(self):
-        html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
+        env = Environment(
+            loader=FileSystemLoader(str(SIDEBAR_TABS_TEMPLATE_PATH.parent)),
+        )
+        html = env.get_template("sidebar_tabs.html").render(
             {
                 "tabs": self.urls_list,
                 "current_active_tab_url": self.current_active_tab_url,
@@ -188,7 +191,7 @@ class ReviewerSidebar:
         # then set the html content, and then adjust the height to fit the content.
         self.header_webview.setFixedHeight(44)
 
-        self.header_webview.setHtml(html_template)
+        self.header_webview.setHtml(html)
         self.header_webview.adjustHeightToFit()
 
     def open_sidebar(self):
