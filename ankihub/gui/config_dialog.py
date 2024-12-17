@@ -51,6 +51,13 @@ def _general_tab(conf_window) -> None:
     )
     tab.hseparator()
     tab.space(8)
+    
+    tab.text("Sidebar", bold=True)
+    tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
+    tab.checkbox("boards_and_beyond", "Boards and Beyond")
+    tab.checkbox("first_aid_forward", "First Aid Forward")
+    tab.hseparator()
+    tab.space(8)
 
     tab.text("Debug", bold=True)
     tab.checkbox("report_errors", "Report errors")
