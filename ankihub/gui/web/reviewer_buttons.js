@@ -73,10 +73,7 @@ class AnkiHubReviewerButtons {
         this.setElementsContainerStyle(elementsContainer);
         this.setButtonContainerStyle(buttonContainer);
 
-        this.buttonsData.forEach((buttonData, buttonIdx) => {
-            if(!this.isAnKingDeck && buttonData.name !== "chatbot") {
-                return;
-            }
+        this.buttonsData.forEach((buttonData) => {
             const container = document.createElement("div");
             container.style.display = "flex";
             container.style.flexDirection = "row-reverse";
@@ -278,6 +275,8 @@ class AnkiHubReviewerButtons {
         // Update style of visible buttons
         visibleButtons.forEach((buttonData, idx) => {
             const buttonElement = this.getButtonElement(buttonData.name);
+            console.log(buttonData.name);
+            console.log(buttonElement);
             buttonElement.style.display = "block";
             this.updateButtonStyle(
                 buttonElement,

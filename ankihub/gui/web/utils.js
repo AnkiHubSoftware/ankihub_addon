@@ -44,7 +44,7 @@ function addTooltip(button, tooltipText) {
     container.style.width = "0";
     container.style.height = "0";
     container.style.overflow = "visible";
-    container.style.zIndex = "1000";
+    container.style.zIndex = "99999";
     container.style.pointerEvents = "none";
     container.appendChild(tooltip);
     document.body.appendChild(container);
