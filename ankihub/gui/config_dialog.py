@@ -51,7 +51,7 @@ def _general_tab(conf_window) -> None:
     )
     tab.hseparator()
     tab.space(8)
-    
+
     tab.text("Sidebar", bold=True)
     tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
     tab.checkbox("boards_and_beyond", "Boards and Beyond")
