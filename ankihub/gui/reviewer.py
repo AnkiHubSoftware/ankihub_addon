@@ -356,9 +356,30 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         {
             "THEME": _ankihub_theme(),
             "IS_ANKING_DECK": is_anking_deck,
+            "ENABLED_BUTTONS": ",".join(_get_enabled_buttons_list()),
         }
     )
     web_content.body += f"<script>{reivewer_button_js}</script>"
+
+
+def _get_enabled_buttons_list() -> List[str]:
+    buttons_map = {
+        "ankihub_ai_chatbot": "chatbot",
+        "boards_and_beyond": "b&b",
+        "first_aid_forward": "fa4",
+    }
+    public_config = config.public_config
+    buttons_config = dict(
+        filter(
+            lambda item: item[0]
+            in ["ankihub_ai_chatbot", "boards_and_beyond", "first_aid_forward"],
+            public_config.items(),
+        )
+    )
+    enabled_buttons_list = [
+        buttons_map[key] for key, value in buttons_config.items() if value
+    ]
+    return enabled_buttons_list
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
