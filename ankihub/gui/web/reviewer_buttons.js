@@ -39,13 +39,45 @@ class AnkiHubReviewerButtons {
     }
 
     setupButtons() {
+        const elementsContainer = document.createElement("div");
         const buttonContainer = document.createElement("div");
+        const toggleButtonsButton = document.createElement("button");
+
+        let isButtonsVisible = true;
+        const iconArrowRight = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+        `;
+        const iconArrowLeft = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+        `;
+        toggleButtonsButton.innerHTML = isButtonsVisible ? iconArrowRight : iconArrowLeft;
+        toggleButtonsButton.onclick = () => {
+            isButtonsVisible = !isButtonsVisible;
+            toggleButtonsButton.innerHTML = isButtonsVisible ? iconArrowRight : iconArrowLeft;
+            if (isButtonsVisible) {
+                toggleButtonsButton.style.borderRadius = "0px";
+            } else {
+                toggleButtonsButton.style.borderRadius = "4px 0px 0px 4px";
+            }
+            buttonContainer.classList.toggle("ankihub-toggle-buttons-button-slide");
+        }
+
+        this.setToggleButtonsButtonStyle(toggleButtonsButton);
+        this.setElementsContainerStyle(elementsContainer);
         this.setButtonContainerStyle(buttonContainer);
 
         this.buttonsData.forEach((buttonData, buttonIdx) => {
             if(!this.isAnKingDeck && buttonData.name !== "chatbot") {
                 return;
             }
+            const container = document.createElement("div");
+            container.style.display = "flex";
+            container.style.flexDirection = "row-reverse";
+
             const buttonElement = document.createElement("button");
             buttonElement.id = `ankihub-${buttonData.name}-button`;
             this.setButtonStyle(
@@ -64,7 +96,7 @@ class AnkiHubReviewerButtons {
             if(buttonData.name !== "chatbot") {
                 // Delay until button is rendered for positioning
                 document.addEventListener("DOMContentLoaded", () => {
-                    this.addResourceCountIndicator(buttonElement, buttonData.name);
+                    this.addResourceCountIndicator(buttonData.name, container);
                 });
             }
 
@@ -83,10 +115,13 @@ class AnkiHubReviewerButtons {
                 this.setButtonState(buttonData, buttonElement, !buttonData.active);
             };
 
-            buttonContainer.appendChild(buttonElement);
+            container.appendChild(buttonElement);
+            buttonContainer.appendChild(container);
         })
 
-        document.body.appendChild(buttonContainer);
+        elementsContainer.appendChild(buttonContainer);
+        elementsContainer.appendChild(toggleButtonsButton);
+        document.body.appendChild(elementsContainer);
         this.injectResourceCountIndicatorStylesheet();
     }
 
@@ -94,13 +129,42 @@ class AnkiHubReviewerButtons {
         return document.getElementById(`ankihub-${buttonName}-button`);
     }
 
+    setToggleButtonsButtonStyle(toggleButtonsButton) {
+        const styles = `
+            .ankihub-toggle-buttons-button:hover {
+                background: ${this.theme == "light" ? "#e5e7eb" : "#1f2937"} !important;
+            }
+            .ankihub-toggle-buttons-button-slide {
+                transform: translateX(100px);
+            }
+        `;
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = styles;
+        document.head.appendChild(styleSheet);
+        toggleButtonsButton.style.width = "16px";
+        toggleButtonsButton.style.padding = "0px";
+        toggleButtonsButton.style.margin = "0px";
+        toggleButtonsButton.style.backgroundColor = this.theme == "light" ? this.colorButtonLight : this.colorButtonDark;
+        toggleButtonsButton.style.border = this.theme == "light" ? `1px solid ${this.colorButtonBorderLight}` : `1px solid ${this.colorButtonBorderDark}`;
+        toggleButtonsButton.style.borderRadius = "0px";
+        toggleButtonsButton.style.boxSizing = "border-box";
+        toggleButtonsButton.style.color = this.theme == "light" ? "#000000" : "#ffffff";
+        toggleButtonsButton.style.zIndex = "2"
+        toggleButtonsButton.classList.add("ankihub-toggle-buttons-button");
+    }
+
+    setElementsContainerStyle(elementsContainer) {
+        elementsContainer.style.position = "fixed";
+        elementsContainer.style.bottom = "0px";
+        elementsContainer.style.right = "0px";
+        elementsContainer.style.zIndex = "9999";
+        elementsContainer.style.display = "flex";
+    }
+
     setButtonContainerStyle(buttonContainer) {
-        buttonContainer.style.position = "fixed";
-        buttonContainer.style.bottom = "0px";
-        buttonContainer.style.right = "0px";
-        buttonContainer.style.zIndex = "9999";
         buttonContainer.style.display = "flex";
         buttonContainer.style.flexDirection = "column";
+        buttonContainer.style.transition = "transform 0.8s ease";
     }
 
     setButtonStateByName(buttonName, active) {
@@ -196,8 +260,8 @@ class AnkiHubReviewerButtons {
 
     setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
         tooltip.style.position = "absolute";
-        tooltip.style.right = "60px";
-        tooltip.style.zIndex = "1000";
+        tooltip.style.right = "76px";
+        tooltip.style.zIndex = "20000";
         tooltip.style.fontSize = "medium";
         tooltip.style.borderRadius = "5px";
         tooltip.style.textAlign = "center";
@@ -244,17 +308,15 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
-    addResourceCountIndicator(button, buttonName) {
+    addResourceCountIndicator(buttonName, container) {
         const indicator = document.createElement("div");
         indicator.classList.add("ankihub-reviewer-button-resource-count");
         indicator.dataset.button = buttonName;
-        this.setResourceCountIndicatorStyles(button, indicator);
-        document.body.appendChild(indicator);
+        this.setResourceCountIndicatorStyles(indicator);
+        container.appendChild(indicator);
     }
 
-    setResourceCountIndicatorStyles(button, indicator) {
-        indicator.style.position = "absolute";
-        indicator.style.right = "48px";
+    setResourceCountIndicatorStyles(indicator) {
         indicator.style.zIndex = "999";
         indicator.style.fontFamily = "Merriweather sans-serif";
         indicator.style.fontSize = "12px";
@@ -265,10 +327,7 @@ class AnkiHubReviewerButtons {
         indicator.style.display = "flex";
         indicator.style.alignItems = "center";
         indicator.style.justifyContent = "center";
-
-        const buttonRect = button.getBoundingClientRect();
-        const indicatorTop = buttonRect.top + 5;
-        indicator.style.top = `${indicatorTop}px`;
+        indicator.style.marginTop = "6px";
     }
 
     injectResourceCountIndicatorStylesheet() {
