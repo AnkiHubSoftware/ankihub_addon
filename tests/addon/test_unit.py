@@ -3064,6 +3064,11 @@ def test_send_daily_review_summaries_without_data(mocker):
             "step1-bb-biochem-amino_acids-ammonia",
         ),
         (
+            "#ak_step1_v12::#b&b::03_biochem::03_amino_acids::04_ammonia",
+            "Ammonia",
+            "step1-bb-biochem-amino_acids-ammonia",
+        ),
+        (
             "#AK_Step2_v12::#FirstAid::14_Pulm::16_Nose_and_Throat::01_Rhinitis",
             "Rhinitis",
             "step2-fa-pulm-nose_and_throat-rhinitis",
