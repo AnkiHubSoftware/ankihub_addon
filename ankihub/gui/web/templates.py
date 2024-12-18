@@ -42,14 +42,11 @@ def get_ankihub_ai_js(
     )
 
 
-def get_reviewer_buttons_js(
-    theme: str, enabled_buttons: List[str], is_anking_deck
-) -> str:
+def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
     return env.get_template("reviewer_buttons.js").render(
         {
             "THEME": theme,
             "ENABLED_BUTTONS": ",".join(enabled_buttons),
-            "IS_ANKING_DECK": is_anking_deck,
         }
     )
 
