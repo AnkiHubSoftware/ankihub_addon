@@ -444,7 +444,6 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
         ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
         == config.anking_deck_id
     )
-    is_anking_deck = True
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
