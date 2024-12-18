@@ -3,7 +3,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
-        this.isAnKingDeck = null;
+        this.isAnKingDeck = "{{ IS_ANKING_DECK }}" === "True";
         this.bbCount = 0;
         this.faCount = 0;
         this.enabledButtons = "{{ ENABLED_BUTTONS }}".split(",");
@@ -40,7 +40,7 @@ class AnkiHubReviewerButtons {
         ]
 
         this.buttonsData = this.buttonsData.filter(buttonData => this.enabledButtons.includes(buttonData.name));
-        this.buttonsData = this.buttonsData.filter(buttonData => 
+        this.buttonsData = this.buttonsData.filter(buttonData =>
             buttonData.name === "chatbot" || (buttonData.name !== "chatbot" && this.isAnKingDeck)
         );
 
