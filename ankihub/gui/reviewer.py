@@ -8,6 +8,7 @@ import aqt
 import aqt.webview
 from anki.cards import Card
 from anki.notes import Note
+from aqt import colors
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -111,6 +112,11 @@ class ReviewerSidebar:
         self.content_webview.setPage(
             CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
         )
+        # Prevent white flicker when opening sidebar on dark mode
+        self.content_webview.page().setBackgroundColor(
+            theme_manager.qcolor(colors.CANVAS)
+        )
+
         self.content_webview.page().profile().setUrlRequestInterceptor(self.interceptor)
 
         aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
