@@ -672,6 +672,16 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
         resource_slug_str = {"b&b": "bb", "firstaid": "fa"}[resource_type_str.lower()]
         path = re.sub(r".+_v12::#.+?::", "", tag, re.IGNORECASE)
         path_parts = path.split("::")
+
+        # Remove path parts after first path part starting with "*"
+        for index, part in enumerate(path_parts):
+            if part.startswith("*"):
+                path_parts = path_parts[:index]
+                break
+
+        if path_parts[-1].lower() == "extra":
+            path_parts = path_parts[:-1]
+
         path_parts = [part.lower() for part in path_parts]
         cleaned_path_parts = [re.sub(r"\d+_", "", part) for part in path_parts]
         slug = f"step{step}-{resource_slug_str}-{'-'.join(cleaned_path_parts)}"
