@@ -233,7 +233,6 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
-            self.content_webview.setUpdatesEnabled(False)
             self.url_page.setUrl(aqt.QUrl(url))
             if self.content_webview.page() != self.url_page:
                 self.content_webview.setPage(self.url_page)
@@ -246,8 +245,6 @@ class ReviewerSidebar:
         )
 
     def _on_url_page_loaded(self, ok: bool) -> None:
-        self.content_webview.setUpdatesEnabled(True)
-
         if ok:
             return
 
