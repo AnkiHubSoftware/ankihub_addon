@@ -235,7 +235,8 @@ class ReviewerSidebar:
         if url:
             self.content_webview.setUpdatesEnabled(False)
             self.url_page.setUrl(aqt.QUrl(url))
-            self.content_webview.setPage(self.url_page)
+            if self.content_webview.page() != self.url_page:
+                self.content_webview.setPage(self.url_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
