@@ -19,7 +19,7 @@ from aqt.gui_hooks import (
 from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
 from aqt.utils import openLink
-from aqt.webview import WebContent
+from aqt.webview import AnkiWebPage, WebContent
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -80,6 +80,10 @@ class ReviewerSidebar:
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
+
+        self.url_page: Optional[aqt.webview.QWebEnginePage] = None
+        self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
+
         self._setup_ui()
 
     def _setup_ui(self):
@@ -106,20 +110,32 @@ class ReviewerSidebar:
         # Create the web views
         self.content_webview = aqt.webview.AnkiWebView()
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
-        # Interceptor that will add the token to the request
+
+        self.url_page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
+        self.url_page.profile().setUrlRequestInterceptor(self.interceptor)
 
-        self.content_webview.setPage(
-            CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
-        )
-        # Prevent white flicker when opening sidebar on dark mode
-        self.content_webview.page().setBackgroundColor(
-            theme_manager.qcolor(colors.CANVAS)
-        )
+        # Prevent white flicker on dark mode
+        self.url_page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
 
-        self.content_webview.page().profile().setUrlRequestInterceptor(self.interceptor)
+        aqt.qconnect(self.url_page.loadFinished, self._on_page_loaded)
 
-        aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
+        # Prepare empty state page for each resource type to prevent flickering
+        for resource_type in ResourceType:
+            page = AnkiWebPage(self.content_webview._onBridgeCmd)
+
+            # Prevent white flicker on dark mode
+            page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+
+            html = get_empty_state_html(
+                theme=_ankihub_theme(),
+                resource_type=resource_type.value,
+            )
+            page.setHtml(html)
+
+            self.empty_state_pages[resource_type] = page
+
+        self.content_webview.setPage(list(self.empty_state_pages.values())[0])
 
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
@@ -181,16 +197,15 @@ class ReviewerSidebar:
             f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
             _ankihub_theme(),
         )
-        # This prevents empty space below the header when there are no tabs.
-        # adjustHeightToFit only works for making the height bigger, not smaller.
-        # So we first set the height to 44px (height of the header without tabs),
-        # then set the html content, and then adjust the height to fit the content.
-        # We only set the reduced height if needed, to prevent flickering.
+
+        # The height of the header depends on whether there is an active tab or not.
+        # Using adjustHeight wouldn't work here, because it can only make the height bigger, not smaller.
         if not self.current_active_tab_url:
             self.header_webview.setFixedHeight(44)
+        else:
+            self.header_webview.setFixedHeight(88)
 
         self.header_webview.setHtml(html)
-        self.header_webview.adjustHeightToFit()
 
     def open_sidebar(self):
         if not config.token():
@@ -219,13 +234,10 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
-            self.content_webview.setUrl(aqt.QUrl(url))
+            self.url_page.setUrl(aqt.QUrl(url))
+            self.content_webview.setPage(self.url_page)
         else:
-            html = get_empty_state_html(
-                theme=_ankihub_theme(),
-                resource_type=self.resource_type.value,
-            )
-            self.content_webview.setHtml(html)
+            self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
