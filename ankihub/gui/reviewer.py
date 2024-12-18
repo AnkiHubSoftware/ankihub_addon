@@ -118,7 +118,7 @@ class ReviewerSidebar:
         # Prevent white flicker on dark mode
         self.url_page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
 
-        aqt.qconnect(self.url_page.loadFinished, self._on_page_loaded)
+        aqt.qconnect(self.url_page.loadFinished, self._on_url_page_loaded)
 
         # Prepare empty state page for each resource type to prevent flickering
         for resource_type in ResourceType:
@@ -234,6 +234,7 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
+            self.content_webview.setUpdatesEnabled(False)
             self.url_page.setUrl(aqt.QUrl(url))
             self.content_webview.setPage(self.url_page)
         else:
@@ -244,7 +245,9 @@ class ReviewerSidebar:
             f"localStorage.setItem('theme', '{_ankihub_theme()}');"
         )
 
-    def _on_page_loaded(self, ok: bool) -> None:
+    def _on_url_page_loaded(self, ok: bool) -> None:
+        self.content_webview.setUpdatesEnabled(True)
+
         if ok:
             return
 
