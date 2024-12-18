@@ -1,7 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
 from enum import Enum
-from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, List, Optional, Set, Tuple
 
@@ -9,6 +8,7 @@ import aqt
 import aqt.webview
 from anki.cards import Card
 from anki.notes import Note
+from aqt import colors
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -18,8 +18,8 @@ from aqt.gui_hooks import (
 )
 from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
+from aqt.utils import openLink
 from aqt.webview import WebContent
-from jinja2 import Template
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -33,17 +33,15 @@ from .js_message_handling import (
     parse_js_message_kwargs,
 )
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
+from .web.templates import (
+    get_ankihub_ai_js,
+    get_empty_state_html,
+    get_header_webview_html,
+    get_remove_anking_button_js,
+    get_reviewer_buttons_js,
+)
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
-
-ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-ANKIHUB_AI_OLD_JS_PATH = Path(__file__).parent / "web/ankihub_ai_old.js"
-REVIEWER_BUTTONS_JS_PATH = Path(__file__).parent / "web/reviewer_buttons.js"
-REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
-SIDEBAR_TABS_TEMPLATE_PATH = Path(__file__).parent / "web/sidebar_tabs.html"
-NO_URLS_EMPTY_STATE_TEMPLATE_PATH = (
-    Path(__file__).parent / "web/mh_no_urls_empty_state.html"
-)
 
 INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
@@ -51,6 +49,7 @@ CLOSE_SIDEBAR_PYCMD = "ankihub_close_sidebar"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
+OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD = "ankihub_open_sidebar_content_in_browser"
 
 
 class ResourceType(Enum):
@@ -76,7 +75,7 @@ class ReviewerSidebar:
         self.container: Optional[aqt.QWidget] = None
         self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_url: Optional[str] = None
+        self.current_active_tab_url: Optional[str] = None
         self.urls_list = None
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
@@ -109,6 +108,16 @@ class ReviewerSidebar:
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
         # Interceptor that will add the token to the request
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
+
+        self.content_webview.setPage(
+            CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+        )
+        # Prevent white flicker when opening sidebar on dark mode
+        self.content_webview.page().setBackgroundColor(
+            theme_manager.qcolor(colors.CANVAS)
+        )
+
+        self.content_webview.page().profile().setUrlRequestInterceptor(self.interceptor)
 
         aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
 
@@ -161,34 +170,26 @@ class ReviewerSidebar:
 
     def _update_content_webview(self):
         if not self.urls_list:
-            empty_state_html_template = Template(
-                NO_URLS_EMPTY_STATE_TEMPLATE_PATH.read_text()
-            ).render(
-                {
-                    "theme": _ankihub_theme(),
-                    "resource_type": self.resource_type.value,
-                }
-            )
-            self.content_webview.setHtml(empty_state_html_template)
+            self.set_content_url(None)
         else:
-            self.content_webview.setPage(
-                CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
-            )
-            self.content_webview.page().profile().setUrlRequestInterceptor(
-                self.interceptor
-            )
             self.set_content_url(self.urls_list[0]["url"])
 
     def _update_header_webview(self):
-        html_template = Template(SIDEBAR_TABS_TEMPLATE_PATH.read_text()).render(
-            {
-                "tabs": self.urls_list,
-                "current_active_tab_url": self.current_active_url,
-                "page_title": f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
-                "theme": _ankihub_theme(),
-            }
+        html = get_header_webview_html(
+            self.urls_list,
+            self.current_active_tab_url,
+            f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
+            _ankihub_theme(),
         )
-        self.header_webview.setHtml(html_template)
+        # This prevents empty space below the header when there are no tabs.
+        # adjustHeightToFit only works for making the height bigger, not smaller.
+        # So we first set the height to 44px (height of the header without tabs),
+        # then set the html content, and then adjust the height to fit the content.
+        # We only set the reduced height if needed, to prevent flickering.
+        if not self.current_active_tab_url:
+            self.header_webview.setFixedHeight(44)
+
+        self.header_webview.setHtml(html)
         self.header_webview.adjustHeightToFit()
 
     def open_sidebar(self):
@@ -206,10 +207,30 @@ class ReviewerSidebar:
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def set_content_url(self, url) -> None:
-        if self.content_webview:
+    def get_content_url(self) -> Optional[str]:
+        return self.content_webview.url().toString()
+
+    def set_content_url(self, url: Optional[str]) -> None:
+        self.current_active_tab_url = url
+
+        if not self.content_webview:
+            return
+
+        self._update_content_webview_theme()
+
+        if url:
             self.content_webview.setUrl(aqt.QUrl(url))
-            self.current_active_url = url
+        else:
+            html = get_empty_state_html(
+                theme=_ankihub_theme(),
+                resource_type=self.resource_type.value,
+            )
+            self.content_webview.setHtml(html)
+
+    def _update_content_webview_theme(self):
+        self.content_webview.eval(
+            f"localStorage.setItem('theme', '{_ankihub_theme()}');"
+        )
 
     def _on_page_loaded(self, ok: bool) -> None:
         if ok:
@@ -321,9 +342,9 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         return
 
     if feature_flags.get("mh_integration"):
-        ankihub_ai_js_path = ANKIHUB_AI_JS_PATH
+        ankihub_ai_js_template_name = "ankihub_ai.js"
     else:
-        ankihub_ai_js_path = ANKIHUB_AI_OLD_JS_PATH
+        ankihub_ai_js_template_name = "ankihub_ai_old.js"
 
     # TODO This condition is not placed correctly. It should be used to
     # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
@@ -332,33 +353,22 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     # However, we don't have to fix it for the old chatbot implementation, because we will switch
     # to a new one soon. For the new implementation, we should implement the correct logic.
     if _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
-        ankihub_ai_js = Template(ankihub_ai_js_path.read_text()).render(
-            {
-                "KNOX_TOKEN": config.token(),
-                "APP_URL": config.app_url,
-                "ENDPOINT_PATH": "ai/chatbot",
-                "QUERY_PARAMETERS": "is_on_anki=true",
-                "THEME": _ankihub_theme(),
-            }
+        ankihub_ai_js = get_ankihub_ai_js(
+            template_name=ankihub_ai_js_template_name,
+            knox_token=config.token(),
+            app_url=config.app_url,
+            endpoint_path="ai/chatbot",
+            query_parameters="is_on_anki=true",
+            theme=_ankihub_theme(),
         )
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
     global reviewer_sidebar
-    is_anking_deck = (
-        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
-        == config.anking_deck_id
-    )
-    if not reviewer_sidebar and is_anking_deck:
+    if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = Template(REVIEWER_BUTTONS_JS_PATH.read_text()).render(
-        {
-            "THEME": _ankihub_theme(),
-            "IS_ANKING_DECK": is_anking_deck,
-            "ENABLED_BUTTONS": ",".join(_get_enabled_buttons_list()),
-        }
-    )
+    reivewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme(), enabled_buttons=_get_enabled_buttons_list())
     web_content.body += f"<script>{reivewer_button_js}</script>"
 
 
@@ -417,10 +427,10 @@ def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
     feature_flags = config.get_feature_flags()
-    if not feature_flags.get("chatbot", False):
+    if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
+    js = _wrap_with_ankihubAI_check(get_remove_anking_button_js())
     aqt.mw.reviewer.web.eval(js)
 
 
@@ -457,8 +467,19 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
     bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
+
+    is_anking_deck = (
+        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
+        == config.anking_deck_id
+    )
     js = _wrap_with_reviewer_buttons_check(
-        "ankihubReviewerButtons.updateResourceCounts(%d, %d);" % (bb_count, fa_count)
+        f"""
+        ankihubReviewerButtons.updateButtons(
+            {bb_count},
+            {fa_count},
+            {'true' if is_anking_deck else 'false'},
+        );
+        """
     )
     aqt.mw.reviewer.web.eval(js)
 
@@ -537,6 +558,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     elif message.startswith(LOAD_URL_IN_SIDEBAR_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         reviewer_sidebar.set_content_url(kwargs["url"])
+
+        return True, None
+    elif message == OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD:
+        url = reviewer_sidebar.get_content_url()
+        if url:
+            openLink(url)
 
         return True, None
     elif message == ANKIHUB_UPSELL:

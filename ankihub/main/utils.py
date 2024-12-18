@@ -669,7 +669,7 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
     try:
         step = int(re.match(r"#AK_Step(\d+)_v12::", tag, re.IGNORECASE).group(1))
         resource_type_str = re.search(r"_v12::#(.+?)::", tag, re.IGNORECASE).group(1)
-        resource_slug_str = {"B&B": "bb", "FirstAid": "fa"}[resource_type_str]
+        resource_slug_str = {"b&b": "bb", "firstaid": "fa"}[resource_type_str.lower()]
         path = re.sub(r".+_v12::#.+?::", "", tag, re.IGNORECASE)
         path_parts = path.split("::")
         path_parts = [part.lower() for part in path_parts]
