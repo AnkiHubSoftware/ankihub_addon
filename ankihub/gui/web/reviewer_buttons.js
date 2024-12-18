@@ -3,7 +3,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
-        this.isAnKingDeck = "{{ IS_ANKING_DECK }}" === "True";
+        this.isAnKingDeck = null;
         this.bbCount = 0;
         this.faCount = 0;
         this.enabledButtons = "{{ ENABLED_BUTTONS }}".split(",");
@@ -40,9 +40,6 @@ class AnkiHubReviewerButtons {
         ]
 
         this.buttonsData = this.buttonsData.filter(buttonData => this.enabledButtons.includes(buttonData.name));
-        this.buttonsData = this.buttonsData.filter(buttonData =>
-            buttonData.name === "chatbot" || (buttonData.name !== "chatbot" && this.isAnKingDeck)
-        );
 
         this.setupButtons();
     }
@@ -81,6 +78,7 @@ class AnkiHubReviewerButtons {
 
         this.buttonsData.forEach((buttonData) => {
             const container = document.createElement("div");
+            container.id = `ankihub-${buttonData.name}-button-container`;
             container.style.display = "flex";
             container.style.flexDirection = "row-reverse";
 
@@ -135,6 +133,11 @@ class AnkiHubReviewerButtons {
     getButtonElement(buttonName) {
         return document.getElementById(`ankihub-${buttonName}-button`);
     }
+
+    getButtonContainerElement(buttonName) {
+        return document.getElementById(`ankihub-${buttonName}-button-container`);
+    }
+
 
     setToggleButtonsButtonStyle(toggleButtonsButton) {
         const styles = `
@@ -276,19 +279,15 @@ class AnkiHubReviewerButtons {
         // Hide invisible buttons
         this.buttonsData.forEach(buttonData => {
             if (!visibleButtons.includes(buttonData)) {
-                const buttonElement = this.getButtonElement(buttonData.name);
-                buttonElement.style.display = "none";
+                this.udpateButtonVisibility(buttonData.name, false);
             }
         });
 
         // Update style of visible buttons
         visibleButtons.forEach((buttonData, idx) => {
-            const buttonElement = this.getButtonElement(buttonData.name);
-            console.log(buttonData.name);
-            console.log(buttonElement);
-            buttonElement.style.display = "block";
+            this.udpateButtonVisibility(buttonData.name, true);
             this.updateButtonStyle(
-                buttonElement,
+                buttonData.name,
                 idx === 0,
                 idx === visibleButtons.length - 1
             );
@@ -301,7 +300,13 @@ class AnkiHubReviewerButtons {
         return this.buttonsData.filter(buttonData => this.isAnKingDeck || buttonData.name === "chatbot");
     }
 
-    updateButtonStyle(buttonElement, isTopButton, isBottomButton) {
+    udpateButtonVisibility(buttonName, isVisible) {
+        const buttonContainerElemente = this.getButtonContainerElement(buttonName);
+        buttonContainerElemente.style.display = isVisible ? "flex" : "none";
+    }
+
+    updateButtonStyle(buttonName, isTopButton, isBottomButton) {
+        const buttonElement = this.getButtonElement(buttonName);
         if (isTopButton && isBottomButton) {
             buttonElement.style.borderRadius = "8px 0px 0px 8px";
         } else if (isBottomButton) {
