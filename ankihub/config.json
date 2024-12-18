@@ -4,5 +4,8 @@
     "sync_hotkey": "Ctrl+Shift+h",
     "auto_sync": "on_ankiweb_sync",
     "debug_level_logs": false,
-    "use_staging": false
+    "use_staging": false,
+    "ankihub_ai_chatbot": true,
+    "boards_and_beyond": true,
+    "first_aid_forward": true
 }
