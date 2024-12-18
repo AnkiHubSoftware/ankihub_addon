@@ -101,13 +101,19 @@ class ReviewerSidebar:
         container_layout.setSpacing(0)
         self.container.setLayout(container_layout)
 
+        self.header_webview = aqt.webview.AnkiWebView()
+        self.header_webview.setSizePolicy(
+            aqt.QSizePolicy(
+                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
+            )
+        )
+
         # Create a QWebEngineProfile with persistent storage
         self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
         self.profile.setHttpUserAgent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
         )
 
-        # Create the web views
         self.content_webview = aqt.webview.AnkiWebView()
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
 
@@ -136,13 +142,6 @@ class ReviewerSidebar:
             self.empty_state_pages[resource_type] = page
 
         self.content_webview.setPage(list(self.empty_state_pages.values())[0])
-
-        self.header_webview = aqt.webview.AnkiWebView()
-        self.header_webview.setSizePolicy(
-            aqt.QSizePolicy(
-                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
-            )
-        )
 
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.content_webview)
