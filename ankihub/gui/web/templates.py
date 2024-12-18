@@ -42,7 +42,13 @@ def get_ankihub_ai_js(
 
 
 def get_reviewer_buttons_js(theme: str) -> str:
-    return env.get_template("reviewer_buttons.js").render({"THEME": theme})
+    return env.get_template("reviewer_buttons.js").render(
+        {
+            "THEME": theme,
+            # TODO
+            "IS_PREMIUM": str(True),
+        }
+    )
 
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
