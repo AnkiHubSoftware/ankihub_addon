@@ -383,8 +383,31 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
+    reivewer_button_js = get_reviewer_buttons_js(
+        theme=_ankihub_theme(),
+        enabled_buttons=_get_enabled_buttons_list(),
+    )
     web_content.body += f"<script>{reivewer_button_js}</script>"
+
+
+def _get_enabled_buttons_list() -> List[str]:
+    buttons_map = {
+        "ankihub_ai_chatbot": "chatbot",
+        "boards_and_beyond": "b&b",
+        "first_aid_forward": "fa4",
+    }
+    public_config = config.public_config
+    buttons_config = dict(
+        filter(
+            lambda item: item[0]
+            in ["ankihub_ai_chatbot", "boards_and_beyond", "first_aid_forward"],
+            public_config.items(),
+        )
+    )
+    enabled_buttons_list = [
+        buttons_map[key] for key, value in buttons_config.items() if value
+    ]
+    return enabled_buttons_list
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -458,15 +481,16 @@ def _notify_sidebar_of_card_change(_: Card) -> None:
         _update_sidebar_tabs_based_on_tags(reviewer_sidebar.resource_type)
 
 
+def _is_anking_deck(card: Card) -> bool:
+    return ankihub_db.ankihub_did_for_anki_nid(card.note().id) == config.anking_deck_id
+
+
 def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
     bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
 
-    is_anking_deck = (
-        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
-        == config.anking_deck_id
-    )
+    is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
