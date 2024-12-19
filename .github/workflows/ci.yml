@@ -16,7 +16,7 @@ on:
 
 jobs:
   test-addon:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         include:
@@ -45,7 +45,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml
-          pytest ./tests/addon -n 0 -m "not sequential and not performance" --cov --cov-report=xml --cov-append
+          pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append
           pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append
 
       - name: Upload coverage
