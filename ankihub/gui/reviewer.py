@@ -19,7 +19,7 @@ from aqt.gui_hooks import (
 from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
 from aqt.utils import openLink
-from aqt.webview import WebContent
+from aqt.webview import AnkiWebPage, WebContent
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -76,6 +76,10 @@ class ReviewerSidebar:
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
+
+        self.url_page: Optional[aqt.webview.QWebEnginePage] = None
+        self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
+
         self._setup_ui()
 
     def _setup_ui(self):
@@ -93,36 +97,47 @@ class ReviewerSidebar:
         container_layout.setSpacing(0)
         self.container.setLayout(container_layout)
 
-        # Create a QWebEngineProfile with persistent storage
-        self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
-        self.profile.setHttpUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
-        )
-
-        # Create the web views
-        self.content_webview = aqt.webview.AnkiWebView()
-        self.content_webview.setMinimumWidth(self.original_mw_min_width)
-        # Interceptor that will add the token to the request
-        self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
-
-        self.content_webview.setPage(
-            CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
-        )
-        # Prevent white flicker when opening sidebar on dark mode
-        self.content_webview.page().setBackgroundColor(
-            theme_manager.qcolor(colors.CANVAS)
-        )
-
-        self.content_webview.page().profile().setUrlRequestInterceptor(self.interceptor)
-
-        aqt.qconnect(self.content_webview.loadFinished, self._on_page_loaded)
-
         self.header_webview = aqt.webview.AnkiWebView()
         self.header_webview.setSizePolicy(
             aqt.QSizePolicy(
                 aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
             )
         )
+
+        # Create a QWebEngineProfile with persistent storage
+        self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
+        self.profile.setHttpUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
+        )
+
+        self.content_webview = aqt.webview.AnkiWebView()
+        self.content_webview.setMinimumWidth(self.original_mw_min_width)
+
+        self.url_page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+        self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
+        self.url_page.profile().setUrlRequestInterceptor(self.interceptor)
+
+        # Prevent white flicker on dark mode
+        self.url_page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+
+        aqt.qconnect(self.url_page.loadFinished, self._on_url_page_loaded)
+
+        # Prepare empty state page for each resource type to prevent flickering
+        for resource_type in ResourceType:
+            page = AnkiWebPage(self.content_webview._onBridgeCmd)
+
+            # Prevent white flicker on dark mode
+            page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+
+            html = get_empty_state_html(
+                theme=_ankihub_theme(),
+                resource_type=resource_type.value,
+            )
+            page.setHtml(html)
+
+            self.empty_state_pages[resource_type] = page
+
+        self.content_webview.setPage(list(self.empty_state_pages.values())[0])
 
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.content_webview)
@@ -177,16 +192,15 @@ class ReviewerSidebar:
             f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
             _ankihub_theme(),
         )
-        # This prevents empty space below the header when there are no tabs.
-        # adjustHeightToFit only works for making the height bigger, not smaller.
-        # So we first set the height to 44px (height of the header without tabs),
-        # then set the html content, and then adjust the height to fit the content.
-        # We only set the reduced height if needed, to prevent flickering.
+
+        # The height of the header depends on whether there is an active tab or not.
+        # Using adjustHeight wouldn't work here, because it can only make the height bigger, not smaller.
         if not self.current_active_tab_url:
             self.header_webview.setFixedHeight(44)
+        else:
+            self.header_webview.setFixedHeight(88)
 
         self.header_webview.setHtml(html)
-        self.header_webview.adjustHeightToFit()
 
     def open_sidebar(self):
         if not config.token():
@@ -215,20 +229,18 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
-            self.content_webview.setUrl(aqt.QUrl(url))
+            self.url_page.setUrl(aqt.QUrl(url))
+            if self.content_webview.page() != self.url_page:
+                self.content_webview.setPage(self.url_page)
         else:
-            html = get_empty_state_html(
-                theme=_ankihub_theme(),
-                resource_type=self.resource_type.value,
-            )
-            self.content_webview.setHtml(html)
+            self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
             f"localStorage.setItem('theme', '{_ankihub_theme()}');"
         )
 
-    def _on_page_loaded(self, ok: bool) -> None:
+    def _on_url_page_loaded(self, ok: bool) -> None:
         if ok:
             return
 
@@ -364,8 +376,31 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
+    reivewer_button_js = get_reviewer_buttons_js(
+        theme=_ankihub_theme(),
+        enabled_buttons=_get_enabled_buttons_list(),
+    )
     web_content.body += f"<script>{reivewer_button_js}</script>"
+
+
+def _get_enabled_buttons_list() -> List[str]:
+    buttons_map = {
+        "ankihub_ai_chatbot": "chatbot",
+        "boards_and_beyond": "b&b",
+        "first_aid_forward": "fa4",
+    }
+    public_config = config.public_config
+    buttons_config = dict(
+        filter(
+            lambda item: item[0]
+            in ["ankihub_ai_chatbot", "boards_and_beyond", "first_aid_forward"],
+            public_config.items(),
+        )
+    )
+    enabled_buttons_list = [
+        buttons_map[key] for key, value in buttons_config.items() if value
+    ]
+    return enabled_buttons_list
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -439,15 +474,16 @@ def _notify_sidebar_of_card_change(_: Card) -> None:
         _update_sidebar_tabs_based_on_tags(reviewer_sidebar.resource_type)
 
 
+def _is_anking_deck(card: Card) -> bool:
+    return ankihub_db.ankihub_did_for_anki_nid(card.note().id) == config.anking_deck_id
+
+
 def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
     bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
 
-    is_anking_deck = (
-        ankihub_db.ankihub_did_for_anki_nid(aqt.mw.reviewer.card.note().id)
-        == config.anking_deck_id
-    )
+    is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(

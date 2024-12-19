@@ -1,4 +1,5 @@
 import pathlib
+from typing import List
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -41,15 +42,15 @@ def get_ankihub_ai_js(
     )
 
 
-def get_reviewer_buttons_js(theme: str) -> str:
+def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
     return env.get_template("reviewer_buttons.js").render(
         {
             "THEME": theme,
+            "ENABLED_BUTTONS": ",".join(enabled_buttons),
             # TODO
             "IS_PREMIUM": str(True),
         }
     )
-
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
     return env.get_template("mh_no_urls_empty_state.html").render(

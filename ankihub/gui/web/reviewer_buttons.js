@@ -7,6 +7,7 @@ class AnkiHubReviewerButtons {
         this.isAnKingDeck = null;
         this.bbCount = 0;
         this.faCount = 0;
+        this.enabledButtons = "{{ ENABLED_BUTTONS }}".split(",");
 
         this.colorButtonLight = "#F9FAFB";
         this.colorButtonSelectedLight = "#C7D2FE";
@@ -39,6 +40,8 @@ class AnkiHubReviewerButtons {
                 tooltip: "AI Chatbot"
             },
         ]
+
+        this.buttonsData = this.buttonsData.filter(buttonData => this.enabledButtons.includes(buttonData.name));
 
         this.setupButtons();
     }
@@ -77,6 +80,7 @@ class AnkiHubReviewerButtons {
 
         this.buttonsData.forEach((buttonData) => {
             const container = document.createElement("div");
+            container.id = `ankihub-${buttonData.name}-button-container`;
             container.style.display = "flex";
             container.style.flexDirection = "row-reverse";
 
@@ -123,11 +127,19 @@ class AnkiHubReviewerButtons {
         elementsContainer.appendChild(toggleButtonsButton);
         document.body.appendChild(elementsContainer);
         this.injectResourceCountIndicatorStylesheet();
+        if (this.buttonsData.length == 0) {
+            toggleButtonsButton.style.display = "none";
+        }
     }
 
     getButtonElement(buttonName) {
         return document.getElementById(`ankihub-${buttonName}-button`);
     }
+
+    getButtonContainerElement(buttonName) {
+        return document.getElementById(`ankihub-${buttonName}-button-container`);
+    }
+
 
     setToggleButtonsButtonStyle(toggleButtonsButton) {
         const styles = `
@@ -269,19 +281,15 @@ class AnkiHubReviewerButtons {
         // Hide invisible buttons
         this.buttonsData.forEach(buttonData => {
             if (!visibleButtons.includes(buttonData)) {
-                const buttonElement = this.getButtonElement(buttonData.name);
-                buttonElement.style.display = "none";
+                this.udpateButtonVisibility(buttonData.name, false);
             }
         });
 
         // Update style of visible buttons
         visibleButtons.forEach((buttonData, idx) => {
-            const buttonElement = this.getButtonElement(buttonData.name);
-            console.log(buttonData.name);
-            console.log(buttonElement);
-            buttonElement.style.display = "block";
+            this.udpateButtonVisibility(buttonData.name, true);
             this.updateButtonStyle(
-                buttonElement,
+                buttonData.name,
                 idx === 0,
                 idx === visibleButtons.length - 1
             );
@@ -294,7 +302,13 @@ class AnkiHubReviewerButtons {
         return this.buttonsData.filter(buttonData => this.isAnKingDeck || buttonData.name === "chatbot");
     }
 
-    updateButtonStyle(buttonElement, isTopButton, isBottomButton) {
+    udpateButtonVisibility(buttonName, isVisible) {
+        const buttonContainerElemente = this.getButtonContainerElement(buttonName);
+        buttonContainerElemente.style.display = isVisible ? "flex" : "none";
+    }
+
+    updateButtonStyle(buttonName, isTopButton, isBottomButton) {
+        const buttonElement = this.getButtonElement(buttonName);
         if (isTopButton && isBottomButton) {
             buttonElement.style.borderRadius = "8px 0px 0px 8px";
         } else if (isBottomButton) {
