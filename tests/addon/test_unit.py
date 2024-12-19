@@ -3058,21 +3058,40 @@ def test_send_daily_review_summaries_without_data(mocker):
 @pytest.mark.parametrize(
     "tag, expected_title, expected_slug",
     [
+        # With B&B tag
         (
             "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia",
             "Ammonia",
             "step1-bb-biochem-amino_acids-ammonia",
         ),
-        (
-            "#ak_step1_v12::#b&b::03_biochem::03_amino_acids::04_ammonia",
-            "Ammonia",
-            "step1-bb-biochem-amino_acids-ammonia",
-        ),
+        # With First Aid tag
         (
             "#AK_Step2_v12::#FirstAid::14_Pulm::16_Nose_and_Throat::01_Rhinitis",
             "Rhinitis",
             "step2-fa-pulm-nose_and_throat-rhinitis",
         ),
+        # With lowercase tag
+        (
+            "#ak_step1_v12::#b&b::03_biochem::03_amino_acids::04_ammonia",
+            "Ammonia",
+            "step1-bb-biochem-amino_acids-ammonia",
+        ),
+        # With trailing Extra tag part that should be ignored
+        (
+            "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia::Extra",
+            "Ammonia",
+            "step1-bb-biochem-amino_acids-ammonia",
+        ),
+        # With tag part group starting with "*" that should be ignored
+        (
+            (
+                "#AK_Step1_v12::#FirstAid::05_Pharm::02_Autonomic_Drugs::15_beta-blockers::"
+                "*B-Antagonists::Cardioselective_B1_Antagonists"
+            ),
+            "Beta-blockers",
+            "step1-fa-pharm-autonomic_drugs-beta-blockers",
+        ),
+        # With invalid tag
         ("invalid_tag", None, None),
     ],
 )
