@@ -42,6 +42,8 @@ def setup():
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
+    print("CONTEXT", context)
+    print("MESSAGE", message)
     if message == VIEW_NOTE_PYCMD:
         anki_nid = context.reviewer.card.nid
         ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(anki_nid)
@@ -86,9 +88,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
+        
+        if not context:
+            from .reviewer import reviewer_sidebar
+            web = reviewer_sidebar.content_webview
+        else:
+            web = context.web
+
         _post_message_to_ankihub_js(
             message={"noteSuspensionStates": note_suspension_states},
-            web=context.web,
+            web=web,
         )
         return (True, None)
     elif message == ANKIHUB_UPSELL:

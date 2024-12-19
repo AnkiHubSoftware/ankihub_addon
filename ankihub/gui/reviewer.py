@@ -264,6 +264,17 @@ class ReviewerSidebar:
     def _handle_auth_failure(self) -> None:
         if self.on_auth_failure_hook:
             self.on_auth_failure_hook()
+            
+    def set_page_content(self, html: str, page_title: str) -> None:
+        header_html = get_header_webview_html(
+            [],
+            None,
+            page_title,
+            _ankihub_theme(),
+        )
+        self.header_webview.setFixedHeight(44)
+        self.header_webview.setHtml(header_html)
+        self.content_webview.setHtml(html)
 
 
 reviewer_sidebar: Optional[ReviewerSidebar] = None
@@ -432,10 +443,14 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     feature_flags = config.get_feature_flags()
     if not feature_flags.get("chatbot", False):
         return
+    
+    if not reviewer_sidebar:
+        return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
-    aqt.mw.reviewer.web.eval(js)
+    reviewer_sidebar.content_webview.eval(js)
+    # aqt.mw.reviewer.web.eval(js)
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -488,6 +503,7 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
 
     is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
+    is_anking_deck = True
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
@@ -544,13 +560,30 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = parse_js_message_kwargs(message)
         button_name = kwargs.get("buttonName")
         is_active = kwargs.get("isActive")
+        ankihub_ai_js = get_ankihub_ai_js(
+            template_name="ankihub_ai.js",
+            knox_token=config.token(),
+            app_url=config.app_url,
+            endpoint_path="ai/chatbot",
+            query_parameters="is_on_anki=true",
+            theme=_ankihub_theme(),
+        )
 
         if button_name == "chatbot":
+            # if is_active:
+            #     js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
+            # else:
+            #     js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
+            # context.web.eval(js)
             if is_active:
+                reviewer_sidebar.open_sidebar()
+                reviewer_sidebar.set_page_content(f"<body><script>{ankihub_ai_js}</script></body>", "AnkiHub Chatbot")
                 js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
+                _notify_ankihub_ai_of_card_change(context.card)
+                reviewer_sidebar.content_webview.eval(js)
+                # context.web.eval(js)
             else:
-                js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-            context.web.eval(js)
+                reviewer_sidebar.close_sidebar()
         else:
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
