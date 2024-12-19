@@ -27,11 +27,7 @@ from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import mh_tag_to_resource_title_and_slug
 from ..settings import config, url_mh_integrations_preview
-from .js_message_handling import (
-    ANKIHUB_UPSELL,
-    VIEW_NOTE_PYCMD,
-    parse_js_message_kwargs,
-)
+from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
     get_ankihub_ai_js,
@@ -545,10 +541,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if url:
             openLink(url)
 
-        return True, None
-    elif message == ANKIHUB_UPSELL:
-        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-        context.web.eval(js)
         return True, None
 
     return handled
