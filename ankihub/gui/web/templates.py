@@ -47,9 +47,10 @@ def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
         {
             "THEME": theme,
             "ENABLED_BUTTONS": ",".join(enabled_buttons),
+            # TODO
+            "IS_PREMIUM": str(True),
         }
     )
-
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
     return env.get_template("mh_no_urls_empty_state.html").render(
