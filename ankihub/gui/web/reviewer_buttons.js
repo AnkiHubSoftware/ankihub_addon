@@ -45,7 +45,7 @@ class AnkiHubReviewerButtons {
     }
 
     setupButtons() {
-        const elementsContainer = document.createElement("div");
+        this.elementsContainer = document.createElement("div");
         const buttonContainer = document.createElement("div");
         const toggleButtonsButton = document.createElement("button");
 
@@ -73,7 +73,7 @@ class AnkiHubReviewerButtons {
         }
 
         this.setToggleButtonsButtonStyle(toggleButtonsButton);
-        this.setElementsContainerStyle(elementsContainer);
+        this.setElementsContainerStyle(this.elementsContainer);
         this.setButtonContainerStyle(buttonContainer);
 
         this.buttonsData.forEach((buttonData) => {
@@ -121,9 +121,9 @@ class AnkiHubReviewerButtons {
             buttonContainer.appendChild(container);
         })
 
-        elementsContainer.appendChild(buttonContainer);
-        elementsContainer.appendChild(toggleButtonsButton);
-        document.body.appendChild(elementsContainer);
+        this.elementsContainer.appendChild(buttonContainer);
+        this.elementsContainer.appendChild(toggleButtonsButton);
+        document.body.appendChild(this.elementsContainer);
         this.injectResourceCountIndicatorStylesheet();
         if (this.buttonsData.length == 0) {
             toggleButtonsButton.style.display = "none";
@@ -295,6 +295,12 @@ class AnkiHubReviewerButtons {
         });
 
         this.updateResourceCountIndicators(visibleButtons);
+
+        if (visibleButtons.length === 0) {
+            this.elementsContainer.style.visibility = "hidden";
+        } else {
+            this.elementsContainer.style.visibility = "visible";
+        }
     }
 
     getVisibleButtons() {
