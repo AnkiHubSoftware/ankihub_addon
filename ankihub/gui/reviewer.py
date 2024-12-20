@@ -527,8 +527,7 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
         if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
         for title, slug in [title_and_slug]
     }
-    result = list(sorted(result, key=lambda x: x.title))
-    return result
+    return list(sorted(result, key=lambda x: x.title))
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
