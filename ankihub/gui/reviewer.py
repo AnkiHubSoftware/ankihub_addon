@@ -9,7 +9,7 @@ import aqt
 import aqt.webview
 from anki.cards import Card
 from anki.notes import Note
-from aqt import colors
+from aqt import QTimer, colors
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -124,6 +124,12 @@ class ReviewerSidebar:
         self.content_webview = aqt.webview.AnkiWebView()
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
 
+        self.update_header_button_timer = QTimer(self.content_webview)
+        self.update_header_button_timer.timeout.connect(
+            self._update_header_button_state
+        )
+        self.update_header_button_timer.start(200)
+
         self.url_page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
         self.url_page.profile().setUrlRequestInterceptor(self.interceptor)
@@ -189,6 +195,18 @@ class ReviewerSidebar:
 
         self._update_content_webview()
         self._update_header_webview()
+
+    def _update_header_button_state(self):
+        if not self.resources:
+            return
+
+        # We only want to enable the "Open in Browser" button if the content is not hosted on AnkiHub.
+        enable_open_in_browser_button = not self.get_content_url().startswith(
+            config.app_url
+        )
+        self.header_webview.eval(
+            f"setOpenInBrowserButtonState({'true' if enable_open_in_browser_button else 'false'});"
+        )
 
     def _update_content_webview(self):
         if not self.resources:
