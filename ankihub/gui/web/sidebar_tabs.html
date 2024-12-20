@@ -68,9 +68,19 @@
         border-bottom: 2px solid transparent;
         color: #6b7280;
         transition: color 0.3s, border-color 0.3s;
-        flex-grow: 1;
+        flex: 1 1 0;
         height: 100%;
         align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .webview-tab span {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        display: block;
+        width: 100%;
     }
 
     .webview-tab.selected {
@@ -156,7 +166,7 @@
         <div class="webview-tab {% if current_active_tab_url == tab.url %}selected{% endif %}"
             onclick="selectTab(this); pycmd('ankihub_load_url_in_sidebar { &quot;url&quot;: &quot;{{ tab.url }}&quot; }')"
             data-tab="{{ tab.url }}">
-            {{ tab.title }}
+            <span>{{ tab.title }}</span>
         </div>
         {% endfor %}
     </nav>
