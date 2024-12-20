@@ -269,9 +269,10 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
-    updateButtons(bbCount, faCount, isAnKingDeck) {
+    updateButtons(bbCount, faCount, showChatbot, isAnKingDeck) {
         this.bbCount = bbCount;
         this.faCount = faCount;
+        this.showChatbot = showChatbot;
         this.isAnKingDeck = isAnKingDeck;
 
         const visibleButtons = this.getVisibleButtons();
@@ -297,7 +298,12 @@ class AnkiHubReviewerButtons {
     }
 
     getVisibleButtons() {
-        return this.buttonsData.filter(buttonData => this.isAnKingDeck || buttonData.name === "chatbot");
+        return this.buttonsData.filter(
+            buttonData => (
+                (buttonData.name === "chatbot" && this.showChatbot) ||
+                (buttonData.name !== "chatbot" && this.isAnKingDeck)
+            )
+        );
     }
 
     udpateButtonVisibility(buttonName, isVisible) {
