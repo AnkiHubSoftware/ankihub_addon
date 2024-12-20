@@ -9,7 +9,7 @@ import aqt
 import aqt.webview
 from anki.cards import Card
 from anki.notes import Note
-from aqt import QTimer, colors
+from aqt import QTimer, colors, qconnect
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -125,8 +125,8 @@ class ReviewerSidebar:
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
 
         self.update_header_button_timer = QTimer(self.content_webview)
-        self.update_header_button_timer.timeout.connect(
-            self._update_header_button_state
+        qconnect(
+            self.update_header_button_timer.timeout, self._update_header_button_state
         )
         self.update_header_button_timer.start(200)
 
