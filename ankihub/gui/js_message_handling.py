@@ -16,9 +16,8 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from ..db import ankihub_db
-from ..settings import config, url_plans_page, url_view_note
+from ..settings import config, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
-from .utils import show_dialog
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -27,7 +26,6 @@ OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
-ANKIHUB_UPSELL = "ankihub_ai_upsell"
 COPY_TO_CLIPBOARD_PYCMD = "ankihub_copy_to_clipboard"
 OPEN_LINK_PYCMD = "ankihub_open_link"
 
@@ -91,22 +89,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             web=context.web,
         )
         return (True, None)
-    elif message == ANKIHUB_UPSELL:
-
-        def on_button_clicked(button_index: int) -> None:
-            if button_index == 1:
-                openLink(url_plans_page())
-
-        show_dialog(
-            text="Upgrade your membership to <b>Premium</b> to access this feature 🌟",
-            title="Your trial has ended!",
-            buttons=[
-                ("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole),
-                ("Upgrade", aqt.QDialogButtonBox.ButtonRole.ActionRole),
-            ],
-            default_button_idx=1,
-            callback=on_button_clicked,
-        )
     elif message.startswith(COPY_TO_CLIPBOARD_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         content = kwargs.get("content")
