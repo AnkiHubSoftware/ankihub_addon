@@ -11,10 +11,12 @@ class AnkiHubReviewerButtons {
         this.colorButtonLight = "#F9FAFB";
         this.colorButtonSelectedLight = "#C7D2FE";
         this.colorButtonBorderLight = "#D1D5DB";
+        this.colorButtonHoverLight = "#E5E7EB"
 
         this.colorButtonDark = "#030712";
         this.colorButtonSelectedDark = "#3730A3";
         this.colorButtonBorderDark = "#4b5563";
+        this.colorButtonHoverDark = "#1f2937";
 
         this.buttonsData = [
             {
@@ -45,7 +47,7 @@ class AnkiHubReviewerButtons {
     }
 
     setupButtons() {
-        const elementsContainer = document.createElement("div");
+        this.elementsContainer = document.createElement("div");
         const buttonContainer = document.createElement("div");
         const toggleButtonsButton = document.createElement("button");
 
@@ -73,8 +75,9 @@ class AnkiHubReviewerButtons {
         }
 
         this.setToggleButtonsButtonStyle(toggleButtonsButton);
-        this.setElementsContainerStyle(elementsContainer);
+        this.setElementsContainerStyle(this.elementsContainer);
         this.setButtonContainerStyle(buttonContainer);
+        this.injectReviewerButtonStyleSheet()
 
         this.buttonsData.forEach((buttonData) => {
             const container = document.createElement("div");
@@ -84,6 +87,8 @@ class AnkiHubReviewerButtons {
 
             const buttonElement = document.createElement("button");
             buttonElement.id = `ankihub-${buttonData.name}-button`;
+            buttonElement.classList.add("ankihub-reviewer-button");
+
             this.setButtonStyle(
                 buttonElement,
                 (
@@ -121,13 +126,27 @@ class AnkiHubReviewerButtons {
             buttonContainer.appendChild(container);
         })
 
-        elementsContainer.appendChild(buttonContainer);
-        elementsContainer.appendChild(toggleButtonsButton);
-        document.body.appendChild(elementsContainer);
+        this.elementsContainer.appendChild(buttonContainer);
+        this.elementsContainer.appendChild(toggleButtonsButton);
+        document.body.appendChild(this.elementsContainer);
         this.injectResourceCountIndicatorStylesheet();
         if (this.buttonsData.length == 0) {
             toggleButtonsButton.style.display = "none";
         }
+    }
+
+    injectReviewerButtonStyleSheet() {
+        const style = document.createElement("style");
+        style.innerHTML = `
+            .ankihub-reviewer-button {
+                background-color: ${this.theme == "light" ? this.colorButtonLight : this.colorButtonDark};
+            }
+
+            .ankihub-reviewer-button:hover {
+                background-color: ${this.theme == "light" ? this.colorButtonHoverLight : this.colorButtonHoverDark};
+            }
+        `
+        document.head.appendChild(style);
     }
 
     getButtonElement(buttonName) {
@@ -142,7 +161,7 @@ class AnkiHubReviewerButtons {
     setToggleButtonsButtonStyle(toggleButtonsButton) {
         const styles = `
             .ankihub-toggle-buttons-button:hover {
-                background: ${this.theme == "light" ? "#e5e7eb" : "#1f2937"} !important;
+                background: ${this.theme == "light" ? this.colorButtonHoverLight : this.colorButtonHoverDark} !important;
             }
             .ankihub-toggle-buttons-button-slide {
                 transform: translateX(100px);
@@ -221,7 +240,6 @@ class AnkiHubReviewerButtons {
         button.style.backgroundSize = "cover";
         button.style.backgroundPosition = "center";
         button.style.backgroundRepeat = "no-repeat";
-        button.style.backgroundColor = this.theme == "light" ? this.colorButtonLight : this.colorButtonDark;
 
         button.style.cursor = "pointer";
     }
@@ -269,9 +287,10 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
-    updateButtons(bbCount, faCount, isAnKingDeck) {
+    updateButtons(bbCount, faCount, showChatbot, isAnKingDeck) {
         this.bbCount = bbCount;
         this.faCount = faCount;
+        this.showChatbot = showChatbot;
         this.isAnKingDeck = isAnKingDeck;
 
         const visibleButtons = this.getVisibleButtons();
@@ -294,10 +313,21 @@ class AnkiHubReviewerButtons {
         });
 
         this.updateResourceCountIndicators(visibleButtons);
+
+        if (visibleButtons.length === 0) {
+            this.elementsContainer.style.visibility = "hidden";
+        } else {
+            this.elementsContainer.style.visibility = "visible";
+        }
     }
 
     getVisibleButtons() {
-        return this.buttonsData.filter(buttonData => this.isAnKingDeck || buttonData.name === "chatbot");
+        return this.buttonsData.filter(
+            buttonData => (
+                (buttonData.name === "chatbot" && this.showChatbot) ||
+                (buttonData.name !== "chatbot" && this.isAnKingDeck)
+            )
+        );
     }
 
     udpateButtonVisibility(buttonName, isVisible) {
@@ -308,11 +338,11 @@ class AnkiHubReviewerButtons {
     updateButtonStyle(buttonName, isTopButton, isBottomButton) {
         const buttonElement = this.getButtonElement(buttonName);
         if (isTopButton && isBottomButton) {
-            buttonElement.style.borderRadius = "8px 0px 0px 8px";
+            buttonElement.style.borderRadius = "4px 0px 0px 4px";
         } else if (isBottomButton) {
-            buttonElement.style.borderRadius = "0px 0px 0px 8px";
+            buttonElement.style.borderRadius = "0px 0px 0px 4px";
         } else if (isTopButton) {
-            buttonElement.style.borderRadius = "8px 0px 0px 0px";
+            buttonElement.style.borderRadius = "4px 0px 0px 0px";
         } else {
             buttonElement.style.borderRadius = "0px";
         }
