@@ -320,11 +320,11 @@ class AnkiHubReviewerButtons {
     updateButtonStyle(buttonName, isTopButton, isBottomButton) {
         const buttonElement = this.getButtonElement(buttonName);
         if (isTopButton && isBottomButton) {
-            buttonElement.style.borderRadius = "8px 0px 0px 8px";
+            buttonElement.style.borderRadius = "4px 0px 0px 4px";
         } else if (isBottomButton) {
-            buttonElement.style.borderRadius = "0px 0px 0px 8px";
+            buttonElement.style.borderRadius = "0px 0px 0px 4px";
         } else if (isTopButton) {
-            buttonElement.style.borderRadius = "8px 0px 0px 0px";
+            buttonElement.style.borderRadius = "4px 0px 0px 0px";
         } else {
             buttonElement.style.borderRadius = "0px";
         }
