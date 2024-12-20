@@ -382,6 +382,9 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         )
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
+    if not feature_flags.get("mh_integration"):
+        return
+
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
