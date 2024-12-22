@@ -24,14 +24,13 @@ def get_header_webview_html(
 
 
 def get_ankihub_ai_js(
-    template_name: str,
     knox_token: str,
     app_url: str,
     endpoint_path: str,
     query_parameters: str,
     theme: str,
 ) -> str:
-    return env.get_template(template_name).render(
+    return env.get_template("ankihub_ai.js").render(
         {
             "KNOX_TOKEN": knox_token,
             "APP_URL": app_url,
