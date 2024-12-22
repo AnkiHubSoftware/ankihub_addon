@@ -128,6 +128,7 @@ class AnkiHubReviewerButtons {
 
         this.elementsContainer.appendChild(buttonContainer);
         this.elementsContainer.appendChild(toggleButtonsButton);
+        this.elementsContainer.style.visibility = "hidden";
         document.body.appendChild(this.elementsContainer);
         this.injectResourceCountIndicatorStylesheet();
         if (this.buttonsData.length == 0) {
