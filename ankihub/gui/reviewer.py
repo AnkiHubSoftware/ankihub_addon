@@ -299,7 +299,7 @@ def setup():
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
-        webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
+        webview_will_set_content.append(_inject_ankihub_features_and_setup_sidebar)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
         reviewer_did_show_question.append(_notify_sidebar_of_card_change)
@@ -370,9 +370,17 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
+def _inject_ankihub_features_and_setup_sidebar(
+    web_content: WebContent, context
+) -> None:
     if not isinstance(context, Reviewer):
         return
+
+    reviewer_button_js = get_reviewer_buttons_js(
+        theme=_ankihub_theme(),
+        enabled_buttons=_get_enabled_buttons_list(),
+    )
+    web_content.body += f"<script>{reviewer_button_js}</script>"
 
     ankihub_ai_js = get_ankihub_ai_js(
         knox_token=config.token(),
@@ -387,12 +395,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
-
-    reviewer_button_js = get_reviewer_buttons_js(
-        theme=_ankihub_theme(),
-        enabled_buttons=_get_enabled_buttons_list(),
-    )
-    web_content.body += f"<script>{reviewer_button_js}</script>"
 
 
 def _get_enabled_buttons_list() -> List[str]:
@@ -561,8 +563,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
                 js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
             context.web.eval(js)
         else:
-            # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
-            # depending on the button that was toggled
             if is_active:
                 reviewer_sidebar.open_sidebar()
                 resource_type = ResourceType(button_name)
