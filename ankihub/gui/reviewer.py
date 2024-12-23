@@ -234,10 +234,12 @@ class ReviewerSidebar:
     def open_sidebar(self):
         if not config.token():
             self._handle_auth_failure()
+            return
 
         if not self.container.isVisible():
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
+    
 
     def is_sidebar_open(self):
         return self.container.isVisible()
@@ -263,6 +265,11 @@ class ReviewerSidebar:
                 self.content_webview.setPage(self.url_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
+            
+    def refresh_content_webview(self):
+        self.content_webview.reload()
+
+
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
@@ -375,7 +382,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         return
 
     feature_flags = config.get_feature_flags()
-
     # TODO This condition is not placed correctly. It should be used to
     # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
     # The consquence of the current implementation is that the chatbot icon is shown for notes it
@@ -518,7 +524,9 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
     is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
+    is_anking_deck = True
     show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
+    show_chatbot = True
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
@@ -530,7 +538,8 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
         """
     )
     aqt.mw.reviewer.web.eval(js)
-
+    if reviewer_sidebar and config.token():
+        reviewer_sidebar.set_content_url("http://localhost:8000/ai/chatbot/d165ea37-83b9-4a8e-9563-500ba9dccdd9/is_on_anki=true")
 
 def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
     if not reviewer_sidebar:
@@ -578,10 +587,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         if button_name == "chatbot":
             if is_active:
-                js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
+                reviewer_sidebar.open_sidebar()
+                # js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
             else:
-                js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-            context.web.eval(js)
+                reviewer_sidebar.close_sidebar()
+                # js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
+            # context.web.eval(js)
         else:
             # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
             # depending on the button that was toggled
