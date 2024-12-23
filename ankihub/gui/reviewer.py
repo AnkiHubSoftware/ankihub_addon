@@ -401,12 +401,9 @@ def _get_enabled_buttons_list() -> List[str]:
     buttons_map = {}
 
     feature_flags = config.get_feature_flags()
+
     if feature_flags.get("chatbot"):
-        buttons_map.update(
-            {
-                "ankihub_ai_chatbot": "chatbot",
-            }
-        )
+        buttons_map["ankihub_ai_chatbot"] = "chatbot"
 
     if feature_flags.get("mh_integration"):
         buttons_map.update(
