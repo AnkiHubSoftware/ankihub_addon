@@ -299,7 +299,7 @@ def setup():
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
-        webview_will_set_content.append(_add_ankihub_ai_and_sidebar_and_buttons)
+        webview_will_set_content.append(_inject_ankihub_features_and_setup_sidebar)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
         reviewer_did_show_question.append(_notify_sidebar_of_card_change)
@@ -370,71 +370,54 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
+def _inject_ankihub_features_and_setup_sidebar(
+    web_content: WebContent, context
+) -> None:
     if not isinstance(context, Reviewer):
         return
 
-    feature_flags = config.get_feature_flags()
+    reviewer_button_js = get_reviewer_buttons_js(
+        theme=_ankihub_theme(),
+        enabled_buttons=_get_enabled_buttons_list(),
+    )
+    web_content.body += f"<script>{reviewer_button_js}</script>"
 
-    # TODO This condition is not placed correctly. It should be used to
-    # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
-    # The consquence of the current implementation is that the chatbot icon is shown for notes it
-    # shouldn't be shown for and (maybe) isn't shown for notes it should be shown for in some cases.
-    # However, we don't have to fix it for the old chatbot implementation, because we will switch
-    # to a new one soon. For the new implementation, we should implement the correct logic.
-    if feature_flags.get("chatbot"):
-        if feature_flags.get("mh_integration"):
-            ankihub_ai_js_template_name = "ankihub_ai.js"
-        else:
-            # The new chatbot js (ankihub_ai.js) doesn't show a button, so we can always set it up.
-            # However, the old chatbot js (ankihub_ai_old.js) shows a button when executed, so we only
-            # want to execute it when the note has note embeddings.
-            if not _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
-                return
+    ankihub_ai_js = get_ankihub_ai_js(
+        knox_token=config.token(),
+        app_url=config.app_url,
+        endpoint_path="ai/chatbot",
+        query_parameters="is_on_anki=true",
+        theme=_ankihub_theme(),
+    )
+    web_content.body += f"<script>{ankihub_ai_js}</script>"
 
-            ankihub_ai_js_template_name = "ankihub_ai_old.js"
-
-        ankihub_ai_js = get_ankihub_ai_js(
-            template_name=ankihub_ai_js_template_name,
-            knox_token=config.token(),
-            app_url=config.app_url,
-            endpoint_path="ai/chatbot",
-            query_parameters="is_on_anki=true",
-            theme=_ankihub_theme(),
-        )
-        web_content.body += f"<script>{ankihub_ai_js}</script>"
-
-    if feature_flags.get("mh_integration"):
-        global reviewer_sidebar
-        if not reviewer_sidebar:
-            reviewer_sidebar = ReviewerSidebar(context)
-            reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
-
-        reviewer_button_js = get_reviewer_buttons_js(
-            theme=_ankihub_theme(),
-            enabled_buttons=_get_enabled_buttons_list(),
-        )
-        web_content.body += f"<script>{reviewer_button_js}</script>"
+    global reviewer_sidebar
+    if not reviewer_sidebar:
+        reviewer_sidebar = ReviewerSidebar(context)
+        reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
 
 def _get_enabled_buttons_list() -> List[str]:
-    buttons_map = {
-        "ankihub_ai_chatbot": "chatbot",
-        "boards_and_beyond": "b&b",
-        "first_aid_forward": "fa4",
-    }
-    public_config = config.public_config
-    buttons_config = dict(
-        filter(
-            lambda item: item[0]
-            in ["ankihub_ai_chatbot", "boards_and_beyond", "first_aid_forward"],
-            public_config.items(),
+    buttons_map = {}
+
+    feature_flags = config.get_feature_flags()
+
+    if feature_flags.get("chatbot"):
+        buttons_map["ankihub_ai_chatbot"] = "chatbot"
+
+    if feature_flags.get("mh_integration"):
+        buttons_map.update(
+            {
+                "boards_and_beyond": "b&b",
+                "first_aid_forward": "fa4",
+            }
         )
-    )
-    enabled_buttons_list = [
-        buttons_map[key] for key, value in buttons_config.items() if value
+
+    return [
+        buttons_map[key]
+        for key, value in config.public_config.items()
+        if key in buttons_map and value
     ]
-    return enabled_buttons_list
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -583,8 +566,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
                 js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
             context.web.eval(js)
         else:
-            # TODO load correct sidebar content (Boards&Beyond, First Aid or AnkiHub Chatbot)
-            # depending on the button that was toggled
             if is_active:
                 reviewer_sidebar.open_sidebar()
                 resource_type = ResourceType(button_name)
