@@ -6318,7 +6318,7 @@ class TestAnkiHubAIInReviewer:
                 qtbot.wait_until(lambda: self._ankihubAI_token(qtbot) == test_token)
             else:
                 qtbot.wait(300)
-                assert self._ankihubAI_token(qtbot) is None
+                assert self._ankihubAI_token(qtbot) == "None"
 
     def _suspend_notes_by_ah_nids(self, ah_nids: List[uuid.UUID]):
         """Suspend all cards of the given notes for the given AnkiHub note ids."""
