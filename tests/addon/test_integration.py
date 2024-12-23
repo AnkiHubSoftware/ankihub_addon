@@ -6023,15 +6023,15 @@ def mock_using_qt5_to_return_false(mocker: MockerFixture):
 class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "feature_flag_active, has_note_embeddings, expected_button_exists",
+        "feature_flag_active, has_note_embeddings, expected_button_visible",
         [
-            # The feature is only available for the AnKing deck and only if the feature flag is active
+            # The feature is only available for decks with note embeddings and only if the feature flag is active
             (True, True, True),
             (True, False, False),
             (False, True, False),
         ],
     )
-    def test_basic(
+    def test_ankihub_ai_button(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
@@ -6040,31 +6040,31 @@ class TestAnkiHubAIInReviewer:
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
         has_note_embeddings: bool,
-        expected_button_exists: bool,
+        expected_button_visible: bool,
     ):
         set_feature_flag_state("chatbot", feature_flag_active)
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            self._setup_token_and_app_url()
+
             self._setup_note_for_review(
                 install_ah_deck=install_ah_deck,
                 import_ah_note=import_ah_note,
                 has_note_embeddings=has_note_embeddings,
             )
 
-            # Open reviewer
             aqt.mw.reviewer.show()
             qtbot.wait(300)
 
             assert not self._ankihub_ai_is_visible(qtbot)
 
-            ankihub_ai_button_exists = self._ankihub_ai_button_exist(qtbot)
-            assert ankihub_ai_button_exists == expected_button_exists
-            if not expected_button_exists:
+            assert self._ankihub_ai_button_visible(qtbot) == expected_button_visible
+            if not expected_button_visible:
                 return
 
-            aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
-            qtbot.wait(300)
+            self._click_ankihub_ai_button()
+            qtbot.wait(500)
 
             assert self._ankihub_ai_is_visible(qtbot)
 
@@ -6331,6 +6331,12 @@ class TestAnkiHubAIInReviewer:
                 cards.append(card)
             aqt.mw.col.update_cards(cards)
 
+    def _setup_token_and_app_url(self) -> None:
+        config.save_token("test_token")
+
+        # Prevent JS from making requests to the webapp
+        config.app_url = "http://localhost:3000"
+
     def _setup_note_for_review(
         self,
         install_ah_deck: InstallAHDeck,
@@ -6365,13 +6371,18 @@ class TestAnkiHubAIInReviewer:
             )
         return callback.args[0]
 
-    def _ankihub_ai_button_exist(self, qtbot) -> bool:
+    def _ankihub_ai_button_visible(self, qtbot) -> bool:
         with qtbot.wait_callback() as callback:
             aqt.mw.reviewer.web.evalWithCallback(
-                "document.getElementById('ankihub-ai-button')",
+                "document.getElementById('ankihub-chatbot-button-container').style.display !== 'none'",
                 callback,
             )
-        return callback.args[0] is not None
+        return bool(callback.args[0])
+
+    def _click_ankihub_ai_button(self) -> None:
+        aqt.mw.reviewer.web.eval(
+            "document.getElementById('ankihub-chatbot-button').click()"
+        )
 
 
 class TestMaybeSendDailyReviewSummaries:
