@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Any, Callable, List, Optional, Set, Tuple
@@ -8,7 +9,7 @@ import aqt
 import aqt.webview
 from anki.cards import Card
 from anki.notes import Note
-from aqt import colors
+from aqt import QTimer, colors, qconnect
 from aqt.gui_hooks import (
     reviewer_did_show_answer,
     reviewer_did_show_question,
@@ -64,6 +65,12 @@ RESOURCE_TYPE_TO_DISPLAY_NAME = {
 }
 
 
+@dataclass(frozen=True)
+class Resource:
+    title: str
+    url: str
+
+
 class ReviewerSidebar:
     def __init__(self, reviewer: Reviewer):
         self.reviewer = reviewer
@@ -72,7 +79,7 @@ class ReviewerSidebar:
         self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
         self.current_active_tab_url: Optional[str] = None
-        self.urls_list = None
+        self.resources: List[Resource] = None
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
@@ -112,6 +119,12 @@ class ReviewerSidebar:
 
         self.content_webview = aqt.webview.AnkiWebView()
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
+
+        self.update_header_button_timer = QTimer(self.content_webview)
+        qconnect(
+            self.update_header_button_timer.timeout, self._update_header_button_state
+        )
+        self.update_header_button_timer.start(200)
 
         self.url_page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
@@ -171,23 +184,35 @@ class ReviewerSidebar:
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
     def update_tabs(
-        self, urls_list, resource_type: Optional[ResourceType] = None
+        self, resources: List[Resource], resource_type: Optional[ResourceType] = None
     ) -> None:
-        self.urls_list = urls_list
+        self.resources = resources
         self.resource_type = resource_type if resource_type else self.resource_type
 
         self._update_content_webview()
         self._update_header_webview()
 
+    def _update_header_button_state(self):
+        if not self.resources:
+            return
+
+        # We only want to enable the "Open in Browser" button if the content is not hosted on AnkiHub.
+        enable_open_in_browser_button = not self.get_content_url().startswith(
+            config.app_url
+        )
+        self.header_webview.eval(
+            f"setOpenInBrowserButtonState({'true' if enable_open_in_browser_button else 'false'});"
+        )
+
     def _update_content_webview(self):
-        if not self.urls_list:
+        if not self.resources:
             self.set_content_url(None)
         else:
-            self.set_content_url(self.urls_list[0]["url"])
+            self.set_content_url(self.resources[0].url)
 
     def _update_header_webview(self):
         html = get_header_webview_html(
-            self.urls_list,
+            self.resources,
             self.current_active_tab_url,
             f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
             _ankihub_theme(),
@@ -346,13 +371,6 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         return
 
     feature_flags = config.get_feature_flags()
-    if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
-        return
-
-    if feature_flags.get("mh_integration"):
-        ankihub_ai_js_template_name = "ankihub_ai.js"
-    else:
-        ankihub_ai_js_template_name = "ankihub_ai_old.js"
 
     # TODO This condition is not placed correctly. It should be used to
     # show/hide the AnkiHub AI chatbot button when the reviewer_did_show_question hook is called.
@@ -360,7 +378,18 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
     # shouldn't be shown for and (maybe) isn't shown for notes it should be shown for in some cases.
     # However, we don't have to fix it for the old chatbot implementation, because we will switch
     # to a new one soon. For the new implementation, we should implement the correct logic.
-    if _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
+    if feature_flags.get("chatbot"):
+        if feature_flags.get("mh_integration"):
+            ankihub_ai_js_template_name = "ankihub_ai.js"
+        else:
+            # The new chatbot js (ankihub_ai.js) doesn't show a button, so we can always set it up.
+            # However, the old chatbot js (ankihub_ai_old.js) shows a button when executed, so we only
+            # want to execute it when the note has note embeddings.
+            if not _related_ah_deck_has_note_embeddings(aqt.mw.reviewer.card.note()):
+                return
+
+            ankihub_ai_js_template_name = "ankihub_ai_old.js"
+
         ankihub_ai_js = get_ankihub_ai_js(
             template_name=ankihub_ai_js_template_name,
             knox_token=config.token(),
@@ -371,16 +400,17 @@ def _add_ankihub_ai_and_sidebar_and_buttons(web_content: WebContent, context):
         )
         web_content.body += f"<script>{ankihub_ai_js}</script>"
 
-    global reviewer_sidebar
-    if not reviewer_sidebar:
-        reviewer_sidebar = ReviewerSidebar(context)
-        reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
+    if feature_flags.get("mh_integration"):
+        global reviewer_sidebar
+        if not reviewer_sidebar:
+            reviewer_sidebar = ReviewerSidebar(context)
+            reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    reivewer_button_js = get_reviewer_buttons_js(
-        theme=_ankihub_theme(),
-        enabled_buttons=_get_enabled_buttons_list(),
-    )
-    web_content.body += f"<script>{reivewer_button_js}</script>"
+        reviewer_button_js = get_reviewer_buttons_js(
+            theme=_ankihub_theme(),
+            enabled_buttons=_get_enabled_buttons_list(),
+        )
+        web_content.body += f"<script>{reviewer_button_js}</script>"
 
 
 def _get_enabled_buttons_list() -> List[str]:
@@ -480,15 +510,17 @@ def _is_anking_deck(card: Card) -> bool:
 
 def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     note = card.note()
-    bb_count = len(_get_resource_tags(note.tags, ResourceType.BOARDS_AND_BEYOND))
-    fa_count = len(_get_resource_tags(note.tags, ResourceType.FIRST_AID))
+    bb_count = len(_get_resources(note.tags, ResourceType.BOARDS_AND_BEYOND))
+    fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
     is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
+    show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
             {bb_count},
             {fa_count},
+            {'true' if show_chatbot else 'false'},
             {'true' if is_anking_deck else 'false'},
         );
         """
@@ -501,20 +533,19 @@ def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
         return
 
     tags = aqt.mw.reviewer.card.note().tags
+    resources = _get_resources(tags, resource_type)
+    reviewer_sidebar.update_tabs(resources, resource_type)
+
+
+def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
     resource_tags = _get_resource_tags(tags, resource_type)
-    resource_title_slug_pairs = [
-        title_and_slug
+    result = {
+        Resource(title=title, url=url_mh_integrations_preview(slug))
         for tag in resource_tags
         if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
-    ]
-
-    resource_urls_list = [
-        {"title": title, "url": url_mh_integrations_preview(slug)}
-        for title, slug in resource_title_slug_pairs
-    ]
-    resource_urls_list = list(sorted(resource_urls_list, key=lambda x: x["title"]))
-
-    reviewer_sidebar.update_tabs(resource_urls_list, resource_type)
+        for title, slug in [title_and_slug]
+    }
+    return list(sorted(result, key=lambda x: x.title))
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:

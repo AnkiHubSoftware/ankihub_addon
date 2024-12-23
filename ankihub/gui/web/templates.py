@@ -13,11 +13,11 @@ env = Environment(
 
 
 def get_header_webview_html(
-    urls_list, current_active_tab_url: str, page_title: str, theme: str
+    tabs, current_active_tab_url: str, page_title: str, theme: str
 ) -> str:
     return env.get_template("sidebar_tabs.html").render(
         {
-            "tabs": urls_list,
+            "tabs": tabs,
             "current_active_tab_url": current_active_tab_url,
             "page_title": page_title,
             "theme": theme,
