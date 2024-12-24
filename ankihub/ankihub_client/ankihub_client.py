@@ -1290,6 +1290,14 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
+    def is_premium_user(self) -> bool:
+        response = self._send_request("GET", API.ANKIHUB, "/users/me")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        data = response.json()
+        return data["is_premium"]
+
 
 class ThreadLocalSession:
     def __init__(self):

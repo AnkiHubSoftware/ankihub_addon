@@ -3,6 +3,8 @@ from typing import List
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+
 TEMPLATES_PATH = (pathlib.Path(__file__).parent).absolute()
 
 env = Environment(
@@ -42,10 +44,12 @@ def get_ankihub_ai_js(
 
 
 def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
+    client = AnkiHubClient()
     return env.get_template("reviewer_buttons.js").render(
         {
             "THEME": theme,
             "ENABLED_BUTTONS": ",".join(enabled_buttons),
+            "IS_PREMIUM": str(client.is_premium_user()),
         }
     )
 
