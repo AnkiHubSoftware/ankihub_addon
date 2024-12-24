@@ -203,8 +203,9 @@ class AnkiHubLogin(QWidget):
         tooltip("Signed into AnkiHub!", parent=aqt.mw)
         self.close()
         from .reviewer import reviewer_sidebar
+
         if reviewer_sidebar:
-            reviewer_sidebar.set_content_url("http://localhost:8000/ai/chatbot/d165ea37-83b9-4a8e-9563-500ba9dccdd9/?is_on_anki=true")
+            reviewer_sidebar.update_sidebar_with_chatbot_url()
 
     def _is_email(self, value):
         return re.fullmatch(

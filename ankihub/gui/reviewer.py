@@ -35,7 +35,6 @@ from .js_message_handling import (
 )
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
-    get_ankihub_ai_js,
     get_empty_state_html,
     get_header_webview_html,
     get_remove_anking_button_js,
@@ -56,6 +55,7 @@ OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD = "ankihub_open_sidebar_content_in_browser
 class ResourceType(Enum):
     BOARDS_AND_BEYOND = "b&b"
     FIRST_AID = "fa4"
+    CHATBOT = "chatbot"
 
 
 RESOURCE_TYPE_TO_TAG_PART = {
@@ -66,6 +66,7 @@ RESOURCE_TYPE_TO_TAG_PART = {
 RESOURCE_TYPE_TO_DISPLAY_NAME = {
     ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond",
     ResourceType.FIRST_AID: "First Aid",
+    ResourceType.CHATBOT: "Chatbot",
 }
 
 
@@ -87,8 +88,8 @@ class ReviewerSidebar:
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
-
-        self.url_page: Optional[aqt.webview.QWebEnginePage] = None
+        self.last_card_ah_nid: Optional[str] = None
+        self.url_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
         self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
 
         self._setup_ui()
@@ -130,14 +131,19 @@ class ReviewerSidebar:
         )
         self.update_header_button_timer.start(200)
 
-        self.url_page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
-        self.url_page.profile().setUrlRequestInterceptor(self.interceptor)
+        for resource_type in ResourceType:
+            self.url_pages[resource_type] = CustomWebPage(
+                self.profile, self.content_webview._onBridgeCmd
+            )
+            self.url_pages[resource_type].profile().setUrlRequestInterceptor(
+                self.interceptor
+            )
 
         # Prevent white flicker on dark mode
-        self.url_page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
-
-        aqt.qconnect(self.url_page.loadFinished, self._on_url_page_loaded)
+        for page in self.url_pages.values():
+            page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+            aqt.qconnect(page.loadFinished, self._on_url_page_loaded)
 
         # Prepare empty state page for each resource type to prevent flickering
         for resource_type in ResourceType:
@@ -192,9 +198,9 @@ class ReviewerSidebar:
     ) -> None:
         self.resources = resources
         self.resource_type = resource_type if resource_type else self.resource_type
-
-        self._update_content_webview()
-        self._update_header_webview()
+        if self.resource_type != ResourceType.CHATBOT:
+            self._update_content_webview()
+            self._update_header_webview()
 
     def _update_header_button_state(self):
         if not self.resources:
@@ -236,10 +242,16 @@ class ReviewerSidebar:
             self._handle_auth_failure()
             return
 
-        if not self.container.isVisible():
+        if not self.is_sidebar_open():
+            self.content_webview.setPage(self.url_pages[self.resource_type])
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
-    
+
+    def set_resource_type(self, resource_type: ResourceType):
+        self.resource_type = resource_type
+
+    def get_resource_type(self):
+        return self.resource_type
 
     def is_sidebar_open(self):
         return self.container.isVisible()
@@ -260,16 +272,32 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
-            self.url_page.setUrl(aqt.QUrl(url))
-            if self.content_webview.page() != self.url_page:
-                self.content_webview.setPage(self.url_page)
+            self.url_pages[self.resource_type].setUrl(aqt.QUrl(url))
+            if self.content_webview.page() != self.url_pages[self.resource_type]:
+                self.content_webview.setPage(self.url_pages[self.resource_type])
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
-            
-    def refresh_content_webview(self):
-        self.content_webview.reload()
 
+    def update_sidebar_with_chatbot_url(self) -> None:
+        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
+        self._update_content_webview_theme()
 
+        header_html = get_header_webview_html(
+            self.resources,
+            self.current_active_tab_url,
+            "Chatbot",
+            _ankihub_theme(),
+        )
+
+        self.header_webview.setFixedHeight(44)
+        self.header_webview.setHtml(header_html)
+
+        self.url_pages[ResourceType.CHATBOT].setUrl(
+            aqt.QUrl(f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true")
+        )
+        if self.content_webview.page() != self.url_pages[ResourceType.CHATBOT]:
+            self.content_webview.setPage(self.url_pages[ResourceType.CHATBOT])
+        self.last_card_ah_nid = ah_nid
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
@@ -310,7 +338,6 @@ def setup():
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
         reviewer_did_show_question.append(_notify_sidebar_of_card_change)
-        config.token_change_hook.append(_set_token_for_ankihub_ai_js)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
 
@@ -389,15 +416,6 @@ def _inject_ankihub_features_and_setup_sidebar(
     )
     web_content.body += f"<script>{reviewer_button_js}</script>"
 
-    ankihub_ai_js = get_ankihub_ai_js(
-        knox_token=config.token(),
-        app_url=config.app_url,
-        endpoint_path="ai/chatbot",
-        query_parameters="is_on_anki=true",
-        theme=_ankihub_theme(),
-    )
-    web_content.body += f"<script>{ankihub_ai_js}</script>"
-
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
@@ -454,8 +472,12 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
-    aqt.mw.reviewer.web.eval(js)
+    if (
+        reviewer_sidebar
+        and config.token()
+        and ah_nid != reviewer_sidebar.last_card_ah_nid
+    ):
+        reviewer_sidebar.update_sidebar_with_chatbot_url()
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -465,22 +487,8 @@ def _remove_anking_button(_: Card) -> None:
     if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
         return
 
-    js = _wrap_with_ankihubAI_check(get_remove_anking_button_js())
+    js = get_remove_anking_button_js()
     aqt.mw.reviewer.web.eval(js)
-
-
-def _set_token_for_ankihub_ai_js() -> None:
-    feature_flags = config.get_feature_flags()
-    if not feature_flags.get("chatbot", False):
-        return
-
-    js = _wrap_with_ankihubAI_check(f"ankihubAI.setToken('{config.token()}');")
-    aqt.mw.reviewer.web.eval(js)
-
-
-def _wrap_with_ankihubAI_check(js: str) -> str:
-    """Wraps the given JavaScript code to only run if the AnkiHub AI object is defined."""
-    return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
 
 def _wrap_with_reviewer_buttons_check(js: str) -> str:
@@ -495,7 +503,7 @@ def _close_sidebar_if_exists():
 
 def _notify_sidebar_of_card_change(_: Card) -> None:
     if reviewer_sidebar and reviewer_sidebar.is_sidebar_open():
-        _update_sidebar_tabs_based_on_tags(reviewer_sidebar.resource_type)
+        _update_sidebar_tabs_based_on_tags()
 
 
 def _is_anking_deck(card: Card) -> bool:
@@ -508,9 +516,7 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
     is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
-    is_anking_deck = True
     show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
-    show_chatbot = True
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
@@ -522,14 +528,14 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
         """
     )
     aqt.mw.reviewer.web.eval(js)
-    if reviewer_sidebar and config.token():
-        reviewer_sidebar.set_content_url("http://localhost:8000/ai/chatbot/d165ea37-83b9-4a8e-9563-500ba9dccdd9/is_on_anki=true")
 
-def _update_sidebar_tabs_based_on_tags(resource_type: ResourceType) -> None:
+
+def _update_sidebar_tabs_based_on_tags() -> None:
     if not reviewer_sidebar:
         return
 
     tags = aqt.mw.reviewer.card.note().tags
+    resource_type = reviewer_sidebar.get_resource_type()
     resources = _get_resources(tags, resource_type)
     reviewer_sidebar.update_tabs(resources, resource_type)
 
@@ -547,6 +553,8 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
     """Get all (v12) tags matching a specific resource type."""
+    if resource_type == ResourceType.CHATBOT:
+        return {}
     search_pattern = f"v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}".lower()
     return {tag for tag in tags if search_pattern in tag.lower()}
 
@@ -557,12 +565,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         _handle_auth_failure()
 
         return True, None
-    elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
-        assert isinstance(context, Reviewer), context
-        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-        context.web.eval(js)
-
-        return True, None
     elif message.startswith(REVIEWER_BUTTON_TOGGLED_PYCMD):
         assert isinstance(context, Reviewer), context
         kwargs = parse_js_message_kwargs(message)
@@ -570,18 +572,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         is_active = kwargs.get("isActive")
 
         if button_name == "chatbot":
+            reviewer_sidebar.set_resource_type(ResourceType.CHATBOT)
             if is_active:
                 reviewer_sidebar.open_sidebar()
-                # js = _wrap_with_ankihubAI_check("ankihubAI.showIframe();")
             else:
                 reviewer_sidebar.close_sidebar()
-                # js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-            # context.web.eval(js)
         else:
+            reviewer_sidebar.set_resource_type(ResourceType(button_name))
             if is_active:
                 reviewer_sidebar.open_sidebar()
-                resource_type = ResourceType(button_name)
-                _update_sidebar_tabs_based_on_tags(resource_type)
+                _update_sidebar_tabs_based_on_tags()
             else:
                 reviewer_sidebar.close_sidebar()
 
@@ -607,8 +607,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return True, None
     elif message == ANKIHUB_UPSELL:
-        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
-        context.web.eval(js)
+        reviewer_sidebar.close_sidebar()
         return True, None
 
     return handled
