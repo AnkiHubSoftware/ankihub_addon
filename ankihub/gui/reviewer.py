@@ -64,9 +64,9 @@ RESOURCE_TYPE_TO_TAG_PART = {
 }
 
 RESOURCE_TYPE_TO_DISPLAY_NAME = {
-    ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond",
-    ResourceType.FIRST_AID: "First Aid",
-    ResourceType.CHATBOT: "Chatbot",
+    ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond Viewer",
+    ResourceType.FIRST_AID: "First Aid Viewer",
+    ResourceType.CHATBOT: "Welcome to AnkiHub AI!",
 }
 
 
@@ -259,6 +259,12 @@ class ReviewerSidebar:
     def close_sidebar(self):
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
+        
+    def clear_states(self):
+        self.resources = None
+        self.resource_type = None
+        self.current_active_tab_url = None
+        self.last_card_ah_nid = None
 
     def get_content_url(self) -> Optional[str]:
         return self.content_webview.url().toString()
@@ -277,20 +283,21 @@ class ReviewerSidebar:
                 self.content_webview.setPage(self.url_pages[self.resource_type])
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
-
-    def update_sidebar_with_chatbot_url(self) -> None:
-        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
-        self._update_content_webview_theme()
-
+            
+    def update_chatbot_header_on_sidebar(self):
         header_html = get_header_webview_html(
             self.resources,
             self.current_active_tab_url,
-            "Chatbot",
+            RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type],
             _ankihub_theme(),
         )
 
         self.header_webview.setFixedHeight(44)
         self.header_webview.setHtml(header_html)
+
+    def update_sidebar_content_with_chatbot_url(self) -> None:
+        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
+        self._update_content_webview_theme()
 
         self.url_pages[ResourceType.CHATBOT].setUrl(
             aqt.QUrl(f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true")
@@ -342,7 +349,7 @@ def setup():
         reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
-    reviewer_will_end.append(_close_sidebar_if_exists)
+    reviewer_will_end.append(_close_sidebar_and_clear_states_if_exists)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
@@ -477,7 +484,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         and config.token()
         and ah_nid != reviewer_sidebar.last_card_ah_nid
     ):
-        reviewer_sidebar.update_sidebar_with_chatbot_url()
+        reviewer_sidebar.update_sidebar_content_with_chatbot_url()
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -496,9 +503,10 @@ def _wrap_with_reviewer_buttons_check(js: str) -> str:
     return f"if (typeof ankihubReviewerButtons !== 'undefined') {{ {js} }}"
 
 
-def _close_sidebar_if_exists():
+def _close_sidebar_and_clear_states_if_exists():
     if reviewer_sidebar:
         reviewer_sidebar.close_sidebar()
+        reviewer_sidebar.clear_states()
 
 
 def _notify_sidebar_of_card_change(_: Card) -> None:
@@ -574,6 +582,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if button_name == "chatbot":
             reviewer_sidebar.set_resource_type(ResourceType.CHATBOT)
             if is_active:
+                reviewer_sidebar.update_chatbot_header_on_sidebar()
                 reviewer_sidebar.open_sidebar()
             else:
                 reviewer_sidebar.close_sidebar()
