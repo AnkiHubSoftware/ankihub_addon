@@ -179,7 +179,6 @@ from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
     FlashCardSelectorDialog,
 )
-from ankihub.gui.reviewer import CLOSE_ANKIHUB_CHATBOT_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
