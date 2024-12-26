@@ -46,8 +46,6 @@ VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 INVALID_AUTH_TOKEN_PYCMD = "ankihub_invalid_auth_token"
 REVIEWER_BUTTON_TOGGLED_PYCMD = "ankihub_reviewer_button_toggled"
 CLOSE_SIDEBAR_PYCMD = "ankihub_close_sidebar"
-CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
-OPEN_SPLIT_SCREEN_PYCMD = "ankihub_open_split_screen"
 LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD = "ankihub_open_sidebar_content_in_browser"
 
@@ -426,6 +424,7 @@ def _inject_ankihub_features_and_setup_sidebar(
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
+        aqt.mw.reviewer.sidebar = reviewer_sidebar
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
 
