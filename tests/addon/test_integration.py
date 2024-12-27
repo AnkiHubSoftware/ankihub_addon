@@ -27,6 +27,7 @@ from unittest.mock import Mock
 from zipfile import ZipFile
 
 import aqt
+import aqt.reviewer
 import pytest
 from anki.cards import Card, CardId
 from anki.consts import (
@@ -6215,6 +6216,7 @@ class TestAnkiHubAIInReviewer:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         message: str,
@@ -6227,6 +6229,12 @@ class TestAnkiHubAIInReviewer:
             for ah_note_id_int in range(1, 3):
                 ah_nid = uuid.UUID(int=ah_note_id_int)
                 import_ah_note(ah_nid=ah_nid)
+                
+            self._setup_note_for_review(
+                install_ah_deck,
+                import_ah_note,
+                has_note_embeddings=True,
+            )
 
             # Suspend selected notes
             self._suspend_notes_by_ah_nids(suspended_ah_nids)
@@ -6236,13 +6244,17 @@ class TestAnkiHubAIInReviewer:
                 "ankihub.gui.js_message_handling._post_message_to_ankihub_js",
                 side_effect=original_post_message_to_ankihub_js,
             )
+            
+            reviewer = aqt.mw.reviewer
+            reviewer.show()
+            qtbot.wait(500)
+            assert reviewer.sidebar
+            
+            original_eval = reviewer.sidebar.content_webview.eval
+            eval_mock = mocker.patch.object(reviewer.sidebar.content_webview, "eval")
 
-            original_eval = aqt.mw.reviewer.web.eval
-            eval_mock = mocker.patch.object(aqt.mw.reviewer.web, "eval")
-
-            # Call the pycmd
+            # # Call the pycmd
             original_eval(f"pycmd('{message}')")
-
             qtbot.wait_until(
                 lambda: eval_mock.called
                 and "noteSuspensionStates" in eval_mock.call_args[0][0]
