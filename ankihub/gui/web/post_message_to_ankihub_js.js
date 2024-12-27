@@ -6,6 +6,6 @@
     if (typeof window.ankihubAI !== 'undefined') {
         window.ankihubAI.iframe.contentWindow.postMessage(message, appUrl);
     } else {
-        window.postMessage(message, appUrl);
+        window.postMessage(message);
     }
 })();
