@@ -23,24 +23,6 @@ def get_header_webview_html(
     )
 
 
-def get_ankihub_ai_js(
-    knox_token: str,
-    app_url: str,
-    endpoint_path: str,
-    query_parameters: str,
-    theme: str,
-) -> str:
-    return env.get_template("ankihub_ai.js").render(
-        {
-            "KNOX_TOKEN": knox_token,
-            "APP_URL": app_url,
-            "ENDPOINT_PATH": endpoint_path,
-            "QUERY_PARAMETERS": query_parameters,
-            "THEME": theme,
-        }
-    )
-
-
 def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
     return env.get_template("reviewer_buttons.js").render(
         {
