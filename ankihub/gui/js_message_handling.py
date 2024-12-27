@@ -86,8 +86,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
+        
         from .reviewer import reviewer_sidebar
-
         if reviewer_sidebar:
             _post_message_to_ankihub_js(
                 message={"noteSuspensionStates": note_suspension_states},
