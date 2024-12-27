@@ -6058,7 +6058,7 @@ class TestAnkiHubAIInReviewer:
             reviewer = aqt.mw.reviewer
             qtbot.wait(300)
 
-            assert reviewer.sidebar
+            assert reviewer.sidebar  # type: ignore[attr-defined]
             assert not self._ankihub_ai_is_visible(qtbot)
 
             assert self._ankihub_ai_button_visible(qtbot) == expected_button_visible
@@ -6248,10 +6248,10 @@ class TestAnkiHubAIInReviewer:
             reviewer = aqt.mw.reviewer
             reviewer.show()
             qtbot.wait(500)
-            assert reviewer.sidebar
+            assert reviewer.sidebar  # type: ignore[attr-defined]
 
-            original_eval = reviewer.sidebar.content_webview.eval
-            eval_mock = mocker.patch.object(reviewer.sidebar.content_webview, "eval")
+            original_eval = reviewer.sidebar.content_webview.eval  # type: ignore[attr-defined]
+            eval_mock = mocker.patch.object(reviewer.sidebar.content_webview, "eval")  # type: ignore[attr-defined]
 
             # # Call the pycmd
             original_eval(f"pycmd('{message}')")
@@ -6305,7 +6305,7 @@ class TestAnkiHubAIInReviewer:
         aqt.mw.col.decks.set_current(deck_config.anki_id)
 
     def _ankihub_ai_is_visible(self, qtbot: QtBot):
-        return aqt.mw.reviewer.sidebar.is_sidebar_open()
+        return aqt.mw.reviewer.sidebar.is_sidebar_open()  # type: ignore[attr-defined]
 
     def _ankihub_ai_button_visible(self, qtbot) -> bool:
         with qtbot.wait_callback() as callback:

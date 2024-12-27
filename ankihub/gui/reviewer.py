@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -86,7 +87,7 @@ class ReviewerSidebar:
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
-        self.last_card_ah_nid: Optional[str] = None
+        self.last_card_ah_nid: Optional[uuid.UUID] = None
         self.url_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
         self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
 
@@ -424,7 +425,7 @@ def _inject_ankihub_features_and_setup_sidebar(
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(context)
-        aqt.mw.reviewer.sidebar = reviewer_sidebar
+        aqt.mw.reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
 
@@ -561,7 +562,7 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
     """Get all (v12) tags matching a specific resource type."""
     if resource_type == ResourceType.CHATBOT:
-        return {}
+        return set()
     search_pattern = f"v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}".lower()
     return {tag for tag in tags if search_pattern in tag.lower()}
 
