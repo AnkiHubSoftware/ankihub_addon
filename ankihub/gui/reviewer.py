@@ -223,7 +223,7 @@ class ReviewerSidebar:
         html = get_header_webview_html(
             self.resources,
             self.current_active_tab_url,
-            f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]} Viewer",
+            f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]}",
             _ankihub_theme(),
         )
 
@@ -296,18 +296,29 @@ class ReviewerSidebar:
 
     def update_sidebar_content_with_chatbot_url(self) -> None:
         ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
-        self._update_content_webview_theme()
 
         self.url_pages[ResourceType.CHATBOT].setUrl(
             aqt.QUrl(f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true")
         )
         if self.content_webview.page() != self.url_pages[ResourceType.CHATBOT]:
             self.content_webview.setPage(self.url_pages[ResourceType.CHATBOT])
+            self._update_theme_after_page_load()
         self.last_card_ah_nid = ah_nid
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
             f"localStorage.setItem('theme', '{_ankihub_theme()}');"
+        )
+
+    def _update_theme_after_page_load(self):
+        from .js_message_handling import _post_message_to_ankihub_js
+
+        qconnect(
+            self.content_webview.loadFinished,
+            lambda ok: _post_message_to_ankihub_js(
+                message={"changeTheme": _ankihub_theme()},
+                web=self.content_webview,
+            ),
         )
 
     def _on_url_page_loaded(self, ok: bool) -> None:
