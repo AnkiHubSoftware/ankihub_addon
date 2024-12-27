@@ -6229,7 +6229,7 @@ class TestAnkiHubAIInReviewer:
             for ah_note_id_int in range(1, 3):
                 ah_nid = uuid.UUID(int=ah_note_id_int)
                 import_ah_note(ah_nid=ah_nid)
-                
+
             self._setup_note_for_review(
                 install_ah_deck,
                 import_ah_note,
@@ -6244,12 +6244,12 @@ class TestAnkiHubAIInReviewer:
                 "ankihub.gui.js_message_handling._post_message_to_ankihub_js",
                 side_effect=original_post_message_to_ankihub_js,
             )
-            
+
             reviewer = aqt.mw.reviewer
             reviewer.show()
             qtbot.wait(500)
             assert reviewer.sidebar
-            
+
             original_eval = reviewer.sidebar.content_webview.eval
             eval_mock = mocker.patch.object(reviewer.sidebar.content_webview, "eval")
 

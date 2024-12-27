@@ -257,7 +257,7 @@ class ReviewerSidebar:
     def close_sidebar(self):
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
-        
+
     def clear_states(self):
         self.resources = None
         self.resource_type = None
@@ -281,7 +281,7 @@ class ReviewerSidebar:
                 self.content_webview.setPage(self.url_pages[self.resource_type])
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
-            
+
     def update_chatbot_header_on_sidebar(self):
         header_html = get_header_webview_html(
             self.resources,
