@@ -16,7 +16,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from ..db import ankihub_db
-from ..settings import config, url_plans_page, url_view_note
+from ..settings import url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import show_dialog
 
@@ -141,7 +141,6 @@ def _post_message_to_ankihub_js(message, web: AnkiWebView) -> None:
     """Posts a message to a message listener on an AnkiHub web page."""
     args = {
         "MESSAGE_JSON": json.dumps(message),
-        "APP_URL": config.app_url,
     }
     js = Template(POST_MESSAGE_TO_ANKIHUB_JS_PATH.read_text()).render(args)
     web.eval(js)
