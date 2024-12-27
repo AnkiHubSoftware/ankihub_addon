@@ -6059,7 +6059,7 @@ class TestAnkiHubAIInReviewer:
             qtbot.wait(300)
 
             assert reviewer.sidebar  # type: ignore[attr-defined]
-            assert not self._ankihub_ai_is_visible(qtbot)
+            assert not self._ankihub_ai_is_visible()
 
             assert self._ankihub_ai_button_visible(qtbot) == expected_button_visible
             if not expected_button_visible:
@@ -6068,7 +6068,7 @@ class TestAnkiHubAIInReviewer:
             self._click_ankihub_ai_button()
             qtbot.wait(500)
 
-            assert self._ankihub_ai_is_visible(qtbot)
+            assert self._ankihub_ai_is_visible()
 
     @pytest.mark.sequential
     def test_login_dialog_is_opened_when_invalidateSessionAndPromptToLogin_called(
@@ -6304,7 +6304,7 @@ class TestAnkiHubAIInReviewer:
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)
 
-    def _ankihub_ai_is_visible(self, qtbot: QtBot):
+    def _ankihub_ai_is_visible(self):
         return aqt.mw.reviewer.sidebar.is_sidebar_open()  # type: ignore[attr-defined]
 
     def _ankihub_ai_button_visible(self, qtbot) -> bool:
