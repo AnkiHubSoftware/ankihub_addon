@@ -3062,25 +3062,25 @@ def test_send_daily_review_summaries_without_data(mocker):
         (
             "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia",
             "Ammonia",
-            "step1-bb-biochem-amino_acids-ammonia",
+            "step1-bb-3-3-4",
         ),
         # With First Aid tag
         (
             "#AK_Step2_v12::#FirstAid::14_Pulm::16_Nose_and_Throat::01_Rhinitis",
             "Rhinitis",
-            "step2-fa-pulm-nose_and_throat-rhinitis",
+            "step2-fa-14-16-1",
         ),
         # With lowercase tag
         (
             "#ak_step1_v12::#b&b::03_biochem::03_amino_acids::04_ammonia",
             "Ammonia",
-            "step1-bb-biochem-amino_acids-ammonia",
+            "step1-bb-3-3-4",
         ),
         # With trailing Extra tag part that should be ignored
         (
             "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia::Extra",
             "Ammonia",
-            "step1-bb-biochem-amino_acids-ammonia",
+            "step1-bb-3-3-4",
         ),
         # With tag part group starting with "*" that should be ignored
         (
@@ -3089,7 +3089,7 @@ def test_send_daily_review_summaries_without_data(mocker):
                 "*B-Antagonists::Cardioselective_B1_Antagonists"
             ),
             "Beta-blockers",
-            "step1-fa-pharm-autonomic_drugs-beta-blockers",
+            "step1-fa-5-2-15",
         ),
         # With invalid tag
         ("invalid_tag", None, None),
