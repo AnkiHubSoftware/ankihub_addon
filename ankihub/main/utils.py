@@ -664,7 +664,7 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
 
     Example:
     #AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia
-    -> ('Ammonia', 'step1-bb-biochem-amino_acids-ammonia')
+    -> ('Ammonia', 'step1-bb-3-3-4')
     """
     try:
         step = int(re.match(r"#AK_Step(\d+)_v12::", tag, re.IGNORECASE).group(1))
@@ -683,8 +683,9 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
             path_parts = path_parts[:-1]
 
         path_parts = [part.lower() for part in path_parts]
+        content_numbers = [str(int(re.sub(r"\D", "", part))) for part in path_parts]
         cleaned_path_parts = [re.sub(r"\d+_", "", part) for part in path_parts]
-        slug = f"step{step}-{resource_slug_str}-{'-'.join(cleaned_path_parts)}"
+        slug = f"step{step}-{resource_slug_str}-{'-'.join(content_numbers)}"
 
         title = cleaned_path_parts[-1].replace("_", " ")
         title = " ".join([word.capitalize() for word in title.split()])

@@ -27,6 +27,7 @@ from unittest.mock import Mock
 from zipfile import ZipFile
 
 import aqt
+import aqt.reviewer
 import pytest
 from anki.cards import Card, CardId
 from anki.consts import (
@@ -179,7 +180,6 @@ from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
     FlashCardSelectorDialog,
 )
-from ankihub.gui.reviewer import CLOSE_ANKIHUB_CHATBOT_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -6023,15 +6023,15 @@ def mock_using_qt5_to_return_false(mocker: MockerFixture):
 class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "feature_flag_active, has_note_embeddings, expected_button_exists",
+        "feature_flag_active, has_note_embeddings, expected_button_visible",
         [
-            # The feature is only available for the AnKing deck and only if the feature flag is active
+            # The feature is only available for decks with note embeddings and only if the feature flag is active
             (True, True, True),
             (True, False, False),
             (False, True, False),
         ],
     )
-    def test_basic(
+    def test_ankihub_ai_button(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
@@ -6040,33 +6040,35 @@ class TestAnkiHubAIInReviewer:
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
         has_note_embeddings: bool,
-        expected_button_exists: bool,
+        expected_button_visible: bool,
     ):
         set_feature_flag_state("chatbot", feature_flag_active)
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            self._setup_token_and_app_url()
+
             self._setup_note_for_review(
                 install_ah_deck=install_ah_deck,
                 import_ah_note=import_ah_note,
                 has_note_embeddings=has_note_embeddings,
             )
 
-            # Open reviewer
             aqt.mw.reviewer.show()
+            reviewer = aqt.mw.reviewer
             qtbot.wait(300)
 
-            assert not self._ankihub_ai_is_visible(qtbot)
+            assert reviewer.sidebar  # type: ignore[attr-defined]
+            assert not self._ankihub_ai_is_visible()
 
-            ankihub_ai_button_exists = self._ankihub_ai_button_exist(qtbot)
-            assert ankihub_ai_button_exists == expected_button_exists
-            if not expected_button_exists:
+            assert self._ankihub_ai_button_visible(qtbot) == expected_button_visible
+            if not expected_button_visible:
                 return
 
-            aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
-            qtbot.wait(300)
+            self._click_ankihub_ai_button()
+            qtbot.wait(500)
 
-            assert self._ankihub_ai_is_visible(qtbot)
+            assert self._ankihub_ai_is_visible()
 
     @pytest.mark.sequential
     def test_login_dialog_is_opened_when_invalidateSessionAndPromptToLogin_called(
@@ -6093,7 +6095,7 @@ class TestAnkiHubAIInReviewer:
             display_login_mock = mocker.patch(
                 "ankihub.gui.reviewer.AnkiHubLogin.display_login"
             )
-            aqt.mw.reviewer.web.eval("ankihubAI.invalidateSessionAndPromptToLogin()")
+            self._click_ankihub_ai_button()
             qtbot.wait_until(lambda: display_login_mock.called)
 
     @pytest.mark.sequential
@@ -6214,6 +6216,7 @@ class TestAnkiHubAIInReviewer:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         message: str,
@@ -6227,6 +6230,12 @@ class TestAnkiHubAIInReviewer:
                 ah_nid = uuid.UUID(int=ah_note_id_int)
                 import_ah_note(ah_nid=ah_nid)
 
+            self._setup_note_for_review(
+                install_ah_deck,
+                import_ah_note,
+                has_note_embeddings=True,
+            )
+
             # Suspend selected notes
             self._suspend_notes_by_ah_nids(suspended_ah_nids)
 
@@ -6236,12 +6245,16 @@ class TestAnkiHubAIInReviewer:
                 side_effect=original_post_message_to_ankihub_js,
             )
 
-            original_eval = aqt.mw.reviewer.web.eval
-            eval_mock = mocker.patch.object(aqt.mw.reviewer.web, "eval")
+            reviewer = aqt.mw.reviewer
+            reviewer.show()
+            qtbot.wait(500)
+            assert reviewer.sidebar  # type: ignore[attr-defined]
 
-            # Call the pycmd
+            original_eval = reviewer.sidebar.content_webview.eval  # type: ignore[attr-defined]
+            eval_mock = mocker.patch.object(reviewer.sidebar.content_webview, "eval")  # type: ignore[attr-defined]
+
+            # # Call the pycmd
             original_eval(f"pycmd('{message}')")
-
             qtbot.wait_until(
                 lambda: eval_mock.called
                 and "noteSuspensionStates" in eval_mock.call_args[0][0]
@@ -6256,70 +6269,6 @@ class TestAnkiHubAIInReviewer:
                 "noteSuspensionStates": expected_note_suspension_states
             }
 
-    @pytest.mark.sequential
-    def test_close_ankihub_ai_pycmd(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-        set_feature_flag_state: SetFeatureFlagState,
-    ):
-        set_feature_flag_state("chatbot", True)
-        entry_point.run()
-
-        with anki_session_with_addon_data.profile_loaded():
-            self._setup_note_for_review(
-                install_ah_deck,
-                import_ah_note,
-                has_note_embeddings=True,
-            )
-            aqt.mw.reviewer.show()
-            qtbot.wait(100)
-
-            aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
-            qtbot.wait(100)
-            assert self._ankihub_ai_is_visible(qtbot)
-
-            aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_CHATBOT_PYCMD}')")
-            qtbot.wait(100)
-
-            # Assert that the chatbot UI was closed
-            assert not self._ankihub_ai_is_visible(qtbot)
-
-    @pytest.mark.sequential
-    @pytest.mark.parametrize("feature_flag_active", [True, False])
-    def test_ankihub_ai_token_is_set_when_token_is_saved(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        set_feature_flag_state: SetFeatureFlagState,
-        feature_flag_active: bool,
-    ):
-        set_feature_flag_state("chatbot", feature_flag_active)
-
-        entry_point.run()
-
-        with anki_session_with_addon_data.profile_loaded():
-            self._setup_note_for_review(
-                install_ah_deck,
-                import_ah_note,
-                has_note_embeddings=True,
-            )
-
-            aqt.mw.reviewer.show()
-
-            test_token = "test_token"
-            config.save_token(test_token)
-
-            if feature_flag_active:
-                qtbot.wait_until(lambda: self._ankihubAI_token(qtbot) == test_token)
-            else:
-                qtbot.wait(300)
-                assert self._ankihubAI_token(qtbot) is None
-
     def _suspend_notes_by_ah_nids(self, ah_nids: List[uuid.UUID]):
         """Suspend all cards of the given notes for the given AnkiHub note ids."""
         for ah_nid in ah_nids:
@@ -6330,6 +6279,12 @@ class TestAnkiHubAIInReviewer:
                 card.queue = QUEUE_TYPE_SUSPENDED
                 cards.append(card)
             aqt.mw.col.update_cards(cards)
+
+    def _setup_token_and_app_url(self) -> None:
+        config.save_token("test_token")
+
+        # Prevent JS from making requests to the webapp
+        config.app_url = "http://localhost:3000"
 
     def _setup_note_for_review(
         self,
@@ -6349,29 +6304,21 @@ class TestAnkiHubAIInReviewer:
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)
 
-    def _ankihub_ai_is_visible(self, qtbot: QtBot):
-        with qtbot.wait_callback() as callback:
-            aqt.mw.reviewer.web.evalWithCallback(
-                "ankihubAI.iframeVisible",
-                callback,
-            )
-        return callback.args[0]
+    def _ankihub_ai_is_visible(self):
+        return aqt.mw.reviewer.sidebar.is_sidebar_open()  # type: ignore[attr-defined]
 
-    def _ankihubAI_token(self, qtbot: QtBot) -> bool:
+    def _ankihub_ai_button_visible(self, qtbot) -> bool:
         with qtbot.wait_callback() as callback:
             aqt.mw.reviewer.web.evalWithCallback(
-                "ankihubAI.knoxToken",
+                "document.getElementById('ankihub-chatbot-button-container').style.display !== 'none'",
                 callback,
             )
-        return callback.args[0]
+        return bool(callback.args[0])
 
-    def _ankihub_ai_button_exist(self, qtbot) -> bool:
-        with qtbot.wait_callback() as callback:
-            aqt.mw.reviewer.web.evalWithCallback(
-                "document.getElementById('ankihub-ai-button')",
-                callback,
-            )
-        return callback.args[0] is not None
+    def _click_ankihub_ai_button(self) -> None:
+        aqt.mw.reviewer.web.eval(
+            "document.getElementById('ankihub-chatbot-button').click()"
+        )
 
 
 class TestMaybeSendDailyReviewSummaries:

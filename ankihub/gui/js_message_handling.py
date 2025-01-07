@@ -16,7 +16,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from ..db import ankihub_db
-from ..settings import config, url_view_note
+from ..settings import url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -84,10 +84,14 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
-        _post_message_to_ankihub_js(
-            message={"noteSuspensionStates": note_suspension_states},
-            web=context.web,
-        )
+
+        from .reviewer import reviewer_sidebar
+
+        if reviewer_sidebar:
+            _post_message_to_ankihub_js(
+                message={"noteSuspensionStates": note_suspension_states},
+                web=reviewer_sidebar.content_webview,
+            )
         return (True, None)
     elif message.startswith(COPY_TO_CLIPBOARD_PYCMD):
         kwargs = parse_js_message_kwargs(message)
@@ -119,7 +123,6 @@ def _post_message_to_ankihub_js(message, web: AnkiWebView) -> None:
     """Posts a message to a message listener on an AnkiHub web page."""
     args = {
         "MESSAGE_JSON": json.dumps(message),
-        "APP_URL": config.app_url,
     }
     js = Template(POST_MESSAGE_TO_ANKIHUB_JS_PATH.read_text()).render(args)
     web.eval(js)
