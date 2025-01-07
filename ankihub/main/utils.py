@@ -691,7 +691,7 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
         title = re.sub(r"\d+_", "", path_parts[-1])
         title = title.replace("_", " ")
         title = " ".join([word.capitalize() for word in title.split()])
-    except (KeyError, AttributeError, IndexError):
+    except (KeyError, AttributeError, IndexError, ValueError):
         # We want to ignore any tags that don't match the expected format
         return None
 
