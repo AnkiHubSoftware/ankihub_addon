@@ -31,7 +31,7 @@ def get_reviewer_buttons_js(theme: str, enabled_buttons: List[str]) -> str:
         {
             "THEME": theme,
             "ENABLED_BUTTONS": ",".join(enabled_buttons),
-            "IS_PREMIUM": str(client.is_premium_user()),
+            "IS_PREMIUM_OR_TRIALING": str(client.is_premium_or_trialing()),
         }
     )
 
