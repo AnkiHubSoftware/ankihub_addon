@@ -285,8 +285,8 @@ class ReviewerSidebar:
 
     def update_chatbot_header_on_sidebar(self):
         header_html = get_header_webview_html(
-            self.resources,
-            self.current_active_tab_url,
+            [],
+            None,
             RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type],
             _ankihub_theme(),
         )
