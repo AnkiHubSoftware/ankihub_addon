@@ -3091,8 +3091,20 @@ def test_send_daily_review_summaries_without_data(mocker):
             "Beta-blockers",
             "step1-fa-5-2-15",
         ),
+        # With number later in tag part
+        (
+            "#AK_Step1_v12::#FirstAid::01_Biochem::03_Laboratory_Techniques::02_CRISPR/Cas9",
+            "Crispr/cas9",
+            "step1-fa-1-3-2",
+        ),
         # With invalid tag
         ("invalid_tag", None, None),
+        # With invalid tag (core tag part doesn't start with number)
+        (
+            "#AK_Step1_v12::#FirstAid::Biochem::03_Laboratory_Techniques::CRISPR/Cas9",
+            None,
+            None,
+        ),
     ],
 )
 def test_mh_tag_to_resource_title_and_slug(
