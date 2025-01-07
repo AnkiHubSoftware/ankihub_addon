@@ -683,11 +683,13 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
             path_parts = path_parts[:-1]
 
         path_parts = [part.lower() for part in path_parts]
-        content_numbers = [str(int(re.sub(r"\D", "", part))) for part in path_parts]
-        cleaned_path_parts = [re.sub(r"\d+_", "", part) for part in path_parts]
+        content_numbers = [
+            str(int(re.match(r"\d+", part).group(0))) for part in path_parts
+        ]
         slug = f"step{step}-{resource_slug_str}-{'-'.join(content_numbers)}"
 
-        title = cleaned_path_parts[-1].replace("_", " ")
+        title = re.sub(r"\d+_", "", path_parts[-1])
+        title = title.replace("_", " ")
         title = " ".join([word.capitalize() for word in title.split()])
     except (KeyError, AttributeError, IndexError):
         # We want to ignore any tags that don't match the expected format
