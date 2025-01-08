@@ -21,7 +21,7 @@ import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
 from aqt.utils import showInfo
-from requests import exceptions
+from requests import ReadTimeout, exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
 from sentry_sdk.integrations.dedupe import DedupeIntegration
@@ -255,7 +255,9 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
+    if isinstance(
+        exc_value, (exceptions.ConnectionError, ConnectionError, ReadTimeout)
+    ):
         if not _is_internet_available():
             show_tooltip(
                 "🔌 No Internet Connection detected. Please check your internet connection and try again.",
