@@ -297,13 +297,14 @@ class ReviewerSidebar:
     def update_sidebar_content_with_chatbot_url(self) -> None:
         ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
 
-        self.url_pages[ResourceType.CHATBOT].setUrl(
-            aqt.QUrl(f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true")
-        )
+        self.url_pages[ResourceType.CHATBOT].setUrl(aqt.QUrl(self.chatbot_url))
         if self.content_webview.page() != self.url_pages[ResourceType.CHATBOT]:
             self.content_webview.setPage(self.url_pages[ResourceType.CHATBOT])
             self._update_theme_after_page_load()
         self.last_card_ah_nid = ah_nid
+
+    def set_chatbot_url_by_ah_nid(self, ah_nid) -> None:
+        self.chatbot_url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
@@ -493,9 +494,12 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     if (
         reviewer_sidebar
         and config.token()
+        and ah_nid
         and ah_nid != reviewer_sidebar.last_card_ah_nid
     ):
-        reviewer_sidebar.update_sidebar_content_with_chatbot_url()
+        reviewer_sidebar.set_chatbot_url_by_ah_nid(ah_nid)
+        if reviewer_sidebar.is_sidebar_open():
+            reviewer_sidebar.update_sidebar_content_with_chatbot_url()
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -594,6 +598,13 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             reviewer_sidebar.set_resource_type(ResourceType.CHATBOT)
             if is_active:
                 reviewer_sidebar.update_chatbot_header_on_sidebar()
+                ah_nid = ankihub_db.ankihub_nid_for_anki_nid(context.card.nid)
+                if (
+                    reviewer_sidebar
+                    and config.token()
+                    and ah_nid != reviewer_sidebar.last_card_ah_nid
+                ):
+                    reviewer_sidebar.update_sidebar_content_with_chatbot_url()
                 reviewer_sidebar.open_sidebar()
             else:
                 reviewer_sidebar.close_sidebar()
