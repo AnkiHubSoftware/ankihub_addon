@@ -530,9 +530,7 @@ def _ankihub_terms_and_policy_setup(parent: QMenu):
     )
     qconnect(
         q_terms_and_conditions_action.triggered,
-        lambda: openLink(
-            "https://community.ankihub.net/tos"
-        ),
+        lambda: openLink("https://community.ankihub.net/tos"),
     )
     terms_and_policy_menu.addAction(q_terms_and_conditions_action)
 
