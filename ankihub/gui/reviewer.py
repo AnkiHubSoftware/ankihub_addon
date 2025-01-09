@@ -145,9 +145,10 @@ class ReviewerSidebar:
             )
             self.content_urls[page_type] = None
 
-        # Prevent white flicker on dark mode
         for page in self.content_pages.values():
+            # Prevent white flicker on dark mode
             page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+
             aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
 
         # Prepare empty state page for each resource type to prevent flickering
