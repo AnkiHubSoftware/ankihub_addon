@@ -192,16 +192,18 @@ class ReviewerSidebar:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def update_tabs(self, resources: List[Resource]) -> None:
+    def show_resource_tabs(
+        self, resource_type: ResourceType, resources: List[Resource]
+    ) -> None:
+        self.resource_type = resource_type
         self.resources = resources
-        if self.resource_type != ResourceType.CHATBOT:
-            if not self.resources:
-                self.set_content_url(None)
-            else:
-                url = self.resources[0].url
-                self.set_content_url(url)
 
-            self._update_header_webview()
+        if not self.resources:
+            self.set_content_url(None)
+        else:
+            self.set_content_url(self.resources[0].url)
+
+        self._update_header_webview()
 
     def _update_header_button_state(self):
         if not self.resources:
@@ -238,12 +240,8 @@ class ReviewerSidebar:
             return
 
         if not self.is_sidebar_open():
-            self.content_webview.setPage(self.content_pages[self.resource_type])
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
-
-    def set_resource_type(self, resource_type: ResourceType):
-        self.resource_type = resource_type
 
     def get_resource_type(self):
         return self.resource_type
@@ -281,6 +279,7 @@ class ReviewerSidebar:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
     def show_chatbot(self, ah_nid: uuid.UUID) -> None:
+        self.resource_type = ResourceType.CHATBOT
         self.resources = []
 
         url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
@@ -336,7 +335,7 @@ def setup():
         webview_will_set_content.append(_inject_ankihub_features_and_setup_sidebar)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         reviewer_did_show_question.append(_notify_reviewer_buttons_of_card_change)
-        reviewer_did_show_question.append(_notify_sidebar_of_card_change)
+        reviewer_did_show_question.append(_notify_resource_tabs_of_card_change)
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
 
@@ -499,9 +498,13 @@ def _close_sidebar_and_clear_states_if_exists():
         reviewer_sidebar.clear_states()
 
 
-def _notify_sidebar_of_card_change(_: Card) -> None:
-    if reviewer_sidebar and reviewer_sidebar.is_sidebar_open():
-        _update_sidebar_tabs_based_on_tags()
+def _notify_resource_tabs_of_card_change(_: Card) -> None:
+    if (
+        reviewer_sidebar
+        and reviewer_sidebar.is_sidebar_open()
+        and reviewer_sidebar.get_resource_type() != ResourceType.CHATBOT
+    ):
+        _show_resources_for_card(reviewer_sidebar.get_resource_type())
 
 
 def _is_anking_deck(card: Card) -> bool:
@@ -528,14 +531,13 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
-def _update_sidebar_tabs_based_on_tags() -> None:
+def _show_resources_for_card(resource_type: ResourceType) -> None:
     if not reviewer_sidebar:
         return
 
     tags = aqt.mw.reviewer.card.note().tags
-    resource_type = reviewer_sidebar.get_resource_type()
     resources = _get_resources(tags, resource_type)
-    reviewer_sidebar.update_tabs(resources)
+    reviewer_sidebar.show_resource_tabs(resource_type, resources)
 
 
 def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
@@ -570,17 +572,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         is_active = kwargs.get("isActive")
 
         if button_name == "chatbot":
-            reviewer_sidebar.set_resource_type(ResourceType.CHATBOT)
             if is_active:
                 reviewer_sidebar.open_sidebar()
                 _notify_ankihub_ai_of_card_change(context.card)
             else:
                 reviewer_sidebar.close_sidebar()
         else:
-            reviewer_sidebar.set_resource_type(ResourceType(button_name))
             if is_active:
                 reviewer_sidebar.open_sidebar()
-                _update_sidebar_tabs_based_on_tags()
+                resource_type = ResourceType(button_name)
+                _show_resources_for_card(resource_type)
             else:
                 reviewer_sidebar.close_sidebar()
 
