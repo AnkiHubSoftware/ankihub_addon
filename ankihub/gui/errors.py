@@ -21,7 +21,7 @@ import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
 from aqt.utils import showInfo
-from requests import exceptions
+from requests import ReadTimeout, exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
 from sentry_sdk.integrations.dedupe import DedupeIntegration
@@ -255,18 +255,27 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
+    if isinstance(
+        exc_value, (exceptions.ConnectionError, ConnectionError, ReadTimeout)
+    ):
         if not _is_internet_available():
             show_tooltip(
                 "🔌 No Internet Connection detected. Please check your internet connection and try again.",
                 period=5000,
             )
         else:
-            show_tooltip(
-                "🚧 AnkiHub is undergoing routine maintenance. "
-                "Please visit ankihub.net/status and check your email for details.",
-                period=5000,
+            message = (
+                (
+                    "🚧 We're having trouble connecting to AnkiHub. Please try again later.<br>"
+                    "Visit community.ankihub.net and check your email for details."
+                )
+                if isinstance(exc_value, ReadTimeout)
+                else (
+                    "🚧 AnkiHub is undergoing routine maintenance.<br>"
+                    "Please visit ankihub.net/status and check your email for details."
+                )
             )
+            show_tooltip(message, period=5000)
         return True
 
     if _is_memory_full_error(exc_value):
