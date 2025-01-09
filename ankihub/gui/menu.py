@@ -531,8 +531,7 @@ def _ankihub_terms_and_policy_setup(parent: QMenu):
     qconnect(
         q_terms_and_conditions_action.triggered,
         lambda: openLink(
-            """https://community.ankihub.net/tos?_gl=1*14cx6gn*_ga*MTUwNTk4MjUuMTcwNDk5NTI1NA..\
-            *_ga_T2ZF93TKF6*MTczMzQyNTA4NS42Mi4xLjE3MzM0MjUyMDcuMC4wLjA."""
+            "https://community.ankihub.net/tos"
         ),
     )
     terms_and_policy_menu.addAction(q_terms_and_conditions_action)
