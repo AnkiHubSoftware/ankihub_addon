@@ -212,10 +212,11 @@ class ReviewerSidebar:
 
         self._update_header_webview()
 
-    def show_chatbot(self, ah_nid: uuid.UUID) -> None:
+    def show_chatbot(self, ah_nid: Optional[uuid.UUID]) -> None:
         self.page_type = SidebarPageType.CHATBOT
         self.resources = []
 
+        # The web app handles the case when ah_nid is None and shows the "note not found" screen.
         url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
         self.set_content_url(url)
 
@@ -467,10 +468,9 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     if not feature_flags.get("chatbot", False):
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    if reviewer_sidebar and config.token() and ah_nid:
-        if reviewer_sidebar.is_sidebar_open():
-            reviewer_sidebar.show_chatbot(ah_nid)
+    if reviewer_sidebar and reviewer_sidebar.is_sidebar_open() and config.token():
+        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
+        reviewer_sidebar.show_chatbot(ah_nid)
 
 
 def _remove_anking_button(_: Card) -> None:
