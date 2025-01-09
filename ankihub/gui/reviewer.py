@@ -28,7 +28,7 @@ from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import mh_tag_to_resource_title_and_slug
-from ..settings import config, url_mh_integrations_preview
+from ..settings import config, url_login, url_mh_integrations_preview
 from .js_message_handling import (
     ANKIHUB_UPSELL,
     VIEW_NOTE_PYCMD,
@@ -251,14 +251,20 @@ class ReviewerSidebar:
 
         self.header_webview.setHtml(html)
 
-    def open_sidebar(self):
+    def open_sidebar(self) -> bool:
+        """Opens the sidebar if it's not already open.
+        Handles authentication failures by displaying the login screen.
+        Returns True if the sidebar is open or was opened successfully, False otherwise.
+        """
         if not config.token():
             self._handle_auth_failure()
-            return
+            return False
 
         if not self.is_sidebar_open():
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
+
+        return True
 
     def get_page_type(self) -> Optional[SidebarPageType]:
         return self.page_type
@@ -301,6 +307,10 @@ class ReviewerSidebar:
         )
 
     def _on_content_page_loaded(self, ok: bool) -> None:
+        if url_login() in self.content_webview.url().toString():
+            self._handle_auth_failure()
+            return
+
         if ok:
             return
 
@@ -472,7 +482,6 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         reviewer_sidebar
         and reviewer_sidebar.is_sidebar_open()
         and reviewer_sidebar.get_page_type() == SidebarPageType.CHATBOT
-        and config.token()
     ):
         _show_chatbot_for_current_card(card)
 
@@ -577,15 +586,15 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         if button_name == "chatbot":
             if is_active:
-                reviewer_sidebar.open_sidebar()
-                _show_chatbot_for_current_card(context.card)
+                if reviewer_sidebar.open_sidebar():
+                    _show_chatbot_for_current_card(context.card)
             else:
                 reviewer_sidebar.close_sidebar()
         else:
             if is_active:
-                reviewer_sidebar.open_sidebar()
-                resource_type = ResourceType(button_name)
-                _show_resources_for_current_card(resource_type)
+                if reviewer_sidebar.open_sidebar():
+                    resource_type = ResourceType(button_name)
+                    _show_resources_for_current_card(resource_type)
             else:
                 reviewer_sidebar.close_sidebar()
 
