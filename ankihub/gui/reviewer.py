@@ -503,7 +503,7 @@ def _notify_resource_tabs_of_card_change(_: Card) -> None:
     ):
         page_type = reviewer_sidebar.get_page_type()
         resource_type = ResourceType(page_type.value)
-        _show_resources_for_card(resource_type)
+        _show_resources_for_current_card(resource_type)
 
 
 def _is_anking_deck(card: Card) -> bool:
@@ -530,7 +530,7 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
-def _show_resources_for_card(resource_type: ResourceType) -> None:
+def _show_resources_for_current_card(resource_type: ResourceType) -> None:
     if not reviewer_sidebar:
         return
 
@@ -579,7 +579,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             if is_active:
                 reviewer_sidebar.open_sidebar()
                 resource_type = ResourceType(button_name)
-                _show_resources_for_card(resource_type)
+                _show_resources_for_current_card(resource_type)
             else:
                 reviewer_sidebar.close_sidebar()
 
