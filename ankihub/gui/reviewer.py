@@ -298,17 +298,6 @@ class ReviewerSidebar:
             f"localStorage.setItem('theme', '{_ankihub_theme()}');"
         )
 
-    def _update_theme_after_page_load(self):
-        from .js_message_handling import _post_message_to_ankihub_js
-
-        qconnect(
-            self.content_webview.loadFinished,
-            lambda ok: _post_message_to_ankihub_js(
-                message={"changeTheme": _ankihub_theme()},
-                web=self.content_webview,
-            ),
-        )
-
     def _on_content_page_loaded(self, ok: bool) -> None:
         if ok:
             return
