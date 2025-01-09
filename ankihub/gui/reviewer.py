@@ -468,9 +468,18 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     if not feature_flags.get("chatbot", False):
         return
 
-    if reviewer_sidebar and reviewer_sidebar.is_sidebar_open() and config.token():
-        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-        reviewer_sidebar.show_chatbot(ah_nid)
+    if (
+        reviewer_sidebar
+        and reviewer_sidebar.is_sidebar_open()
+        and reviewer_sidebar.get_page_type() == SidebarPageType.CHATBOT
+        and config.token()
+    ):
+        _show_chatbot_for_current_card(card)
+
+
+def _show_chatbot_for_current_card(card: Card) -> None:
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
+    reviewer_sidebar.show_chatbot(ah_nid)
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -531,9 +540,6 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
 
 
 def _show_resources_for_current_card(resource_type: ResourceType) -> None:
-    if not reviewer_sidebar:
-        return
-
     tags = aqt.mw.reviewer.card.note().tags
     resources = _get_resources(tags, resource_type)
     page_type = SidebarPageType(resource_type.value)
@@ -572,7 +578,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if button_name == "chatbot":
             if is_active:
                 reviewer_sidebar.open_sidebar()
-                _notify_ankihub_ai_of_card_change(context.card)
+                _show_chatbot_for_current_card(context.card)
             else:
                 reviewer_sidebar.close_sidebar()
         else:
