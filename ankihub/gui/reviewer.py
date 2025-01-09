@@ -192,11 +192,8 @@ class ReviewerSidebar:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def update_tabs(
-        self, resources: List[Resource], resource_type: Optional[ResourceType] = None
-    ) -> None:
+    def update_tabs(self, resources: List[Resource]) -> None:
         self.resources = resources
-        self.resource_type = resource_type if resource_type else self.resource_type
         if self.resource_type != ResourceType.CHATBOT:
             self._update_content_webview()
             self._update_header_webview()
@@ -560,7 +557,7 @@ def _update_sidebar_tabs_based_on_tags() -> None:
     tags = aqt.mw.reviewer.card.note().tags
     resource_type = reviewer_sidebar.get_resource_type()
     resources = _get_resources(tags, resource_type)
-    reviewer_sidebar.update_tabs(resources, resource_type)
+    reviewer_sidebar.update_tabs(resources)
 
 
 def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
