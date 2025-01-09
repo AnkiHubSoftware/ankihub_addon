@@ -1,10 +1,9 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
-import uuid
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import Any, Callable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import aqt
 import aqt.webview
@@ -82,13 +81,12 @@ class ReviewerSidebar:
         self.container: Optional[aqt.QWidget] = None
         self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
-        self.current_active_tab_url: Optional[str] = None
         self.resources: List[Resource] = None
         self.resource_type: Optional[ResourceType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
-        self.last_card_ah_nid: Optional[uuid.UUID] = None
-        self.url_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
+        self.content_pages: Dict[ResourceType, aqt.webview.QWebEnginePage] = {}
+        self.content_urls: Dict[ResourceType, Optional[str]] = {}
         self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
 
         self._setup_ui()
@@ -132,17 +130,18 @@ class ReviewerSidebar:
 
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
         for resource_type in ResourceType:
-            self.url_pages[resource_type] = CustomWebPage(
+            self.content_pages[resource_type] = CustomWebPage(
                 self.profile, self.content_webview._onBridgeCmd
             )
-            self.url_pages[resource_type].profile().setUrlRequestInterceptor(
+            self.content_pages[resource_type].profile().setUrlRequestInterceptor(
                 self.interceptor
             )
+            self.content_urls[resource_type] = None
 
         # Prevent white flicker on dark mode
-        for page in self.url_pages.values():
+        for page in self.content_pages.values():
             page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
-            aqt.qconnect(page.loadFinished, self._on_url_page_loaded)
+            aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
 
         # Prepare empty state page for each resource type to prevent flickering
         for resource_type in ResourceType:
@@ -195,7 +194,12 @@ class ReviewerSidebar:
     def update_tabs(self, resources: List[Resource]) -> None:
         self.resources = resources
         if self.resource_type != ResourceType.CHATBOT:
-            self._update_content_webview()
+            if not self.resources:
+                self.set_content_url(None)
+            else:
+                url = self.resources[0].url
+                self.set_content_url(url)
+
             self._update_header_webview()
 
     def _update_header_button_state(self):
@@ -210,23 +214,17 @@ class ReviewerSidebar:
             f"setOpenInBrowserButtonState({'true' if enable_open_in_browser_button else 'false'});"
         )
 
-    def _update_content_webview(self):
-        if not self.resources:
-            self.set_content_url(None)
-        else:
-            self.set_content_url(self.resources[0].url)
-
     def _update_header_webview(self):
         html = get_header_webview_html(
             self.resources,
-            self.current_active_tab_url,
+            self.content_urls[self.resource_type],
             f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]}",
             _ankihub_theme(),
         )
 
         # The height of the header depends on whether there is an active tab or not.
         # Using adjustHeight wouldn't work here, because it can only make the height bigger, not smaller.
-        if not self.current_active_tab_url:
+        if not self.resources:
             self.header_webview.setFixedHeight(44)
         else:
             self.header_webview.setFixedHeight(88)
@@ -239,7 +237,7 @@ class ReviewerSidebar:
             return
 
         if not self.is_sidebar_open():
-            self.content_webview.setPage(self.url_pages[self.resource_type])
+            self.content_webview.setPage(self.content_pages[self.resource_type])
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
 
@@ -259,46 +257,33 @@ class ReviewerSidebar:
     def clear_states(self):
         self.resources = None
         self.resource_type = None
-        self.current_active_tab_url = None
-        self.last_card_ah_nid = None
 
     def get_content_url(self) -> Optional[str]:
         return self.content_webview.url().toString()
 
     def set_content_url(self, url: Optional[str]) -> None:
-        self.current_active_tab_url = url
-
         if not self.content_webview:
             return
 
         self._update_content_webview_theme()
 
         if url:
-            self.url_pages[self.resource_type].setUrl(aqt.QUrl(url))
-            if self.content_webview.page() != self.url_pages[self.resource_type]:
-                self.content_webview.setPage(self.url_pages[self.resource_type])
+            content_page = self.content_pages[self.resource_type]
+
+            if url != self.content_urls[self.resource_type]:
+                content_page.setUrl(aqt.QUrl(url))
+                self.content_urls[self.resource_type] = url
+
+            if self.content_webview.page() != content_page:
+                self.content_webview.setPage(content_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
-    def update_chatbot_header_on_sidebar(self):
-        header_html = get_header_webview_html(
-            [],
-            None,
-            RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type],
-            _ankihub_theme(),
-        )
+    def show_chatbot(self) -> None:
+        self.resources = []
 
-        self.header_webview.setFixedHeight(44)
-        self.header_webview.setHtml(header_html)
-
-    def update_sidebar_content_with_chatbot_url(self) -> None:
-        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(self.reviewer.card.nid)
-
-        self.url_pages[ResourceType.CHATBOT].setUrl(aqt.QUrl(self.chatbot_url))
-        if self.content_webview.page() != self.url_pages[ResourceType.CHATBOT]:
-            self.content_webview.setPage(self.url_pages[ResourceType.CHATBOT])
-            self._update_theme_after_page_load()
-        self.last_card_ah_nid = ah_nid
+        self.set_content_url(self.chatbot_url)
+        self._update_header_webview()
 
     def set_chatbot_url_by_ah_nid(self, ah_nid) -> None:
         self.chatbot_url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
@@ -319,7 +304,7 @@ class ReviewerSidebar:
             ),
         )
 
-    def _on_url_page_loaded(self, ok: bool) -> None:
+    def _on_content_page_loaded(self, ok: bool) -> None:
         if ok:
             return
 
@@ -488,15 +473,10 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    if (
-        reviewer_sidebar
-        and config.token()
-        and ah_nid
-        and ah_nid != reviewer_sidebar.last_card_ah_nid
-    ):
+    if reviewer_sidebar and config.token() and ah_nid:
         reviewer_sidebar.set_chatbot_url_by_ah_nid(ah_nid)
         if reviewer_sidebar.is_sidebar_open():
-            reviewer_sidebar.update_sidebar_content_with_chatbot_url()
+            reviewer_sidebar.show_chatbot()
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -594,15 +574,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if button_name == "chatbot":
             reviewer_sidebar.set_resource_type(ResourceType.CHATBOT)
             if is_active:
-                reviewer_sidebar.update_chatbot_header_on_sidebar()
-                ah_nid = ankihub_db.ankihub_nid_for_anki_nid(context.card.nid)
-                if (
-                    reviewer_sidebar
-                    and config.token()
-                    and ah_nid != reviewer_sidebar.last_card_ah_nid
-                ):
-                    reviewer_sidebar.update_sidebar_content_with_chatbot_url()
                 reviewer_sidebar.open_sidebar()
+                _notify_ankihub_ai_of_card_change(context.card)
             else:
                 reviewer_sidebar.close_sidebar()
         else:
