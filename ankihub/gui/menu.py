@@ -525,10 +525,15 @@ def _ankihub_terms_and_policy_setup(parent: QMenu):
     """Set up the sub menu for terms and policy related items."""
     terms_and_policy_menu = QMenu("🤝 Terms and Policy", parent)
 
-    q_terms_and_conditions_action = QAction("Terms && Conditions", terms_and_policy_menu)
+    q_terms_and_conditions_action = QAction(
+        "Terms && Conditions", terms_and_policy_menu
+    )
     qconnect(
         q_terms_and_conditions_action.triggered,
-        lambda: openLink("https://community.ankihub.net/tos?_gl=1*14cx6gn*_ga*MTUwNTk4MjUuMTcwNDk5NTI1NA..*_ga_T2ZF93TKF6*MTczMzQyNTA4NS42Mi4xLjE3MzM0MjUyMDcuMC4wLjA."),
+        lambda: openLink(
+            """https://community.ankihub.net/tos?_gl=1*14cx6gn*_ga*MTUwNTk4MjUuMTcwNDk5NTI1NA..\
+            *_ga_T2ZF93TKF6*MTczMzQyNTA4NS42Mi4xLjE3MzM0MjUyMDcuMC4wLjA."""
+        ),
     )
     terms_and_policy_menu.addAction(q_terms_and_conditions_action)
 
@@ -540,6 +545,7 @@ def _ankihub_terms_and_policy_setup(parent: QMenu):
     terms_and_policy_menu.addAction(q_privacy_policy_action)
 
     parent.addMenu(terms_and_policy_menu)
+
 
 def _ankihub_logout_setup(parent: QMenu):
     q_action = QAction("🔑 Sign out", aqt.mw)
