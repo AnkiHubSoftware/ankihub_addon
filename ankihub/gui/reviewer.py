@@ -212,6 +212,15 @@ class ReviewerSidebar:
 
         self._update_header_webview()
 
+    def show_chatbot(self, ah_nid: uuid.UUID) -> None:
+        self.page_type = SidebarPageType.CHATBOT
+        self.resources = []
+
+        url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
+        self.set_content_url(url)
+
+        self._update_header_webview()
+
     def _update_header_button_state(self):
         if not self.resources:
             return
@@ -284,14 +293,6 @@ class ReviewerSidebar:
                 self.content_webview.setPage(content_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.page_type])
-
-    def show_chatbot(self, ah_nid: uuid.UUID) -> None:
-        self.page_type = SidebarPageType.CHATBOT
-        self.resources = []
-
-        url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
-        self.set_content_url(url)
-        self._update_header_webview()
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
