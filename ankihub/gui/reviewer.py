@@ -51,21 +51,27 @@ LOAD_URL_IN_SIDEBAR_PYCMD = "ankihub_load_url_in_sidebar"
 OPEN_SIDEBAR_CONTENT_IN_BROWSER_PYCMD = "ankihub_open_sidebar_content_in_browser"
 
 
-class ResourceType(Enum):
+class SidebarPageType(Enum):
     BOARDS_AND_BEYOND = "b&b"
     FIRST_AID = "fa4"
     CHATBOT = "chatbot"
 
 
+PAGE_TYPE_TO_DISPLAY_NAME = {
+    SidebarPageType.BOARDS_AND_BEYOND: "Boards & Beyond Viewer",
+    SidebarPageType.FIRST_AID: "First Aid Viewer",
+    SidebarPageType.CHATBOT: "Welcome to AnkiHub AI!",
+}
+
+
+class ResourceType(Enum):
+    BOARDS_AND_BEYOND = "b&b"
+    FIRST_AID = "fa4"
+
+
 RESOURCE_TYPE_TO_TAG_PART = {
     ResourceType.BOARDS_AND_BEYOND: "#b&b",
     ResourceType.FIRST_AID: "#firstaid",
-}
-
-RESOURCE_TYPE_TO_DISPLAY_NAME = {
-    ResourceType.BOARDS_AND_BEYOND: "Boards & Beyond Viewer",
-    ResourceType.FIRST_AID: "First Aid Viewer",
-    ResourceType.CHATBOT: "Welcome to AnkiHub AI!",
 }
 
 
@@ -83,12 +89,12 @@ class ReviewerSidebar:
         self.content_webview: Optional[aqt.webview.AnkiWebView] = None
         self.header_webview: Optional[aqt.webview.AnkiWebView] = None
         self.resources: List[Resource] = None
-        self.resource_type: Optional[ResourceType] = None
+        self.page_type: Optional[SidebarPageType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
-        self.content_pages: Dict[ResourceType, aqt.webview.QWebEnginePage] = {}
-        self.content_urls: Dict[ResourceType, Optional[str]] = {}
-        self.empty_state_pages: dict[ResourceType, aqt.webview.QWebEnginePage] = {}
+        self.content_pages: Dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
+        self.content_urls: Dict[SidebarPageType, Optional[str]] = {}
+        self.empty_state_pages: dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
 
         self._setup_ui()
 
@@ -130,14 +136,14 @@ class ReviewerSidebar:
         self.update_header_button_timer.start(200)
 
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
-        for resource_type in ResourceType:
-            self.content_pages[resource_type] = CustomWebPage(
+        for page_type in SidebarPageType:
+            self.content_pages[page_type] = CustomWebPage(
                 self.profile, self.content_webview._onBridgeCmd
             )
-            self.content_pages[resource_type].profile().setUrlRequestInterceptor(
+            self.content_pages[page_type].profile().setUrlRequestInterceptor(
                 self.interceptor
             )
-            self.content_urls[resource_type] = None
+            self.content_urls[page_type] = None
 
         # Prevent white flicker on dark mode
         for page in self.content_pages.values():
@@ -145,7 +151,7 @@ class ReviewerSidebar:
             aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
 
         # Prepare empty state page for each resource type to prevent flickering
-        for resource_type in ResourceType:
+        for page_type in SidebarPageType:
             page = AnkiWebPage(self.content_webview._onBridgeCmd)
 
             # Prevent white flicker on dark mode
@@ -153,11 +159,11 @@ class ReviewerSidebar:
 
             html = get_empty_state_html(
                 theme=_ankihub_theme(),
-                resource_type=resource_type.value,
+                resource_type=page_type.value,
             )
             page.setHtml(html)
 
-            self.empty_state_pages[resource_type] = page
+            self.empty_state_pages[page_type] = page
 
         self.content_webview.setPage(list(self.empty_state_pages.values())[0])
 
@@ -193,9 +199,9 @@ class ReviewerSidebar:
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
     def show_resource_tabs(
-        self, resource_type: ResourceType, resources: List[Resource]
+        self, page_type: SidebarPageType, resources: List[Resource]
     ) -> None:
-        self.resource_type = resource_type
+        self.page_type = page_type
         self.resources = resources
 
         if not self.resources:
@@ -220,8 +226,8 @@ class ReviewerSidebar:
     def _update_header_webview(self):
         html = get_header_webview_html(
             self.resources,
-            self.content_urls[self.resource_type],
-            f"{RESOURCE_TYPE_TO_DISPLAY_NAME[self.resource_type]}",
+            self.content_urls[self.page_type],
+            f"{PAGE_TYPE_TO_DISPLAY_NAME[self.page_type]}",
             _ankihub_theme(),
         )
 
@@ -243,19 +249,19 @@ class ReviewerSidebar:
             self.container.show()
             aqt.mw.setMinimumWidth(self.original_mw_min_width * 2)
 
-    def get_resource_type(self):
-        return self.resource_type
+    def get_page_type(self) -> Optional[SidebarPageType]:
+        return self.page_type
 
-    def is_sidebar_open(self):
+    def is_sidebar_open(self) -> bool:
         return self.container.isVisible()
 
-    def close_sidebar(self):
+    def close_sidebar(self) -> None:
         self.container.hide()
         aqt.mw.setMinimumWidth(self.original_mw_min_width)
 
-    def clear_states(self):
+    def clear_states(self) -> None:
         self.resources = None
-        self.resource_type = None
+        self.page_type = None
 
     def get_content_url(self) -> Optional[str]:
         return self.content_webview.url().toString()
@@ -267,19 +273,19 @@ class ReviewerSidebar:
         self._update_content_webview_theme()
 
         if url:
-            content_page = self.content_pages[self.resource_type]
+            content_page = self.content_pages[self.page_type]
 
-            if url != self.content_urls[self.resource_type]:
+            if url != self.content_urls[self.page_type]:
                 content_page.setUrl(aqt.QUrl(url))
-                self.content_urls[self.resource_type] = url
+                self.content_urls[self.page_type] = url
 
             if self.content_webview.page() != content_page:
                 self.content_webview.setPage(content_page)
         else:
-            self.content_webview.setPage(self.empty_state_pages[self.resource_type])
+            self.content_webview.setPage(self.empty_state_pages[self.page_type])
 
     def show_chatbot(self, ah_nid: uuid.UUID) -> None:
-        self.resource_type = ResourceType.CHATBOT
+        self.page_type = SidebarPageType.CHATBOT
         self.resources = []
 
         url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
@@ -502,9 +508,11 @@ def _notify_resource_tabs_of_card_change(_: Card) -> None:
     if (
         reviewer_sidebar
         and reviewer_sidebar.is_sidebar_open()
-        and reviewer_sidebar.get_resource_type() != ResourceType.CHATBOT
+        and reviewer_sidebar.get_page_type() != SidebarPageType.CHATBOT
     ):
-        _show_resources_for_card(reviewer_sidebar.get_resource_type())
+        page_type = reviewer_sidebar.get_page_type()
+        resource_type = ResourceType(page_type.value)
+        _show_resources_for_card(resource_type)
 
 
 def _is_anking_deck(card: Card) -> bool:
@@ -537,7 +545,8 @@ def _show_resources_for_card(resource_type: ResourceType) -> None:
 
     tags = aqt.mw.reviewer.card.note().tags
     resources = _get_resources(tags, resource_type)
-    reviewer_sidebar.show_resource_tabs(resource_type, resources)
+    page_type = SidebarPageType(resource_type.value)
+    reviewer_sidebar.show_resource_tabs(page_type, resources)
 
 
 def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
@@ -553,8 +562,6 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
     """Get all (v12) tags matching a specific resource type."""
-    if resource_type == ResourceType.CHATBOT:
-        return set()
     search_pattern = f"v12::{RESOURCE_TYPE_TO_TAG_PART[resource_type]}".lower()
     return {tag for tag in tags if search_pattern in tag.lower()}
 
