@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -279,14 +280,12 @@ class ReviewerSidebar:
         else:
             self.content_webview.setPage(self.empty_state_pages[self.resource_type])
 
-    def show_chatbot(self) -> None:
+    def show_chatbot(self, ah_nid: uuid.UUID) -> None:
         self.resources = []
 
-        self.set_content_url(self.chatbot_url)
+        url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
+        self.set_content_url(url)
         self._update_header_webview()
-
-    def set_chatbot_url_by_ah_nid(self, ah_nid) -> None:
-        self.chatbot_url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
@@ -474,9 +473,8 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     if reviewer_sidebar and config.token() and ah_nid:
-        reviewer_sidebar.set_chatbot_url_by_ah_nid(ah_nid)
         if reviewer_sidebar.is_sidebar_open():
-            reviewer_sidebar.show_chatbot()
+            reviewer_sidebar.show_chatbot(ah_nid)
 
 
 def _remove_anking_button(_: Card) -> None:
