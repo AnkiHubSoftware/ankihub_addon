@@ -55,7 +55,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, Qt, QUrl
+from aqt.qt import QAction, Qt, QUrl, QWidget
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -5672,6 +5672,16 @@ class TestFlashCardSelector:
 
             mocker.patch.object(AnkiWebView, "load_url")
 
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_user_details",
+                return_value={
+                    "is_premium": True,
+                    "is_trialing": False,
+                    "show_trial_ended_message": False,
+                },
+            )
+
             overview_web: AnkiWebView = aqt.mw.overview.web
             overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
@@ -5709,6 +5719,16 @@ class TestFlashCardSelector:
 
             mocker.patch.object(AnkiWebView, "load_url")
 
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_user_details",
+                return_value={
+                    "is_premium": True,
+                    "is_trialing": False,
+                    "show_trial_ended_message": False,
+                },
+            )
+
             overview_web: AnkiWebView = aqt.mw.overview.web
             overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
@@ -5735,6 +5755,64 @@ class TestFlashCardSelector:
             qtbot.wait_until(flashcard_selector_opened)
 
             assert FlashCardSelectorDialog.dialog == dialog
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "show_trial_ended_message",
+        [False, True],
+    )
+    def test_shows_flashcard_selector_upsell_if_no_access(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+        show_trial_ended_message: bool,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            anki_did = DeckId(1)
+            install_ah_deck(
+                anki_did=anki_did,
+                has_note_embeddings=True,
+            )
+            aqt.mw.deckBrowser.set_current_deck(anki_did)
+
+            qtbot.wait(500)
+
+            mocker.patch.object(AnkiWebView, "load_url")
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_user_details",
+                return_value={
+                    "is_premium": False,
+                    "is_trialing": False,
+                    "show_trial_ended_message": show_trial_ended_message,
+                },
+            )
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
+            overview_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
+            )
+
+            def upsell_dialog_opened():
+                dialog: QWidget = aqt.mw.app.activeWindow()
+                if not isinstance(dialog, utils._Dialog):
+                    return False
+                return (
+                    "Trial" in dialog.windowTitle()
+                    if show_trial_ended_message
+                    else True
+                )
+
+            qtbot.wait_until(upsell_dialog_opened)
 
     def test_with_no_auth_token(
         self,
