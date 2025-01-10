@@ -74,6 +74,7 @@ def refresh_ankihub_menu() -> None:
         _ankihub_login_setup(parent=menu_state.ankihub_menu)
 
     _config_setup(parent=menu_state.ankihub_menu)
+    _ankihub_terms_and_policy_setup(parent=menu_state.ankihub_menu)
     _ankihub_help_setup(parent=menu_state.ankihub_menu)
 
 
@@ -518,6 +519,29 @@ def _trigger_install_release_version():
     aqt.mw.addonManager.write_addon_meta(addon_meta)
 
     check_and_prompt_for_updates_on_main_window()
+
+
+def _ankihub_terms_and_policy_setup(parent: QMenu):
+    """Set up the sub menu for terms and policy related items."""
+    terms_and_policy_menu = QMenu("🤝 Terms and Policy", parent)
+
+    q_terms_and_conditions_action = QAction(
+        "Terms && Conditions", terms_and_policy_menu
+    )
+    qconnect(
+        q_terms_and_conditions_action.triggered,
+        lambda: openLink("https://community.ankihub.net/tos"),
+    )
+    terms_and_policy_menu.addAction(q_terms_and_conditions_action)
+
+    q_privacy_policy_action = QAction("Privacy Policy", terms_and_policy_menu)
+    qconnect(
+        q_privacy_policy_action.triggered,
+        lambda: openLink("https://community.ankihub.net/privacy"),
+    )
+    terms_and_policy_menu.addAction(q_privacy_policy_action)
+
+    parent.addMenu(terms_and_policy_menu)
 
 
 def _ankihub_logout_setup(parent: QMenu):
