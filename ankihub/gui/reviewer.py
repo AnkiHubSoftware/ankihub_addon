@@ -290,9 +290,9 @@ class ReviewerSidebar:
     def set_content_url(self, url: Optional[str]) -> None:
         if not self.content_webview:
             return
-        
+
         if self.needs_to_accept_terms:
-            self.content_webview.reload()
+            self.refresh_page_content()
 
         self._update_content_webview_theme()
 
@@ -307,6 +307,9 @@ class ReviewerSidebar:
                 self.content_webview.setPage(content_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.page_type])
+
+    def refresh_page_content(self):
+        self.content_webview.reload()
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(

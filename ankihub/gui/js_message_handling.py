@@ -15,9 +15,8 @@ from aqt.utils import openLink, tooltip
 from aqt.webview import AnkiWebView
 from jinja2 import Template
 
-from ..gui.terms_dialog import TermsOfServiceDialog
-
 from ..db import ankihub_db
+from ..gui.terms_dialog import TermsOfServiceDialog
 from ..settings import url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import show_dialog
@@ -32,6 +31,9 @@ GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 ANKIHUB_UPSELL = "ankihub_ai_upsell"
 COPY_TO_CLIPBOARD_PYCMD = "ankihub_copy_to_clipboard"
 OPEN_LINK_PYCMD = "ankihub_open_link"
+TERMS_AGREEMENT_NOT_ACCEPTED = "terms_agreement_not_accepted"
+TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
+
 
 POST_MESSAGE_TO_ANKIHUB_JS_PATH = (
     Path(__file__).parent / "web/post_message_to_ankihub_js.js"
@@ -51,28 +53,30 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         openLink(view_note_url)
 
         return (True, None)
-    elif message == "terms_agreement_notifier":
+    elif message == TERMS_AGREEMENT_NOT_ACCEPTED:
         from .reviewer import reviewer_sidebar
-        
+
         if reviewer_sidebar:
-            
-            TermsOfServiceDialog.display_static(parent=aqt.mw)
+
+            TermsOfServiceDialog.display(parent=aqt.mw)
             reviewer_sidebar.set_needs_to_accept_terms(True)
             reviewer_sidebar.close_sidebar()
 
             if aqt.mw.reviewer:
                 js = "ankihubReviewerButtons.unselectAllButtons()"
                 aqt.mw.reviewer.web.eval(js)
-            
+
         return (True, None)
-    elif message == "terms_agreement_accepted":
+    elif message == TERMS_AGREEMENT_ACCEPTED:
         from .reviewer import reviewer_sidebar
-        
+
         if reviewer_sidebar:
             reviewer_sidebar.set_needs_to_accept_terms(False)
-            
+            reviewer_sidebar.refresh_page_content()
+            TermsOfServiceDialog.hide()
+
         return (True, None)
-    
+
     elif message.startswith(OPEN_BROWSER_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds", [])
