@@ -15,6 +15,8 @@ from aqt.utils import openLink, tooltip
 from aqt.webview import AnkiWebView
 from jinja2 import Template
 
+from ..gui.terms_dialog import TermsOfServiceDialog
+
 from ..db import ankihub_db
 from ..settings import url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
@@ -49,6 +51,28 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         openLink(view_note_url)
 
         return (True, None)
+    elif message == "terms_agreement_notifier":
+        from .reviewer import reviewer_sidebar
+        
+        if reviewer_sidebar:
+            
+            TermsOfServiceDialog.display_static(parent=aqt.mw)
+            reviewer_sidebar.set_needs_to_accept_terms(True)
+            reviewer_sidebar.close_sidebar()
+
+            if aqt.mw.reviewer:
+                js = "ankihubReviewerButtons.unselectAllButtons()"
+                aqt.mw.reviewer.web.eval(js)
+            
+        return (True, None)
+    elif message == "terms_agreement_accepted":
+        from .reviewer import reviewer_sidebar
+        
+        if reviewer_sidebar:
+            reviewer_sidebar.set_needs_to_accept_terms(False)
+            
+        return (True, None)
+    
     elif message.startswith(OPEN_BROWSER_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds", [])

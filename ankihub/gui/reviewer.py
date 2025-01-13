@@ -95,6 +95,7 @@ class ReviewerSidebar:
         self.content_pages: Dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
         self.content_urls: Dict[SidebarPageType, Optional[str]] = {}
         self.empty_state_pages: dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
+        self.needs_to_accept_terms = False
 
         self._setup_ui()
 
@@ -266,6 +267,9 @@ class ReviewerSidebar:
 
         return True
 
+    def set_needs_to_accept_terms(self, needs_to_accept_terms: bool) -> None:
+        self.needs_to_accept_terms = needs_to_accept_terms
+
     def get_page_type(self) -> Optional[SidebarPageType]:
         return self.page_type
 
@@ -286,6 +290,9 @@ class ReviewerSidebar:
     def set_content_url(self, url: Optional[str]) -> None:
         if not self.content_webview:
             return
+        
+        if self.needs_to_accept_terms:
+            self.content_webview.reload()
 
         self._update_content_webview_theme()
 
