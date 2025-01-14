@@ -1,4 +1,5 @@
 """AnkiHub menu on Anki's main window."""
+
 import re
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -49,13 +50,8 @@ menu_state = _MenuState()
 def setup_ankihub_menu() -> None:
     menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
     aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
-    config.token_change_hook.append(
-        lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
-    )
-    config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
-        refresh_ankihub_menu
-    )
-    refresh_ankihub_menu()
+
+    qconnect(menu_state.ankihub_menu.aboutToShow, refresh_ankihub_menu)
 
 
 def refresh_ankihub_menu() -> None:
@@ -74,6 +70,7 @@ def refresh_ankihub_menu() -> None:
         _ankihub_login_setup(parent=menu_state.ankihub_menu)
 
     _config_setup(parent=menu_state.ankihub_menu)
+    _ankihub_terms_and_policy_setup(parent=menu_state.ankihub_menu)
     _ankihub_help_setup(parent=menu_state.ankihub_menu)
 
 
@@ -518,6 +515,29 @@ def _trigger_install_release_version():
     aqt.mw.addonManager.write_addon_meta(addon_meta)
 
     check_and_prompt_for_updates_on_main_window()
+
+
+def _ankihub_terms_and_policy_setup(parent: QMenu):
+    """Set up the sub menu for terms and policy related items."""
+    terms_and_policy_menu = QMenu("🤝 Terms and Policy", parent)
+
+    q_terms_and_conditions_action = QAction(
+        "Terms && Conditions", terms_and_policy_menu
+    )
+    qconnect(
+        q_terms_and_conditions_action.triggered,
+        lambda: openLink("https://community.ankihub.net/tos"),
+    )
+    terms_and_policy_menu.addAction(q_terms_and_conditions_action)
+
+    q_privacy_policy_action = QAction("Privacy Policy", terms_and_policy_menu)
+    qconnect(
+        q_privacy_policy_action.triggered,
+        lambda: openLink("https://community.ankihub.net/privacy"),
+    )
+    terms_and_policy_menu.addAction(q_privacy_policy_action)
+
+    parent.addMenu(terms_and_policy_menu)
 
 
 def _ankihub_logout_setup(parent: QMenu):

@@ -165,7 +165,7 @@ from ankihub.gui.js_message_handling import (
     _post_message_to_ankihub_js,
 )
 from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import AnkiHubLogin, menu_state
+from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
@@ -5541,6 +5541,8 @@ class TestConfigDialog:
     def test_ankihub_menu_item_exists(self, anki_session_with_addon_data: AnkiSession):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            refresh_ankihub_menu()
+
             # Assert that the Config menu item exists
             config_action = next(
                 child
