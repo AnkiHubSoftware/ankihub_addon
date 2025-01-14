@@ -4,10 +4,11 @@ from aqt.qt import QColor, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebPage, AnkiWebView
 
 from ..gui.webview import AlwaysOnTopOfParentDialog, AuthenticationRequestInterceptor
+from ..settings import config
 
 
-class TermsOfServiceDialog(AlwaysOnTopOfParentDialog):
-    dialog: Optional["TermsOfServiceDialog"] = None
+class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
+    dialog: Optional["TermsAndConditionsDialog"] = None
 
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
@@ -26,19 +27,14 @@ class TermsOfServiceDialog(AlwaysOnTopOfParentDialog):
         self.web.setPage(page)
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
         self.web.page().setBackgroundColor(QColor("white"))
-        # TODO: Change the URL to the actual URL of the terms of service page
-        self.web.page().setUrl(
-            QUrl(
-                "http://localhost:8000/ai/bf5e66e5-1149-4f3b-99bf-31cd95ad970a/flashcard-selector-embed/?is_on_anki=true"
-            )
-        )
+        self.web.page().setUrl(QUrl(f"{config.app_url}/common/terms-and-conditions/"))
 
         layout = QVBoxLayout()
         layout.addWidget(self.web)
         self.setLayout(layout)
 
     @classmethod
-    def display(cls, parent: Any) -> "TermsOfServiceDialog":
+    def display(cls, parent: Any) -> "TermsAndConditionsDialog":
         if cls.dialog:
             cls.dialog.close()
             cls.dialog = None

@@ -16,7 +16,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from ..db import ankihub_db
-from ..gui.terms_dialog import TermsOfServiceDialog
+from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import show_dialog
@@ -58,7 +58,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         if reviewer_sidebar:
 
-            TermsOfServiceDialog.display(parent=aqt.mw)
+            TermsAndConditionsDialog.display(parent=aqt.mw)
             reviewer_sidebar.set_needs_to_accept_terms(True)
             reviewer_sidebar.close_sidebar()
 
@@ -73,7 +73,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if reviewer_sidebar:
             reviewer_sidebar.set_needs_to_accept_terms(False)
             reviewer_sidebar.refresh_page_content()
-            TermsOfServiceDialog.hide()
+            TermsAndConditionsDialog.hide()
 
         return (True, None)
 
