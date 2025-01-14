@@ -260,13 +260,13 @@ class _Config:
 
     def save_token(self, token: str):
         # aqt.mw.pm.set_ankihub_token(token)
-        aqt.mw.pm.profile["ankiHubToken"] = token
+        aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
         for func in self.token_change_hook:
             func()
 
     def save_user_email(self, user_email: str):
         # aqt.mw.pm.set_ankihub_username(user_email)
-        aqt.mw.pm.profile["ankiHubUsername"] = user_email
+        aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = user_email
 
     def save_latest_deck_update(
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
@@ -398,11 +398,11 @@ class _Config:
 
     def token(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_token()
-        return aqt.mw.pm.profile.get("ankiHubToken")
+        return aqt.mw.pm.profile.get("thirdPartyAnkiHubToken")
 
     def user(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_username()
-        return aqt.mw.pm.profile.get("ankiHubUsername")
+        return aqt.mw.pm.profile.get("thirdPartyAnkiHubUsername")
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
