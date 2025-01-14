@@ -1,8 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
-import re
 import uuid
-from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -28,8 +26,8 @@ from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
-from ..main.utils import mh_tag_to_resource_title_and_slug
-from ..settings import config, url_login, url_mh_integrations_preview
+from ..main.utils import Resource, mh_tag_to_resource
+from ..settings import config, url_login
 from .js_message_handling import (
     ANKIHUB_UPSELL,
     VIEW_NOTE_PYCMD,
@@ -74,12 +72,6 @@ RESOURCE_TYPE_TO_TAG_PART = {
     ResourceType.BOARDS_AND_BEYOND: "#b&b",
     ResourceType.FIRST_AID: "#firstaid",
 }
-
-
-@dataclass(frozen=True)
-class Resource:
-    title: str
-    url: str
 
 
 class ReviewerSidebar:
@@ -446,15 +438,10 @@ def _get_enabled_buttons_list() -> List[str]:
             }
         )
 
-    def normalize_key(key: str) -> str:
-        return re.sub(r"_step_\d+", "", key)
-
     def is_feature_enabled(feature_key: str) -> bool:
-        for config_key, config_value in config.public_config.items():
-            normalized_key = normalize_key(config_key)
-            if feature_key == normalized_key and config_value:
-                return True
-        return False
+        return config.public_config.get(f"{feature_key}") or any(
+            config.public_config.get(f"{feature_key}_step_{step}") for step in [1, 2]
+        )
 
     return [value for key, value in buttons_map.items() if is_feature_enabled(key)]
 
@@ -565,12 +552,27 @@ def _show_resources_for_current_card(resource_type: ResourceType) -> None:
 def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
     resource_tags = _get_resource_tags(tags, resource_type)
     result = {
-        Resource(title=title, url=url_mh_integrations_preview(slug))
+        resource
         for tag in resource_tags
-        if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
-        for title, slug in [title_and_slug]
+        if (
+            (resource := mh_tag_to_resource(tag)).usmle_step
+            in _get_enabled_steps_for_resource_type(resource_type)
+        )
     }
     return list(sorted(result, key=lambda x: x.title))
+
+
+def _get_enabled_steps_for_resource_type(resource_type: ResourceType) -> Set[int]:
+    resource_type_to_config_key_prefix = {
+        ResourceType.BOARDS_AND_BEYOND: "boards_and_beyond",
+        ResourceType.FIRST_AID: "first_aid_forward",
+    }
+    config_key_prefix = resource_type_to_config_key_prefix[resource_type]
+    return {
+        step
+        for step in [1, 2]
+        if config.public_config.get(f"{config_key_prefix}_step_{step}")
+    }
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:

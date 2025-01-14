@@ -150,7 +150,7 @@ from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
-    mh_tag_to_resource_title_and_slug,
+    mh_tag_to_resource,
     mids_of_notes,
     note_type_with_updated_templates,
     retain_nids_with_ah_note_type,
@@ -3111,6 +3111,6 @@ def test_mh_tag_to_resource_title_and_slug(
     tag: str, expected_title: str, expected_slug: str
 ):
     if expected_title is None:
-        assert mh_tag_to_resource_title_and_slug(tag) is None
+        assert mh_tag_to_resource(tag) is None
     else:
-        assert mh_tag_to_resource_title_and_slug(tag) == (expected_title, expected_slug)
+        assert mh_tag_to_resource(tag) == (expected_title, expected_slug)
