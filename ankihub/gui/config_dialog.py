@@ -9,7 +9,11 @@ during normal execution.
 
 from typing import cast
 
+from aqt import qconnect
+from aqt.qt import QCheckBox
+
 from ..settings import config
+from .ankiaddonconfig.window import ConfigLayout
 
 _config_dialog_manager = None
 
@@ -56,8 +60,14 @@ def _general_tab(conf_window) -> None:
     if config.get_feature_flags().get("mh_integration"):
         tab.text("Sidebar", bold=True)
         tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
-        tab.checkbox("boards_and_beyond", "Boards and Beyond")
-        tab.checkbox("first_aid_forward", "First Aid Forward")
+
+        add_nested_checkboxes(
+            tab, key_prefix="boards_and_beyond", description="Boards and Beyond"
+        )
+        add_nested_checkboxes(
+            tab, key_prefix="first_aid_forward", description="First Aid Forward"
+        )
+
         tab.hseparator()
         tab.space(8)
 
@@ -66,3 +76,39 @@ def _general_tab(conf_window) -> None:
     tab.checkbox("debug_level_logs", "Verbose logs (restart required)")
 
     tab.stretch()
+
+
+def add_nested_checkboxes(
+    config_layout: ConfigLayout, key_prefix: str, description: str
+) -> None:
+    main_checkbox = QCheckBox(description)
+    config_layout.addWidget(main_checkbox)
+
+    container_outer = config_layout.hcontainer()
+    container_outer.setContentsMargins(0, 2, 0, 2)
+
+    container_inner = container_outer.vcontainer()
+    container_inner.setContentsMargins(30, 0, 0, 0)
+
+    step_1_checkbox = container_inner.checkbox(
+        f"{key_prefix}_step_1", description="Step 1"
+    )
+    step_2_checkbox = container_inner.checkbox(
+        f"{key_prefix}_step_2", description="Step 2"
+    )
+
+    def update_main_checkbox() -> None:
+        main_checkbox.blockSignals(True)
+        main_checkbox.setChecked(
+            step_1_checkbox.isChecked() and step_2_checkbox.isChecked()
+        )
+        main_checkbox.blockSignals(False)
+
+    qconnect(step_1_checkbox.stateChanged, update_main_checkbox)
+    qconnect(step_2_checkbox.stateChanged, update_main_checkbox)
+
+    def update_step_checkboxes(checked: bool) -> None:
+        step_1_checkbox.setChecked(checked)
+        step_2_checkbox.setChecked(checked)
+
+    qconnect(main_checkbox.toggled, update_step_checkboxes)

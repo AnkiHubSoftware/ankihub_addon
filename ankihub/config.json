@@ -6,6 +6,8 @@
     "debug_level_logs": false,
     "use_staging": false,
     "ankihub_ai_chatbot": true,
-    "boards_and_beyond": true,
-    "first_aid_forward": true
+    "boards_and_beyond_step_1": true,
+    "boards_and_beyond_step_2": true,
+    "first_aid_forward_step_1": true,
+    "first_aid_forward_step_2": true
 }
