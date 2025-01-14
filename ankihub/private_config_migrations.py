@@ -125,13 +125,21 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
 def _move_credentials_to_profile_config(
     private_config_dict: Dict,
 ) -> None:
-    """Move login credentials to Anki's profile config."""
+    """
+    Move login credentials to Anki's profile config.
+    Also move the ankiHubToken/ankiHubUsername profile config keys to thirdPartyAnkiHubToken/thirdPartyAnkiHubUsername
+    as the keys used by Anki have changed.
+    """
 
-    token = private_config_dict.pop("token", None)
-    username = private_config_dict.pop("user", None)
+    token = private_config_dict.pop("token", None) or aqt.mw.pm.profile.pop(
+        "ankiHubToken", None
+    )
+    username = private_config_dict.pop("user", None) or aqt.mw.pm.profile.pop(
+        "ankiHubUsername", None
+    )
     if token:
         # aqt.mw.pm.set_ankihub_token(token)
-        aqt.mw.pm.profile["ankiHubToken"] = token
+        aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
     if username:
         # aqt.mw.pm.set_ankihub_username(username)
-        aqt.mw.pm.profile["ankiHubUsername"] = username
+        aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = username
