@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import re
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -445,11 +446,17 @@ def _get_enabled_buttons_list() -> List[str]:
             }
         )
 
-    return [
-        buttons_map[key]
-        for key, value in config.public_config.items()
-        if key in buttons_map and value
-    ]
+    def normalize_key(key: str) -> str:
+        return re.sub(r"_step_\d+", "", key)
+
+    def is_feature_enabled(feature_key: str) -> bool:
+        for config_key, config_value in config.public_config.items():
+            normalized_key = normalize_key(config_key)
+            if feature_key == normalized_key and config_value:
+                return True
+        return False
+
+    return [value for key, value in buttons_map.items() if is_feature_enabled(key)]
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
