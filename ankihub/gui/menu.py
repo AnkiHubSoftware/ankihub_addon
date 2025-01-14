@@ -51,7 +51,7 @@ def setup_ankihub_menu() -> None:
     menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
     aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
 
-    menu_state.ankihub_menu.aboutToShow.connect(refresh_ankihub_menu)
+    qconnect(menu_state.ankihub_menu.aboutToShow, refresh_ankihub_menu)
 
 
 def refresh_ankihub_menu() -> None:
