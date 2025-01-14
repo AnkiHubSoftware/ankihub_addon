@@ -13,7 +13,6 @@ from aqt import qconnect
 from aqt.qt import QCheckBox
 
 from ..settings import config
-from .ankiaddonconfig.window import ConfigLayout
 
 _config_dialog_manager = None
 
@@ -78,9 +77,12 @@ def _general_tab(conf_window) -> None:
     tab.stretch()
 
 
-def add_nested_checkboxes(
-    config_layout: ConfigLayout, key_prefix: str, description: str
-) -> None:
+def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> None:
+
+    from .ankiaddonconfig.window import ConfigLayout
+
+    config_layout = cast(ConfigLayout, config_layout)
+
     main_checkbox = QCheckBox(description)
     config_layout.addWidget(main_checkbox)
 
