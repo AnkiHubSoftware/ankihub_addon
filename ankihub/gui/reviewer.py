@@ -423,27 +423,21 @@ def _inject_ankihub_features_and_setup_sidebar(
 
 
 def _get_enabled_buttons_list() -> List[str]:
-    buttons_map = {}
+    result = []
 
     feature_flags = config.get_feature_flags()
 
     if feature_flags.get("chatbot"):
-        buttons_map["ankihub_ai_chatbot"] = "chatbot"
+        if config.public_config.get("ankihub_ai_chatbot"):
+            result.append("chatbot")
 
     if feature_flags.get("mh_integration"):
-        buttons_map.update(
-            {
-                "boards_and_beyond": "b&b",
-                "first_aid_forward": "fa4",
-            }
-        )
+        if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
+            result.append("b&b")
+        if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
+            result.append("fa4")
 
-    def is_feature_enabled(feature_key: str) -> bool:
-        return config.public_config.get(f"{feature_key}") or any(
-            config.public_config.get(f"{feature_key}_step_{step}") for step in [1, 2]
-        )
-
-    return [value for key, value in buttons_map.items() if is_feature_enabled(key)]
+    return result
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
