@@ -1259,12 +1259,15 @@ class AnkiHubClient:
         if response.status_code != 204:
             raise AnkiHubHTTPError(response)
 
-    def owned_deck_ids(self) -> List[uuid.UUID]:
+    def get_user_details(self) -> Dict[str, Any]:
         response = self._send_request("GET", API.ANKIHUB, "/users/me")
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
 
-        data = response.json()
+        return response.json()
+
+    def owned_deck_ids(self) -> List[uuid.UUID]:
+        data = self.get_user_details()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
         return result
 
@@ -1289,6 +1292,10 @@ class AnkiHubClient:
         )
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
+
+    def is_premium_or_trialing(self) -> bool:
+        data = self.get_user_details()
+        return data["is_premium"] or data["is_trialing"]
 
 
 class ThreadLocalSession:

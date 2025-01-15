@@ -190,7 +190,6 @@ class _Config:
         self._private_config: Optional[PrivateConfig] = None
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: List[Callable[[], None]] = []
-        self.subscriptions_change_hook: Optional[Callable[[], None]] = None
         self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
@@ -260,13 +259,13 @@ class _Config:
 
     def save_token(self, token: str):
         # aqt.mw.pm.set_ankihub_token(token)
-        aqt.mw.pm.profile["ankiHubToken"] = token
+        aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
         for func in self.token_change_hook:
             func()
 
     def save_user_email(self, user_email: str):
         # aqt.mw.pm.set_ankihub_username(user_email)
-        aqt.mw.pm.profile["ankiHubUsername"] = user_email
+        aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = user_email
 
     def save_latest_deck_update(
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
@@ -340,9 +339,6 @@ class _Config:
         self.save_latest_deck_update(ankihub_did, latest_udpate)
         self._update_private_config()
 
-        if self.subscriptions_change_hook:
-            self.subscriptions_change_hook()
-
     def update_deck(self, deck: Deck):
         """Update the deck config with the values from the Deck object."""
         deck_config = self.deck_config(deck.ah_did)
@@ -363,8 +359,6 @@ class _Config:
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
             self._update_private_config()
-        if self.subscriptions_change_hook:
-            self.subscriptions_change_hook()
 
     def log_private_config(self, log_level=logging.INFO):
         config_copy = deepcopy(self._private_config)
@@ -398,11 +392,11 @@ class _Config:
 
     def token(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_token()
-        return aqt.mw.pm.profile.get("ankiHubToken")
+        return aqt.mw.pm.profile.get("thirdPartyAnkiHubToken")
 
     def user(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_username()
-        return aqt.mw.pm.profile.get("ankiHubUsername")
+        return aqt.mw.pm.profile.get("thirdPartyAnkiHubUsername")
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
