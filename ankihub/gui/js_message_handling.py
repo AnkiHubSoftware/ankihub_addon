@@ -77,7 +77,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         TermsAndConditionsDialog.hide()
         if reviewer_sidebar:
             reviewer_sidebar.set_needs_to_accept_terms(False)
-            # TODO: Instead of the refresh I should call again the last url before the redirect
             reviewer_sidebar.access_last_accessed_url()
 
         return (True, None)
