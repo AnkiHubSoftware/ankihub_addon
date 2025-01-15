@@ -54,11 +54,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message == TERMS_AGREEMENT_NOT_ACCEPTED:
+        from ..gui.overview import FlashCardSelectorDialog
         from .reviewer import reviewer_sidebar
 
+        TermsAndConditionsDialog.display(parent=aqt.mw)
         if reviewer_sidebar:
 
-            TermsAndConditionsDialog.display(parent=aqt.mw)
             reviewer_sidebar.set_needs_to_accept_terms(True)
             reviewer_sidebar.close_sidebar()
 
@@ -66,14 +67,18 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
                 js = "ankihubReviewerButtons.unselectAllButtons()"
                 aqt.mw.reviewer.web.eval(js)
 
+        if FlashCardSelectorDialog.dialog:
+            FlashCardSelectorDialog.dialog.close()
+
         return (True, None)
     elif message == TERMS_AGREEMENT_ACCEPTED:
         from .reviewer import reviewer_sidebar
 
+        TermsAndConditionsDialog.hide()
         if reviewer_sidebar:
             reviewer_sidebar.set_needs_to_accept_terms(False)
-            reviewer_sidebar.refresh_page_content()
-            TermsAndConditionsDialog.hide()
+            # TODO: Instead of the refresh I should call again the last url before the redirect
+            reviewer_sidebar.access_last_accessed_url()
 
         return (True, None)
 
