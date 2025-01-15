@@ -3,6 +3,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
+        this.isPremiumOrTrialing = "{{ IS_PREMIUM_OR_TRIALING }}" == "True";
         this.isAnKingDeck = null;
         this.bbCount = 0;
         this.faCount = 0;
@@ -35,7 +36,8 @@ class AnkiHubReviewerButtons {
             },
             {
                 name: "chatbot",
-                iconPath: "/_chatbot_icon.svg",
+                iconPath: this.isPremiumOrTrialing ? "/_chatbot_icon.svg" : "/_chatbot_icon_sleeping.svg",
+                iconPathDarkTheme: this.isPremiumOrTrialing ? null : "/_chatbot_icon_sleeping_dark_theme.svg",
                 active: false,
                 tooltip: "AI Chatbot"
             },
