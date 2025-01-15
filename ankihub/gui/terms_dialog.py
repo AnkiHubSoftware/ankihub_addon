@@ -15,8 +15,7 @@ class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        # TODO: Change the title of the dialog to the actual title of the terms of service window
-        self.setWindowTitle("Terms")
+        self.setWindowTitle("Settings")
         self.resize(1000, 800)
 
         self.web = AnkiWebView(parent=self)
@@ -27,7 +26,7 @@ class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
         self.web.setPage(page)
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
         self.web.page().setBackgroundColor(QColor("white"))
-        self.web.page().setUrl(QUrl(f"{config.app_url}/common/terms-and-conditions/"))
+        self.web.page().setUrl(QUrl(f"{config.app_url}/users/terms-and-conditions/"))
 
         layout = QVBoxLayout()
         layout.addWidget(self.web)
