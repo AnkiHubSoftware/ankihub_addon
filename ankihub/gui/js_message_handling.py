@@ -17,7 +17,7 @@ from jinja2 import Template
 
 from ..db import ankihub_db
 from ..gui.terms_dialog import TermsAndConditionsDialog
-from ..settings import url_plans_page, url_view_note
+from ..settings import url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
