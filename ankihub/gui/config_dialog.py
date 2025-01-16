@@ -100,8 +100,6 @@ def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> N
     )
 
     def update_main_checkbox() -> None:
-        main_checkbox.blockSignals(True)
-
         checkboxes = [step_1_checkbox, step_2_checkbox]
         checked_count = sum(checkbox.isChecked() for checkbox in checkboxes)
 
@@ -111,8 +109,6 @@ def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> N
             main_checkbox.setCheckState(Qt.CheckState.Checked)
         else:
             main_checkbox.setCheckState(Qt.CheckState.PartiallyChecked)
-
-        main_checkbox.blockSignals(False)
 
     def on_main_checkbox_clicked() -> None:
         is_checked = main_checkbox.checkState() != Qt.CheckState.Unchecked
