@@ -29,6 +29,7 @@ from zipfile import ZipFile
 import aqt
 import aqt.reviewer
 import pytest
+import requests_mock
 from anki.cards import Card, CardId
 from anki.consts import (
     QUEUE_TYPE_NEW,
@@ -161,6 +162,8 @@ from ankihub.gui.js_message_handling import (
     GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
     SUSPEND_NOTES_PYCMD,
+    TERMS_AGREEMENT_ACCEPTED,
+    TERMS_AGREEMENT_NOT_ACCEPTED,
     UNSUSPEND_NOTES_PYCMD,
     _post_message_to_ankihub_js,
 )
@@ -6559,3 +6562,118 @@ class TestMaybeSendDailyReviewSummaries:
                 if revlog_type != REVLOG_RESCHED
             ]
             assert dates_from_summaries == expected_dates
+
+
+@pytest.mark.sequential
+def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+    requests_mock: requests_mock.Mocker,
+):
+    entry_point.run()
+    message = TERMS_AGREEMENT_NOT_ACCEPTED
+    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = uuid.uuid4()
+        install_ah_deck(ah_did=ah_did)
+
+        # Changes the deck setting so that there are unsuspend cards ready for review
+        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+        deck_config = config.deck_config(ah_did)
+        import_ah_note(
+            ah_did=ah_did,
+            anki_did=deck_config.anki_id,
+        )
+        aqt.mw.col.decks.set_current(deck_config.anki_id)
+        terms_dialog_mock = mocker.patch(
+            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
+        )
+        aqt.mw.reviewer.show()
+        reviewer_sidebar_mock = mocker.patch("ankihub.gui.reviewer.reviewer_sidebar")
+
+        aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+
+        qtbot.wait_until(lambda: terms_dialog_mock.display.called)
+        terms_dialog_mock.display.assert_called_once_with(parent=aqt.mw)
+        reviewer_sidebar_mock.set_needs_to_accept_terms.assert_called_once_with(True)
+        reviewer_sidebar_mock.close_sidebar.assert_called_once()
+
+
+@pytest.mark.sequential
+def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+    requests_mock: requests_mock.Mocker,
+):
+    entry_point.run()
+    message = TERMS_AGREEMENT_NOT_ACCEPTED
+    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = uuid.uuid4()
+        install_ah_deck(ah_did=ah_did)
+
+        # Changes the deck setting so that there are unsuspend cards ready for review
+        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+        deck_config = config.deck_config(ah_did)
+        import_ah_note(
+            ah_did=ah_did,
+            anki_did=deck_config.anki_id,
+        )
+        aqt.mw.col.decks.set_current(deck_config.anki_id)
+        terms_dialog_mock = mocker.patch(
+            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
+        )
+        aqt.mw.reviewer.show()
+        flashcard_selector_dialog_mock = mocker.patch(
+            "ankihub.gui.overview.FlashCardSelectorDialog.dialog"
+        )
+
+        aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+
+        qtbot.wait_until(lambda: terms_dialog_mock.display.called)
+        terms_dialog_mock.display.assert_called_once_with(parent=aqt.mw)
+        flashcard_selector_dialog_mock.close.assert_called_once()
+
+
+def test_terms_agreement_accepted(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+    requests_mock: requests_mock.Mocker,
+):
+    entry_point.run()
+    message = TERMS_AGREEMENT_ACCEPTED
+    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = uuid.uuid4()
+        install_ah_deck(ah_did=ah_did)
+
+        # Changes the deck setting so that there are unsuspend cards ready for review
+        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+        deck_config = config.deck_config(ah_did)
+        import_ah_note(
+            ah_did=ah_did,
+            anki_did=deck_config.anki_id,
+        )
+        aqt.mw.col.decks.set_current(deck_config.anki_id)
+
+        aqt.mw.reviewer.show()
+        terms_dialog_mock = mocker.patch(
+            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
+        )
+        reviewer_sidebar_mock = mocker.patch("ankihub.gui.reviewer.reviewer_sidebar")
+
+        aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+
+        qtbot.wait_until(lambda: terms_dialog_mock.hide.called)
+        terms_dialog_mock.hide.assert_called_once()
+        reviewer_sidebar_mock.set_needs_to_accept_terms.assert_called_once_with(False)
+        reviewer_sidebar_mock.access_last_accessed_url.assert_called_once()
