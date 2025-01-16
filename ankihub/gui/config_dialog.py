@@ -10,7 +10,7 @@ during normal execution.
 from typing import cast
 
 from aqt import qconnect
-from aqt.qt import QCheckBox
+from aqt.qt import QCheckBox, Qt
 
 from ..settings import config
 
@@ -101,16 +101,25 @@ def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> N
 
     def update_main_checkbox() -> None:
         main_checkbox.blockSignals(True)
-        main_checkbox.setChecked(
-            step_1_checkbox.isChecked() and step_2_checkbox.isChecked()
-        )
+
+        checkboxes = [step_1_checkbox, step_2_checkbox]
+        checked_count = sum(checkbox.isChecked() for checkbox in checkboxes)
+
+        if checked_count == 0:
+            main_checkbox.setCheckState(Qt.CheckState.Unchecked)
+        elif checked_count == len(checkboxes):
+            main_checkbox.setCheckState(Qt.CheckState.Checked)
+        else:
+            main_checkbox.setCheckState(Qt.CheckState.PartiallyChecked)
+
         main_checkbox.blockSignals(False)
+
+    def on_main_checkbox_clicked() -> None:
+        is_checked = main_checkbox.checkState() != Qt.CheckState.Unchecked
+        main_checkbox.setChecked(is_checked)
+        step_1_checkbox.setChecked(is_checked)
+        step_2_checkbox.setChecked(is_checked)
 
     qconnect(step_1_checkbox.stateChanged, update_main_checkbox)
     qconnect(step_2_checkbox.stateChanged, update_main_checkbox)
-
-    def update_step_checkboxes(checked: bool) -> None:
-        step_1_checkbox.setChecked(checked)
-        step_2_checkbox.setChecked(checked)
-
-    qconnect(main_checkbox.toggled, update_step_checkboxes)
+    qconnect(main_checkbox.clicked, on_main_checkbox_clicked)
