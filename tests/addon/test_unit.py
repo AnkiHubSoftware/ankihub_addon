@@ -3060,6 +3060,10 @@ def test_send_daily_review_summaries_without_data(mocker):
 
 
 def url_mh_integrations_preview(slug: str) -> str:
+    # Test-specific replacement for settings.url_mh_integrations_preview using DEFAULT_APP_URL
+    # We need this because:
+    # 1. settings.config.app_url is not initialized during test startup
+    # 2. pytest needs these URLs during test collection for parametrize data
     return f"{DEFAULT_APP_URL}/integrations/mcgraw-hill/preview/{slug}"
 
 
