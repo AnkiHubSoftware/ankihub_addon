@@ -4,6 +4,7 @@ import re
 import time
 from collections import defaultdict
 from concurrent.futures import Future
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -24,6 +25,7 @@ from ..settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
+    url_mh_integrations_preview,
     url_view_note,
 )
 
@@ -659,7 +661,14 @@ def collection_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
 
 
-def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
+@dataclass(frozen=True)
+class Resource:
+    title: str
+    url: str
+    usmle_step: int
+
+
+def mh_tag_to_resource(tag: str) -> Optional[Resource]:
     """Converts a McGrawHill tag to a title and URL for the MH resource preview.
 
     Example:
@@ -695,4 +704,4 @@ def mh_tag_to_resource_title_and_slug(tag: str) -> Optional[Tuple[str, str]]:
         # We want to ignore any tags that don't match the expected format
         return None
 
-    return title, slug
+    return Resource(title=title, url=url_mh_integrations_preview(slug), usmle_step=step)

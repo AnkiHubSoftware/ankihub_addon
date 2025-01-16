@@ -18,6 +18,7 @@ from jinja2 import Template
 from ..db import ankihub_db
 from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import url_view_note
+from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -32,6 +33,7 @@ OPEN_LINK_PYCMD = "ankihub_open_link"
 TERMS_AGREEMENT_NOT_ACCEPTED = "terms_agreement_not_accepted"
 TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
 
+OPEN_CONFIG_PYCMD = "ankihub_open_config"
 
 POST_MESSAGE_TO_ANKIHUB_JS_PATH = (
     Path(__file__).parent / "web/post_message_to_ankihub_js.js"
@@ -138,6 +140,9 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if url:
             openLink(url)
 
+        return (True, None)
+    elif message == OPEN_CONFIG_PYCMD:
+        get_config_dialog_manager().open_config()
         return (True, None)
 
     return handled

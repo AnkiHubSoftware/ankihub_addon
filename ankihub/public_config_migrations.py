@@ -26,3 +26,11 @@ def migrate_public_config() -> None:
     if "ankihub_url" in addon_config:
         addon_config.pop("ankihub_url")
         aqt.mw.addonManager.writeConfig(__name__, addon_config)
+
+    if "boards_and_beyond" in addon_config:
+        addon_config.pop("boards_and_beyond")
+        aqt.mw.addonManager.writeConfig(__name__, addon_config)
+
+    if "first_aid_forward" in addon_config:
+        addon_config.pop("first_aid_forward")
+        aqt.mw.addonManager.writeConfig(__name__, addon_config)
