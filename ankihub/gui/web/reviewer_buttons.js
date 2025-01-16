@@ -6,7 +6,6 @@ class AnkiHubReviewerButtons {
         this.isPremiumOrTrialing = "{{ IS_PREMIUM_OR_TRIALING }}" == "True";
         this.bbCount = 0;
         this.faCount = 0;
-        this.enabledButtons = "{{ ENABLED_BUTTONS }}".split(",");
 
         this.colorButtonLight = "#F9FAFB";
         this.colorButtonSelectedLight = "#C7D2FE";
@@ -44,8 +43,6 @@ class AnkiHubReviewerButtons {
                 tooltip: "AI Chatbot"
             },
         ]
-
-        this.buttonsData = this.buttonsData.filter(buttonData => this.enabledButtons.includes(buttonData.name));
 
         this.setupButtons();
     }
@@ -299,6 +296,7 @@ class AnkiHubReviewerButtons {
         for (const buttonData of this.buttonsData) {
             buttonData.visible = visibleButtons.includes(buttonData.name)
         }
+
         const visibleButtonElements = this.getVisibleButtons();
 
         // Hide invisible buttons
