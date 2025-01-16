@@ -28,24 +28,6 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.ankihub_client import (
-    DEFAULT_API_URL,
-    AnkiHubRequestException,
-)
-from ankihub.ankihub_client.models import (  # type: ignore
-    CardReviewData,
-    DailyCardReviewSummary,
-    UserDeckExtensionRelation,
-)
-from ankihub.gui import menu
-from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.gui.exceptions import DeckDownloadAndInstallError
-from ankihub.main.review_data import (
-    get_daily_review_summaries_since_last_sync,
-    send_daily_review_summaries,
-)
-from ankihub.settings import ANKIHUB_TEMPLATE_END_COMMENT, DatadogLogHandler
-
 from ..factories import (
     DeckExtensionFactory,
     DeckFactory,
@@ -54,6 +36,7 @@ from ..factories import (
 )
 from ..fixtures import (  # type: ignore
     AddAnkiNote,
+    ImportAHNote,
     ImportAHNoteType,
     InstallAHDeck,
     LatestInstanceTracker,
@@ -64,7 +47,6 @@ from ..fixtures import (  # type: ignore
     create_anki_deck,
     record_review_for_anki_nid,
 )
-from .test_integration import ImportAHNote
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -79,6 +61,16 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
+from ankihub.ankihub_client.ankihub_client import (
+    DEFAULT_API_URL,
+    DEFAULT_APP_URL,
+    AnkiHubRequestException,
+)
+from ankihub.ankihub_client.models import (  # type: ignore
+    CardReviewData,
+    DailyCardReviewSummary,
+    UserDeckExtensionRelation,
+)
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
@@ -87,6 +79,8 @@ from ankihub.feature_flags import (
     add_feature_flags_update_callback,
     update_feature_flags_in_background,
 )
+from ankihub.gui import menu
+from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_RESPONSE_DETAIL,
@@ -95,6 +89,7 @@ from ankihub.gui.errors import (
     _try_handle_exception,
     upload_logs_in_background,
 )
+from ankihub.gui.exceptions import DeckDownloadAndInstallError
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations.deck_creation import (
@@ -139,6 +134,8 @@ from ankihub.main.note_conversion import (
 from ankihub.main.review_data import (
     _get_first_and_last_review_datetime_for_ah_deck,
     _get_review_count_for_ah_deck_since,
+    get_daily_review_summaries_since_last_sync,
+    send_daily_review_summaries,
     send_review_data,
 )
 from ankihub.main.subdecks import (
@@ -148,14 +145,21 @@ from ankihub.main.subdecks import (
 )
 from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
+    Resource,
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
-    mh_tag_to_resource_title_and_slug,
+    mh_tag_to_resource,
     mids_of_notes,
     note_type_with_updated_templates,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, config, log_file_path
+from ankihub.settings import (
+    ANKIHUB_TEMPLATE_END_COMMENT,
+    ANKIWEB_ID,
+    DatadogLogHandler,
+    config,
+    log_file_path,
+)
 
 
 @pytest.fixture
@@ -3055,32 +3059,52 @@ def test_send_daily_review_summaries_without_data(mocker):
     mock_anki_hub_client.send_daily_card_review_summaries.assert_not_called()
 
 
+def url_mh_integrations_preview(slug: str) -> str:
+    # Test-specific replacement for settings.url_mh_integrations_preview using DEFAULT_APP_URL
+    # We need this because:
+    # 1. settings.config.app_url is not initialized during test startup
+    # 2. pytest needs these URLs during test collection for parametrize data
+    return f"{DEFAULT_APP_URL}/integrations/mcgraw-hill/preview/{slug}"
+
+
 @pytest.mark.parametrize(
-    "tag, expected_title, expected_slug",
+    "tag, expected_resource",
     [
         # With B&B tag
         (
             "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia",
-            "Ammonia",
-            "step1-bb-3-3-4",
+            Resource(
+                "Ammonia",
+                url_mh_integrations_preview("step1-bb-3-3-4"),
+                1,
+            ),
         ),
         # With First Aid tag
         (
             "#AK_Step2_v12::#FirstAid::14_Pulm::16_Nose_and_Throat::01_Rhinitis",
-            "Rhinitis",
-            "step2-fa-14-16-1",
+            Resource(
+                "Rhinitis",
+                url_mh_integrations_preview("step2-fa-14-16-1"),
+                2,
+            ),
         ),
         # With lowercase tag
         (
             "#ak_step1_v12::#b&b::03_biochem::03_amino_acids::04_ammonia",
-            "Ammonia",
-            "step1-bb-3-3-4",
+            Resource(
+                "Ammonia",
+                url_mh_integrations_preview("step1-bb-3-3-4"),
+                1,
+            ),
         ),
         # With trailing Extra tag part that should be ignored
         (
             "#AK_Step1_v12::#B&B::03_Biochem::03_Amino_Acids::04_Ammonia::Extra",
-            "Ammonia",
-            "step1-bb-3-3-4",
+            Resource(
+                "Ammonia",
+                url_mh_integrations_preview("step1-bb-3-3-4"),
+                1,
+            ),
         ),
         # With tag part group starting with "*" that should be ignored
         (
@@ -3088,29 +3112,31 @@ def test_send_daily_review_summaries_without_data(mocker):
                 "#AK_Step1_v12::#FirstAid::05_Pharm::02_Autonomic_Drugs::15_beta-blockers::"
                 "*B-Antagonists::Cardioselective_B1_Antagonists"
             ),
-            "Beta-blockers",
-            "step1-fa-5-2-15",
+            Resource(
+                "Beta-blockers",
+                url_mh_integrations_preview("step1-fa-5-2-15"),
+                1,
+            ),
         ),
         # With number later in tag part
         (
             "#AK_Step1_v12::#FirstAid::01_Biochem::03_Laboratory_Techniques::02_CRISPR/Cas9",
-            "Crispr/cas9",
-            "step1-fa-1-3-2",
+            Resource(
+                "Crispr/cas9",
+                url_mh_integrations_preview("step1-fa-1-3-2"),
+                1,
+            ),
         ),
         # With invalid tag
-        ("invalid_tag", None, None),
+        ("invalid_tag", None),
         # With invalid tag (core tag part doesn't start with number)
         (
             "#AK_Step1_v12::#FirstAid::Biochem::03_Laboratory_Techniques::CRISPR/Cas9",
-            None,
             None,
         ),
     ],
 )
 def test_mh_tag_to_resource_title_and_slug(
-    tag: str, expected_title: str, expected_slug: str
+    tag: str, expected_resource: Optional[Resource]
 ):
-    if expected_title is None:
-        assert mh_tag_to_resource_title_and_slug(tag) is None
-    else:
-        assert mh_tag_to_resource_title_and_slug(tag) == (expected_title, expected_slug)
+    assert mh_tag_to_resource(tag) == expected_resource

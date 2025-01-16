@@ -1,7 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
 import uuid
-from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -27,8 +26,8 @@ from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
-from ..main.utils import mh_tag_to_resource_title_and_slug
-from ..settings import config, url_login, url_mh_integrations_preview
+from ..main.utils import Resource, mh_tag_to_resource
+from ..settings import config, url_login
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
@@ -69,12 +68,6 @@ RESOURCE_TYPE_TO_TAG_PART = {
     ResourceType.BOARDS_AND_BEYOND: "#b&b",
     ResourceType.FIRST_AID: "#firstaid",
 }
-
-
-@dataclass(frozen=True)
-class Resource:
-    title: str
-    url: str
 
 
 class ReviewerSidebar:
@@ -426,26 +419,21 @@ def _inject_ankihub_features_and_setup_sidebar(
 
 
 def _get_enabled_buttons_list() -> List[str]:
-    buttons_map = {}
+    result = []
 
     feature_flags = config.get_feature_flags()
 
     if feature_flags.get("chatbot"):
-        buttons_map["ankihub_ai_chatbot"] = "chatbot"
+        if config.public_config.get("ankihub_ai_chatbot"):
+            result.append("chatbot")
 
     if feature_flags.get("mh_integration"):
-        buttons_map.update(
-            {
-                "boards_and_beyond": "b&b",
-                "first_aid_forward": "fa4",
-            }
-        )
+        if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
+            result.append("b&b")
+        if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
+            result.append("fa4")
 
-    return [
-        buttons_map[key]
-        for key, value in config.public_config.items()
-        if key in buttons_map and value
-    ]
+    return result
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -554,12 +542,27 @@ def _show_resources_for_current_card(resource_type: ResourceType) -> None:
 def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resource]:
     resource_tags = _get_resource_tags(tags, resource_type)
     result = {
-        Resource(title=title, url=url_mh_integrations_preview(slug))
+        resource
         for tag in resource_tags
-        if (title_and_slug := mh_tag_to_resource_title_and_slug(tag))
-        for title, slug in [title_and_slug]
+        if (
+            (resource := mh_tag_to_resource(tag)).usmle_step
+            in _get_enabled_steps_for_resource_type(resource_type)
+        )
     }
     return list(sorted(result, key=lambda x: x.title))
+
+
+def _get_enabled_steps_for_resource_type(resource_type: ResourceType) -> Set[int]:
+    resource_type_to_config_key_prefix = {
+        ResourceType.BOARDS_AND_BEYOND: "boards_and_beyond",
+        ResourceType.FIRST_AID: "first_aid_forward",
+    }
+    config_key_prefix = resource_type_to_config_key_prefix[resource_type]
+    return {
+        step
+        for step in [1, 2]
+        if config.public_config.get(f"{config_key_prefix}_step_{step}")
+    }
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
