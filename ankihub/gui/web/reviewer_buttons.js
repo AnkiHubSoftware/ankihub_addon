@@ -3,7 +3,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
-        this.isPremiumOrTrialing = "{{ IS_PREMIUM_OR_TRIALING }}" == "True";
+        this.isPremiumOrTrialing = false;
         this.bbCount = 0;
         this.faCount = 0;
 
@@ -22,6 +22,8 @@ class AnkiHubReviewerButtons {
                 name: "b&b",
                 iconPath: "/_b&b_icon.svg",
                 iconPathDarkTheme: "/_b&b_icon_dark_theme.svg",
+                premiumIconPath: null,
+                premiumIconPathDarkTheme: null,
                 active: false,
                 visible: true,
                 tooltip: "Boards & Beyond",
@@ -30,14 +32,18 @@ class AnkiHubReviewerButtons {
                 name: "fa4",
                 iconPath: "/_fa4_icon.svg",
                 iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
+                premiumIconPath: null,
+                premiumIconPathDarkTheme: null,
                 active: false,
                 visible: true,
                 tooltip: "First Aid Forward",
             },
             {
                 name: "chatbot",
-                iconPath: this.isPremiumOrTrialing ? "/_chatbot_icon.svg" : "/_chatbot_icon_sleeping.svg",
-                iconPathDarkTheme: this.isPremiumOrTrialing ? null : "/_chatbot_icon_sleeping_dark_theme.svg",
+                iconPath: "/_chatbot_icon_sleeping.svg",
+                iconPathDarkTheme: "/_chatbot_icon_sleeping_dark_theme.svg",
+                premiumIconPath: "/_chatbot_icon.svg",
+                premiumIconPathDarkTheme: "/_chatbot_icon.svg",
                 active: false,
                 visible: true,
                 tooltip: "AI Chatbot"
@@ -90,13 +96,7 @@ class AnkiHubReviewerButtons {
             buttonElement.id = `ankihub-${buttonData.name}-button`;
             buttonElement.classList.add("ankihub-reviewer-button");
 
-            this.setButtonStyle(
-                buttonElement,
-                (
-                    this.theme == "dark" && buttonData.iconPathDarkTheme ?
-                        buttonData.iconPathDarkTheme : buttonData.iconPath
-                ),
-            );
+            this.setButtonStyle(buttonElement, this.iconPath(buttonData.name));
 
             if (buttonData.tooltip) {
                 addTooltip(buttonElement, buttonData.tooltip);
@@ -135,6 +135,25 @@ class AnkiHubReviewerButtons {
         if (this.buttonsData.length == 0) {
             toggleButtonsButton.style.display = "none";
         }
+    }
+
+    iconPath(buttonName) {
+        const button = this.buttonsData.find(buttonData => buttonData.name === buttonName);
+
+        if (this.theme == "dark" && button.iconPathDarkTheme) {
+            if (this.isPremiumOrTrialing && button.premiumIconPathDarkTheme) {
+                return button.premiumIconPathDarkTheme;
+            } else {
+                return button.iconPathDarkTheme;
+            }
+        } else {
+            if (this.isPremiumOrTrialing && button.premiumIconPath) {
+                return button.premiumIconPath;
+            } else {
+                return button.iconPath
+            }
+        }
+
     }
 
     injectReviewerButtonStyleSheet() {
@@ -325,6 +344,14 @@ class AnkiHubReviewerButtons {
         }
     }
 
+    updateIsPremiumOrTrialing(isPremiumOrTrialing) {
+        this.isPremiumOrTrialing = isPremiumOrTrialing;
+
+        this.updateButtons(
+            this.bbCount, this.faCount, this.getVisibleButtons().map(buttonData => buttonData.name)
+        );
+    }
+
     getVisibleButtons() {
         return this.buttonsData.filter(buttonData => (buttonData.visible));
     }
@@ -345,6 +372,8 @@ class AnkiHubReviewerButtons {
         } else {
             buttonElement.style.borderRadius = "0px";
         }
+
+        buttonElement.style.backgroundImage = `url('${this.iconPath(buttonName)}')`;
     }
 
     updateResourceCountIndicators(visibleButtons) {
