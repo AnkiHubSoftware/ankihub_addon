@@ -438,15 +438,14 @@ def _inject_ankihub_features_and_setup_sidebar(
         reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    def on_load_finished(ok: bool):
-        if ok:
-            _fetch_is_premium_or_trialing_and_notify_reviewer_buttons()
-        reviewer.web.loadFinished.disconnect(on_load_finished)
+    def check_premium_and_notify_buttons_once(_: Card) -> None:
+        _check_premium_and_notify_buttons()
+        reviewer_did_show_question.remove(check_premium_and_notify_buttons_once)
 
-    qconnect(reviewer.web.loadFinished, on_load_finished)
+    reviewer_did_show_question.append(check_premium_and_notify_buttons_once)
 
 
-def _fetch_is_premium_or_trialing_and_notify_reviewer_buttons() -> None:
+def _check_premium_and_notify_buttons() -> None:
     """Fetches the user's premium or trialing status in the background and notifies the reviewer buttons
     once the status is fetched."""
 
@@ -460,11 +459,9 @@ def _fetch_is_premium_or_trialing_and_notify_reviewer_buttons() -> None:
         )
         aqt.mw.reviewer.web.eval(js)
 
-    op = AddonQueryOp(
+    AddonQueryOp(
         op=fetch_is_premium_or_trialing, success=notify_reviewer_buttons, parent=aqt.mw
-    ).without_collection()
-
-    op.run_in_background()
+    ).without_collection().run_in_background()
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
