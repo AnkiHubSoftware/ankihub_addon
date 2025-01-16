@@ -139,23 +139,18 @@ class AnkiHubReviewerButtons {
 
     iconPath(buttonName) {
         const button = this.buttonsData.find(buttonData => buttonData.name === buttonName);
+        const isDark = this.theme === "dark";
 
-        if (this.theme == "dark" && button.iconPathDarkTheme) {
-            if (this.isPremiumOrTrialing && button.premiumIconPathDarkTheme) {
-                return button.premiumIconPathDarkTheme;
-            } else {
-                return button.iconPathDarkTheme;
-            }
-        } else {
-            if (this.isPremiumOrTrialing && button.premiumIconPath) {
-                return button.premiumIconPath;
-            } else {
-                return button.iconPath
-            }
+        if (isDark && button.iconPathDarkTheme) {
+            return this.isPremiumOrTrialing && button.premiumIconPathDarkTheme
+                ? button.premiumIconPathDarkTheme
+                : button.iconPathDarkTheme;
         }
 
+        return this.isPremiumOrTrialing && button.premiumIconPath
+            ? button.premiumIconPath
+            : button.iconPath;
     }
-
     injectReviewerButtonStyleSheet() {
         const style = document.createElement("style");
         style.innerHTML = `
