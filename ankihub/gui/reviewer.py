@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import json
 import uuid
 from enum import Enum
 from textwrap import dedent
@@ -28,6 +29,7 @@ from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import Resource, mh_tag_to_resource
 from ..settings import config, url_login
+from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
@@ -336,8 +338,26 @@ def setup():
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
 
+        _setup_sidebar_update_on_config_close()
+
     webview_did_receive_js_message.append(_on_js_message)
     reviewer_will_end.append(_close_sidebar_and_clear_states_if_exists)
+
+
+def _setup_sidebar_update_on_config_close() -> None:
+    """Sets up the update of the reviewer buttons and resource tabs when the config dialog is closed."""
+    from .ankiaddonconfig import ConfigWindow
+
+    def setup_config_close_callback(window: ConfigWindow) -> None:
+        window.execute_on_close(notify_elements)
+
+    def notify_elements() -> None:
+        card = aqt.mw.reviewer.card
+        if card:
+            _notify_reviewer_buttons_of_card_change(card)
+            _notify_resource_tabs_of_card_change(card)
+
+    get_config_dialog_manager().on_window_open(setup_config_close_callback)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
@@ -405,10 +425,7 @@ def _inject_ankihub_features_and_setup_sidebar(
     if not isinstance(context, Reviewer):
         return
 
-    reviewer_button_js = get_reviewer_buttons_js(
-        theme=_ankihub_theme(),
-        enabled_buttons=_get_enabled_buttons_list(),
-    )
+    reviewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
     web_content.body += f"<script>{reviewer_button_js}</script>"
 
     global reviewer_sidebar
@@ -416,24 +433,6 @@ def _inject_ankihub_features_and_setup_sidebar(
         reviewer_sidebar = ReviewerSidebar(context)
         aqt.mw.reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
-
-
-def _get_enabled_buttons_list() -> List[str]:
-    result = []
-
-    feature_flags = config.get_feature_flags()
-
-    if feature_flags.get("chatbot"):
-        if config.public_config.get("ankihub_ai_chatbot"):
-            result.append("chatbot")
-
-    if feature_flags.get("mh_integration"):
-        if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
-            result.append("b&b")
-        if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
-            result.append("fa4")
-
-    return result
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
@@ -517,19 +516,51 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     bb_count = len(_get_resources(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
-    is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
-    show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
+    visible_buttons = _get_enabled_buttons() & _get_relevant_buttons_for_card(card)
+
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
             {bb_count},
             {fa_count},
-            {'true' if show_chatbot else 'false'},
-            {'true' if is_anking_deck else 'false'},
+            {json.dumps(list(visible_buttons))}
         );
         """
     )
     aqt.mw.reviewer.web.eval(js)
+
+
+def _get_enabled_buttons() -> Set[str]:
+    result = set()
+    feature_flags = config.get_feature_flags()
+
+    if feature_flags.get("chatbot") and config.public_config.get("ankihub_ai_chatbot"):
+        result.add(SidebarPageType.CHATBOT.value)
+
+    if feature_flags.get("mh_integration"):
+        if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
+            result.add(SidebarPageType.BOARDS_AND_BEYOND.value)
+        if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
+            result.add(SidebarPageType.FIRST_AID.value)
+
+    return result
+
+
+def _get_relevant_buttons_for_card(card: Card) -> Set[str]:
+    result = set()
+
+    show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
+    if show_chatbot:
+        result.add(SidebarPageType.CHATBOT.value)
+
+    show_mh_buttons = _is_anking_deck(aqt.mw.reviewer.card)
+    if show_mh_buttons:
+        result |= {
+            SidebarPageType.BOARDS_AND_BEYOND.value,
+            SidebarPageType.FIRST_AID.value,
+        }
+
+    return result
 
 
 def _show_resources_for_current_card(resource_type: ResourceType) -> None:
