@@ -29,6 +29,7 @@ from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import Resource, mh_tag_to_resource
 from ..settings import config, url_login
+from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
@@ -337,8 +338,26 @@ def setup():
         reviewer_did_show_question.append(_remove_anking_button)
         reviewer_did_show_answer.append(_remove_anking_button)
 
+        _setup_sidebar_update_on_config_close()
+
     webview_did_receive_js_message.append(_on_js_message)
     reviewer_will_end.append(_close_sidebar_and_clear_states_if_exists)
+
+
+def _setup_sidebar_update_on_config_close() -> None:
+    """Sets up the update of the reviewer buttons and resource tabs when the config dialog is closed."""
+    from .ankiaddonconfig import ConfigWindow
+
+    def setup_config_close_callback(window: ConfigWindow) -> None:
+        window.execute_on_close(notify_elements)
+
+    def notify_elements() -> None:
+        card = aqt.mw.reviewer.card
+        if card:
+            _notify_reviewer_buttons_of_card_change(card)
+            _notify_resource_tabs_of_card_change(card)
+
+    get_config_dialog_manager().on_window_open(setup_config_close_callback)
 
 
 def _add_or_refresh_view_note_button(card: Card) -> None:
