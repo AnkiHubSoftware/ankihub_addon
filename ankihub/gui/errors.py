@@ -347,8 +347,6 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
             TermsAndConditionsDialog.display(parent=aqt.mw)
             return True
-        else:
-            return False
 
     elif response.status_code == 406:
         try:
