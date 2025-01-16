@@ -4,7 +4,6 @@ class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
         this.isPremiumOrTrialing = "{{ IS_PREMIUM_OR_TRIALING }}" == "True";
-        this.isAnKingDeck = null;
         this.bbCount = 0;
         this.faCount = 0;
         this.enabledButtons = "{{ ENABLED_BUTTONS }}".split(",");
@@ -25,6 +24,7 @@ class AnkiHubReviewerButtons {
                 iconPath: "/_b&b_icon.svg",
                 iconPathDarkTheme: "/_b&b_icon_dark_theme.svg",
                 active: false,
+                visible: true,
                 tooltip: "Boards & Beyond",
             },
             {
@@ -32,6 +32,7 @@ class AnkiHubReviewerButtons {
                 iconPath: "/_fa4_icon.svg",
                 iconPathDarkTheme: "/_fa4_icon_dark_theme.svg",
                 active: false,
+                visible: true,
                 tooltip: "First Aid Forward",
             },
             {
@@ -39,6 +40,7 @@ class AnkiHubReviewerButtons {
                 iconPath: this.isPremiumOrTrialing ? "/_chatbot_icon.svg" : "/_chatbot_icon_sleeping.svg",
                 iconPathDarkTheme: this.isPremiumOrTrialing ? null : "/_chatbot_icon_sleeping_dark_theme.svg",
                 active: false,
+                visible: true,
                 tooltip: "AI Chatbot"
             },
         ]
@@ -290,34 +292,35 @@ class AnkiHubReviewerButtons {
         document.head.appendChild(style);
     }
 
-    updateButtons(bbCount, faCount, showChatbot, isAnKingDeck) {
+    updateButtons(bbCount, faCount, visibleButtons) {
         this.bbCount = bbCount;
         this.faCount = faCount;
-        this.showChatbot = showChatbot;
-        this.isAnKingDeck = isAnKingDeck;
 
-        const visibleButtons = this.getVisibleButtons();
+        for (const buttonData of this.buttonsData) {
+            buttonData.visible = visibleButtons.includes(buttonData.name)
+        }
+        const visibleButtonElements = this.getVisibleButtons();
 
         // Hide invisible buttons
         this.buttonsData.forEach(buttonData => {
-            if (!visibleButtons.includes(buttonData)) {
+            if (!visibleButtonElements.includes(buttonData)) {
                 this.udpateButtonVisibility(buttonData.name, false);
             }
         });
 
         // Update style of visible buttons
-        visibleButtons.forEach((buttonData, idx) => {
+        visibleButtonElements.forEach((buttonData, idx) => {
             this.udpateButtonVisibility(buttonData.name, true);
             this.updateButtonStyle(
                 buttonData.name,
                 idx === 0,
-                idx === visibleButtons.length - 1
+                idx === visibleButtonElements.length - 1
             );
         });
 
-        this.updateResourceCountIndicators(visibleButtons);
+        this.updateResourceCountIndicators(visibleButtonElements);
 
-        if (visibleButtons.length === 0) {
+        if (visibleButtonElements.length === 0) {
             this.elementsContainer.style.visibility = "hidden";
         } else {
             this.elementsContainer.style.visibility = "visible";
@@ -325,12 +328,7 @@ class AnkiHubReviewerButtons {
     }
 
     getVisibleButtons() {
-        return this.buttonsData.filter(
-            buttonData => (
-                (buttonData.name === "chatbot" && this.showChatbot) ||
-                (buttonData.name !== "chatbot" && this.isAnKingDeck)
-            )
-        );
+        return this.buttonsData.filter(buttonData => (buttonData.visible));
     }
 
     udpateButtonVisibility(buttonName, isVisible) {

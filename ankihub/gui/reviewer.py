@@ -1,5 +1,6 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import json
 import uuid
 from enum import Enum
 from textwrap import dedent
@@ -517,15 +518,27 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     bb_count = len(_get_resources(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
-    is_anking_deck = _is_anking_deck(aqt.mw.reviewer.card)
+    visible_button_names = []
+
     show_chatbot = _related_ah_deck_has_note_embeddings(card.note())
+    if show_chatbot:
+        visible_button_names.append("chatbot")
+
+    show_mh_buttons = _is_anking_deck(aqt.mw.reviewer.card)
+    if show_mh_buttons:
+        visible_button_names.extend(
+            [
+                ResourceType.BOARDS_AND_BEYOND.value,
+                ResourceType.FIRST_AID.value,
+            ]
+        )
+
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
             {bb_count},
             {fa_count},
-            {'true' if show_chatbot else 'false'},
-            {'true' if is_anking_deck else 'false'},
+            {json.dumps(visible_button_names)}
         );
         """
     )
