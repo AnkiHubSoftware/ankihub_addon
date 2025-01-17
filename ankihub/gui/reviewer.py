@@ -24,6 +24,7 @@ from aqt.utils import openLink
 from aqt.webview import AnkiWebPage, WebContent
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
@@ -31,6 +32,7 @@ from ..main.utils import Resource, mh_tag_to_resource
 from ..settings import config, url_login
 from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
+from .operations import AddonQueryOp
 from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 from .web.templates import (
     get_empty_state_html,
@@ -443,14 +445,41 @@ def _inject_ankihub_features_and_setup_sidebar(
     if not isinstance(context, Reviewer):
         return
 
+    reviewer: Reviewer = context
+
     reviewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
     web_content.body += f"<script>{reviewer_button_js}</script>"
 
     global reviewer_sidebar
     if not reviewer_sidebar:
-        reviewer_sidebar = ReviewerSidebar(context)
-        aqt.mw.reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
+        reviewer_sidebar = ReviewerSidebar(reviewer)
+        reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
+
+    def check_premium_and_notify_buttons_once(_: Card) -> None:
+        _check_premium_and_notify_buttons()
+        reviewer_did_show_question.remove(check_premium_and_notify_buttons_once)
+
+    reviewer_did_show_question.append(check_premium_and_notify_buttons_once)
+
+
+def _check_premium_and_notify_buttons() -> None:
+    """Fetches the user's premium or trialing status in the background and notifies the reviewer buttons
+    once the status is fetched."""
+
+    def fetch_is_premium_or_trialing(_) -> bool:
+        client = AnkiHubClient()
+        return client.is_premium_or_trialing()
+
+    def notify_reviewer_buttons(is_premium_or_trialing: bool) -> None:
+        js = _wrap_with_reviewer_buttons_check(
+            f"ankihubReviewerButtons.updateIsPremiumOrTrialing({'true' if is_premium_or_trialing else 'false'})"
+        )
+        aqt.mw.reviewer.web.eval(js)
+
+    AddonQueryOp(
+        op=fetch_is_premium_or_trialing, success=notify_reviewer_buttons, parent=aqt.mw
+    ).without_collection().run_in_background()
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
