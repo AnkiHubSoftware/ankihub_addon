@@ -2,8 +2,6 @@ import pathlib
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-
 TEMPLATES_PATH = (pathlib.Path(__file__).parent).absolute()
 
 env = Environment(
@@ -25,13 +23,7 @@ def get_header_webview_html(
 
 
 def get_reviewer_buttons_js(theme: str) -> str:
-    client = AnkiHubClient()
-    return env.get_template("reviewer_buttons.js").render(
-        {
-            "THEME": theme,
-            "IS_PREMIUM_OR_TRIALING": str(client.is_premium_or_trialing()),
-        }
-    )
+    return env.get_template("reviewer_buttons.js").render({"THEME": theme})
 
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
