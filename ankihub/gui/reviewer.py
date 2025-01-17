@@ -308,7 +308,7 @@ class ReviewerSidebar:
         self.content_webview.reload()
 
     def access_last_accessed_url(self):
-        if self.last_accessed_url:
+        if self.last_accessed_url and self.page_type:
             content_page = self.content_pages[self.page_type]
             content_page.setUrl(aqt.QUrl(self.last_accessed_url))
 
