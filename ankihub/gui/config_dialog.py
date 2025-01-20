@@ -93,10 +93,10 @@ def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> N
     container_inner.setContentsMargins(30, 0, 0, 0)
 
     step_1_checkbox = container_inner.checkbox(
-        f"{key_prefix}_step_1", description="USMLE Step 1"
+        f"{key_prefix}_step_1", description="USMLE - Step 1"
     )
     step_2_checkbox = container_inner.checkbox(
-        f"{key_prefix}_step_2", description="USMLE Step 2"
+        f"{key_prefix}_step_2", description="USMLE - Step 2"
     )
 
     def update_main_checkbox() -> None:
