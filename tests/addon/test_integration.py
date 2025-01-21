@@ -6577,7 +6577,7 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
     message = TERMS_AGREEMENT_NOT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        anki_did = 1
+        anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
         import_ah_note(ah_did=ah_did, anki_did=anki_did)
         aqt.mw.col.decks.set_current(anki_did)
@@ -6608,7 +6608,7 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
     message = TERMS_AGREEMENT_NOT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        anki_did = 1
+        anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
         import_ah_note(ah_did=ah_did, anki_did=anki_did)
         aqt.mw.col.decks.set_current(anki_did)
@@ -6639,7 +6639,7 @@ def test_terms_agreement_accepted(
     message = TERMS_AGREEMENT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        anki_did = 1
+        anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
         import_ah_note(ah_did=ah_did, anki_did=anki_did)
         aqt.mw.col.decks.set_current(anki_did)

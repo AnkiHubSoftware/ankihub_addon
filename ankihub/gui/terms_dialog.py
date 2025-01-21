@@ -36,7 +36,7 @@ class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
         self.setLayout(layout)
 
     @classmethod
-    def display(cls, parent: Any) -> "TermsAndConditionsDialog":
+    def display(cls, parent: Any) -> None:
         if not cls.dialog:
             cls.dialog = cls(parent=parent)
 
