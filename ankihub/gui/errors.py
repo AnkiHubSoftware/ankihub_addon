@@ -341,7 +341,7 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     elif response.status_code == 403:
         try:
             response_data = response.json()
-        except ValueError:
+        except JSONDecodeError:
             return False
 
         if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:

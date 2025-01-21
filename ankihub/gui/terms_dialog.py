@@ -31,20 +31,16 @@ class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
         )
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.web)
         self.setLayout(layout)
 
     @classmethod
     def display(cls, parent: Any) -> "TermsAndConditionsDialog":
-        if cls.dialog:
-            cls.dialog.close()
-            cls.dialog = None
-
         if not cls.dialog:
             cls.dialog = cls(parent=parent)
-            cls.dialog.show()
 
-        return cls.dialog
+        cls.dialog.show()
 
     @classmethod
     def hide(cls):

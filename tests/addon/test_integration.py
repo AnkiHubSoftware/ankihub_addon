@@ -6577,17 +6577,10 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
     message = TERMS_AGREEMENT_NOT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        ah_did = uuid.uuid4()
-        install_ah_deck(ah_did=ah_did)
-
-        # Changes the deck setting so that there are unsuspend cards ready for review
-        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
-        deck_config = config.deck_config(ah_did)
-        import_ah_note(
-            ah_did=ah_did,
-            anki_did=deck_config.anki_id,
-        )
-        aqt.mw.col.decks.set_current(deck_config.anki_id)
+        anki_did = 1
+        ah_did = install_ah_deck(anki_did=anki_did)
+        import_ah_note(ah_did=ah_did, anki_did=anki_did)
+        aqt.mw.col.decks.set_current(anki_did)
         terms_dialog_mock = mocker.patch(
             "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
         )
@@ -6615,17 +6608,10 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
     message = TERMS_AGREEMENT_NOT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        ah_did = uuid.uuid4()
-        install_ah_deck(ah_did=ah_did)
-
-        # Changes the deck setting so that there are unsuspend cards ready for review
-        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
-        deck_config = config.deck_config(ah_did)
-        import_ah_note(
-            ah_did=ah_did,
-            anki_did=deck_config.anki_id,
-        )
-        aqt.mw.col.decks.set_current(deck_config.anki_id)
+        anki_did = 1
+        ah_did = install_ah_deck(anki_did=anki_did)
+        import_ah_note(ah_did=ah_did, anki_did=anki_did)
+        aqt.mw.col.decks.set_current(anki_did)
         terms_dialog_mock = mocker.patch(
             "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
         )
@@ -6653,17 +6639,10 @@ def test_terms_agreement_accepted(
     message = TERMS_AGREEMENT_ACCEPTED
     requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
     with anki_session_with_addon_data.profile_loaded():
-        ah_did = uuid.uuid4()
-        install_ah_deck(ah_did=ah_did)
-
-        # Changes the deck setting so that there are unsuspend cards ready for review
-        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
-        deck_config = config.deck_config(ah_did)
-        import_ah_note(
-            ah_did=ah_did,
-            anki_did=deck_config.anki_id,
-        )
-        aqt.mw.col.decks.set_current(deck_config.anki_id)
+        anki_did = 1
+        ah_did = install_ah_deck(anki_did=anki_did)
+        import_ah_note(ah_did=ah_did, anki_did=anki_did)
+        aqt.mw.col.decks.set_current(anki_did)
 
         aqt.mw.reviewer.show()
         terms_dialog_mock = mocker.patch(
