@@ -84,6 +84,7 @@ from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_RESPONSE_DETAIL,
+    TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL,
     _contains_path_to_this_addon,
     _normalize_url,
     _try_handle_exception,
@@ -1677,12 +1678,16 @@ class TestErrorHandling:
             ("", False),
             ("{}", False),
             ('{"detail": "test"}', True),
+            (f'{{"detail": "{TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL}"}}', True),
         ],
     )
     def test_handle_ankihub_403(
         self, mocker: MockerFixture, response_content: str, expected_handled: bool
     ):
         show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
+        terms_and_conditions_dialog = mocker.patch(
+            "ankihub.gui.errors.TermsAndConditionsDialog"
+        )
 
         response_mock = mocker.Mock()
         response_mock.status_code = 403
@@ -1694,7 +1699,15 @@ class TestErrorHandling:
             tb=None,
         )
         assert handled == expected_handled
-        assert show_error_dialog_mock.called == expected_handled
+        if (
+            response_content
+            and json.loads(response_content).get("detail")
+            == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL
+        ):
+            terms_and_conditions_dialog.display.assert_called_once()
+
+        else:
+            assert show_error_dialog_mock.called == expected_handled
 
     def test_handle_ankihub_406(self, mocker: MockerFixture):
         ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)

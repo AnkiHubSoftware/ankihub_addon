@@ -33,6 +33,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from ..gui.exceptions import DeckDownloadAndInstallError, FullSyncCancelled
+from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -59,6 +60,9 @@ os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 
 OUTDATED_CLIENT_RESPONSE_DETAIL = "Outdated client"
+TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL = (
+    "You need to accept the terms and conditions to perform this action."
+)
 
 
 def setup_error_handler():
@@ -334,6 +338,16 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
 
         AnkiHubLogin.display_login()
         return True
+    elif response.status_code == 403:
+        try:
+            response_data = response.json()
+        except JSONDecodeError:
+            return False
+
+        if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
+            TermsAndConditionsDialog.display(parent=aqt.mw)
+            return True
+
     elif response.status_code == 406:
         try:
             response_data = response.json()

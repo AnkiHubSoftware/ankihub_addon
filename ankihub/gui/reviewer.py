@@ -88,6 +88,8 @@ class ReviewerSidebar:
         self.content_pages: Dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
         self.content_urls: Dict[SidebarPageType, Optional[str]] = {}
         self.empty_state_pages: dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
+        self.last_accessed_url: Optional[str] = None
+        self.needs_to_accept_terms = False
 
         self._setup_ui()
 
@@ -259,6 +261,9 @@ class ReviewerSidebar:
 
         return True
 
+    def set_needs_to_accept_terms(self, needs_to_accept_terms: bool) -> None:
+        self.needs_to_accept_terms = needs_to_accept_terms
+
     def get_page_type(self) -> Optional[SidebarPageType]:
         return self.page_type
 
@@ -280,6 +285,11 @@ class ReviewerSidebar:
         if not self.content_webview:
             return
 
+        self.last_accessed_url = url
+
+        if self.needs_to_accept_terms:
+            self.refresh_page_content()
+
         self._update_content_webview_theme()
 
         if url:
@@ -293,6 +303,14 @@ class ReviewerSidebar:
                 self.content_webview.setPage(content_page)
         else:
             self.content_webview.setPage(self.empty_state_pages[self.page_type])
+
+    def refresh_page_content(self):
+        self.content_webview.reload()
+
+    def access_last_accessed_url(self):
+        if self.last_accessed_url and self.page_type:
+            content_page = self.content_pages[self.page_type]
+            content_page.setUrl(aqt.QUrl(self.last_accessed_url))
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
