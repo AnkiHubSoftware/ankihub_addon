@@ -49,6 +49,8 @@ menu_state = _MenuState()
 
 def setup_ankihub_menu() -> None:
     menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+    # We can't leave the menu empty, otherwise it won't show up on MacOS
+    menu_state.ankihub_menu.addAction("Loading...").setEnabled(False)
     aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
 
     qconnect(menu_state.ankihub_menu.aboutToShow, refresh_ankihub_menu)
