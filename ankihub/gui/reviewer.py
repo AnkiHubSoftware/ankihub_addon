@@ -623,7 +623,8 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
         resource
         for tag in resource_tags
         if (
-            (resource := mh_tag_to_resource(tag)).usmle_step
+            (resource := mh_tag_to_resource(tag))
+            and resource.usmle_step
             in _get_enabled_steps_for_resource_type(resource_type)
         )
     }
