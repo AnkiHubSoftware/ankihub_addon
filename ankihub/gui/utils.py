@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from anki.decks import DeckId
+from anki.utils import is_mac
 from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
@@ -317,6 +318,8 @@ class _Dialog(QDialog):
 
     def _setup_button_box(self) -> QDialogButtonBox:
         button_box = QDialogButtonBox()
+        # Use Windows layout
+        button_box.setStyleSheet("button-layout: 0")
 
         self.default_button = None
         for button_index, button in enumerate(self.buttons):
@@ -387,6 +390,13 @@ def show_dialog(
     The callback is called with the index of the clicked button."""
     if not parent:
         parent = active_window_or_mw()
+
+    if is_mac:
+        if text_format == Qt.TextFormat.PlainText:
+            text = f"{title}\n\n{text}"
+        else:
+            font_size = QLabel().font().pointSize() + 2
+            text = f"<b style='font-size: {font_size}px'>{title}</b><br><br>" + text
 
     dialog = _Dialog(
         parent=parent,
