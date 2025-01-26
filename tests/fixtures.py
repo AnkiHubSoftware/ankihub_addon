@@ -30,7 +30,7 @@ from ankihub.feature_flags import _setup_feature_flags
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
-from ankihub.main.utils import modify_note_type
+from ankihub.main.utils import modified_note_type
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 
 
@@ -84,7 +84,7 @@ def create_or_get_ah_version_of_note_type(
     if model := mw.col.models.by_name(note_type["name"]):
         return model
 
-    modify_note_type(note_type)
+    note_type = modified_note_type(note_type)
     mw.col.models.add_dict(note_type)
     return mw.col.models.by_name(note_type["name"])
 

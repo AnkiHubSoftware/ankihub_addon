@@ -2931,8 +2931,7 @@ class TestNoteTypeWithUpdatedTemplates:
 
         updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=old_note_type,
-            new_note_type=new_note_type,
-            use_new_templates_and_css=use_new_templates,
+            new_note_type=new_note_type if use_new_templates else None,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]
@@ -2974,8 +2973,7 @@ class TestNoteTypeWithUpdatedTemplates:
 
         updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=old_note_type,
-            new_note_type=new_note_type,
-            use_new_templates_and_css=use_new_templates,
+            new_note_type=new_note_type if use_new_templates else None,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]

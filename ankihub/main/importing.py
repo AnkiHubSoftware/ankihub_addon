@@ -784,8 +784,7 @@ def _update_templates_and_css(
 
         updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=local_note_type,
-            new_note_type=remote_note_type,
-            use_new_templates_and_css=use_new_templates_and_css,
+            new_note_type=(remote_note_type if use_new_templates_and_css else None),
         )
 
         aqt.mw.col.models.update_dict(updated_note_type)
