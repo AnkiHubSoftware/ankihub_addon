@@ -307,7 +307,7 @@ def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
     the card templates updated."""
     note_type = copy.deepcopy(note_type)
 
-    modify_fields(note_type)
+    _modify_fields(note_type)
 
     return note_type_with_updated_templates_and_css(
         old_note_type=note_type,
@@ -315,17 +315,7 @@ def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
     )
 
 
-def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
-    for mid in note_type_ids:
-        note_type = aqt.mw.col.models.get(mid)
-        note_type = note_type_with_updated_templates_and_css(
-            old_note_type=note_type,
-            new_note_type=None,
-        )
-        aqt.mw.col.models.update_dict(note_type)
-
-
-def modify_fields(note_type: Dict) -> None:
+def _modify_fields(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
@@ -339,6 +329,16 @@ def modify_fields(note_type: Dict) -> None:
     # Put AnkiHub field last
     ankihub_field["ord"] = len(fields)
     note_type["flds"].append(ankihub_field)
+
+
+def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
+    for mid in note_type_ids:
+        note_type = aqt.mw.col.models.get(mid)
+        note_type = note_type_with_updated_templates_and_css(
+            old_note_type=note_type,
+            new_note_type=None,
+        )
+        aqt.mw.col.models.update_dict(note_type)
 
 
 def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
@@ -478,9 +478,9 @@ def note_type_with_updated_templates_and_css(
 
 def _upated_note_type_content(
     old_content: str,
+    new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
     content_type: str,
-    new_content: Optional[str],
 ) -> str:
     """Returns the updated content with the AnkiHub modifications applied."""
     if content_type == "html":
