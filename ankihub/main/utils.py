@@ -425,16 +425,15 @@ def note_type_with_updated_templates_and_css(
     old_note_type: NotetypeDict,
     new_note_type: Optional[NotetypeDict],
 ) -> NotetypeDict:
-    """Returns the new note type with modifications applied to the card templates and css.
-    The new templates and css are used as the base if they are provided.
+    """Returns the updated note type with modifications applied to the card templates and css.
+    The templates and css of the new note type are used as the base if it is provided.
 
     The modifications are as follows:
     - The View on AnkiHub button is added to the back side of each template.
     - Contents below the AnkiHub end comments are preserved when the template/css is updated.
 
     Args:
-        old_note_type (NotetypeDict): The old note tpye. The contents below the AnkiHub end comments is preserved
-        when the template is updated.
+        old_note_type (NotetypeDict): The old note tpye. The contents below the AnkiHub end comments are preserved.
         new_note_type (Optional[NotetypeDict]): The new note type. If provided, the templates and css are updated
         based on this.
 
@@ -451,7 +450,7 @@ def note_type_with_updated_templates_and_css(
             updated_template = copy.deepcopy(old_template)
 
         for template_side_name in ["qfmt", "afmt"]:
-            updated_template[template_side_name] = _upated_note_type_content(
+            updated_template[template_side_name] = _updated_note_type_content(
                 old_content=old_template[template_side_name],
                 new_content=(
                     new_template[template_side_name]
@@ -466,7 +465,7 @@ def note_type_with_updated_templates_and_css(
     result = copy.deepcopy(old_note_type)
     result["tmpls"] = updated_templates
 
-    result["css"] = _upated_note_type_content(
+    result["css"] = _updated_note_type_content(
         old_content=old_note_type["css"],
         new_content=new_note_type["css"] if new_note_type is not None else None,
         add_view_on_ankihub_snippet=False,
@@ -476,13 +475,20 @@ def note_type_with_updated_templates_and_css(
     return result
 
 
-def _upated_note_type_content(
+def _updated_note_type_content(
     old_content: str,
     new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
     content_type: str,
 ) -> str:
-    """Returns the updated content with the AnkiHub modifications applied."""
+    """Returns updated content with preserved content below ankihub end comment.
+
+    Args:
+      old_content: Original content to preserve custom additions from
+      new_content: New base content to use, or None to use old_content
+      add_view_on_ankihub_snippet: Whether to add AnkiHub view button
+      content_type: Either "html" or "css" to determine comment style
+    """
     if content_type == "html":
         end_comment = ANKIHUB_HTML_END_COMMENT
         end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
@@ -496,14 +502,14 @@ def _upated_note_type_content(
     # Choose the base for the result
     result = new_content if new_content is not None else old_content
 
-    # Remove end comment and content below it from the template side.
+    # Remove end comment and content below it.
     # It will be added back below.
     result = re.sub(end_comment_pattern, "", result)
 
     if add_view_on_ankihub_snippet:
         result = _template_side_with_view_on_ankihub_snippet(result)
 
-    # Add the AnkiHub end comment and the content below it back to the template side.
+    # Add the AnkiHub end comment and the content below it back.
     return result.rstrip("\n ") + "\n\n" + end_comment + "\n" + text_to_migrate
 
 
