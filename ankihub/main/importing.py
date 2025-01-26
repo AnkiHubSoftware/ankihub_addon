@@ -46,7 +46,7 @@ from .utils import (
     get_unique_ankihub_deck_name,
     is_tag_in_list,
     lowest_level_common_ancestor_did,
-    note_type_with_updated_templates,
+    note_type_with_updated_templates_and_css,
     truncated_list,
 )
 
@@ -782,13 +782,11 @@ def _update_templates_and_css(
             )
         )
 
-        updated_note_type = note_type_with_updated_templates(
+        updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=local_note_type,
             new_note_type=remote_note_type,
-            use_new_templates=use_new_templates_and_css,
+            use_new_templates_and_css=use_new_templates_and_css,
         )
-        if use_new_templates_and_css:
-            updated_note_type["css"] = remote_note_type["css"]
 
         aqt.mw.col.models.update_dict(updated_note_type)
 
