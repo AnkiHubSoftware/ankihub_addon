@@ -223,9 +223,9 @@ from ankihub.main.utils import (
     note_type_contains_field,
 )
 from ankihub.settings import (
+    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
-    ANKIHUB_TEMPLATE_END_COMMENT,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -2066,16 +2066,16 @@ class TestAnkiHubImporter:
                 assert new_qfmt in updated_qfmt
             else:
                 assert new_qfmt not in updated_qfmt
-            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_qfmt
+            assert ANKIHUB_HTML_END_COMMENT in updated_qfmt
 
             updated_afmt = updated_note_type["tmpls"][0]["afmt"]
             if expected_template_and_css_updated:
                 assert new_afmt in updated_afmt
-                assert updated_note_type["css"] == new_css
+                assert new_css in updated_note_type["css"]
             else:
                 assert new_afmt not in updated_afmt
-                assert updated_note_type["css"] == old_css
-            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_afmt
+                assert new_css not in updated_note_type["css"]
+            assert ANKIHUB_HTML_END_COMMENT in updated_afmt
             # This is only on the back template (afmt)
             assert ANKIHUB_NOTE_TYPE_MODIFICATION_STRING in updated_afmt
 

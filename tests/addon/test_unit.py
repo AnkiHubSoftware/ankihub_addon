@@ -151,11 +151,12 @@ from ankihub.main.utils import (
     lowest_level_common_ancestor_deck_name,
     mh_tag_to_resource,
     mids_of_notes,
-    note_type_with_updated_templates,
+    note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
 )
 from ankihub.settings import (
-    ANKIHUB_TEMPLATE_END_COMMENT,
+    ANKIHUB_CSS_END_COMMENT,
+    ANKIHUB_HTML_END_COMMENT,
     ANKIWEB_ID,
     DatadogLogHandler,
     config,
@@ -2918,18 +2919,20 @@ class TestNoteTypeWithUpdatedTemplates:
     def test_basic(self, use_new_templates: bool):
         old_note_type_content = "old content"
         old_note_type = {
-            "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}]
+            "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}],
+            "css": old_note_type_content,
         }
 
         new_note_type_content = "new content"
         new_note_type = {
-            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}]
+            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}],
+            "css": new_note_type_content,
         }
 
-        updated_note_type = note_type_with_updated_templates(
+        updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=old_note_type,
             new_note_type=new_note_type,
-            use_new_templates=use_new_templates,
+            use_new_templates_and_css=use_new_templates,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]
@@ -2941,27 +2944,38 @@ class TestNoteTypeWithUpdatedTemplates:
         verify(
             template["afmt"],
             options=NamerFactory.with_parameters("afmt", use_new_templates),
+        )
+        verify(
+            updated_note_type["css"],
+            options=NamerFactory.with_parameters("css", use_new_templates),
         )
 
     @pytest.mark.parametrize("use_new_templates", [True, False])
     def test_with_migrating_content_from_old_note_type(self, use_new_templates: bool):
         content_to_migrate = "content to migrate"
-        old_note_type_content = (
-            f"old content\n{ANKIHUB_TEMPLATE_END_COMMENT}\n{content_to_migrate}"
+        old_note_type_html_content = (
+            f"old content\n{ANKIHUB_HTML_END_COMMENT}\n{content_to_migrate}"
+        )
+        old_note_type_css_content = (
+            f"old css\n{ANKIHUB_CSS_END_COMMENT}\n{content_to_migrate}"
         )
         old_note_type = {
-            "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}]
+            "tmpls": [
+                {"qfmt": old_note_type_html_content, "afmt": old_note_type_html_content}
+            ],
+            "css": old_note_type_css_content,
         }
 
         new_note_type_content = "new content"
         new_note_type = {
-            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}]
+            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}],
+            "css": new_note_type_content,
         }
 
-        updated_note_type = note_type_with_updated_templates(
+        updated_note_type = note_type_with_updated_templates_and_css(
             old_note_type=old_note_type,
             new_note_type=new_note_type,
-            use_new_templates=use_new_templates,
+            use_new_templates_and_css=use_new_templates,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]
@@ -2973,6 +2987,10 @@ class TestNoteTypeWithUpdatedTemplates:
         verify(
             template["afmt"],
             options=NamerFactory.with_parameters("afmt", use_new_templates),
+        )
+        verify(
+            updated_note_type["css"],
+            options=NamerFactory.with_parameters("css", use_new_templates),
         )
 
 
