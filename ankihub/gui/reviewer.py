@@ -456,9 +456,10 @@ def _inject_ankihub_features_and_setup_sidebar(
         reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    def check_premium_and_notify_buttons_once(_: Card) -> None:
-        _check_premium_and_notify_buttons()
-        reviewer_did_show_question.remove(check_premium_and_notify_buttons_once)
+    def check_premium_and_notify_buttons_once(card: Card) -> None:
+        if _visible_buttons(card):
+            _check_premium_and_notify_buttons()
+            reviewer_did_show_question.remove(check_premium_and_notify_buttons_once)
 
     reviewer_did_show_question.append(check_premium_and_notify_buttons_once)
 
@@ -563,8 +564,7 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
     bb_count = len(_get_resources(note.tags, ResourceType.BOARDS_AND_BEYOND))
     fa_count = len(_get_resources(note.tags, ResourceType.FIRST_AID))
 
-    visible_buttons = _get_enabled_buttons() & _get_relevant_buttons_for_card(card)
-
+    visible_buttons = _visible_buttons(card)
     js = _wrap_with_reviewer_buttons_check(
         f"""
         ankihubReviewerButtons.updateButtons(
@@ -575,6 +575,10 @@ def _notify_reviewer_buttons_of_card_change(card: Card) -> None:
         """
     )
     aqt.mw.reviewer.web.eval(js)
+
+
+def _visible_buttons(card: Card) -> Set[str]:
+    return _get_enabled_buttons() & _get_relevant_buttons_for_card(card)
 
 
 def _get_enabled_buttons() -> Set[str]:
