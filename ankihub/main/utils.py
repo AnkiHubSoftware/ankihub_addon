@@ -510,7 +510,13 @@ def _updated_note_type_content(
         result = _template_side_with_view_on_ankihub_snippet(result)
 
     # Add the AnkiHub end comment and the content below it back.
-    return result.rstrip("\n ") + "\n\n" + end_comment + "\n" + text_to_migrate
+    return (
+        result.rstrip("\n ")
+        + "\n\n"
+        + end_comment
+        + "\n"
+        + text_to_migrate.strip("\n ")
+    )
 
 
 # ... undo modifications
