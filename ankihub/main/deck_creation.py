@@ -3,7 +3,6 @@
 import re
 import typing
 import uuid
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -23,7 +22,7 @@ from .utils import (
     change_note_types_of_notes,
     create_backup,
     get_note_types_in_deck,
-    modify_note_type,
+    modified_note_type,
 )
 
 
@@ -88,8 +87,7 @@ def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]
     result: Dict[NotetypeId, NotetypeId] = {}
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:
-        new_model = deepcopy(aqt.mw.col.models.get(mid))
-        modify_note_type(new_model)
+        new_model = modified_note_type(aqt.mw.col.models.get(mid))
         name_without_modifications = _note_type_name_without_ankihub_modifications(
             new_model["name"]
         )

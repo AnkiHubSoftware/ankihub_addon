@@ -22,9 +22,10 @@ from ..db import ankihub_db
 from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
+    ANKIHUB_CSS_END_COMMENT,
+    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
-    ANKIHUB_TEMPLATE_END_COMMENT,
     url_mh_integrations_preview,
     url_view_note,
 )
@@ -35,8 +36,11 @@ if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
 # Pattern for the AnkiHub end comment in card templates.
 # The end comment is used to allow users to add their own content below it without it being overwritten
 # when the template is updated.
-ANKIHUB_END_COMMENT_PATTERN = re.compile(
-    rf"{ANKIHUB_TEMPLATE_END_COMMENT}(?P<html_to_migrate>[\w\W]*)"
+ANKIHUB_HTML_END_COMMENT_PATTERN = re.compile(
+    rf"{re.escape(ANKIHUB_HTML_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
+)
+ANKIHUB_CSS_END_COMMENT_PATTERN = re.compile(
+    rf"{re.escape(ANKIHUB_CSS_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
 )
 
 # decks
@@ -298,30 +302,20 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
 )
 
 
-def modify_note_type(note_type: NotetypeDict) -> None:
-    """Adds the AnkiHub ID Field to the Note Type and modifies the card templates."""
-    LOGGER.info(
-        "Modifying note type...",
-        note_type_name=note_type["name"],
-        note_type_id=note_type["id"],
+def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
+    """Returns a modified version of the note type with the AnkiHub field added and
+    the card templates updated."""
+    note_type = copy.deepcopy(note_type)
+
+    _modify_fields(note_type)
+
+    return note_type_with_updated_templates_and_css(
+        old_note_type=note_type,
+        new_note_type=None,
     )
 
-    modify_fields(note_type)
 
-    templates = note_type["tmpls"]
-    for template in templates:
-        modify_template(template)
-
-
-def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
-    for mid in note_type_ids:
-        note_type = aqt.mw.col.models.get(mid)
-        for template in note_type["tmpls"]:
-            modify_template(template)
-        aqt.mw.col.models.update_dict(note_type)
-
-
-def modify_fields(note_type: Dict) -> None:
+def _modify_fields(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
@@ -337,10 +331,14 @@ def modify_fields(note_type: Dict) -> None:
     note_type["flds"].append(ankihub_field)
 
 
-def modify_template(template: Dict) -> None:
-    # the order is important here, the end comment must be added last
-    template["afmt"] = _template_side_with_view_on_ankihub_snippet(template["afmt"])
-    _add_ankihub_end_comment_to_template(template)
+def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
+    for mid in note_type_ids:
+        note_type = aqt.mw.col.models.get(mid)
+        note_type = note_type_with_updated_templates_and_css(
+            old_note_type=note_type,
+            new_note_type=None,
+        )
+        aqt.mw.col.models.update_dict(note_type)
 
 
 def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
@@ -423,110 +421,101 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
         )
 
 
-def _add_ankihub_end_comment_to_template(template: Dict) -> None:
-    """Add the AnkiHub end comment to the template if it is not already present.
-    The purpose of the AnkiHub end comment is to allow users to add their own content below it without it being
-    overwritten when the note type is updated."""
-    for key in ["qfmt", "afmt"]:
-        cur_side = template[key]
-        if re.search(ANKIHUB_TEMPLATE_END_COMMENT, cur_side):
-            continue
-
-        template[key] = (
-            template[key].rstrip("\n ") + "\n\n" + ANKIHUB_TEMPLATE_END_COMMENT + "\n\n"
-        )
-        LOGGER.info(
-            "Added ANKIHUB_TEMPLATE_END_COMMENT to template.",
-            template=template["name"],
-            key=key,
-        )
-
-
-def note_type_with_updated_templates(
-    old_note_type: NotetypeDict, new_note_type: NotetypeDict, use_new_templates: bool
+def note_type_with_updated_templates_and_css(
+    old_note_type: NotetypeDict,
+    new_note_type: Optional[NotetypeDict],
 ) -> NotetypeDict:
-    """Returns the new note type with modifications applied to the card templates.
-    The new templates are used as the base if use_new_templates is True.
+    """Returns the updated note type with modifications applied to the card templates and css.
+    The templates and css of the new note type are used as the base if it is provided.
 
     The modifications are as follows:
     - The View on AnkiHub button is added to the back side of each template.
-    - Contents below the AnkiHub end comments are preserved when the template is updated.
+    - Contents below the AnkiHub end comments are preserved when the template/css is updated.
 
     Args:
-        old_note_type (NotetypeDict): The old note tpye. The contents below the AnkiHub end comments is preserved
-        when the template is updated.
-        new_note_type (NotetypeDict): The new note type.
-        use_new_templates (bool): If True, the templates from the new_note_type are used as the base for
-            the updated templates, otherwise the old templates are used. Then this function just refreshes
-            the modifications or adds them if they are not present.
+        old_note_type (NotetypeDict): The old note tpye. The contents below the AnkiHub end comments are preserved.
+        new_note_type (Optional[NotetypeDict]): The new note type. If provided, the templates and css are updated
+        based on this.
 
     Returns:
         NotetypeDict: The updated note type.
     """
 
     updated_templates = []
-    for new_template, old_template in zip(
-        new_note_type["tmpls"], old_note_type["tmpls"]
-    ):
-        if use_new_templates:
+    for template_idx, old_template in enumerate(old_note_type["tmpls"]):
+        if new_note_type is not None:
+            new_template = new_note_type["tmpls"][template_idx]
             updated_template = copy.deepcopy(new_template)
         else:
             updated_template = copy.deepcopy(old_template)
 
-        # Update template sides
         for template_side_name in ["qfmt", "afmt"]:
-            updated_template[template_side_name] = _updated_template_side(
-                new_template_side=new_template[template_side_name],
-                old_template_side=old_template[template_side_name],
-                template_side_name=template_side_name,
-                use_new_template=use_new_templates,
+            updated_template[template_side_name] = _updated_note_type_content(
+                old_content=old_template[template_side_name],
+                new_content=(
+                    new_template[template_side_name]
+                    if new_note_type is not None
+                    else None
+                ),
+                add_view_on_ankihub_snippet=template_side_name == "afmt",
+                content_type="html",
             )
         updated_templates.append(updated_template)
 
     result = copy.deepcopy(old_note_type)
     result["tmpls"] = updated_templates
+
+    result["css"] = _updated_note_type_content(
+        old_content=old_note_type["css"],
+        new_content=new_note_type["css"] if new_note_type is not None else None,
+        add_view_on_ankihub_snippet=False,
+        content_type="css",
+    )
+
     return result
 
 
-def _updated_template_side(
-    new_template_side: str,
-    old_template_side: str,
-    template_side_name: str,
-    use_new_template: bool,
+def _updated_note_type_content(
+    old_content: str,
+    new_content: Optional[str],
+    add_view_on_ankihub_snippet: bool,
+    content_type: str,
 ) -> str:
-    """
-    Args:
-        template_side_name (str): The name of the template side ("qfmt" or "afmt").
-        use_new_template (bool): If True, the new template side is used as the base for
-            the updated template side, otherwise the old template side is used.
+    """Returns updated content with preserved content below ankihub end comment.
 
-    Returns:
-        str: The updated template side with the AnkiHub modifications applied.
+    Args:
+      old_content: Original content to preserve custom additions from
+      new_content: New base content to use, or None to use old_content
+      add_view_on_ankihub_snippet: Whether to add AnkiHub view button
+      content_type: Either "html" or "css" to determine comment style
     """
-    m = re.search(ANKIHUB_END_COMMENT_PATTERN, old_template_side)
-    html_to_migrate = m.group("html_to_migrate") if m else ""
+    if content_type == "html":
+        end_comment = ANKIHUB_HTML_END_COMMENT
+        end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
+    else:
+        end_comment = ANKIHUB_CSS_END_COMMENT
+        end_comment_pattern = ANKIHUB_CSS_END_COMMENT_PATTERN
+
+    m = re.search(end_comment_pattern, old_content)
+    text_to_migrate = m.group("text_to_migrate") if m else ""
 
     # Choose the base for the result
-    if use_new_template:
-        result = new_template_side
-    else:
-        result = old_template_side
+    result = new_content if new_content is not None else old_content
 
-    # Remove end comment and content below it from the template side.
+    # Remove end comment and content below it.
     # It will be added back below.
-    result = re.sub(ANKIHUB_END_COMMENT_PATTERN, "", result)
+    result = re.sub(end_comment_pattern, "", result)
 
-    if template_side_name == "afmt":
-        # The view on AnkiHub button is added to the back side of the template.
+    if add_view_on_ankihub_snippet:
         result = _template_side_with_view_on_ankihub_snippet(result)
 
-    # Add the AnkiHub end comment and the content below it back to the template side.
+    # Add the AnkiHub end comment and the content below it back.
     return (
         result.rstrip("\n ")
         + "\n\n"
-        + ANKIHUB_TEMPLATE_END_COMMENT
+        + end_comment
         + "\n"
-        + html_to_migrate
+        + text_to_migrate.strip("\n ")
     )
 
 

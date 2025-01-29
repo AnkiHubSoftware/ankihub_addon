@@ -184,7 +184,7 @@ from ankihub.gui.overview import (
     FlashCardSelectorDialog,
 )
 from ankihub.gui.suggestion_dialog import SuggestionDialog
-from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
@@ -223,9 +223,9 @@ from ankihub.main.utils import (
     note_type_contains_field,
 )
 from ankihub.settings import (
+    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
-    ANKIHUB_TEMPLATE_END_COMMENT,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -880,7 +880,7 @@ def test_modify_note_type(anki_session_with_addon_data: AnkiSession):
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
             original_note_template = original_note_type["tmpls"][0]["afmt"]
-            modify_note_type(note_type)
+            note_type = modified_note_type(note_type)
             modified_template = note_type["tmpls"][0]["afmt"]
             # # TODO Make more precise assertions.
             assert ANKIHUB_NOTE_TYPE_FIELD_NAME in modified_template
@@ -1651,12 +1651,12 @@ def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
         ankihub_basic_1 = copy.deepcopy(mw.col.models.by_name("Basic"))
         ankihub_basic_1["id"] = 1
         ankihub_basic_1["name"] = "AnkiHub Basic 1"
-        modify_note_type(ankihub_basic_1)
+        ankihub_basic_1 = modified_note_type(ankihub_basic_1)
 
         # for testing updating existing note type
         ankihub_basic_2 = copy.deepcopy(mw.col.models.by_name("Basic"))
         ankihub_basic_2["name"] = "AnkiHub Basic 2"
-        modify_note_type(ankihub_basic_2)
+        ankihub_basic_2 = modified_note_type(ankihub_basic_2)
         # ... save the note type
         ankihub_basic_2["id"] = 0
         changes = mw.col.models.add_dict(ankihub_basic_2)
@@ -2066,16 +2066,16 @@ class TestAnkiHubImporter:
                 assert new_qfmt in updated_qfmt
             else:
                 assert new_qfmt not in updated_qfmt
-            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_qfmt
+            assert ANKIHUB_HTML_END_COMMENT in updated_qfmt
 
             updated_afmt = updated_note_type["tmpls"][0]["afmt"]
             if expected_template_and_css_updated:
                 assert new_afmt in updated_afmt
-                assert updated_note_type["css"] == new_css
+                assert new_css in updated_note_type["css"]
             else:
                 assert new_afmt not in updated_afmt
-                assert updated_note_type["css"] == old_css
-            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_afmt
+                assert new_css not in updated_note_type["css"]
+            assert ANKIHUB_HTML_END_COMMENT in updated_afmt
             # This is only on the back template (afmt)
             assert ANKIHUB_NOTE_TYPE_MODIFICATION_STRING in updated_afmt
 
