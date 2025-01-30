@@ -221,7 +221,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
     # This is the common part of the JS code for refreshing the fields.
     # (using an old-style format string here to avoid having to escape braces)
     refresh_fields_js = """
-        require("svelte/internal").tick().then(() => {
+        setTimeout(() => {
             let hide_last_field = %s;
             let num_fields = require('anki/NoteEditor').instances[0].fields.length;
 
@@ -234,7 +234,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
             if (hide_last_field) {
                 changeVisibilityOfField(num_fields - 1, false);
             }
-        });
+        })
         """ % (
         "true" if hide_last_field else "false"
     )
