@@ -140,8 +140,8 @@ def choose_subset(
 
     button_box = QDialogButtonBox()
     if buttons:
-        for button in buttons:
-            add_button_from_param(button_box, button)
+        for button_param in buttons:
+            add_button_from_param(button_box, button_param)
     else:
         button_box.addButton(QDialogButtonBox.StandardButton.Ok)
     qconnect(button_box.accepted, dialog.accept)
