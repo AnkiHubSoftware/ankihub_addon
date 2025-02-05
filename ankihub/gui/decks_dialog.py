@@ -658,6 +658,10 @@ class DeckManagementDialog(QDialog):
                 f"Choose fields to add to the <b>{notetype['name']}</b> note type",
                 choices=new_fields,
                 current=[],
+                buttons=[
+                    ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
+                    ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
+                ],
                 parent=self,
             )
             if new_fields:

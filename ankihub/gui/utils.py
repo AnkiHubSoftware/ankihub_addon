@@ -34,6 +34,25 @@ from aqt.utils import disable_help_button, tooltip
 from .. import LOGGER
 from ..settings import config
 
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
+def add_button_from_param(
+    button_box: QDialogButtonBox, button: ButtonParam
+) -> QPushButton:
+    if isinstance(button, str):
+        button = button_box.addButton(button, QDialogButtonBox.ButtonRole.ActionRole)
+    elif isinstance(button, QDialogButtonBox.StandardButton):
+        button = button_box.addButton(button)
+    elif isinstance(button, tuple):
+        button = button_box.addButton(*button)
+
+    return button
+
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
     aqt.mw.taskman.run_on_main(  # type: ignore
@@ -70,6 +89,7 @@ def choose_subset(
     current: List[str] = [],
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
+    buttons: Optional[Sequence[ButtonParam]] = None,
     parent: Any = None,
 ) -> Optional[List[str]]:
     if not parent:
@@ -118,7 +138,12 @@ def choose_subset(
 
     layout.addSpacing(10)
 
-    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    button_box = QDialogButtonBox()
+    if buttons:
+        for button in buttons:
+            add_button_from_param(button_box, button)
+    else:
+        button_box.addButton(QDialogButtonBox.StandardButton.Ok)
     qconnect(button_box.accepted, dialog.accept)
     layout.addWidget(button_box)
 
@@ -225,13 +250,6 @@ def choose_ankihub_deck(
     return chosen_deck_ah_did
 
 
-ButtonParam = Union[
-    QDialogButtonBox.StandardButton,
-    str,
-    Tuple[str, QDialogButtonBox.ButtonRole],
-]
-
-
 class _Dialog(QDialog):
     """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
     the callback is called with the index of the clicked button.
@@ -323,15 +341,7 @@ class _Dialog(QDialog):
 
         self.default_button = None
         for button_index, button in enumerate(self.buttons):
-            if isinstance(button, str):
-                button = button_box.addButton(
-                    button, QDialogButtonBox.ButtonRole.ActionRole
-                )
-            elif isinstance(button, QDialogButtonBox.StandardButton):
-                button = button_box.addButton(button)
-            elif isinstance(button, tuple):
-                button = button_box.addButton(*button)
-
+            button = add_button_from_param(button_box, button)
             qconnect(
                 button.clicked,
                 partial(self._on_btn_clicked_or_dialog_rejected, button_index),
