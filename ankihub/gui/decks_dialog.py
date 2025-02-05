@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 import aqt
+from anki.models import NotetypeId
 from aqt.qt import (
     QBoxLayout,
     QCheckBox,
@@ -28,8 +29,11 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client.models import UserDeckRelation
+from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
+from ..main.notetype_management import add_notetype
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
 from ..settings import (
@@ -175,6 +179,11 @@ class DeckManagementDialog(QDialog):
             selected_ah_did
         )
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
+        self.box_bottom_right.addStretch()
+
+        # Note Types
+        self.box_notetypes = self._setup_box_notetypes(selected_ah_did)
+        self.box_bottom_right.addLayout(self.box_notetypes)
         self.box_bottom_right.addStretch()
 
     def _setup_box_deck_actions(self) -> QVBoxLayout:
@@ -560,6 +569,58 @@ class DeckManagementDialog(QDialog):
 
         return box
 
+    def _setup_box_notetypes(self, selected_ah_did: uuid.UUID) -> Optional[QVBoxLayout]:
+        box = QVBoxLayout()
+        deck_config = config.deck_config(selected_ah_did)
+        if deck_config.user_relation != UserDeckRelation.OWNER:
+            return box
+
+        self.notetypes_label = QLabel("<b>📝 Note Types</b>")
+        self.add_notetype_btn = QPushButton("Add note type")
+        qconnect(self.add_notetype_btn.clicked, self._on_add_notetype_btn_clicked)
+        self.add_field_btn = QPushButton("Add field")
+        self.update_styling_btn = QPushButton("Update note styling")
+        box.addWidget(self.notetypes_label)
+        box.addWidget(self.add_notetype_btn)
+        box.addWidget(self.add_field_btn)
+        box.addWidget(self.update_styling_btn)
+
+        return box
+
+    def _on_add_notetype_btn_clicked(self):
+        mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
+
+        def names_callback() -> list[str]:
+            return sorted(
+                n.name
+                for n in aqt.mw.col.models.all_names_and_ids()
+                if NotetypeId(n.id) not in mids
+            )
+
+        def on_notetype_selected(ret: StudyDeck) -> None:
+            if not ret.name:
+                return
+            confirm = ask_user(
+                "Add this note type to all AnkiHub users of your deck?",
+                title="Add Note Type",
+            )
+            if not confirm:
+                return
+
+            notetype = aqt.mw.col.models.by_name(ret.name)
+            add_notetype(notetype)
+
+            tooltip("Note type added", parent=aqt.mw)
+
+        StudyDeckWithoutHelpButton(
+            aqt.mw,
+            names=names_callback,
+            accept="Choose",
+            title="Add Note Type",
+            parent=self,
+            callback=on_notetype_selected,
+        )
+
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
         destination_anki_did = deck_config.anki_id
@@ -652,7 +713,6 @@ class DeckManagementDialog(QDialog):
             title="Select Destination for New Cards",
             parent=self,
             callback=update_deck_config,
-            buttons=[],  # This removes the "Add" button
         )
 
     def _on_toggle_subdecks(self):
@@ -706,6 +766,8 @@ class DeckManagementDialog(QDialog):
 
 class StudyDeckWithoutHelpButton(StudyDeck):
     def __init__(self, *args, **kwargs) -> None:
+        if kwargs.get("buttons") is None:
+            kwargs["buttons"] = []  # This removes the "Add" button
         super().__init__(*args, **kwargs)
 
         self.form.buttonBox.removeButton(
