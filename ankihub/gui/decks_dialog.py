@@ -33,7 +33,12 @@ from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..main.notetype_management import add_notetype, update_notetype_fields
+from ..main.notetype_management import (
+    add_notetype,
+    deck_has_template_changes,
+    update_deck_templates,
+    update_notetype_fields,
+)
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
 from ..settings import (
@@ -581,8 +586,10 @@ class DeckManagementDialog(QDialog):
         qconnect(self.add_notetype_btn.clicked, self._on_add_notetype_btn_clicked)
         self.add_field_btn = QPushButton("Add field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
-
         self.update_styling_btn = QPushButton("Update note styling")
+        if not deck_has_template_changes(self._selected_ah_did()):
+            self.update_styling_btn.setEnabled(False)
+        qconnect(self.update_styling_btn.clicked, self._on_update_styling_btn_clicked)
         box.addWidget(self.notetypes_label)
         box.addWidget(self.add_notetype_btn)
         box.addWidget(self.add_field_btn)
@@ -665,6 +672,19 @@ class DeckManagementDialog(QDialog):
             parent=self,
             callback=on_notetype_selected,
         )
+
+    def _on_update_styling_btn_clicked(self) -> None:
+        confirm = ask_user(
+            "Confirm to update the note styling to all AnkiHub users of your deck.<br><br>"
+            "Please note that <b>certain changes may break the note type</b> so proceed with caution.",
+            title="Proceed?",
+            yes_button_label="OK",
+            no_button_label="Cancel",
+        )
+        if not confirm:
+            return
+        update_deck_templates(self._selected_ah_did())
+        tooltip("Styling updated", parent=aqt.mw)
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
