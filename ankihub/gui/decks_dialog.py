@@ -33,7 +33,7 @@ from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..main.notetype_management import add_notetype
+from ..main.notetype_management import add_notetype, update_notetype_fields
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
 from ..settings import (
@@ -47,6 +47,7 @@ from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import (
     ask_user,
+    choose_subset,
     clear_layout,
     set_styled_tooltip,
     tooltip_icon,
@@ -579,6 +580,8 @@ class DeckManagementDialog(QDialog):
         self.add_notetype_btn = QPushButton("Add note type")
         qconnect(self.add_notetype_btn.clicked, self._on_add_notetype_btn_clicked)
         self.add_field_btn = QPushButton("Add field")
+        qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
+
         self.update_styling_btn = QPushButton("Update note styling")
         box.addWidget(self.notetypes_label)
         box.addWidget(self.add_notetype_btn)
@@ -588,9 +591,8 @@ class DeckManagementDialog(QDialog):
         return box
 
     def _on_add_notetype_btn_clicked(self):
-        mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
-
         def names_callback() -> list[str]:
+            mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
             return sorted(
                 n.name
                 for n in aqt.mw.col.models.all_names_and_ids()
@@ -617,6 +619,49 @@ class DeckManagementDialog(QDialog):
             names=names_callback,
             accept="Choose",
             title="Add Note Type",
+            parent=self,
+            callback=on_notetype_selected,
+        )
+
+    def _on_add_field_btn_clicked(self) -> None:
+        def names_callback() -> list[str]:
+            mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
+            return sorted(
+                n.name
+                for n in aqt.mw.col.models.all_names_and_ids()
+                if NotetypeId(n.id) in mids
+            )
+
+        def on_notetype_selected(ret: StudyDeck) -> None:
+            if not ret.name:
+                return
+
+            notetype = aqt.mw.col.models.by_name(ret.name)
+            field_names = aqt.mw.col.models.field_names(notetype)
+            ankihub_field_names = ankihub_db.note_type_field_names(
+                self._selected_ah_did(), notetype["id"]
+            )
+            new_fields = [
+                name for name in field_names if name not in ankihub_field_names
+            ]
+            if not new_fields:
+                tooltip("No new fields to add", parent=aqt.mw)
+                return
+            new_fields = choose_subset(
+                f"Choose fields to add to the <b>{notetype['name']}</b> note type",
+                choices=new_fields,
+                current=[],
+                parent=self,
+            )
+            if new_fields:
+                update_notetype_fields(notetype, new_fields)
+                tooltip("Fields added", parent=aqt.mw)
+
+        StudyDeckWithoutHelpButton(
+            aqt.mw,
+            names=names_callback,
+            accept="Choose",
+            title="Which note type do you want to edit?",
             parent=self,
             callback=on_notetype_selected,
         )
