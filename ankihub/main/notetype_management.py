@@ -20,6 +20,8 @@ def deck_has_template_changes(ah_did: uuid.UUID) -> bool:
     for mid in ankihub_db.note_types_for_ankihub_deck(ah_did):
         db_notetype = ankihub_db.note_type_dict(ah_did, mid)
         notetype = aqt.mw.col.models.get(mid)
+        if notetype["css"] != db_notetype["css"]:
+            return True
         if len(notetype["tmpls"]) != len(db_notetype["tmpls"]):
             return True
         else:
