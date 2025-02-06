@@ -24,10 +24,9 @@ def deck_has_template_changes(ah_did: uuid.UUID) -> bool:
             return True
         if len(notetype["tmpls"]) != len(db_notetype["tmpls"]):
             return True
-        else:
-            for i, tmpl in enumerate(notetype["tmpls"]):
-                if tmpl != db_notetype["tmpls"][i]:
-                    return True
+        for i, tmpl in enumerate(notetype["tmpls"]):
+            if tmpl != db_notetype["tmpls"][i]:
+                return True
 
     return False
 
