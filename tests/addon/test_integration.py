@@ -5618,6 +5618,49 @@ class TestFlashCardSelector:
                 )
             callback.assert_called_with(expected_button_exists)
 
+    def test_flashcard_selector_send_note_suspension_states_message(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button", is_active=True)
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            anki_did = DeckId(1)
+            install_ah_deck(
+                anki_did=anki_did,
+                has_note_embeddings=True,
+            )
+            post_message_to_ankihub_js_mock = mocker.patch(
+                "ankihub.gui.js_message_handling._post_message_to_ankihub_js",
+            )
+            aqt.mw.deckBrowser.set_current_deck(anki_did)
+
+            qtbot.wait(500)
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
+            with qtbot.wait_callback() as callback:
+                overview_web.evalWithCallback(
+                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+                    callback,
+                )
+            callback.assert_called_with(True)
+
+            # # Call the pycmd
+            message = f'{GET_NOTE_SUSPENSION_STATES_PYCMD} {{"noteIds": ["{uuid.UUID(int=10)}"]}}'
+            overview_web.eval(f"pycmd('{message}')")
+
+            # assert post_message_to_ankihub_js_mock.called
+            qtbot.wait_until(lambda: post_message_to_ankihub_js_mock.called)
+            post_message_to_ankihub_js_mock.assert_called_with(
+                message={"noteSuspensionStates": {}},
+                web=overview_web,
+            )
+
     @pytest.mark.sequential
     def test_flashcard_selector_button_exists_for_subdeck_of_deck_with_note_embeddings(
         self,
