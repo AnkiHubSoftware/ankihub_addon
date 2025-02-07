@@ -33,11 +33,11 @@ from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..main.notetype_management import (
-    add_notetype,
+from ..main.note_type_management import (
+    add_note_type,
     deck_has_template_changes,
     update_deck_templates,
-    update_notetype_fields,
+    update_note_type_fields,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
@@ -188,8 +188,8 @@ class DeckManagementDialog(QDialog):
         self.box_bottom_right.addStretch()
 
         # Note Types
-        self.box_notetypes = self._setup_box_notetypes(selected_ah_did)
-        self.box_bottom_right.addLayout(self.box_notetypes)
+        self.box_note_types = self._setup_box_note_types(selected_ah_did)
+        self.box_bottom_right.addLayout(self.box_note_types)
         self.box_bottom_right.addStretch()
 
     def _setup_box_deck_actions(self) -> QVBoxLayout:
@@ -575,29 +575,31 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_notetypes(self, selected_ah_did: uuid.UUID) -> Optional[QVBoxLayout]:
+    def _setup_box_note_types(
+        self, selected_ah_did: uuid.UUID
+    ) -> Optional[QVBoxLayout]:
         box = QVBoxLayout()
         deck_config = config.deck_config(selected_ah_did)
         if deck_config.user_relation != UserDeckRelation.OWNER:
             return box
 
-        self.notetypes_label = QLabel("<b>📝 Note Types</b>")
-        self.add_notetype_btn = QPushButton("Add note type")
-        qconnect(self.add_notetype_btn.clicked, self._on_add_notetype_btn_clicked)
+        self.note_types_label = QLabel("<b>📝 Note Types</b>")
+        self.add_note_type_btn = QPushButton("Add note type")
+        qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
         self.add_field_btn = QPushButton("Add field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
         self.update_styling_btn = QPushButton("Update note styling")
         if not deck_has_template_changes(self._selected_ah_did()):
             self.update_styling_btn.setEnabled(False)
         qconnect(self.update_styling_btn.clicked, self._on_update_styling_btn_clicked)
-        box.addWidget(self.notetypes_label)
-        box.addWidget(self.add_notetype_btn)
+        box.addWidget(self.note_types_label)
+        box.addWidget(self.add_note_type_btn)
         box.addWidget(self.add_field_btn)
         box.addWidget(self.update_styling_btn)
 
         return box
 
-    def _on_add_notetype_btn_clicked(self):
+    def _on_add_note_type_btn_clicked(self):
         def names_callback() -> list[str]:
             mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
             return sorted(
@@ -606,7 +608,7 @@ class DeckManagementDialog(QDialog):
                 if NotetypeId(n.id) not in mids
             )
 
-        def on_notetype_selected(ret: StudyDeck) -> None:
+        def on_note_type_selected(ret: StudyDeck) -> None:
             if not ret.name:
                 return
             confirm = ask_user(
@@ -616,8 +618,8 @@ class DeckManagementDialog(QDialog):
             if not confirm:
                 return
 
-            notetype = aqt.mw.col.models.by_name(ret.name)
-            add_notetype(notetype)
+            note_type = aqt.mw.col.models.by_name(ret.name)
+            add_note_type(note_type)
 
             tooltip("Note type added", parent=aqt.mw)
 
@@ -627,7 +629,7 @@ class DeckManagementDialog(QDialog):
             accept="Choose",
             title="Add Note Type",
             parent=self,
-            callback=on_notetype_selected,
+            callback=on_note_type_selected,
         )
 
     def _on_add_field_btn_clicked(self) -> None:
@@ -639,14 +641,14 @@ class DeckManagementDialog(QDialog):
                 if NotetypeId(n.id) in mids
             )
 
-        def on_notetype_selected(ret: StudyDeck) -> None:
+        def on_note_type_selected(ret: StudyDeck) -> None:
             if not ret.name:
                 return
 
-            notetype = aqt.mw.col.models.by_name(ret.name)
-            field_names = aqt.mw.col.models.field_names(notetype)
+            note_type = aqt.mw.col.models.by_name(ret.name)
+            field_names = aqt.mw.col.models.field_names(note_type)
             ankihub_field_names = ankihub_db.note_type_field_names(
-                self._selected_ah_did(), notetype["id"]
+                self._selected_ah_did(), note_type["id"]
             )
             new_fields = [
                 name for name in field_names if name not in ankihub_field_names
@@ -655,7 +657,7 @@ class DeckManagementDialog(QDialog):
                 tooltip("No new fields to add", parent=aqt.mw)
                 return
             new_fields = choose_subset(
-                f"Choose fields to add to the <b>{notetype['name']}</b> note type",
+                f"Choose fields to add to the <b>{note_type['name']}</b> note type",
                 choices=new_fields,
                 current=[],
                 buttons=[
@@ -665,7 +667,7 @@ class DeckManagementDialog(QDialog):
                 parent=self,
             )
             if new_fields:
-                update_notetype_fields(notetype, new_fields)
+                update_note_type_fields(note_type, new_fields)
                 tooltip("Fields added", parent=aqt.mw)
 
         StudyDeckWithoutHelpButton(
@@ -674,7 +676,7 @@ class DeckManagementDialog(QDialog):
             accept="Choose",
             title="Which note type do you want to edit?",
             parent=self,
-            callback=on_notetype_selected,
+            callback=on_note_type_selected,
         )
 
     def _on_update_styling_btn_clicked(self) -> None:
