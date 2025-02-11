@@ -3,7 +3,7 @@
     const rect = button.getBoundingClientRect();
 
     // Remove existing dropdown if any
-    const existingDropdown = document.getElementById('template-dropdown');
+    const existingDropdown = document.getElementById('prompt-dropdown');
     if (existingDropdown) {
         existingDropdown.remove();
         return;
@@ -11,7 +11,7 @@
 
     // Create dropdown
     const dropdown = document.createElement('div');
-    dropdown.id = 'template-dropdown';
+    dropdown.id = 'prompt-dropdown';
     dropdown.style.position = 'absolute';
     dropdown.style.left = rect.left + 'px';
     dropdown.style.top = (rect.bottom + 2) + 'px';
@@ -24,19 +24,19 @@
     dropdown.style.overflowY = 'auto';
 
     // Parse the options JSON string
-    const templateOptions = JSON.parse('{{ options }}');
+    const promptTemplates = JSON.parse('{{ options }}');
 
-    if (templateOptions.length === 0) {
+    if (promptTemplates.length === 0 || promptTemplates[0] === 'No prompt templates found') {
         const item = document.createElement('div');
-        item.textContent = 'No templates found';
+        item.textContent = 'No prompt templates found';
         item.style.padding = '8px 12px';
         item.style.color = '#666';
         item.style.fontStyle = 'italic';
         dropdown.appendChild(item);
     } else {
-        templateOptions.forEach(opt => {
+        promptTemplates.forEach(template => {
             const item = document.createElement('div');
-            item.textContent = opt;
+            item.textContent = template;
             item.style.padding = '8px 12px';
             item.style.cursor = 'pointer';
             item.style.whiteSpace = 'nowrap';
@@ -50,7 +50,7 @@
             });
 
             item.addEventListener('click', () => {
-                pycmd(`template-select:${opt}`);
+                pycmd(`prompt-select:${template}`);
                 dropdown.remove();
             });
 
