@@ -35,6 +35,10 @@ runs:
 
     - name: Install deps
       run: |
+        # We need to use Qt5 instead of Qt6 for CI because Qt6 has
+        # compatibility issues in the CI environment.
+        sed -i 's/\[qt6\]/[qt5]/' requirements/*.txt
+
         python -m pip install -r ./requirements/dev.txt
       shell: bash
 
