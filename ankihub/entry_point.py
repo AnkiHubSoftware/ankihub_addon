@@ -29,6 +29,7 @@ from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .gui.operations.ankihub_sync import setup_full_sync_patch
+from .labs.llm import templates as llm_templates
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
@@ -237,6 +238,10 @@ def _general_setup():
     LOGGER.info(
         "Set up feature flag fetching (flags will be fetched in the background)."
     )
+
+    if config.labs_enabled:
+        llm_templates.setup()
+        LOGGER.info("Set up LLM templates.")
 
 
 def _copy_web_media_to_media_folder():

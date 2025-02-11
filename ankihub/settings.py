@@ -193,6 +193,7 @@ class _Config:
         self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
+        self.labs_enabled: bool = True if os.getenv("LABS_ENABLED") == "True" else False
 
     def setup_public_config_and_other_settings(self):
         migrate_public_config()
