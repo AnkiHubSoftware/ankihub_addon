@@ -109,6 +109,9 @@ class ReviewerSidebar:
         self.container.setLayout(container_layout)
 
         self.header_webview = aqt.webview.AnkiWebView()
+        self.header_webview.set_bridge_command(
+            self.header_webview.defaultOnBridgeCmd, context=self
+        )
         self.header_webview.setSizePolicy(
             aqt.QSizePolicy(
                 aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
@@ -122,6 +125,12 @@ class ReviewerSidebar:
         )
 
         self.content_webview = aqt.webview.AnkiWebView()
+        self.content_webview.set_bridge_command(
+            self.content_webview.defaultOnBridgeCmd, context=self
+        )
+        # Set the content_webview as the webview which will receive messages from js message handlers
+        self.web = self.content_webview
+
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
 
         self.update_header_button_timer = QTimer(self.content_webview)
