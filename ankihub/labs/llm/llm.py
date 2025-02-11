@@ -5,8 +5,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, List
 
+import aqt
 from aqt import gui_hooks
 from aqt.editor import Editor
+from aqt.qt import QDialog, QPushButton, QTextEdit, QVBoxLayout
 from aqt.utils import tooltip
 from jinja2 import Template
 
@@ -75,14 +77,74 @@ def _on_prompt_button_press(editor: Editor) -> None:
     editor.web.eval(script)
 
 
+def _get_note_content(editor: Editor) -> str:
+    """Extract content from the current note's fields."""
+    note = editor.note
+    if not note:
+        return ""
+
+    fields_dict = {name: note[name] for name in note.keys()}
+    return json.dumps(fields_dict)
+
+
+def _show_llm_response(response: str) -> None:
+    """Display the LLM response in a dialog."""
+    dialog = QDialog(aqt.mw)
+    dialog.setWindowTitle("LLM Response")
+    dialog.setMinimumWidth(600)
+    dialog.setMinimumHeight(400)
+
+    layout = QVBoxLayout()
+
+    # Create text display area
+    text_edit = QTextEdit()
+    text_edit.setPlainText(response)
+    text_edit.setReadOnly(True)
+    layout.addWidget(text_edit)
+
+    # Add close button
+    close_button = QPushButton("Close")
+    close_button.clicked.connect(dialog.accept)
+    layout.addWidget(close_button)
+
+    dialog.setLayout(layout)
+    dialog.exec()
+
+
 def _execute_prompt_template(editor: Editor, template_name: str) -> None:
     """Execute the selected prompt template with the current note as input."""
-    # TODO: Implement prompt execution logic
-    # 1. Load the selected template
-    # 2. Extract note content
-    # 3. Run the prompt through the LLM
-    # 4. Handle the response
-    tooltip(f"Will execute prompt template: {template_name}")
+    note_content = _get_note_content(editor)
+    if not note_content:
+        tooltip("No note content available")
+        return
+
+    try:
+        # Run the LLM command with the template and note content
+        # Use shlex.quote to properly escape the note content for shell command
+        import shlex
+
+        escaped_content = shlex.quote(note_content)
+        result = subprocess.run(
+            [
+                "llm",
+                "--no-stream",
+                "-t",
+                template_name.replace(".yaml", ""),
+                escaped_content,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Show the response in a dialog
+        _show_llm_response(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Error running LLM command: {e.stderr}"
+        tooltip(error_msg)
+    except Exception as e:
+        tooltip(f"Unexpected error: {str(e)}")
 
 
 def _handle_js_message(
