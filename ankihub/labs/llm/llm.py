@@ -289,9 +289,7 @@ def _update_note_fields(editor: Editor, new_fields: Dict[str, str]) -> None:
         if field_name in note:
             note[field_name] = new_content
 
-    # Save changes and update the editor
-    note.flush()
-    editor.loadNote()
+    editor.loadNoteKeepingFocus()
 
 
 def _create_diff_html(original: str, suggested: str) -> str:
