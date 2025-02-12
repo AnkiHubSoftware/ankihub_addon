@@ -20,6 +20,7 @@ def _check_and_install_uv() -> None:
     """Check if uv is installed and install it if not."""
     try:
         subprocess.run(["uv", "version"], capture_output=True, check=True)
+        print("uv is installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
             if platform.system() == "Darwin":  # macOS
@@ -39,9 +40,27 @@ def _check_and_install_uv() -> None:
             showWarning(f"Failed to install uv: {str(e)}")
 
 
+def _install_llm() -> None:
+    """Install llm using uv if not already installed."""
+    try:
+        subprocess.run(["llm", "--version"], capture_output=True, check=True)
+        print("llm is already installed")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            subprocess.run(
+                ["uv", "install", "llm"],
+                check=True,
+                capture_output=True,
+            )
+            tooltip("Successfully installed llm")
+        except subprocess.CalledProcessError as e:
+            showWarning(f"Failed to install llm: {str(e)}")
+
+
 def setup() -> None:
     """Set up the LLM prompt functionality."""
     _check_and_install_uv()
+    _install_llm()
     gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
     gui_hooks.webview_did_receive_js_message.append(_handle_js_message)
 
