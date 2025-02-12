@@ -7,12 +7,13 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-import aqt
 from aqt import QFont, gui_hooks
 from aqt.editor import Editor
 from aqt.qt import QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout
 from aqt.utils import showWarning, tooltip
 from jinja2 import Template
+
+from ...gui.utils import active_window_or_mw
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
 
@@ -324,7 +325,7 @@ def _show_llm_response(editor: Editor, response: str) -> None:
         showWarning("Invalid JSON response from LLM")
         return
 
-    dialog = QDialog(aqt.mw)
+    dialog = QDialog(active_window_or_mw())
     dialog.setWindowTitle("LLM Response - Field Changes")
     dialog.setMinimumWidth(800)
     dialog.setMinimumHeight(600)
@@ -371,7 +372,7 @@ def _show_llm_response(editor: Editor, response: str) -> None:
 
     layout.addLayout(button_layout)
     dialog.setLayout(layout)
-    dialog.exec()
+    dialog.open()
 
 
 def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
@@ -396,8 +397,8 @@ def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
 
 def _handle_prompt_selection(editor: Editor, template_name: str) -> None:
     """Handle the selection of a prompt template."""
-    dialog = PromptPreviewDialog(None, template_name, editor)
-    dialog.exec()
+    dialog = PromptPreviewDialog(active_window_or_mw(), template_name, editor)
+    dialog.open()
 
 
 def _execute_prompt_template(
