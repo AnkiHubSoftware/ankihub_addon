@@ -1,6 +1,7 @@
 """Module for handling LLM prompt functionality in the editor."""
 
 import json
+import platform
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,8 +16,32 @@ from jinja2 import Template
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
 
 
+def _check_and_install_uv() -> None:
+    """Check if uv is installed and install it if not."""
+    try:
+        subprocess.run(["uv", "version"], capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            if platform.system() == "Darwin":  # macOS
+                subprocess.run(
+                    "curl -LsSf https://astral.sh/uv/install.sh | sh",
+                    shell=True,
+                    check=True,
+                )
+            elif platform.system() == "Windows":
+                subprocess.run(
+                    'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"',
+                    shell=True,
+                    check=True,
+                )
+            tooltip("Successfully installed uv")
+        except subprocess.CalledProcessError as e:
+            showWarning(f"Failed to install uv: {str(e)}")
+
+
 def setup() -> None:
     """Set up the LLM prompt functionality."""
+    _check_and_install_uv()
     gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
     gui_hooks.webview_did_receive_js_message.append(_handle_js_message)
 
