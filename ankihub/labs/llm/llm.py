@@ -51,7 +51,7 @@ def _install_llm() -> None:
         try:
             # Install base llm package
             subprocess.run(
-                ["uv", "install", "llm"],
+                ["uv", "tool", "install", "llm"],
                 check=True,
                 capture_output=True,
             )
