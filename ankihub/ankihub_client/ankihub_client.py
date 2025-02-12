@@ -1052,11 +1052,9 @@ class AnkiHubClient:
         self, ah_did: uuid.UUID, note_type: Dict[str, Any]
     ) -> Dict[str, Any]:
         note_type = _to_ankihub_note_type(note_type.copy())
-        print(json.dumps(note_type))
         response = self._send_request(
             "POST", API.ANKIHUB, f"/decks/{ah_did}/create-note-type/", json=note_type
         )
-        print(f"{response.text=}")
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
         data = response.json()
