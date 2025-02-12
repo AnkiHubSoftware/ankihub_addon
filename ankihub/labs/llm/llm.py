@@ -21,6 +21,7 @@ class TemplateManager:
     """Manages LLM template operations and caching."""
 
     _templates_path = None
+    _local_templates_dir = Path(__file__).parent / "prompt_templates"
 
     @classmethod
     def initialize(cls) -> None:
@@ -34,12 +35,36 @@ class TemplateManager:
             )
             cls._templates_path = Path(result.stdout.strip())
             print(f"Templates directory: {cls._templates_path}")
+
+            # After finding templates path, try to copy local templates
+            cls._copy_local_templates()
         except subprocess.CalledProcessError as e:
             print(f"Error finding templates directory: {e.stderr}")
             cls._templates_path = None
         except Exception as e:
             print(f"Unexpected error finding templates directory: {str(e)}")
             cls._templates_path = None
+
+    @classmethod
+    def _copy_local_templates(cls) -> None:
+        """Copy local templates to user's templates directory if they don't exist."""
+        if not cls._templates_path or not cls._local_templates_dir.exists():
+            return
+
+        try:
+            # Create templates directory if it doesn't exist
+            cls._templates_path.mkdir(parents=True, exist_ok=True)
+
+            # Copy each template that doesn't already exist
+            for template_file in cls._local_templates_dir.glob("*.yaml"):
+                target_path = cls._templates_path / template_file.name
+                if not target_path.exists():
+                    print(f"Copying template: {template_file.name}")
+                    target_path.write_text(template_file.read_text())
+                else:
+                    print(f"Template already exists: {template_file.name}")
+        except Exception as e:
+            print(f"Error copying templates: {str(e)}")
 
     @classmethod
     def get_templates_path(cls):
@@ -208,7 +233,7 @@ def _setup_prompt_selector_button(buttons: List[str], editor: Editor) -> None:
         icon=None,
         cmd=PROMPT_SELECTOR_BTN_ID,
         func=_on_prompt_button_press,
-        label="Prompts ▾",
+        label="✨ LLM Prompts",
         id=PROMPT_SELECTOR_BTN_ID,
         disables=False,
     )
