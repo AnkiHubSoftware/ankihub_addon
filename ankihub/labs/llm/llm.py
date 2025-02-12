@@ -41,18 +41,33 @@ def _check_and_install_uv() -> None:
 
 
 def _install_llm() -> None:
-    """Install llm using uv if not already installed."""
+    """Install llm and additional providers using uv if not already installed."""
     try:
         subprocess.run(["llm", "--version"], capture_output=True, check=True)
         print("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
+            # Install base llm package
             subprocess.run(
                 ["uv", "install", "llm"],
                 check=True,
                 capture_output=True,
             )
             tooltip("Successfully installed llm")
+
+            # Install additional providers
+            providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
+            for provider in providers:
+                try:
+                    subprocess.run(
+                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
+                        check=True,
+                        capture_output=True,
+                    )
+                    print(f"Successfully installed {provider}")
+                except subprocess.CalledProcessError as e:
+                    showWarning(f"Failed to install {provider}: {str(e)}")
+
         except subprocess.CalledProcessError as e:
             showWarning(f"Failed to install llm: {str(e)}")
 
@@ -224,6 +239,9 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
                 "run",
                 "--no-project",
                 "llm",
+                # TODO Allow users to choose model
+                # TODO Allow users to continue a conversation
+                # TODO Allow users to add an attachment
                 "-m",
                 "gpt-4o",
                 "--no-stream",
