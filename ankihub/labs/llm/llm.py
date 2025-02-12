@@ -168,15 +168,15 @@ def _check_and_install_uv() -> None:
         print("uv is installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            if platform.system() == "Darwin":  # macOS
+            if platform.system() == "Windows":
                 subprocess.run(
-                    "curl -LsSf https://astral.sh/uv/install.sh | sh",
+                    'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"',
                     shell=True,
                     check=True,
                 )
-            elif platform.system() == "Windows":
+            else:  # macOS and Linux
                 subprocess.run(
-                    'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"',
+                    "curl -LsSf https://astral.sh/uv/install.sh | sh",
                     shell=True,
                     check=True,
                 )
