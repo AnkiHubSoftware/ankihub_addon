@@ -17,18 +17,14 @@ from jinja2 import Template
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
 
 
-class PromptPreviewDialog(QDialog):
-    """Dialog for previewing and editing a prompt template before execution."""
+class TemplateManager:
+    """Manages LLM template operations and caching."""
 
-    def __init__(self, parent, template_name: str, editor: Editor) -> None:
-        super().__init__(parent)
-        self.template_name = template_name
-        self.editor = editor
-        self.template_content = self._load_template()
-        self._setup_ui()
+    _templates_path = None
 
-    def _load_template(self) -> str:
-        """Load the content of the template file."""
+    @classmethod
+    def initialize(cls) -> None:
+        """Initialize the template manager by finding the templates directory."""
         try:
             result = subprocess.run(
                 ["uv", "run", "--no-project", "llm", "templates", "path"],
@@ -36,15 +32,66 @@ class PromptPreviewDialog(QDialog):
                 text=True,
                 check=True,
             )
-            templates_path = Path(result.stdout.strip())
-            template_file = templates_path / f"{self.template_name}.yaml"
-
-            if template_file.exists():
-                return template_file.read_text()
-            else:
-                return "Template file not found"
+            cls._templates_path = Path(result.stdout.strip())
+            print(f"Templates directory: {cls._templates_path}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error finding templates directory: {e.stderr}")
+            cls._templates_path = None
         except Exception as e:
-            return f"Error loading template: {str(e)}"
+            print(f"Unexpected error finding templates directory: {str(e)}")
+            cls._templates_path = None
+
+    @classmethod
+    def get_templates_path(cls):
+        """Get the cached templates path."""
+        if cls._templates_path is None:
+            cls.initialize()
+        return cls._templates_path
+
+    @classmethod
+    def get_template_content(cls, template_name: str) -> str:
+        """Get the content of a specific template."""
+        templates_path = cls.get_templates_path()
+        if not templates_path:
+            return "Error: Templates directory not found"
+
+        template_file = templates_path / f"{template_name}.yaml"
+        if not template_file.exists():
+            return "Template file not found"
+
+        try:
+            return template_file.read_text()
+        except Exception as e:
+            return f"Error reading template: {str(e)}"
+
+    @classmethod
+    def get_anki_templates(cls) -> List[str]:
+        """Get list of Anki-specific template names."""
+        templates_path = cls.get_templates_path()
+        if not templates_path or not templates_path.exists():
+            return ["No prompt templates found"]
+
+        try:
+            yaml_files = [
+                f.stem
+                for f in templates_path.glob("*.yaml")
+                if f.is_file() and f.stem.lower().startswith("anki")
+            ]
+            yaml_files.sort()
+            return yaml_files or ["No Anki templates found"]
+        except Exception:
+            return ["Error listing templates"]
+
+
+class PromptPreviewDialog(QDialog):
+    """Dialog for previewing and editing a prompt template before execution."""
+
+    def __init__(self, parent, template_name: str, editor: Editor) -> None:
+        super().__init__(parent)
+        self.template_name = template_name
+        self.editor = editor
+        self.template_content = TemplateManager.get_template_content(template_name)
+        self._setup_ui()
 
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
@@ -150,6 +197,7 @@ def setup() -> None:
     """Set up the LLM prompt functionality."""
     _check_and_install_uv()
     _install_llm()
+    TemplateManager.initialize()  # Initialize templates path
     gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
     gui_hooks.webview_did_receive_js_message.append(_handle_js_message)
 
@@ -177,29 +225,7 @@ def _setup_prompt_selector_button(buttons: List[str], editor: Editor) -> None:
 
 def _get_prompt_templates() -> List[str]:
     """Get list of prompt template files from the LLM templates directory."""
-    try:
-        # Get templates directory path from llm command
-        result = subprocess.run(
-            ["uv", "run", "--no-project", "llm", "templates", "path"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        templates_path = Path(result.stdout.strip())
-
-        # Get yaml files that start with "Anki" (case insensitive)
-        yaml_files = []
-        if templates_path.exists():
-            yaml_files = [
-                f.stem  # stem gives filename without extension
-                for f in templates_path.glob("*.yaml")
-                if f.is_file() and f.stem.lower().startswith("anki")
-            ]
-            yaml_files.sort()
-
-        return yaml_files or ["No Anki templates found"]
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ["No prompt templates found"]
+    return TemplateManager.get_anki_templates()
 
 
 def _on_prompt_button_press(editor: Editor) -> None:
