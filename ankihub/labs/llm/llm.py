@@ -115,13 +115,17 @@ def _get_prompt_templates() -> List[str]:
         )
         templates_path = Path(result.stdout.strip())
 
-        # Get all yaml files from the directory
+        # Get yaml files that start with "Anki" (case insensitive)
         yaml_files = []
         if templates_path.exists():
-            yaml_files = [f.name for f in templates_path.glob("*.yaml") if f.is_file()]
+            yaml_files = [
+                f.stem  # stem gives filename without extension
+                for f in templates_path.glob("*.yaml")
+                if f.is_file() and f.stem.lower().startswith("anki")
+            ]
             yaml_files.sort()
 
-        return yaml_files
+        return yaml_files or ["No Anki templates found"]
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ["No prompt templates found"]
 
