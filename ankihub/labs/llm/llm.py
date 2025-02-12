@@ -3,13 +3,13 @@
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Dict, List
 
 import aqt
 from aqt import gui_hooks
 from aqt.editor import Editor
-from aqt.qt import QDialog, QPushButton, QTextEdit, QVBoxLayout
-from aqt.utils import tooltip
+from aqt.qt import QDialog, QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout
+from aqt.utils import showWarning, tooltip
 from jinja2 import Template
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
@@ -87,8 +87,24 @@ def _get_note_content(editor: Editor) -> str:
     return json.dumps(fields_dict)
 
 
-def _show_llm_response(response: str) -> None:
-    """Display the LLM response in a dialog."""
+def _update_note_fields(editor: Editor, new_fields: Dict[str, str]) -> None:
+    """Update the note fields with new content."""
+    note = editor.note
+    if not note:
+        return
+
+    # Only update fields that exist in the note
+    for field_name, new_content in new_fields.items():
+        if field_name in note:
+            note[field_name] = new_content
+
+    # Save changes and update the editor
+    note.flush()
+    editor.loadNote()
+
+
+def _show_llm_response(editor: Editor, response: str) -> None:
+    """Display the LLM response in a dialog with option to update note."""
     dialog = QDialog(aqt.mw)
     dialog.setWindowTitle("LLM Response")
     dialog.setMinimumWidth(600)
@@ -102,13 +118,42 @@ def _show_llm_response(response: str) -> None:
     text_edit.setReadOnly(True)
     layout.addWidget(text_edit)
 
+    # Create button row
+    button_layout = QHBoxLayout()
+
+    # Add update button
+    update_button = QPushButton("Update Note")
+    update_button.clicked.connect(lambda: _handle_update_note(editor, response, dialog))
+    button_layout.addWidget(update_button)
+
     # Add close button
     close_button = QPushButton("Close")
     close_button.clicked.connect(dialog.accept)
-    layout.addWidget(close_button)
+    button_layout.addWidget(close_button)
 
+    layout.addLayout(button_layout)
     dialog.setLayout(layout)
     dialog.exec()
+
+
+def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
+    """Handle the update note button click."""
+    try:
+        # Parse the JSON response
+        new_fields = json.loads(response)
+        if not isinstance(new_fields, dict):
+            showWarning("Invalid response format. Expected a JSON object.")
+            return
+
+        # Update the note
+        _update_note_fields(editor, new_fields)
+        tooltip("Note updated successfully")
+        dialog.accept()
+
+    except json.JSONDecodeError:
+        showWarning("Invalid JSON response from LLM")
+    except Exception as e:
+        showWarning(f"Error updating note: {str(e)}")
 
 
 def _execute_prompt_template(editor: Editor, template_name: str) -> None:
@@ -124,13 +169,21 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
         import shlex
 
         escaped_content = shlex.quote(note_content)
+        # TODO Exclude ankihub_id field
+        note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
         result = subprocess.run(
             [
                 "llm",
                 "--no-stream",
                 "-t",
                 template_name.replace(".yaml", ""),
+                "-p",
+                "note_schema",
+                shlex.quote(note_schema),
                 escaped_content,
+                "-o",
+                "json_object",
+                "1",
             ],
             capture_output=True,
             text=True,
@@ -138,13 +191,15 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
         )
 
         # Show the response in a dialog
-        _show_llm_response(result.stdout)
+        _show_llm_response(editor, result.stdout)
 
     except subprocess.CalledProcessError as e:
         error_msg = f"Error running LLM command: {e.stderr}"
         tooltip(error_msg)
+        raise Exception(error_msg)
     except Exception as e:
         tooltip(f"Unexpected error: {str(e)}")
+        raise Exception(f"Unexpected error: {str(e)}")
 
 
 def _handle_js_message(
