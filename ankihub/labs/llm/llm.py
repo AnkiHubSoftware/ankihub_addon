@@ -91,7 +91,10 @@ def _get_prompt_templates() -> List[str]:
     try:
         # Get templates directory path from llm command
         result = subprocess.run(
-            ["llm", "templates", "path"], capture_output=True, text=True, check=True
+            ["uv", "run", "--no-project", "llm", "templates", "path"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
         templates_path = Path(result.stdout.strip())
 
@@ -217,7 +220,12 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
         note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
         result = subprocess.run(
             [
+                "uv",
+                "run",
+                "--no-project",
                 "llm",
+                "-m",
+                "gpt-4o",
                 "--no-stream",
                 "-t",
                 template_name.replace(".yaml", ""),
