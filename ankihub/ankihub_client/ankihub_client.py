@@ -1048,6 +1048,21 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
+    def create_note_type(
+        self, ah_did: uuid.UUID, note_type: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        note_type = _to_ankihub_note_type(note_type.copy())
+        print(json.dumps(note_type))
+        response = self._send_request(
+            "POST", API.ANKIHUB, f"/decks/{ah_did}/create-note-type/", json=note_type
+        )
+        print(f"{response.text=}")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+        data = response.json()
+        result = _to_anki_note_type(data)
+        return result
+
     def get_protected_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
@@ -1345,3 +1360,11 @@ def _to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     note_type_data["tmpls"] = note_type_data.pop("templates")
     note_type_data["flds"] = note_type_data.pop("fields")
     return note_type_data
+
+
+def _to_ankihub_note_type(note_type: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn NotetypeDict into the format used by AnkiHub."""
+    note_type["anki_id"] = note_type.pop("id")
+    note_type["templates"] = note_type.pop("tmpls")
+    note_type["fields"] = note_type.pop("flds")
+    return note_type

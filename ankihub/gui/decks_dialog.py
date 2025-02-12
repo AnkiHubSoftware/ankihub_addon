@@ -619,7 +619,7 @@ class DeckManagementDialog(QDialog):
                 return
 
             note_type = aqt.mw.col.models.by_name(ret.name)
-            add_note_type(note_type)
+            add_note_type(self._selected_ah_did(), note_type)
 
             tooltip("Note type added", parent=aqt.mw)
 
