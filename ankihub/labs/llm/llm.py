@@ -1,5 +1,6 @@
 """Module for handling LLM prompt functionality in the editor."""
 
+import difflib
 import json
 import platform
 import subprocess
@@ -42,6 +43,7 @@ def _check_and_install_uv() -> None:
 
 def _install_llm() -> None:
     """Install llm and additional providers using uv if not already installed."""
+    # TODO Prompt users to set up their API keys.
     try:
         subprocess.run(["llm", "--version"], capture_output=True, check=True)
         print("llm is already installed")
@@ -165,19 +167,68 @@ def _update_note_fields(editor: Editor, new_fields: Dict[str, str]) -> None:
     editor.loadNote()
 
 
+def _create_diff_html(original: str, suggested: str) -> str:
+    """Create HTML diff between original and suggested text."""
+    differ = difflib.Differ()
+    diff = list(differ.compare(original.splitlines(True), suggested.splitlines(True)))
+
+    html = []
+    for line in diff:
+        if line.startswith("+"):
+            html.append(f'<span style="background-color: #e6ffe6">{line[2:]}</span>')
+        elif line.startswith("-"):
+            html.append(
+                f'<span style="background-color: #ffe6e6; text-decoration: line-through">{line[2:]}</span>'
+            )
+        elif line.startswith("?"):
+            continue
+        else:
+            html.append(line[2:])
+
+    return "".join(html)
+
+
 def _show_llm_response(editor: Editor, response: str) -> None:
     """Display the LLM response in a dialog with option to update note."""
+    try:
+        suggested_fields = json.loads(response)
+        if not isinstance(suggested_fields, dict):
+            showWarning("Invalid response format. Expected a JSON object.")
+            return
+    except json.JSONDecodeError:
+        showWarning("Invalid JSON response from LLM")
+        return
+
     dialog = QDialog(aqt.mw)
-    dialog.setWindowTitle("LLM Response")
-    dialog.setMinimumWidth(600)
-    dialog.setMinimumHeight(400)
+    dialog.setWindowTitle("LLM Response - Field Changes")
+    dialog.setMinimumWidth(800)
+    dialog.setMinimumHeight(600)
 
     layout = QVBoxLayout()
 
-    # Create text display area
+    # Create text display area with HTML formatting
     text_edit = QTextEdit()
-    text_edit.setPlainText(response)
     text_edit.setReadOnly(True)
+
+    # Build HTML content showing diffs for each field
+    html_content = [
+        "<style>",
+        "body { font-family: monospace; }",
+        ".field-name { font-weight: bold; font-size: 1.1em; margin-top: 1em; }",
+        ".field-content { margin-left: 1em; white-space: pre-wrap; }",
+        "</style>",
+    ]
+
+    note = editor.note
+    for field_name, suggested_content in suggested_fields.items():
+        if field_name in note:
+            original_content = note[field_name]
+            html_content.append(f'<div class="field-name">{field_name}:</div>')
+            html_content.append('<div class="field-content">')
+            html_content.append(_create_diff_html(original_content, suggested_content))
+            html_content.append("</div>")
+
+    text_edit.setHtml("".join(html_content))
     layout.addWidget(text_edit)
 
     # Create button row

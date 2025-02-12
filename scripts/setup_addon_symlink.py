@@ -14,6 +14,16 @@ def setup_addon_symlink(anki_base_path: Path) -> None:
     print(f"Created addons21 directory: {addons21_dir} (if it didn't exist already)")
 
     addon_dst = addons21_dir / "ankihub"
+    ankiwebview_inspector = Path(
+        "/Users/andrewsanchez/Projects/anki21-addon-ankiwebview-inspector/src"
+    )
+    inspector_dst = addons21_dir / "inspector"
+    try:
+        os.remove(inspector_dst)
+        print(f"Removed existing symlink: {inspector_dst}")
+    except FileNotFoundError:
+        pass
+    inspector_dst.symlink_to(ankiwebview_inspector)
 
     if addon_dst.is_symlink():
         os.remove(addon_dst)
