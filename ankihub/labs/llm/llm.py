@@ -8,13 +8,85 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import aqt
-from aqt import gui_hooks
+from aqt import QFont, gui_hooks
 from aqt.editor import Editor
-from aqt.qt import QDialog, QHBoxLayout, QPushButton, QTextEdit, QVBoxLayout
+from aqt.qt import QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout
 from aqt.utils import showWarning, tooltip
 from jinja2 import Template
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
+
+
+class PromptPreviewDialog(QDialog):
+    """Dialog for previewing and editing a prompt template before execution."""
+
+    def __init__(self, parent, template_name: str, editor: Editor) -> None:
+        super().__init__(parent)
+        self.template_name = template_name
+        self.editor = editor
+        self.template_content = self._load_template()
+        self._setup_ui()
+
+    def _load_template(self) -> str:
+        """Load the content of the template file."""
+        try:
+            result = subprocess.run(
+                ["uv", "run", "--no-project", "llm", "templates", "path"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            templates_path = Path(result.stdout.strip())
+            template_file = templates_path / f"{self.template_name}.yaml"
+
+            if template_file.exists():
+                return template_file.read_text()
+            else:
+                return "Template file not found"
+        except Exception as e:
+            return f"Error loading template: {str(e)}"
+
+    def _setup_ui(self) -> None:
+        """Set up the dialog UI."""
+        self.setWindowTitle(f"Preview Template: {self.template_name}")
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
+
+        layout = QVBoxLayout()
+
+        # Add description label
+        description = QLabel("Review and edit the prompt template below:")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        # Add template editor
+        self.template_edit = QTextEdit()
+        self.template_edit.setPlainText(self.template_content)
+        self.template_edit.setFont(QFont("Consolas"))
+        layout.addWidget(self.template_edit)
+
+        # Add button row
+        button_layout = QHBoxLayout()
+
+        # Execute button
+        execute_button = QPushButton("Execute Prompt")
+        execute_button.clicked.connect(self._on_execute)
+        button_layout.addWidget(execute_button)
+
+        # Cancel button
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+    def _on_execute(self) -> None:
+        """Handle the execute button click."""
+        modified_template = self.template_edit.toPlainText()
+        # TODO Save the modified template if it differs from the original
+        _execute_prompt_template(self.editor, self.template_name, modified_template)
+        self.accept()
 
 
 def _check_and_install_uv() -> None:
@@ -273,7 +345,15 @@ def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
         showWarning(f"Error updating note: {str(e)}")
 
 
-def _execute_prompt_template(editor: Editor, template_name: str) -> None:
+def _handle_prompt_selection(editor: Editor, template_name: str) -> None:
+    """Handle the selection of a prompt template."""
+    dialog = PromptPreviewDialog(None, template_name, editor)
+    dialog.exec()
+
+
+def _execute_prompt_template(
+    editor: Editor, template_name: str, template_content=None
+) -> None:
     """Execute the selected prompt template with the current note as input."""
     note_content = _get_note_content(editor)
     if not note_content:
@@ -288,20 +368,29 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
         escaped_content = shlex.quote(note_content)
         # TODO Exclude ankihub_id field
         note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
-        result = subprocess.run(
+
+        cmd = [
+            "uv",
+            "run",
+            "--no-project",
+            "llm",
+            # TODO Allow users to choose model
+            # TODO Allow users to continue a conversation
+            # TODO Allow users to add an attachment
+            "-m",
+            "gpt-4o",
+            "--no-stream",
+        ]
+
+        if template_content:
+            # If we have modified template content, pass it via stdin
+            cmd.extend(["-s", template_content])
+        else:
+            # Otherwise use the template file
+            cmd.extend(["-t", template_name])
+
+        cmd.extend(
             [
-                "uv",
-                "run",
-                "--no-project",
-                "llm",
-                # TODO Allow users to choose model
-                # TODO Allow users to continue a conversation
-                # TODO Allow users to add an attachment
-                "-m",
-                "gpt-4o",
-                "--no-stream",
-                "-t",
-                template_name.replace(".yaml", ""),
                 "-p",
                 "note_schema",
                 shlex.quote(note_schema),
@@ -309,7 +398,11 @@ def _execute_prompt_template(editor: Editor, template_name: str) -> None:
                 "-o",
                 "json_object",
                 "1",
-            ],
+            ]
+        )
+
+        result = subprocess.run(
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -333,6 +426,6 @@ def _handle_js_message(
     """Handle JavaScript messages for prompt template selection."""
     if message.startswith("prompt-select:"):
         template_name = message.split(":", 1)[1]
-        _execute_prompt_template(context, template_name)
+        _handle_prompt_selection(context, template_name)
         return (True, None)
     return handled
