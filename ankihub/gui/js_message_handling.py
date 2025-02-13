@@ -119,13 +119,9 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
 
-        from .reviewer import reviewer_sidebar
-
-        if reviewer_sidebar:
-            _post_message_to_ankihub_js(
-                message={"noteSuspensionStates": note_suspension_states},
-                web=reviewer_sidebar.content_webview,
-            )
+        _post_message_to_ankihub_js(
+            message={"noteSuspensionStates": note_suspension_states}, web=context.web
+        )
         return (True, None)
     elif message.startswith(COPY_TO_CLIPBOARD_PYCMD):
         kwargs = parse_js_message_kwargs(message)
