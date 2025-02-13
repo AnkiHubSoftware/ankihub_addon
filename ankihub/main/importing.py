@@ -144,12 +144,14 @@ class AnkiHubImporter:
 
         self._import_note_types(note_types=note_types)
 
-        dids = self._import_notes(
-            notes_data=notes,
-            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
-            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
-            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
-        )
+        dids = set()
+        if notes:
+            dids = self._import_notes(
+                notes_data=notes,
+                behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+                suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+                suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
+            )
 
         if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(

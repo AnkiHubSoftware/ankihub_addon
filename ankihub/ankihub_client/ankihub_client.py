@@ -1048,7 +1048,7 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
-    def get_note_types_for_deck(self, ah_did: uuid.UUID) -> List[Dict[str, Any]]:
+    def get_note_types_for_deck(self, ah_did: uuid.UUID) -> Dict[int, Dict[str, Any]]:
         response = self._send_request(
             "GET", API.ANKIHUB, f"/decks/{ah_did}/note-types/"
         )
@@ -1056,8 +1056,10 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         data = response.json()
-        result = [_to_anki_note_type(note_type) for note_type in data]
-        return result
+        return {
+            note_type_data["anki_id"]: _to_anki_note_type(note_type_data)
+            for note_type_data in data
+        }
 
     def get_protected_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
