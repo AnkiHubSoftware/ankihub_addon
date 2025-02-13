@@ -1,0 +1,101 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2025-03-13T17:23:12.951944Z","token":"5ed38daaed994ab0833193f22ec8ab94015251c485f235e8fd85e714a79675a5"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Thu, 13 Feb 2025 17:23:12 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.12.2
+      Server-Timing:
+      - TimerPanel_utime;dur=273.8119999999995;desc="User CPU time", TimerPanel_stime;dur=6.806999999998453;desc="System
+        CPU time", TimerPanel_total;dur=280.618999999998;desc="Total CPU time", TimerPanel_total_time;dur=103.21817400108557;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.574725004204083;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=NHhSHIoKXGN0EFHrvVDMzmbljXnsGKeY; expires=Thu, 12 Feb 2026 17:23:12
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=4pk2e8z26joe150fm44p691a0tkbm5fv; expires=Thu, 20 Feb 2025 17:23:12
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 5fad72449c9641c39eae42b6df03f684
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Authorization:
+      - Token 5ed38daaed994ab0833193f22ec8ab94015251c485f235e8fd85e714a79675a5
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/note-types/
+  response:
+    body:
+      string: '[{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"did":null,"ord":0,"afmt":"{{cloze:Text}}<br>","name":"Test","qfmt":"{{cloze:Text}}","bafmt":"","bfont":"Arial","bqfmt":"","bsize":12}],"name":"Test_note_type","type":1,"mod":666353884,"usn":-1,"sortf":0,"did":4134053730,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}]'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '785'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Thu, 13 Feb 2025 17:23:13 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.12.2
+      Server-Timing:
+      - TimerPanel_utime;dur=21.847999999998535;desc="User CPU time", TimerPanel_stime;dur=3.0490000000007456;desc="System
+        CPU time", TimerPanel_total;dur=24.89699999999928;desc="Total CPU time", TimerPanel_total_time;dur=29.932849000033457;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.0872489987814333;desc="SQL 9 queries", CachePanel_total_time;dur=0.036879002436762676;desc="Cache
+        1 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 77f5329a824f40bf8280a53fdfb80800
+    status:
+      code: 200
+      message: OK
+version: 1
