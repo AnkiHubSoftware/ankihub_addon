@@ -90,6 +90,7 @@ def choose_subset(
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
     buttons: Optional[Sequence[ButtonParam]] = None,
+    title: str = "AnkiHub",
     parent: Any = None,
 ) -> Optional[List[str]]:
     if not parent:
@@ -97,6 +98,7 @@ def choose_subset(
 
     dialog = QDialog(parent)
     disable_help_button(dialog)
+    dialog.setWindowTitle(title)
 
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     layout = QVBoxLayout()

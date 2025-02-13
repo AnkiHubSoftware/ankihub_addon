@@ -664,6 +664,7 @@ class DeckManagementDialog(QDialog):
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
+                title="Add Fields",
                 parent=self,
             )
             if new_fields:
