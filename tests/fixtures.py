@@ -489,7 +489,6 @@ class MockDownloadAndInstallDeckDependencies(Protocol):
 def mock_download_and_install_deck_dependencies(
     monkeypatch: MonkeyPatch,
     mock_show_dialog_with_cb: MockShowDialogWithCB,
-    mocker: MockerFixture,
 ) -> MockDownloadAndInstallDeckDependencies:
     """Mocks the dependencies of the download_and_install_deck function.
     deck: The deck that is downloaded and installed.
@@ -514,7 +513,7 @@ def mock_download_and_install_deck_dependencies(
         # Mock client functions
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
-        add_mock(AnkiHubClient, "get_note_type", note_type)
+        add_mock(AnkiHubClient, "get_note_types_for_deck", {note_type["id"]: note_type})
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
