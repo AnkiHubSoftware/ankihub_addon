@@ -589,8 +589,7 @@ class DeckManagementDialog(QDialog):
         self.add_field_btn = QPushButton("Add field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
         self.update_styling_btn = QPushButton("Update note styling")
-        if not deck_has_template_changes(self._selected_ah_did()):
-            self.update_styling_btn.setEnabled(False)
+        self._update_styling_btn_state()
         qconnect(self.update_styling_btn.clicked, self._on_update_styling_btn_clicked)
         box.addWidget(self.note_types_label)
         box.addWidget(self.add_note_type_btn)
@@ -598,6 +597,10 @@ class DeckManagementDialog(QDialog):
         box.addWidget(self.update_styling_btn)
 
         return box
+
+    def _update_styling_btn_state(self):
+        if not deck_has_template_changes(self._selected_ah_did()):
+            self.update_styling_btn.setEnabled(False)
 
     def _on_add_note_type_btn_clicked(self):
         def names_callback() -> list[str]:
@@ -692,6 +695,7 @@ class DeckManagementDialog(QDialog):
             return
         update_deck_templates(self._selected_ah_did())
         tooltip("Styling updated", parent=aqt.mw)
+        self._update_styling_btn_state()
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
