@@ -7,9 +7,20 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+import yaml
 from aqt import QFont, gui_hooks
 from aqt.editor import Editor
-from aqt.qt import QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout
+from aqt.qt import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from aqt.utils import showWarning, tooltip
 from jinja2 import Template
 
@@ -108,6 +119,32 @@ class TemplateManager:
         except Exception:
             return ["Error listing templates"]
 
+    @classmethod
+    def save_template(cls, template_name: str, content: str) -> None:
+        """Save a template with the given content.
+
+        Args:
+            template_name: Name of the template without .yaml extension
+            content: YAML content to save
+
+        Raises:
+            Exception: If templates directory is not found or if saving fails
+        """
+        templates_path = cls.get_templates_path()
+        if not templates_path:
+            raise Exception("Templates directory not found")
+
+        try:
+            # Validate YAML content before saving
+            yaml.safe_load(content)
+
+            template_file = templates_path / f"{template_name}.yaml"
+            template_file.write_text(content)
+        except yaml.YAMLError as e:
+            raise Exception(f"Invalid YAML content: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to save template: {str(e)}")
+
 
 class PromptPreviewDialog(QDialog):
     """Dialog for previewing and editing a prompt template before execution."""
@@ -117,10 +154,18 @@ class PromptPreviewDialog(QDialog):
         self.template_name = template_name
         self.editor = editor
         self.template_content = TemplateManager.get_template_content(template_name)
+        try:
+            self.yaml_data = yaml.safe_load(self.template_content)
+            if not isinstance(self.yaml_data, dict):
+                self.yaml_data = {}
+        except yaml.YAMLError:
+            self.yaml_data = {}
+
+        self.section_editors = {}  # Store references to editors for each section
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        """Set up the dialog UI."""
+        """Set up the dialog UI with all YAML sections visible."""
         self.setWindowTitle(f"Preview Template: {self.template_name}")
         self.setMinimumWidth(800)
         self.setMinimumHeight(600)
@@ -128,15 +173,46 @@ class PromptPreviewDialog(QDialog):
         layout = QVBoxLayout()
 
         # Add description label
-        description = QLabel("Review and edit the prompt template below:")
+        description = QLabel("Edit the template sections below:")
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        # Add template editor
-        self.template_edit = QTextEdit()
-        self.template_edit.setPlainText(self.template_content)
-        self.template_edit.setFont(QFont("Consolas"))
-        layout.addWidget(self.template_edit)
+        # Create a scroll area for sections
+        scroll_area = QWidget()
+        scroll_layout = QVBoxLayout()
+        scroll_area.setLayout(scroll_layout)
+
+        # Create an editor for each YAML section
+        for key, value in self.yaml_data.items():
+            section_widget = QWidget()
+            section_layout = QVBoxLayout()
+
+            # Add section label
+            label = QLabel(f"{key}:")
+            label.setFont(QFont("Consolas"))
+            section_layout.addWidget(label)
+
+            # Add section editor
+            editor = QTextEdit()
+            editor.setPlainText(str(value))
+            editor.setFont(QFont("Consolas"))
+            editor.setMinimumHeight(100)  # Ensure minimum visibility
+            section_layout.addWidget(editor)
+
+            # Store reference to editor
+            self.section_editors[key] = editor
+
+            section_widget.setLayout(section_layout)
+            scroll_layout.addWidget(section_widget)
+
+        # Add spacer at the bottom to push content up
+        scroll_layout.addStretch()
+
+        # Create a scroll area container
+        scroll_container = QScrollArea()
+        scroll_container.setWidget(scroll_area)
+        scroll_container.setWidgetResizable(True)
+        layout.addWidget(scroll_container)
 
         # Add button row
         button_layout = QHBoxLayout()
@@ -146,6 +222,11 @@ class PromptPreviewDialog(QDialog):
         execute_button.clicked.connect(self._on_execute)
         button_layout.addWidget(execute_button)
 
+        # Save button
+        save_button = QPushButton("Save Template")
+        save_button.clicked.connect(self._on_save)
+        button_layout.addWidget(save_button)
+
         # Cancel button
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
@@ -154,11 +235,26 @@ class PromptPreviewDialog(QDialog):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
+    def _get_yaml_content(self) -> str:
+        """Generate valid YAML content from the current field values."""
+        data = {
+            key: editor.toPlainText() for key, editor in self.section_editors.items()
+        }
+        return yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
+
+    def _on_save(self) -> None:
+        """Save the modified template."""
+        try:
+            modified_content = self._get_yaml_content()
+            TemplateManager.save_template(self.template_name, modified_content)
+            QMessageBox.information(self, "Success", "Template saved successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save template: {str(e)}")
+
     def _on_execute(self) -> None:
         """Handle the execute button click."""
-        modified_template = self.template_edit.toPlainText()
-        # TODO Save the modified template if it differs from the original
-        _execute_prompt_template(self.editor, self.template_name, modified_template)
+        modified_content = self._get_yaml_content()
+        _execute_prompt_template(self.editor, self.template_name, modified_content)
         self.accept()
 
 

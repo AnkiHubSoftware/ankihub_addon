@@ -27,6 +27,12 @@ repos:
       hooks:
           - id: pycln
 
+    - repo: https://github.com/PyCQA/autoflake
+      rev: v2.3.1
+      hooks:
+          - id: autoflake
+            args: [--remove-all-unused-imports, --in-place]
+
     - repo: local
       hooks:
           - id: no_absolute_imports_from_ankihub
