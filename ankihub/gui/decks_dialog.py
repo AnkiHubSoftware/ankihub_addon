@@ -588,19 +588,21 @@ class DeckManagementDialog(QDialog):
         qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
         self.add_field_btn = QPushButton("Add field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
-        self.update_styling_btn = QPushButton("Update note styling")
-        self._update_styling_btn_state()
-        qconnect(self.update_styling_btn.clicked, self._on_update_styling_btn_clicked)
+        self.update_templates_btn = QPushButton("Update note styling and templates")
+        self._update_templates_btn_state()
+        qconnect(
+            self.update_templates_btn.clicked, self._on_update_templates_btn_clicked
+        )
         box.addWidget(self.note_types_label)
         box.addWidget(self.add_note_type_btn)
         box.addWidget(self.add_field_btn)
-        box.addWidget(self.update_styling_btn)
+        box.addWidget(self.update_templates_btn)
 
         return box
 
-    def _update_styling_btn_state(self):
+    def _update_templates_btn_state(self):
         if not deck_has_template_changes(self._selected_ah_did()):
-            self.update_styling_btn.setEnabled(False)
+            self.update_templates_btn.setEnabled(False)
 
     def _on_add_note_type_btn_clicked(self):
         def names_callback() -> list[str]:
@@ -683,9 +685,9 @@ class DeckManagementDialog(QDialog):
             callback=on_note_type_selected,
         )
 
-    def _on_update_styling_btn_clicked(self) -> None:
+    def _on_update_templates_btn_clicked(self) -> None:
         confirm = ask_user(
-            "Confirm to update the note styling to all AnkiHub users of your deck.<br><br>"
+            "Confirm to update the note styling and templates for all AnkiHub users of your deck.<br><br>"
             "Please note that <b>certain changes may break the note type</b> so proceed with caution.",
             title="Proceed?",
             yes_button_label="OK",
@@ -694,8 +696,8 @@ class DeckManagementDialog(QDialog):
         if not confirm:
             return
         update_deck_templates(self._selected_ah_did())
-        tooltip("Styling updated", parent=aqt.mw)
-        self._update_styling_btn_state()
+        tooltip("Changes updated", parent=aqt.mw)
+        self._update_templates_btn_state()
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
