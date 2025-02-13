@@ -105,6 +105,7 @@ def choose_subset(
     dialog.setLayout(layout)
     label = QLabel(prompt)
     label.setOpenExternalLinks(True)
+    label.setWordWrap(True)
     layout.addWidget(label)
     list_widget = CustomListWidget()
     layout.addWidget(list_widget)
