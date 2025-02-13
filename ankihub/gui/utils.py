@@ -28,6 +28,7 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
+from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, tooltip
 
@@ -164,6 +165,17 @@ def choose_subset(
         if list_widget.item(i).checkState() == Qt.CheckState.Checked
     ]
     return result
+
+
+class SearchableSelectionDialog(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        if kwargs.get("buttons") is None:
+            kwargs["buttons"] = []  # This removes the "Add" button
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
 
 
 class CustomListWidget(QListWidget):

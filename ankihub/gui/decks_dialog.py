@@ -23,7 +23,6 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
-from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
@@ -51,6 +50,7 @@ from ..settings import (
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import (
+    SearchableSelectionDialog,
     ask_user,
     choose_subset,
     clear_layout,
@@ -623,7 +623,7 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_add_note_type_btn_clicked(self):
-        def on_note_type_selected(ret: StudyDeck) -> None:
+        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
             if not ret.name:
                 return
             confirm = ask_user(
@@ -638,7 +638,7 @@ class DeckManagementDialog(QDialog):
 
             tooltip("Note type added", parent=aqt.mw)
 
-        StudyDeckWithoutHelpButton(
+        SearchableSelectionDialog(
             aqt.mw,
             names=lambda: self._get_note_type_names_for_deck(
                 self._selected_ah_did(), assigned_to_deck=False
@@ -650,7 +650,7 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_add_field_btn_clicked(self) -> None:
-        def on_note_type_selected(ret: StudyDeck) -> None:
+        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
             if not ret.name:
                 return
 
@@ -680,7 +680,7 @@ class DeckManagementDialog(QDialog):
                 update_note_type_fields(note_type, new_fields)
                 tooltip("Fields added", parent=aqt.mw)
 
-        StudyDeckWithoutHelpButton(
+        SearchableSelectionDialog(
             aqt.mw,
             names=lambda: self._get_note_type_names_for_deck(
                 self._selected_ah_did(), assigned_to_deck=True
@@ -781,7 +781,7 @@ class DeckManagementDialog(QDialog):
         else:
             current = current_destination_deck["name"]
 
-        def update_deck_config(ret: StudyDeck):
+        def update_deck_config(ret: SearchableSelectionDialog):
             if not ret.name:
                 return
 
@@ -790,7 +790,7 @@ class DeckManagementDialog(QDialog):
             self._refresh_new_cards_destination_details_label(ah_did)
 
         # this lets the user pick a deck
-        StudyDeckWithoutHelpButton(
+        SearchableSelectionDialog(
             aqt.mw,
             current=current,
             accept="Confirm Destination for New Cards",
@@ -846,14 +846,3 @@ class DeckManagementDialog(QDialog):
     def closeEvent(self, event) -> None:
         super().closeEvent(event)
         config.log_private_config()
-
-
-class StudyDeckWithoutHelpButton(StudyDeck):
-    def __init__(self, *args, **kwargs) -> None:
-        if kwargs.get("buttons") is None:
-            kwargs["buttons"] = []  # This removes the "Add" button
-        super().__init__(*args, **kwargs)
-
-        self.form.buttonBox.removeButton(
-            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
-        )
