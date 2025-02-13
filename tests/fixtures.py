@@ -513,7 +513,9 @@ def mock_download_and_install_deck_dependencies(
         # Mock client functions
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
-        add_mock(AnkiHubClient, "get_note_types_for_deck", {note_type["id"]: note_type})
+        add_mock(
+            AnkiHubClient, "get_note_types_dict_for_deck", {note_type["id"]: note_type}
+        )
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 

@@ -132,7 +132,7 @@ class _AnkiHubDeckUpdater:
 
         note_types = cast(
             Dict[NotetypeId, NotetypeDict],
-            self._client.get_note_types_for_deck(ankihub_did),
+            self._client.get_note_types_dict_for_deck(ankihub_did),
         )
 
         import_result = self._importer.import_ankihub_deck(

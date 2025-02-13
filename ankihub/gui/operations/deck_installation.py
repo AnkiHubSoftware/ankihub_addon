@@ -236,7 +236,7 @@ def _install_deck(
     protected_tags = client.get_protected_tags(ah_did=ankihub_did)
     note_types = cast(
         Dict[NotetypeId, NotetypeDict],
-        client.get_note_types_for_deck(ankihub_did),
+        client.get_note_types_dict_for_deck(ankihub_did),
     )
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,

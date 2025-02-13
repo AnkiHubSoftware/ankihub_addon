@@ -1048,7 +1048,9 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
-    def get_note_types_for_deck(self, ah_did: uuid.UUID) -> Dict[int, Dict[str, Any]]:
+    def get_note_types_dict_for_deck(
+        self, ah_did: uuid.UUID
+    ) -> Dict[int, Dict[str, Any]]:
         response = self._send_request(
             "GET", API.ANKIHUB, f"/decks/{ah_did}/note-types/"
         )
