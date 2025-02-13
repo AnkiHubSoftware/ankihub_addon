@@ -2,7 +2,7 @@
 
 import uuid
 from concurrent.futures import Future
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 import aqt
@@ -604,15 +604,25 @@ class DeckManagementDialog(QDialog):
         if not deck_has_template_changes(self._selected_ah_did()):
             self.update_templates_btn.setEnabled(False)
 
-    def _on_add_note_type_btn_clicked(self):
-        def names_callback() -> list[str]:
-            mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
-            return sorted(
-                n.name
-                for n in aqt.mw.col.models.all_names_and_ids()
-                if NotetypeId(n.id) not in mids
-            )
+    def _get_note_type_names_for_deck(
+        self, deck_id: UUID, assigned_to_deck: bool
+    ) -> List[str]:
+        """
+        Returns a sorted list of note type names filtered by whether they are assigned to the deck.
 
+        Args:
+            deck_id: The ID of the selected AnkiHub deck.
+            assigned_to_deck: If True, return note types that are already assigned to the deck.
+                            If False, return note types that are not yet assigned.
+        """
+        mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+        return sorted(
+            n.name
+            for n in aqt.mw.col.models.all_names_and_ids()
+            if (NotetypeId(n.id) in mids) == assigned_to_deck
+        )
+
+    def _on_add_note_type_btn_clicked(self):
         def on_note_type_selected(ret: StudyDeck) -> None:
             if not ret.name:
                 return
@@ -630,7 +640,9 @@ class DeckManagementDialog(QDialog):
 
         StudyDeckWithoutHelpButton(
             aqt.mw,
-            names=names_callback,
+            names=lambda: self._get_note_type_names_for_deck(
+                self._selected_ah_did(), assigned_to_deck=False
+            ),
             accept="Choose",
             title="Add Note Type",
             parent=self,
@@ -638,14 +650,6 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_add_field_btn_clicked(self) -> None:
-        def names_callback() -> list[str]:
-            mids = ankihub_db.note_types_for_ankihub_deck(self._selected_ah_did())
-            return sorted(
-                n.name
-                for n in aqt.mw.col.models.all_names_and_ids()
-                if NotetypeId(n.id) in mids
-            )
-
         def on_note_type_selected(ret: StudyDeck) -> None:
             if not ret.name:
                 return
@@ -678,7 +682,9 @@ class DeckManagementDialog(QDialog):
 
         StudyDeckWithoutHelpButton(
             aqt.mw,
-            names=names_callback,
+            names=lambda: self._get_note_type_names_for_deck(
+                self._selected_ah_did(), assigned_to_deck=True
+            ),
             accept="Choose",
             title="Which note type do you want to edit?",
             parent=self,
