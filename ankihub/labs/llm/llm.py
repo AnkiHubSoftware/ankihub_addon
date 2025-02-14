@@ -476,6 +476,9 @@ def _show_llm_response(editor: Editor, response: str) -> None:
 
 def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
     """Handle the update note button click."""
+
+    dialog.accept()
+
     try:
         # Parse the JSON response
         new_fields = json.loads(response)
@@ -486,7 +489,6 @@ def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
         # Update the note
         _update_note_fields(editor, new_fields)
         tooltip("Note updated successfully")
-        dialog.accept()
 
     except json.JSONDecodeError:
         showWarning("Invalid JSON response from LLM")
