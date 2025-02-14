@@ -236,11 +236,14 @@ class PromptPreviewDialog(QDialog):
         self.setLayout(layout)
 
     def _get_yaml_content(self) -> str:
-        """Generate valid YAML content from the current field values."""
+        """Generate valid YAML content from the current field values and save template."""
         data = {
             key: editor.toPlainText() for key, editor in self.section_editors.items()
         }
-        return yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
+        content = yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
+        # Save the template
+        TemplateManager.save_template(self.template_name, content)
+        return content
 
     def _on_save(self) -> None:
         """Save the modified template."""
@@ -508,11 +511,9 @@ def _execute_prompt_template(
 
     try:
         # Run the LLM command with the template and note content
-        # Use shlex.quote to properly escape the note content for shell command
         import shlex
 
         escaped_content = shlex.quote(note_content)
-        # TODO Exclude ankihub_id field
         note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
 
         cmd = [
@@ -520,32 +521,19 @@ def _execute_prompt_template(
             "run",
             "--no-project",
             "llm",
-            # TODO Allow users to choose model
-            # TODO Allow users to continue a conversation
-            # TODO Allow users to add an attachment
             "-m",
             "gpt-4o",
             "--no-stream",
+            "-t",
+            template_name,
+            "-p",
+            "note_schema",
+            shlex.quote(note_schema),
+            escaped_content,
+            "-o",
+            "json_object",
+            "1",
         ]
-
-        if template_content:
-            # If we have modified template content, pass it via stdin
-            cmd.extend(["-s", template_content])
-        else:
-            # Otherwise use the template file
-            cmd.extend(["-t", template_name])
-
-        cmd.extend(
-            [
-                "-p",
-                "note_schema",
-                shlex.quote(note_schema),
-                escaped_content,
-                "-o",
-                "json_object",
-                "1",
-            ]
-        )
 
         result = subprocess.run(
             cmd,
