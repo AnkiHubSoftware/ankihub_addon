@@ -257,8 +257,8 @@ class PromptPreviewDialog(QDialog):
     def _on_execute(self) -> None:
         """Handle the execute button click."""
         modified_content = self._get_yaml_content()
-        _execute_prompt_template(self.editor, self.template_name, modified_content)
         self.accept()
+        _execute_prompt_template(self.editor, self.template_name, modified_content)
 
 
 def _check_and_install_uv() -> None:
