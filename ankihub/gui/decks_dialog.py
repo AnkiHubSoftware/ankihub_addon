@@ -604,8 +604,9 @@ class DeckManagementDialog(QDialog):
         return box
 
     def _update_templates_btn_state(self):
-        if not deck_has_template_changes(self._selected_ah_did()):
-            self.update_templates_btn.setEnabled(False)
+        self.update_templates_btn.setEnabled(
+            deck_has_template_changes(self._selected_ah_did())
+        )
 
     def _get_note_type_names_for_deck(
         self, deck_id: UUID, assigned_to_deck: bool
