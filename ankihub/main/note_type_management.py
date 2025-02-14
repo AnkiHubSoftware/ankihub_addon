@@ -9,7 +9,7 @@ from ..db import ankihub_db
 from .utils import modified_note_type
 
 
-def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
+def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
     client = AddonAnkiHubClient()
 
     new_note_type = modified_note_type(note_type)
@@ -24,6 +24,8 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
     aqt.mw.col.models.update_dict(new_note_type)
     new_note_type = aqt.mw.col.models.get(NotetypeId(new_mid))
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=new_note_type)
+
+    return new_note_type
 
 
 def update_note_type_fields(note_type: NotetypeDict, fields: List[str]) -> None:

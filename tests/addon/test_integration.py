@@ -133,6 +133,7 @@ from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
     DEFAULT_API_URL,
     DeckExtensionUpdateChunk,
+    _to_ankihub_note_type,
     _transform_notes_data,
 )
 from ankihub.common_utils import local_media_names_from_html
@@ -201,6 +202,7 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
+from ankihub.main.note_type_management import add_note_type
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import (
     SUBDECK_TAG,
@@ -947,6 +949,29 @@ def test_create_collaborative_deck_and_upload(
 
         # check that note mod value is in database
         assert AnkiHubNote.get(AnkiHubNote.anki_note_id == note.id).mod == note.mod
+
+
+def test_create_note_type(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    mocker: MockerFixture,
+    requests_mock: Mocker,
+):
+
+    with anki_session_with_addon_data.profile_loaded():
+        anki_did, ah_did = install_sample_ah_deck()
+        note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
+        note_type["name"] = "New Type"
+        note_type["id"] = 0
+        note_type = aqt.mw.col.models.get(aqt.mw.col.models.add_dict(note_type).id)
+        expected_data = note_type.copy()
+        requests_mock.post(
+            f"{config.api_url}/decks/{ah_did}/create-note-type/",
+            json=_to_ankihub_note_type(expected_data),
+        )
+        new_note_type = add_note_type(ah_did, note_type)
+
+        assert new_note_type["id"] in ankihub_db.note_types_for_ankihub_deck(ah_did)
 
 
 class TestDownloadAndInstallDecks:
