@@ -318,7 +318,7 @@ def setup() -> None:
         parent=active_window_or_mw(),
         op=lambda _: _install_labs_dependencies(),
         success=lambda _: None,
-    ).with_progress("Setting up AnkiHub Labs").run_in_background()
+    ).without_collection().with_progress("Setting up AnkiHub Labs").run_in_background()
 
     TemplateManager.initialize()  # Initialize templates path
     gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
