@@ -1758,6 +1758,20 @@ class TestGetNoteType:
 
 
 @pytest.mark.vcr()
+class TestGetNoteTypesDictForDeck:
+    def test_get_note_types_dict(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        assert len(note_types_by_id) == 1
+
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
+        assert note_type["name"] == "Cloze (test1)"
+
+
+@pytest.mark.vcr()
 class TestGetFeatureFlags:
     def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1

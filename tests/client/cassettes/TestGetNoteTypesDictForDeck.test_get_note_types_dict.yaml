@@ -1,0 +1,102 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2025-03-14T11:17:59.220615Z","token":"32cb7742ec5a9c4a8df48b01cc5f3fdf12839928931b4aefa91dc83f90260dc4"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Fri, 14 Feb 2025 11:17:59 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.12.2
+      Server-Timing:
+      - TimerPanel_utime;dur=263.38699999999983;desc="User CPU time", TimerPanel_stime;dur=6.219000000000197;desc="System
+        CPU time", TimerPanel_total;dur=269.60600000000005;desc="Total CPU time",
+        TimerPanel_total_time;dur=105.22080200007622;desc="Elapsed time", SQLPanel_sql_time;dur=5.690275000006295;desc="SQL
+        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Set-Cookie:
+      - csrftoken=LGq3599vdgdgavdYiuaBxEkAyEGa6Gex; expires=Fri, 13 Feb 2026 11:17:59
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=tyc06lqlgjvg3ijpmaj7vr0fpixbyugk; expires=Fri, 21 Feb 2025 11:17:59
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - bab7d89ddc784e42ab11b5116f1c1ee5
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Authorization:
+      - Token 32cb7742ec5a9c4a8df48b01cc5f3fdf12839928931b4aefa91dc83f90260dc4
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/note-types/
+  response:
+    body:
+      string: '[{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"did":null,"ord":0,"afmt":"{{cloze:Text}}<br>","name":"Test","qfmt":"{{cloze:Text}}","bafmt":"","bfont":"Arial","bqfmt":"","bsize":12}],"name":"Cloze
+        (test1)","type":1,"mod":1638265797,"usn":-1,"sortf":0,"did":1416219443,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}]'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '785'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Fri, 14 Feb 2025 11:17:59 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.12.2
+      Server-Timing:
+      - TimerPanel_utime;dur=44.36399999999985;desc="User CPU time", TimerPanel_stime;dur=6.820999999999966;desc="System
+        CPU time", TimerPanel_total;dur=51.18499999999982;desc="Total CPU time", TimerPanel_total_time;dur=49.66266999997515;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.756050999844774;desc="SQL 10 queries", CachePanel_total_time;dur=0.026710000042839965;desc="Cache
+        2 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 3940ad98191d4f5e8f36b99579a39357
+    status:
+      code: 200
+      message: OK
+version: 1

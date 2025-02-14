@@ -5,9 +5,10 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from functools import partial
-from typing import Callable, List
+from typing import Callable, Dict, List, cast
 
 import aqt
+from anki.models import NotetypeDict, NotetypeId
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import QDialogButtonBox
 
@@ -17,7 +18,6 @@ from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import Deck, UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
-from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
 from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
@@ -234,7 +234,10 @@ def _install_deck(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ankihub_did)
     protected_tags = client.get_protected_tags(ah_did=ankihub_did)
-    note_types = fetch_note_types_based_on_notes(notes_data=notes_data)
+    note_types = cast(
+        Dict[NotetypeId, NotetypeDict],
+        client.get_note_types_dict_for_deck(ankihub_did),
+    )
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
         notes=notes_data,
