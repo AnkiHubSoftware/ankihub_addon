@@ -1745,7 +1745,7 @@ class TestGetNoteType:
             anki_note_type_id=ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
         )
         assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
-        assert note_type["name"] == "Test_note_type"
+        assert note_type["name"] == "Cloze (test1)"
 
     def test_get_not_existing_note_type(
         self, authorized_client_for_user_test1: AnkiHubClient
@@ -1768,7 +1768,7 @@ class TestGetNoteTypesDictForDeck:
 
         note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
         assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
-        assert note_type["name"] == "Test_note_type"
+        assert note_type["name"] == "Cloze (test1)"
 
 
 @pytest.mark.vcr()
