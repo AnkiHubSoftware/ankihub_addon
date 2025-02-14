@@ -412,7 +412,7 @@ def _show_llm_response(editor: Editor, response: str) -> None:
         showWarning("Invalid JSON response from LLM")
         return
 
-    dialog = QDialog(active_window_or_mw())
+    dialog = QDialog(editor.parentWindow)
     dialog.setWindowTitle("LLM Response - Field Changes")
     dialog.setMinimumWidth(800)
     dialog.setMinimumHeight(600)
