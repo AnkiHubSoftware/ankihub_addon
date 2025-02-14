@@ -59,8 +59,8 @@ from .utils import (
     tooltip_stylesheet,
 )
 
-NOTE_TYPE_CHANGES_WARNING = "⚠️ Note type changes require a full sync and "
-"<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>"
+NOTE_TYPE_CHANGES_WARNING = "⚠️ Note type changes require a full sync and \
+<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>"
 
 
 class DeckManagementDialog(QDialog):
@@ -705,19 +705,35 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_update_templates_btn_clicked(self) -> None:
-        confirm = ask_user(
-            "<b>Proceed?</b><br><br>"
-            "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
-            + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
-            + NOTE_TYPE_CHANGES_WARNING,
-            title="Update templates for all users",
-        )
-        if not confirm:
-            return
+        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
+            if not ret.name:
+                return
 
-        update_deck_templates(self._selected_ah_did())
-        tooltip("Templates updated", parent=aqt.mw)
-        self._update_templates_btn_state()
+            note_type = aqt.mw.col.models.by_name(ret.name)
+            confirm = ask_user(
+                "<b>Proceed?</b><br><br>"
+                "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
+                + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
+                + NOTE_TYPE_CHANGES_WARNING,
+                title="Update templates for all users",
+            )
+            if not confirm:
+                return
+
+            update_deck_templates(self._selected_ah_did(), note_type)
+            tooltip("Templates updated", parent=aqt.mw)
+            self._update_templates_btn_state()
+
+        SearchableSelectionDialog(
+            aqt.mw,
+            names=lambda: self._get_note_type_names_for_deck(
+                self._selected_ah_did(), assigned_to_deck=True
+            ),
+            accept="Choose",
+            title="Which note type do you want to update?",
+            parent=self,
+            callback=on_note_type_selected,
+        )
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)

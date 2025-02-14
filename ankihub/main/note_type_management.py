@@ -45,5 +45,5 @@ def deck_has_template_changes(ah_did: uuid.UUID) -> bool:
     return False
 
 
-def update_deck_templates(ah_did: uuid.UUID) -> None:
+def update_deck_templates(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
     print("update_deck_templates", ah_did)
