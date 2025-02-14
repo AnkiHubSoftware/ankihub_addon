@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from datetime import date, datetime, time
-from typing import Any, Callable, Dict, Type, TypeVar, Union
+from typing import Any, Type, TypeVar, Union, final
 from uuid import UUID
 
 import orjson
@@ -14,10 +15,11 @@ T = TypeVar("T", bound="DataClassORJSONMixin")
 
 EncodedData = Union[str, bytes, bytearray]
 Encoder = Callable[[Any], EncodedData]
-Decoder = Callable[[EncodedData], Dict[Any, Any]]
+Decoder = Callable[[EncodedData], dict[Any, Any]]
 
 
 class OrjsonDialect(Dialect):
+    no_copy_collections = (list, dict)
     serialization_strategy = {
         datetime: {"serialize": pass_through},
         date: {"serialize": pass_through},
@@ -45,23 +47,23 @@ class DataClassORJSONMixin(DataClassDictMixin):
         },
     }
 
+    @final
     def to_jsonb(
         self: T,
         encoder: Encoder = orjson.dumps,
         *,
         orjson_options: int = ...,
-        **to_dict_kwargs,
-    ) -> bytes:
-        ...
+        **to_dict_kwargs: Any,
+    ) -> bytes: ...
 
-    def to_json(self: T, **kwargs) -> str:
+    def to_json(self: T, **kwargs: Any) -> str:
         return self.to_jsonb(**kwargs).decode()
 
     @classmethod
+    @final
     def from_json(
         cls: Type[T],
         data: EncodedData,
         decoder: Decoder = orjson.loads,
-        **from_dict_kwargs,
-    ) -> T:
-        ...
+        **from_dict_kwargs: Any,
+    ) -> T: ...
