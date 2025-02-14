@@ -3795,7 +3795,7 @@ class TestDeckManagementDialog:
                 new_destination_deck_name
             )
             mock_study_deck_dialog_with_cb(
-                "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
+                "ankihub.gui.decks_dialog.SearchableSelectionDialog",
                 deck_name=new_destination_deck_name,
             )
 
