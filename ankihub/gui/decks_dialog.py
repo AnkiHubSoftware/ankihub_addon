@@ -59,6 +59,9 @@ from .utils import (
     tooltip_stylesheet,
 )
 
+NOTE_TYPE_CHANGES_WARNING = "⚠️ Note type changes require a full sync and "
+"<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>"
+
 
 class DeckManagementDialog(QDialog):
     _window: Optional["DeckManagementDialog"] = None
@@ -627,8 +630,9 @@ class DeckManagementDialog(QDialog):
             if not ret.name:
                 return
             confirm = ask_user(
-                "Add this note type to all AnkiHub users of your deck?",
-                title="Add Note Type",
+                "<b>Proceed?</b><br><br>"
+                "Confirm to add this note type for all AnkiHub users of your deck.<br><br>",
+                title="Add note type for all users",
             )
             if not confirm:
                 return
@@ -644,7 +648,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=False
             ),
             accept="Choose",
-            title="Add Note Type",
+            title="Which note type do you want to add?",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -666,17 +670,26 @@ class DeckManagementDialog(QDialog):
                 tooltip("No new fields to add", parent=aqt.mw)
                 return
             new_fields = choose_subset(
-                f"Choose fields to add to the <b>{note_type['name']}</b> note type",
+                "",
                 choices=new_fields,
                 current=[],
                 buttons=[
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
-                title="Add Fields",
+                title="Which fields do you want to add?",
                 parent=self,
             )
             if new_fields:
+                confirm = ask_user(
+                    "<b>Proceed?</b><br><br>"
+                    "Confirm to add the fields to all AnkiHub users of your deck.<br><br>"
+                    + NOTE_TYPE_CHANGES_WARNING,
+                    title="Add fields for all users",
+                )
+                if not confirm:
+                    return
+
                 update_note_type_fields(note_type, new_fields)
                 tooltip("Fields added", parent=aqt.mw)
 
@@ -693,16 +706,17 @@ class DeckManagementDialog(QDialog):
 
     def _on_update_templates_btn_clicked(self) -> None:
         confirm = ask_user(
-            "Confirm to update the note styling and templates for all AnkiHub users of your deck.<br><br>"
-            "Please note that <b>certain changes may break the note type</b> so proceed with caution.",
-            title="Proceed?",
-            yes_button_label="OK",
-            no_button_label="Cancel",
+            "<b>Proceed?</b><br><br>"
+            "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
+            + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
+            + NOTE_TYPE_CHANGES_WARNING,
+            title="Update templates for all users",
         )
         if not confirm:
             return
+
         update_deck_templates(self._selected_ah_did())
-        tooltip("Changes updated", parent=aqt.mw)
+        tooltip("Templates updated", parent=aqt.mw)
         self._update_templates_btn_state()
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
