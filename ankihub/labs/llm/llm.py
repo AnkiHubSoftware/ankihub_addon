@@ -275,11 +275,8 @@ def _check_and_install_uv() -> None:
                     check=True,
                 )
             else:  # macOS and Linux
-                subprocess.run(
-                    "curl -LsSf https://astral.sh/uv/install.sh | sh",
-                    shell=True,
-                    check=True,
-                )
+                script_path = Path(__file__).parents[4] / "scripts" / "install_uv.sh"
+                subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed uv")
         except subprocess.CalledProcessError as e:
             showWarning(f"Failed to install uv: {str(e)}")
@@ -293,27 +290,9 @@ def _install_llm() -> None:
         print("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            # Install base llm package
-            subprocess.run(
-                ["uv", "tool", "install", "llm"],
-                check=True,
-                capture_output=True,
-            )
+            script_path = Path(__file__).parents[4] / "scripts" / "install_llm.sh"
+            subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed llm")
-
-            # Install additional providers
-            providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
-            for provider in providers:
-                try:
-                    subprocess.run(
-                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
-                        check=True,
-                        capture_output=True,
-                    )
-                    print(f"Successfully installed {provider}")
-                except subprocess.CalledProcessError as e:
-                    showWarning(f"Failed to install {provider}: {str(e)}")
-
         except subprocess.CalledProcessError as e:
             showWarning(f"Failed to install llm: {str(e)}")
 
