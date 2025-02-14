@@ -24,6 +24,7 @@ from aqt.qt import (
 from aqt.utils import showWarning, tooltip
 from jinja2 import Template
 
+from ...gui.operations import AddonQueryOp
 from ...gui.utils import active_window_or_mw
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
@@ -308,8 +309,17 @@ def _install_llm() -> None:
 
 def setup() -> None:
     """Set up the LLM prompt functionality."""
-    _check_and_install_uv()
-    _install_llm()
+
+    def _install_labs_dependencies():
+        _check_and_install_uv()
+        _install_llm()
+
+    AddonQueryOp(
+        parent=active_window_or_mw(),
+        op=lambda _: _install_labs_dependencies(),
+        success=lambda _: None,
+    ).with_progress("Setting up AnkiHub Labs").run_in_background()
+
     TemplateManager.initialize()  # Initialize templates path
     gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
     gui_hooks.webview_did_receive_js_message.append(_handle_js_message)
