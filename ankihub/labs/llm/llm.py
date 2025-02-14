@@ -290,8 +290,17 @@ def _install_llm() -> None:
         print("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            script_path = Path(__file__).parent / "install_llm.sh"
-            subprocess.run([str(script_path)], check=True)
+            if platform.system() == "Windows":
+                subprocess.run(["uv", "tool", "install", "llm"], check=True)
+                providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
+                for provider in providers:
+                    subprocess.run(
+                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
+                        check=True,
+                    )
+            else:
+                script_path = Path(__file__).parent / "install_llm.sh"
+                subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed llm")
         except subprocess.CalledProcessError as e:
             showWarning(f"Failed to install llm: {str(e)}")
