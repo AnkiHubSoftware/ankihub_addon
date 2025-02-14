@@ -275,7 +275,7 @@ def _check_and_install_uv() -> None:
                     check=True,
                 )
             else:  # macOS and Linux
-                script_path = Path(__file__).parents[4] / "scripts" / "install_uv.sh"
+                script_path = Path(__file__).parent / "install_uv.sh"
                 subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed uv")
         except subprocess.CalledProcessError as e:
@@ -290,7 +290,7 @@ def _install_llm() -> None:
         print("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            script_path = Path(__file__).parents[4] / "scripts" / "install_llm.sh"
+            script_path = Path(__file__).parent / "install_llm.sh"
             subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed llm")
         except subprocess.CalledProcessError as e:
