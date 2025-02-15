@@ -258,11 +258,15 @@ class _Config:
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
     def save_token(self, token: str):
+        token_changed = self.token() != token
+
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
-        for func in self.token_change_hook:
-            # Prevent potential exceptions from being backpropagated to the caller.
-            aqt.mw.taskman.run_on_main(func)
+
+        if token_changed:
+            for func in self.token_change_hook:
+                # Prevent potential exceptions from being backpropagated to the caller.
+                aqt.mw.taskman.run_on_main(func)
 
     def save_user_email(self, user_email: str):
         # aqt.mw.pm.set_ankihub_username(user_email)
