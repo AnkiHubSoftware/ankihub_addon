@@ -108,7 +108,7 @@ class TemplateManager:
             return "Template file not found"
 
         try:
-            return template_file.read_text()
+            return template_file.read_text(encoding="utf-8")
         except Exception as e:
             return f"Error reading template: {str(e)}"
 
