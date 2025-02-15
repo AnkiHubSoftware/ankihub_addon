@@ -4,8 +4,11 @@ set -e
 # Ensure ~/.local/bin is in PATH
 export PATH="$HOME/.local/bin:$PATH"
 
+# Define UV executable path
+UV_PATH="$HOME/.local/bin/uv"
+
 function check_uv() {
-    uv version
+    "$UV_PATH" version
 }
 
 function install_uv() {
@@ -22,16 +25,16 @@ function check_llm() {
 
 function install_llm() {
     # Install llm using uv
-    uv tool install llm
+    "$UV_PATH" tool install llm
 
     # Install additional providers
-    uv run --no-project llm install -U llm-gemini
-    uv run --no-project llm install -U llm-perplexity
-    uv run --no-project llm install -U llm-claude-3
+    "$UV_PATH" run --no-project llm install -U llm-gemini
+    "$UV_PATH" run --no-project llm install -U llm-perplexity
+    "$UV_PATH" run --no-project llm install -U llm-claude-3
 }
 
 function get_templates_path() {
-    uv run --no-project llm templates path
+    "$UV_PATH" run --no-project llm templates path
 }
 
 function execute_prompt() {
@@ -39,7 +42,7 @@ function execute_prompt() {
     # $1: template_name
     # $2: note_schema
     # $3: note_content
-    uv run --no-project llm -m gpt-4o --no-stream -t "$1" -p note_schema "$2" "$3" -o json_object 1
+    "$UV_PATH" run --no-project llm -m gpt-4o --no-stream -t "$1" -p note_schema "$2" "$3" -o json_object 1
 }
 
 # Main command router
