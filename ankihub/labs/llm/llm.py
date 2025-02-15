@@ -79,11 +79,15 @@ class TemplateManager:
                 target_path = cls._templates_path / template_file.name
                 if not target_path.exists():
                     LOGGER.info("Copying template", template=template_file.name)
-                    target_path.write_text(template_file.read_text())
+                    target_path.write_text(
+                        template_file.read_text(encoding="utf-8"), encoding="utf-8"
+                    )
                 else:
                     LOGGER.info("Template already exists", template=template_file.name)
         except Exception as e:
-            LOGGER.error("Error copying templates", error=str(e))
+            LOGGER.error(
+                "Error copying templates", error=str(e), path=str(cls._templates_path)
+            )
 
     @classmethod
     def get_templates_path(cls):
