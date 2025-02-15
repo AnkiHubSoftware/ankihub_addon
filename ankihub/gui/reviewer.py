@@ -465,12 +465,22 @@ def _inject_ankihub_features_and_setup_sidebar(
         reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    def check_premium_and_notify_buttons_once(card: Card) -> None:
-        if _visible_buttons(card):
-            _check_premium_and_notify_buttons()
-            reviewer_did_show_question.remove(check_premium_and_notify_buttons_once)
+    if _check_premium_and_notify_buttons_once not in reviewer_did_show_question._hooks:
+        reviewer_did_show_question.append(_check_premium_and_notify_buttons_once)
 
-    reviewer_did_show_question.append(check_premium_and_notify_buttons_once)
+    if _check_premium_and_notify_buttons_once not in config.token_change_hook:
+        config.token_change_hook.append(_check_premium_and_notify_buttons_once)
+
+
+def _check_premium_and_notify_buttons_once(*args, **kwargs) -> None:
+    card = aqt.mw.reviewer.card
+
+    if not card:
+        return
+
+    if _visible_buttons(card):
+        _check_premium_and_notify_buttons()
+        reviewer_did_show_question.remove(_check_premium_and_notify_buttons_once)
 
 
 def _check_premium_and_notify_buttons() -> None:
