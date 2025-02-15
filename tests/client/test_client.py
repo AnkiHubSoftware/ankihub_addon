@@ -336,14 +336,14 @@ def new_note_suggestion(
         ah_nid=ah_nid,
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front1", order=0),
-            Field(name="Back", value="back1", order=1),
+            Field(name="Text", value="text1", order=0),
+            Field(name="Extra", value="extra1", order=1),
         ],
         tags=["tag1", "tag2"],
         guid="asdf",
         comment="comment1",
         ah_did=ah_nid,
-        note_type_name="Cloze",
+        note_type_name="Cloze (test1)",
         anki_note_type_id=1,
     )
 
@@ -356,8 +356,8 @@ def new_note_suggestion_note_info(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front1", order=0),
-            Field(name="Back", value="back1", order=1),
+            Field(name="Text", value="text1", order=0),
+            Field(name="Extra", value="extra1", order=1),
         ],
         tags=["tag1", "tag2"],
         mid=1,
@@ -374,8 +374,8 @@ def change_note_suggestion(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front2", order=0),
-            Field(name="Back", value="back2", order=1),
+            Field(name="Text", value="text2", order=0),
+            Field(name="Extra", value="extra2", order=1),
         ],
         added_tags=["tag3", "tag4"],
         removed_tags=[],
@@ -610,7 +610,7 @@ class TestCreateSuggestion:
         cns: ChangeNoteSuggestion = change_note_suggestion
         cns.ah_nid = new_note_suggestion.ah_nid
         cns.fields = [
-            Field(name="Front", value="front2", order=0),
+            Field(name="Text", value="text2", order=0),
         ]
 
         # ... this shouldn't raise an exception
