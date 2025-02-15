@@ -20,7 +20,7 @@ def update_feature_flags_in_background() -> None:
         LOGGER.info("Set up feature flags.")
 
         for callback in _feature_flags_update_callbacks:
-            callback()
+            aqt.mw.taskman.run_on_main(callback)
 
     AddonQueryOp(
         parent=aqt.mw,
