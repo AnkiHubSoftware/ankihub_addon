@@ -29,8 +29,9 @@ class SecretsDialog(QDialog):
     def _get_keys_file_path(self) -> Path:
         """Get the path to the keys.json file."""
         try:
+            script_path = Path(__file__).parent.parent / "llm" / "llm.sh"
             result = subprocess.run(
-                ["uv", "run", "--no-project", "llm", "keys", "path"],
+                [str(script_path), "get_keys_path"],
                 capture_output=True,
                 text=True,
                 check=True,

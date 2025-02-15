@@ -37,6 +37,10 @@ function get_templates_path() {
     "$UV_PATH" run --no-project llm templates path
 }
 
+function get_keys_path() {
+    "$UV_PATH" run --no-project llm keys path
+}
+
 function execute_prompt() {
     # Arguments:
     # $1: template_name
@@ -64,6 +68,9 @@ case $cmd in
         ;;
     "get_templates_path")
         get_templates_path
+        ;;
+    "get_keys_path")
+        get_keys_path
         ;;
     "execute_prompt")
         execute_prompt "$@"
