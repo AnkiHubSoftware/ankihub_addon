@@ -475,10 +475,7 @@ def _inject_ankihub_features_and_setup_sidebar(
 def _check_premium_and_notify_buttons_once(*args, **kwargs) -> None:
     card = aqt.mw.reviewer.card
 
-    if not card:
-        return
-
-    if _visible_buttons(card):
+    if card and _visible_buttons(card):
         _check_premium_and_notify_buttons()
         reviewer_did_show_question.remove(_check_premium_and_notify_buttons_once)
 
