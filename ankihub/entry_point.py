@@ -241,8 +241,11 @@ def _general_setup():
     if config.labs_enabled:
         from .labs.llm import llm
 
-        llm.setup()
-        LOGGER.info("Set up LLM prompt functionality.")
+        try:
+            llm.setup()
+            LOGGER.info("Set up LLM prompt functionality.")
+        except Exception as e:
+            LOGGER.exception("Failed to set up LLM prompt functionality", error=e)
 
 
 def _copy_web_media_to_media_folder():

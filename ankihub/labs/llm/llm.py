@@ -4,6 +4,7 @@ import difflib
 import json
 import platform
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -24,10 +25,14 @@ from aqt.qt import (
 from aqt.utils import showWarning, tooltip
 from jinja2 import Template
 
+from ... import LOGGER
 from ...gui.operations import AddonQueryOp
 from ...gui.utils import active_window_or_mw
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
+
+# Modify the system path by prepending $HOME/.local/bin with sys.path.insert
+sys.path.insert(0, str(Path.home() / ".local/bin"))
 
 
 class TemplateManager:
@@ -40,22 +45,23 @@ class TemplateManager:
     def initialize(cls) -> None:
         """Initialize the template manager by finding the templates directory."""
         try:
+            script_path = Path(__file__).parent / "get_templates_path.sh"
             result = subprocess.run(
-                ["uv", "run", "--no-project", "llm", "templates", "path"],
+                [str(script_path)],
                 capture_output=True,
                 text=True,
                 check=True,
             )
             cls._templates_path = Path(result.stdout.strip())
-            print(f"Templates directory: {cls._templates_path}")
+            LOGGER.info("Templates directory found", path=str(cls._templates_path))
 
             # After finding templates path, try to copy local templates
             cls._copy_local_templates()
         except subprocess.CalledProcessError as e:
-            print(f"Error finding templates directory: {e.stderr}")
+            LOGGER.error("Error finding templates directory", error=str(e.stderr))
             cls._templates_path = None
         except Exception as e:
-            print(f"Unexpected error finding templates directory: {str(e)}")
+            LOGGER.error("Unexpected error finding templates directory", error=str(e))
             cls._templates_path = None
 
     @classmethod
@@ -72,12 +78,12 @@ class TemplateManager:
             for template_file in cls._local_templates_dir.glob("*.yaml"):
                 target_path = cls._templates_path / template_file.name
                 if not target_path.exists():
-                    print(f"Copying template: {template_file.name}")
+                    LOGGER.info("Copying template", template=template_file.name)
                     target_path.write_text(template_file.read_text())
                 else:
-                    print(f"Template already exists: {template_file.name}")
+                    LOGGER.info("Template already exists", template=template_file.name)
         except Exception as e:
-            print(f"Error copying templates: {str(e)}")
+            LOGGER.error("Error copying templates", error=str(e))
 
     @classmethod
     def get_templates_path(cls):
@@ -265,8 +271,9 @@ class PromptPreviewDialog(QDialog):
 def _check_and_install_uv() -> None:
     """Check if uv is installed and install it if not."""
     try:
-        subprocess.run(["uv", "version"], capture_output=True, check=True)
-        print("uv is installed")
+        script_path = Path(__file__).parent / "check_uv.sh"
+        subprocess.run([str(script_path)], capture_output=True, check=True)
+        LOGGER.info("uv is installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
             if platform.system() == "Windows":
@@ -287,8 +294,9 @@ def _install_llm() -> None:
     """Install llm and additional providers using uv if not already installed."""
     # TODO Prompt users to set up their API keys.
     try:
-        subprocess.run(["llm", "--version"], capture_output=True, check=True)
-        print("llm is already installed")
+        check_llm_script = Path(__file__).parent / "check_llm.sh"
+        subprocess.run([str(check_llm_script)], capture_output=True, check=True)
+        LOGGER.info("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
             if platform.system() == "Windows":
@@ -304,7 +312,7 @@ def _install_llm() -> None:
                 subprocess.run([str(script_path)], check=True)
             tooltip("Successfully installed llm")
         except subprocess.CalledProcessError as e:
-            showWarning(f"Failed to install llm: {str(e)}")
+            showWarning(f"Failed to install uv: {str(e)}")
 
 
 def setup() -> None:
@@ -511,32 +519,11 @@ def _execute_prompt_template(
 
     try:
         # Run the LLM command with the template and note content
-        import shlex
-
-        escaped_content = shlex.quote(note_content)
         note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
-
-        cmd = [
-            "uv",
-            "run",
-            "--no-project",
-            "llm",
-            "-m",
-            "gpt-4o",
-            "--no-stream",
-            "-t",
-            template_name,
-            "-p",
-            "note_schema",
-            shlex.quote(note_schema),
-            escaped_content,
-            "-o",
-            "json_object",
-            "1",
-        ]
+        script_path = Path(__file__).parent / "execute_prompt.sh"
 
         result = subprocess.run(
-            cmd,
+            [str(script_path), template_name, note_schema, note_content],
             capture_output=True,
             text=True,
             check=True,
