@@ -494,9 +494,13 @@ def _check_premium_and_notify_buttons() -> None:
         )
         aqt.mw.reviewer.web.eval(js)
 
+    def on_failure(exception: Exception) -> None:
+        notify_reviewer_buttons(False)
+        raise exception
+
     AddonQueryOp(
         op=fetch_is_premium_or_trialing, success=notify_reviewer_buttons, parent=aqt.mw
-    ).without_collection().run_in_background()
+    ).without_collection().failure(on_failure).run_in_background()
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
