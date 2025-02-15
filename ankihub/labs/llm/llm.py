@@ -425,15 +425,6 @@ def _create_diff_html(original: str, suggested: str) -> str:
 
 def _show_llm_response(editor: Editor, response: str) -> None:
     """Display the LLM response in a dialog with option to update note."""
-    try:
-        suggested_fields = json.loads(response)
-        if not isinstance(suggested_fields, dict):
-            showWarning("Invalid response format. Expected a JSON object.")
-            return
-    except json.JSONDecodeError:
-        showWarning("Invalid JSON response from LLM")
-        return
-
     dialog = QDialog(editor.parentWindow)
     dialog.setWindowTitle("LLM Response - Field Changes")
     dialog.setMinimumWidth(800)
@@ -445,7 +436,7 @@ def _show_llm_response(editor: Editor, response: str) -> None:
     text_edit = QTextEdit()
     text_edit.setReadOnly(True)
 
-    # Build HTML content showing diffs for each field
+    # Build HTML content showing diff for the first field
     html_content = [
         "<style>",
         "body { font-family: monospace; }",
@@ -454,14 +445,15 @@ def _show_llm_response(editor: Editor, response: str) -> None:
         "</style>",
     ]
 
+    # Get the first field's name and content
     note = editor.note
-    for field_name, suggested_content in suggested_fields.items():
-        if field_name in note:
-            original_content = note[field_name]
-            html_content.append(f'<div class="field-name">{field_name}:</div>')
-            html_content.append('<div class="field-content">')
-            html_content.append(_create_diff_html(original_content, suggested_content))
-            html_content.append("</div>")
+    if note and note.keys():
+        field_name = note.keys()[0]
+        original_content = note[field_name]
+        html_content.append(f'<div class="field-name">{field_name}:</div>')
+        html_content.append('<div class="field-content">')
+        html_content.append(_create_diff_html(original_content, response))
+        html_content.append("</div>")
 
     text_edit.setHtml("".join(html_content))
     layout.addWidget(text_edit)
@@ -486,22 +478,16 @@ def _show_llm_response(editor: Editor, response: str) -> None:
 
 def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
     """Handle the update note button click."""
-
     dialog.accept()
 
     try:
-        # Parse the JSON response
-        new_fields = json.loads(response)
-        if not isinstance(new_fields, dict):
-            showWarning("Invalid response format. Expected a JSON object.")
-            return
-
-        # Update the note
-        _update_note_fields(editor, new_fields)
-        tooltip("Note updated successfully")
-
-    except json.JSONDecodeError:
-        showWarning("Invalid JSON response from LLM")
+        note = editor.note
+        if note and note.keys():
+            # Update only the first field
+            field_name = note.keys()[0]
+            note[field_name] = response
+            editor.loadNoteKeepingFocus()
+            tooltip("Note updated successfully")
     except Exception as e:
         showWarning(f"Error updating note: {str(e)}")
 
@@ -517,13 +503,13 @@ def _execute_prompt_template(
 ) -> None:
     """Execute the selected prompt template with the current note as input."""
     note_content = _get_note_content(editor)
+    text_field = editor.note.items()[0][1]
     if not note_content:
         tooltip("No note content available")
         return
 
     try:
         # Run the LLM command with the template and note content
-        note_schema = json.dumps([{field: "string" for field in editor.note.keys()}])
         script_path = Path(__file__).parent / "llm.sh"
 
         result = subprocess.run(
@@ -531,8 +517,7 @@ def _execute_prompt_template(
                 str(script_path),
                 "execute_prompt",
                 template_name,
-                note_schema,
-                note_content,
+                text_field,
             ],
             capture_output=True,
             text=True,

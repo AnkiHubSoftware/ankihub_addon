@@ -46,7 +46,7 @@ function execute_prompt() {
     # $1: template_name
     # $2: note_schema
     # $3: note_content
-    "$UV_PATH" run --no-project llm -m gpt-4o --no-stream -t "$1" -p note_schema "$2" "$3" -o json_object 1
+    "$UV_PATH" run --no-project llm -m gpt-4o --no-stream -t "$1" "$2"
 }
 
 # Main command router
