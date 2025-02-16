@@ -305,18 +305,33 @@ def _install_llm() -> None:
         try:
             if platform.system() == "Windows":
                 subprocess.run(["uv", "tool", "install", "llm"], check=True)
-                providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
-                for provider in providers:
-                    subprocess.run(
-                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
-                        check=True,
-                    )
             else:
                 script_path = Path(__file__).parent / "llm.sh"
                 subprocess.run([str(script_path), "install_llm"], check=True)
             tooltip("Successfully installed llm")
+            LOGGER.info("Successfully installed llm")
         except subprocess.CalledProcessError as e:
-            showWarning(f"Failed to install uv: {str(e)}")
+            showWarning(f"Failed to install llm: {str(e)}")
+            LOGGER.error("Failed to install llm", error=str(e))
+            return
+
+    # Install providers regardless of llm installation status
+    try:
+        if platform.system() == "Windows":
+            providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
+            for provider in providers:
+                subprocess.run(
+                    ["uv", "run", "--no-project", "llm", "install", "-U", provider],
+                    check=True,
+                )
+        else:
+            script_path = Path(__file__).parent / "llm.sh"
+            subprocess.run([str(script_path), "install_providers"], check=True)
+        tooltip("Successfully installed llm providers")
+        LOGGER.info("Successfully installed llm providers")
+    except subprocess.CalledProcessError as e:
+        showWarning(f"Failed to install llm providers: {str(e)}")
+        LOGGER.error("Failed to install llm providers", error=str(e))
 
 
 def setup() -> None:
