@@ -27,7 +27,7 @@ from jinja2 import Template
 
 from ... import LOGGER
 from ...gui.operations import AddonQueryOp
-from ...gui.utils import active_window_or_mw
+from ...gui.utils import active_window_or_mw, ask_user
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
 
@@ -239,6 +239,11 @@ class PromptPreviewDialog(QDialog):
         save_button.clicked.connect(self._on_save)
         button_layout.addWidget(save_button)
 
+        # Reset button
+        reset_button = QPushButton("Reset Template")
+        reset_button.clicked.connect(self._on_reset)
+        button_layout.addWidget(reset_button)
+
         # Cancel button
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
@@ -271,6 +276,30 @@ class PromptPreviewDialog(QDialog):
         modified_content = self._get_yaml_content()
         self.accept()
         _execute_prompt_template(self.editor, self.template_name, modified_content)
+
+    def _update_editors(self) -> None:
+        """Update the YAML editors with the current yaml_data."""
+        for key, editor in self.section_editors.items():
+            if key in self.yaml_data:
+                editor.setPlainText(str(self.yaml_data[key]))
+            else:
+                editor.setPlainText("")
+
+    def _on_reset(self) -> None:
+        """Reset the template to the version in the local templates directory."""
+        if ask_user(
+            "Are you sure you want to reset the template to the original version?"
+        ):
+            local_template_path = (
+                TemplateManager._local_templates_dir / f"{self.template_name}.yaml"
+            )
+            self.template_content = local_template_path.read_text(encoding="utf-8")
+            self.yaml_data = yaml.safe_load(self.template_content)
+            if not isinstance(self.yaml_data, dict):
+                self.yaml_data = {}
+            self._update_editors()  # Update the editors with the reset content
+            TemplateManager.save_template(self.template_name, self.template_content)
+            tooltip("Template reset.", parent=self)
 
 
 def _check_and_install_uv() -> None:
