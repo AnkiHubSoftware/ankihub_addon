@@ -31,6 +31,8 @@ from ...gui.utils import active_window_or_mw
 
 PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
 
+LLM_SCRIPT_PATH = Path(__file__).parent / "llm.sh"
+
 # Modify the system path by prepending $HOME/.local/bin with sys.path.insert
 sys.path.insert(0, str(Path.home() / ".local/bin"))
 
@@ -45,9 +47,8 @@ class TemplateManager:
     def initialize(cls) -> None:
         """Initialize the template manager by finding the templates directory."""
         try:
-            script_path = Path(__file__).parent / "llm.sh"
             result = subprocess.run(
-                [str(script_path), "get_templates_path"],
+                [str(LLM_SCRIPT_PATH), "get_templates_path"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -275,8 +276,9 @@ class PromptPreviewDialog(QDialog):
 def _check_and_install_uv() -> None:
     """Check if uv is installed and install it if not."""
     try:
-        script_path = Path(__file__).parent / "llm.sh"
-        subprocess.run([str(script_path), "check_uv"], capture_output=True, check=True)
+        subprocess.run(
+            [str(LLM_SCRIPT_PATH), "check_uv"], capture_output=True, check=True
+        )
         LOGGER.info("uv is installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
@@ -287,33 +289,30 @@ def _check_and_install_uv() -> None:
                     check=True,
                 )
             else:  # macOS and Linux
-                script_path = Path(__file__).parent / "llm.sh"
-                subprocess.run([str(script_path), "install_uv"], check=True)
-            tooltip("Successfully installed uv")
+                subprocess.run([str(LLM_SCRIPT_PATH), "install_uv"], check=True)
         except subprocess.CalledProcessError as e:
-            showWarning(f"Failed to install uv: {str(e)}")
+            LOGGER.warning("Failed to install uv", error=str(e))
+            raise e
 
 
 def _install_llm() -> None:
     """Install llm and additional providers using uv if not already installed."""
     # TODO Prompt users to set up their API keys.
     try:
-        script_path = Path(__file__).parent / "llm.sh"
-        subprocess.run([str(script_path), "check_llm"], capture_output=True, check=True)
+        subprocess.run(
+            [str(LLM_SCRIPT_PATH), "check_llm"], capture_output=True, check=True
+        )
         LOGGER.info("llm is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
             if platform.system() == "Windows":
                 subprocess.run(["uv", "tool", "install", "llm"], check=True)
             else:
-                script_path = Path(__file__).parent / "llm.sh"
-                subprocess.run([str(script_path), "install_llm"], check=True)
-            tooltip("Successfully installed llm")
+                subprocess.run([str(LLM_SCRIPT_PATH), "install_llm"], check=True)
             LOGGER.info("Successfully installed llm")
         except subprocess.CalledProcessError as e:
-            showWarning(f"Failed to install llm: {str(e)}")
-            LOGGER.error("Failed to install llm", error=str(e))
-            return
+            LOGGER.warning("Failed to install llm", error=str(e))
+            raise e
 
     # Install providers regardless of llm installation status
     try:
@@ -325,13 +324,11 @@ def _install_llm() -> None:
                     check=True,
                 )
         else:
-            script_path = Path(__file__).parent / "llm.sh"
-            subprocess.run([str(script_path), "install_providers"], check=True)
-        tooltip("Successfully installed llm providers")
+            subprocess.run([str(LLM_SCRIPT_PATH), "install_providers"], check=True)
         LOGGER.info("Successfully installed llm providers")
     except subprocess.CalledProcessError as e:
-        showWarning(f"Failed to install llm providers: {str(e)}")
-        LOGGER.error("Failed to install llm providers", error=str(e))
+        LOGGER.warning("Failed to install llm providers", error=str(e))
+        raise e
 
 
 def setup() -> None:
@@ -525,11 +522,9 @@ def _execute_prompt_template(
 
     try:
         # Run the LLM command with the template and note content
-        script_path = Path(__file__).parent / "llm.sh"
-
         result = subprocess.run(
             [
-                str(script_path),
+                str(LLM_SCRIPT_PATH),
                 "execute_prompt",
                 template_name,
                 text_field,

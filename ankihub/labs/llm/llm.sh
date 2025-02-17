@@ -26,7 +26,9 @@ function check_llm() {
 function install_llm() {
     # Install llm using uv
     "$UV_PATH" tool install llm
+}
 
+function install_providers(){
     # Install additional providers
     "$UV_PATH" run --no-project llm install -U llm-gemini
     "$UV_PATH" run --no-project llm install -U llm-perplexity
@@ -65,6 +67,9 @@ case $cmd in
         ;;
     "install_llm")
         install_llm
+        ;;
+    "install_providers")
+        install_providers
         ;;
     "get_templates_path")
         get_templates_path
