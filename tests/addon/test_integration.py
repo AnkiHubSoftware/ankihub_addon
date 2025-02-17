@@ -381,18 +381,9 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 @fixture
 def mock_ankihub_sync_dependencies(
     mock_client_methods_called_during_ankihub_sync: None,
-    mock_fetch_note_types_to_return_empty_dict: None,
 ) -> None:
     # Set a fake token so that the deck update is not aborted
     config.save_token("test_token")
-
-
-@fixture
-def mock_fetch_note_types_to_return_empty_dict(
-    mocker: MockerFixture,
-) -> None:
-    # This prevents the add-on from fetching the note types from the server
-    mocker.patch("ankihub.main.note_types._fetch_note_types")
 
 
 @pytest.fixture
@@ -403,9 +394,11 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
+    mocker.patch.object(AnkiHubClient, "get_note_types_dict_for_deck", return_value={})
 
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
+    deck_updates_mock.latest_update = None
     mocker.patch.object(
         AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock
     )
@@ -5732,7 +5725,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(
@@ -5782,7 +5775,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(anki_did=anki_did, has_note_embeddings=True)
@@ -5847,7 +5840,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(
@@ -5914,7 +5907,7 @@ class TestFlashCardSelector:
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             self._mock_load_url_to_show_page(mocker, body="Invalid token")
 
@@ -5935,7 +5928,7 @@ class TestFlashCardSelector:
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             ah_did = next_deterministic_uuid()
             dialog = FlashCardSelectorDialog.display_for_ah_did(
@@ -5960,7 +5953,7 @@ class TestFlashCardSelector:
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             fetch_and_apply_pending_notes_actions_for_deck = mocker.patch.object(
                 ah_deck_updater,

@@ -336,14 +336,14 @@ def new_note_suggestion(
         ah_nid=ah_nid,
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front1", order=0),
-            Field(name="Back", value="back1", order=1),
+            Field(name="Text", value="text1", order=0),
+            Field(name="Extra", value="extra1", order=1),
         ],
         tags=["tag1", "tag2"],
         guid="asdf",
         comment="comment1",
         ah_did=ah_nid,
-        note_type_name="Cloze",
+        note_type_name="Cloze (test1)",
         anki_note_type_id=1,
     )
 
@@ -356,8 +356,8 @@ def new_note_suggestion_note_info(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front1", order=0),
-            Field(name="Back", value="back1", order=1),
+            Field(name="Text", value="text1", order=0),
+            Field(name="Extra", value="extra1", order=1),
         ],
         tags=["tag1", "tag2"],
         mid=1,
@@ -374,8 +374,8 @@ def change_note_suggestion(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Front", value="front2", order=0),
-            Field(name="Back", value="back2", order=1),
+            Field(name="Text", value="text2", order=0),
+            Field(name="Extra", value="extra2", order=1),
         ],
         added_tags=["tag3", "tag4"],
         removed_tags=[],
@@ -610,7 +610,7 @@ class TestCreateSuggestion:
         cns: ChangeNoteSuggestion = change_note_suggestion
         cns.ah_nid = new_note_suggestion.ah_nid
         cns.fields = [
-            Field(name="Front", value="front2", order=0),
+            Field(name="Text", value="text2", order=0),
         ]
 
         # ... this shouldn't raise an exception
@@ -1745,7 +1745,7 @@ class TestGetNoteType:
             anki_note_type_id=ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
         )
         assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
-        assert note_type["name"] == "Cloze"
+        assert note_type["name"] == "Cloze (test1)"
 
     def test_get_not_existing_note_type(
         self, authorized_client_for_user_test1: AnkiHubClient
@@ -1755,6 +1755,20 @@ class TestGetNoteType:
             client.get_note_type(anki_note_type_id=-1)
 
         assert cast(AnkiHubHTTPError, excinfo.value).response.status_code == 404
+
+
+@pytest.mark.vcr()
+class TestGetNoteTypesDictForDeck:
+    def test_get_note_types_dict(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        assert len(note_types_by_id) == 1
+
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
+        assert note_type["name"] == "Cloze (test1)"
 
 
 @pytest.mark.vcr()
