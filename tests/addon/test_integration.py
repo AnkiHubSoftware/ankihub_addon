@@ -956,7 +956,9 @@ def test_create_note_type(
         note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
         note_type["name"] = "New Type"
         note_type["id"] = 0
-        note_type = aqt.mw.col.models.get(aqt.mw.col.models.add_dict(note_type).id)
+        note_type = aqt.mw.col.models.get(
+            NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
+        )
         expected_data = note_type.copy()
         requests_mock.post(
             f"{config.api_url}/decks/{ah_did}/create-note-type/",

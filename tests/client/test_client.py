@@ -1788,7 +1788,7 @@ class TestCreateNoteType:
         )
         assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
         assert len(note_types_by_id) == 2
-        new_note_type = note_types_by_id[note_type["id"]]
+        new_note_type = note_types_by_id[cast(int, note_type["id"])]
         assert new_note_type["id"] == note_type["id"]
         assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
 
