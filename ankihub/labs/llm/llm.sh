@@ -46,8 +46,7 @@ function get_keys_path() {
 function execute_prompt() {
     # Arguments:
     # $1: template_name
-    # $2: note_schema
-    # $3: note_content
+    # $2: note_content
     "$UV_PATH" run --no-project llm -m gpt-4o --no-stream -t "$1" "$2"
 }
 
