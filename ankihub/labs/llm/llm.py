@@ -343,21 +343,36 @@ def _install_llm() -> None:
             LOGGER.warning("Failed to install llm", error=str(e))
             raise e
 
-    # Install providers regardless of llm installation status
+    # Check installed providers
     try:
-        if platform.system() == "Windows":
-            providers = ["llm-gemini", "llm-perplexity", "llm-claude-3"]
-            for provider in providers:
-                subprocess.run(
-                    ["uv", "run", "--no-project", "llm", "install", "-U", provider],
-                    check=True,
-                )
-        else:
-            subprocess.run([str(LLM_SCRIPT_PATH), "install_providers"], check=True)
-        LOGGER.info("Successfully installed llm providers")
+        result = subprocess.run(
+            ["llm", "plugins"], capture_output=True, text=True, check=True
+        )
+        installed_plugins = {plugin["name"] for plugin in json.loads(result.stdout)}
     except subprocess.CalledProcessError as e:
-        LOGGER.warning("Failed to install llm providers", error=str(e))
-        raise e
+        LOGGER.warning("Failed to check installed providers", error=str(e))
+        installed_plugins = set()
+
+    # Install providers if not already installed
+    providers = ["llm-gemini", "llm-perplexity", "llm-anthropic"]
+    for provider in providers:
+        if provider in installed_plugins:
+            LOGGER.info(f"{provider} is already installed")
+        else:
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(
+                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
+                        check=True,
+                    )
+                else:
+                    subprocess.run(
+                        [str(LLM_SCRIPT_PATH), "install_provider", provider], check=True
+                    )
+                LOGGER.info(f"Successfully installed {provider}")
+            except subprocess.CalledProcessError as e:
+                LOGGER.warning(f"Failed to install {provider}", error=str(e))
+                raise e
 
 
 def setup() -> None:

@@ -28,11 +28,9 @@ function install_llm() {
     "$UV_PATH" tool install llm
 }
 
-function install_providers(){
-    # Install additional providers
-    "$UV_PATH" run --no-project llm install -U llm-gemini
-    "$UV_PATH" run --no-project llm install -U llm-perplexity
-    "$UV_PATH" run --no-project llm install -U llm-claude-3
+function install_provider(){
+    echo "Installing provider: '$1'"
+    "$UV_PATH" run --no-project llm install -U "$1"
 }
 
 function get_templates_path() {
@@ -67,8 +65,8 @@ case $cmd in
     "install_llm")
         install_llm
         ;;
-    "install_providers")
-        install_providers
+    "install_provider")
+        install_provider "$@"
         ;;
     "get_templates_path")
         get_templates_path
