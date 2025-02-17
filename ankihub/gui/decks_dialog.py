@@ -587,11 +587,11 @@ class DeckManagementDialog(QDialog):
             return box
 
         self.note_types_label = QLabel("<b>📝 Note Types</b>")
-        self.add_note_type_btn = QPushButton("Add note type")
+        self.add_note_type_btn = QPushButton("Publish note type")
         qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
-        self.add_field_btn = QPushButton("Add field")
+        self.add_field_btn = QPushButton("Publish field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
-        self.update_templates_btn = QPushButton("Update note styling and templates")
+        self.update_templates_btn = QPushButton("Publish style/template updates")
         self._update_templates_btn_state()
         qconnect(
             self.update_templates_btn.clicked, self._on_update_templates_btn_clicked
@@ -632,8 +632,8 @@ class DeckManagementDialog(QDialog):
                 return
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
-                "Confirm to add this note type for all AnkiHub users of your deck.<br><br>",
-                title="Add note type for all users",
+                "Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
+                title="Publish note type to all users",
             )
             if not confirm:
                 return
@@ -641,7 +641,7 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(ret.name)
             add_note_type(self._selected_ah_did(), note_type)
 
-            tooltip("Note type added", parent=aqt.mw)
+            tooltip("Note type published", parent=aqt.mw)
 
         SearchableSelectionDialog(
             aqt.mw,
@@ -649,7 +649,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=False
             ),
             accept="Choose",
-            title="Which note type do you want to add?",
+            title="Which note type do you want to publish?",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -668,7 +668,7 @@ class DeckManagementDialog(QDialog):
                 name for name in field_names if name not in ankihub_field_names
             ]
             if not new_fields:
-                tooltip("No new fields to add", parent=aqt.mw)
+                tooltip("No new fields to publish", parent=aqt.mw)
                 return
             new_fields = choose_subset(
                 "",
@@ -678,21 +678,21 @@ class DeckManagementDialog(QDialog):
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
-                title="Which fields do you want to add?",
+                title="Which fields do you want to publish?",
                 parent=self,
             )
             if new_fields:
                 confirm = ask_user(
                     "<b>Proceed?</b><br><br>"
-                    "Confirm to add the fields to all AnkiHub users of your deck.<br><br>"
+                    "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
                     + NOTE_TYPE_CHANGES_WARNING,
-                    title="Add fields for all users",
+                    title="Publish fields to all users",
                 )
                 if not confirm:
                     return
 
                 update_note_type_fields(note_type, new_fields)
-                tooltip("Fields added", parent=aqt.mw)
+                tooltip("Fields published", parent=aqt.mw)
 
         SearchableSelectionDialog(
             aqt.mw,
@@ -716,7 +716,7 @@ class DeckManagementDialog(QDialog):
                 "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
                 + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
                 + NOTE_TYPE_CHANGES_WARNING,
-                title="Update templates for all users",
+                title="Publish style/template updates to all users",
             )
             if not confirm:
                 return
