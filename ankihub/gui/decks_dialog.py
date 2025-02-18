@@ -738,7 +738,7 @@ class DeckManagementDialog(QDialog):
             tooltip("Templates updated", parent=aqt.mw)
             self._update_templates_btn_state()
 
-        nids_with_updates = note_types_with_template_changes_for_deck(
+        mids_with_updates = note_types_with_template_changes_for_deck(
             self._selected_ah_did()
         )
         SearchableSelectionDialog(
@@ -748,7 +748,7 @@ class DeckManagementDialog(QDialog):
                 for n in self._get_note_type_names_and_ids_for_deck(
                     self._selected_ah_did(), assigned_to_deck=True
                 )
-                if n.id in nids_with_updates
+                if n.id in mids_with_updates
             ],
             accept="Choose",
             title="Which note type do you want to update?",
