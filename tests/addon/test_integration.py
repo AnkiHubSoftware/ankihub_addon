@@ -133,6 +133,7 @@ from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
     DEFAULT_API_URL,
     DeckExtensionUpdateChunk,
+    _to_ankihub_note_type,
     _transform_notes_data,
 )
 from ankihub.common_utils import local_media_names_from_html
@@ -201,6 +202,7 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
+from ankihub.main.note_type_management import add_note_type
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import (
     SUBDECK_TAG,
@@ -379,18 +381,9 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 @fixture
 def mock_ankihub_sync_dependencies(
     mock_client_methods_called_during_ankihub_sync: None,
-    mock_fetch_note_types_to_return_empty_dict: None,
 ) -> None:
     # Set a fake token so that the deck update is not aborted
     config.save_token("test_token")
-
-
-@fixture
-def mock_fetch_note_types_to_return_empty_dict(
-    mocker: MockerFixture,
-) -> None:
-    # This prevents the add-on from fetching the note types from the server
-    mocker.patch("ankihub.main.note_types._fetch_note_types")
 
 
 @pytest.fixture
@@ -401,9 +394,11 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
+    mocker.patch.object(AnkiHubClient, "get_note_types_dict_for_deck", return_value={})
 
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
+    deck_updates_mock.latest_update = None
     mocker.patch.object(
         AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock
     )
@@ -947,6 +942,31 @@ def test_create_collaborative_deck_and_upload(
 
         # check that note mod value is in database
         assert AnkiHubNote.get(AnkiHubNote.anki_note_id == note.id).mod == note.mod
+
+
+def test_create_note_type(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    mocker: MockerFixture,
+    requests_mock: Mocker,
+):
+
+    with anki_session_with_addon_data.profile_loaded():
+        anki_did, ah_did = install_sample_ah_deck()
+        note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
+        note_type["name"] = "New Type"
+        note_type["id"] = 0
+        note_type = aqt.mw.col.models.get(
+            NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
+        )
+        expected_data = note_type.copy()
+        requests_mock.post(
+            f"{config.api_url}/decks/{ah_did}/create-note-type/",
+            json=_to_ankihub_note_type(expected_data),
+        )
+        new_note_type = add_note_type(ah_did, note_type)
+
+        assert new_note_type["id"] in ankihub_db.note_types_for_ankihub_deck(ah_did)
 
 
 class TestDownloadAndInstallDecks:
@@ -3770,7 +3790,7 @@ class TestDeckManagementDialog:
                 new_destination_deck_name
             )
             mock_study_deck_dialog_with_cb(
-                "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
+                "ankihub.gui.decks_dialog.SearchableSelectionDialog",
                 deck_name=new_destination_deck_name,
             )
 
@@ -5707,7 +5727,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(
@@ -5757,7 +5777,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(anki_did=anki_did, has_note_embeddings=True)
@@ -5822,7 +5842,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
             install_ah_deck(
@@ -5889,7 +5909,7 @@ class TestFlashCardSelector:
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             self._mock_load_url_to_show_page(mocker, body="Invalid token")
 
@@ -5910,7 +5930,7 @@ class TestFlashCardSelector:
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             ah_did = next_deterministic_uuid()
             dialog = FlashCardSelectorDialog.display_for_ah_did(
@@ -5935,7 +5955,7 @@ class TestFlashCardSelector:
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token")
+            mocker.patch.object(config, "token", return_value="test_token")
 
             fetch_and_apply_pending_notes_actions_for_deck = mocker.patch.object(
                 ah_deck_updater,

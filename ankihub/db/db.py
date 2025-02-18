@@ -296,7 +296,7 @@ class _AnkiHubDB:
         if not note:
             return None
 
-        field_names = self._note_type_field_names(
+        field_names = self.note_type_field_names(
             ankihub_did=note.ankihub_deck_id, anki_note_type_id=note.anki_note_type_id
         )
 
@@ -316,9 +316,7 @@ class _AnkiHubDB:
         field_names_by_mid: Dict[NotetypeId, List[str]] = {}
         for note in notes:
             if note.anki_note_type_id not in field_names_by_mid:
-                field_names_by_mid[
-                    note.anki_note_type_id
-                ] = self._note_type_field_names(
+                field_names_by_mid[note.anki_note_type_id] = self.note_type_field_names(
                     ankihub_did=cast(uuid.UUID, note.ankihub_deck_id),
                     anki_note_type_id=cast(NotetypeId, note.anki_note_type_id),
                 )
@@ -634,7 +632,7 @@ class _AnkiHubDB:
             .objects(flat)
         )
 
-    def _note_type_field_names(
+    def note_type_field_names(
         self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
     ) -> List[str]:
         """Returns the names of the fields of the note type."""

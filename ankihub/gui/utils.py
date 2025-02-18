@@ -28,11 +28,31 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
+from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, tooltip
 
 from .. import LOGGER
 from ..settings import config
+
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
+def add_button_from_param(
+    button_box: QDialogButtonBox, button: ButtonParam
+) -> QPushButton:
+    if isinstance(button, str):
+        button = button_box.addButton(button, QDialogButtonBox.ButtonRole.ActionRole)
+    elif isinstance(button, QDialogButtonBox.StandardButton):
+        button = button_box.addButton(button)
+    elif isinstance(button, tuple):
+        button = button_box.addButton(*button)
+
+    return button
 
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
@@ -70,6 +90,8 @@ def choose_subset(
     current: List[str] = [],
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
+    buttons: Optional[Sequence[ButtonParam]] = None,
+    title: str = "AnkiHub",
     parent: Any = None,
 ) -> Optional[List[str]]:
     if not parent:
@@ -77,12 +99,14 @@ def choose_subset(
 
     dialog = QDialog(parent)
     disable_help_button(dialog)
+    dialog.setWindowTitle(title)
 
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     layout = QVBoxLayout()
     dialog.setLayout(layout)
     label = QLabel(prompt)
     label.setOpenExternalLinks(True)
+    label.setWordWrap(True)
     layout.addWidget(label)
     list_widget = CustomListWidget()
     layout.addWidget(list_widget)
@@ -118,7 +142,12 @@ def choose_subset(
 
     layout.addSpacing(10)
 
-    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    button_box = QDialogButtonBox()
+    if buttons:
+        for button_param in buttons:
+            add_button_from_param(button_box, button_param)
+    else:
+        button_box.addButton(QDialogButtonBox.StandardButton.Ok)
     qconnect(button_box.accepted, dialog.accept)
     layout.addWidget(button_box)
 
@@ -136,6 +165,17 @@ def choose_subset(
         if list_widget.item(i).checkState() == Qt.CheckState.Checked
     ]
     return result
+
+
+class SearchableSelectionDialog(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        if kwargs.get("buttons") is None:
+            kwargs["buttons"] = []  # This removes the "Add" button
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
 
 
 class CustomListWidget(QListWidget):
@@ -223,13 +263,6 @@ def choose_ankihub_deck(
 
     chosen_deck_ah_did = ah_did_deck_config_tuples[chosen_deck_idx][0]
     return chosen_deck_ah_did
-
-
-ButtonParam = Union[
-    QDialogButtonBox.StandardButton,
-    str,
-    Tuple[str, QDialogButtonBox.ButtonRole],
-]
 
 
 class _Dialog(QDialog):
@@ -323,15 +356,7 @@ class _Dialog(QDialog):
 
         self.default_button = None
         for button_index, button in enumerate(self.buttons):
-            if isinstance(button, str):
-                button = button_box.addButton(
-                    button, QDialogButtonBox.ButtonRole.ActionRole
-                )
-            elif isinstance(button, QDialogButtonBox.StandardButton):
-                button = button_box.addButton(button)
-            elif isinstance(button, tuple):
-                button = button_box.addButton(*button)
-
+            button = add_button_from_param(button_box, button)
             qconnect(
                 button.clicked,
                 partial(self._on_btn_clicked_or_dialog_rejected, button_index),
