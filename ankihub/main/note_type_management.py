@@ -32,19 +32,23 @@ def update_note_type_fields(note_type: NotetypeDict, fields: List[str]) -> None:
     print("update_note_type_fields", note_type["name"], fields)
 
 
-def deck_has_template_changes(ah_did: uuid.UUID) -> bool:
+def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[NotetypeId]:
+    ids = []
     for mid in ankihub_db.note_types_for_ankihub_deck(ah_did):
+        changed = False
         db_note_type = ankihub_db.note_type_dict(ah_did, mid)
         note_type = aqt.mw.col.models.get(mid)
         if note_type["css"] != db_note_type["css"]:
-            return True
+            changed = True
         if len(note_type["tmpls"]) != len(db_note_type["tmpls"]):
-            return True
+            changed = True
         for i, tmpl in enumerate(note_type["tmpls"]):
             if tmpl != db_note_type["tmpls"][i]:
-                return True
-
-    return False
+                changed = True
+                break
+        if changed:
+            ids.append(mid)
+    return ids
 
 
 def update_deck_templates(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:

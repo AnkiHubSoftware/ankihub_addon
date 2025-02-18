@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 import aqt
-from anki.models import NotetypeId
+from anki.models import NotetypeId, NotetypeNameId
 from aqt.qt import (
     QBoxLayout,
     QCheckBox,
@@ -34,7 +34,7 @@ from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.note_type_management import (
     add_note_type,
-    deck_has_template_changes,
+    note_types_with_template_changes_for_deck,
     update_deck_templates,
     update_note_type_fields,
 )
@@ -605,14 +605,14 @@ class DeckManagementDialog(QDialog):
 
     def _update_templates_btn_state(self):
         self.update_templates_btn.setEnabled(
-            deck_has_template_changes(self._selected_ah_did())
+            bool(note_types_with_template_changes_for_deck(self._selected_ah_did()))
         )
 
-    def _get_note_type_names_for_deck(
+    def _get_note_type_names_and_ids_for_deck(
         self, deck_id: UUID, assigned_to_deck: bool
-    ) -> List[str]:
+    ) -> List[NotetypeNameId]:
         """
-        Returns a sorted list of note type names filtered by whether they are assigned to the deck.
+        Returns a sorted list of note type names and IDs filtered by whether they are assigned to the deck.
 
         Args:
             deck_id: The ID of the selected AnkiHub deck.
@@ -621,10 +621,23 @@ class DeckManagementDialog(QDialog):
         """
         mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
         return sorted(
-            n.name
-            for n in aqt.mw.col.models.all_names_and_ids()
-            if (NotetypeId(n.id) in mids) == assigned_to_deck
+            (
+                n
+                for n in aqt.mw.col.models.all_names_and_ids()
+                if (NotetypeId(n.id) in mids) == assigned_to_deck
+            ),
+            key=lambda n: n.name,
         )
+
+    def _get_note_type_names_for_deck(
+        self, deck_id: UUID, assigned_to_deck: bool
+    ) -> List[str]:
+        return [
+            n.name
+            for n in self._get_note_type_names_and_ids_for_deck(
+                deck_id, assigned_to_deck
+            )
+        ]
 
     def _on_add_note_type_btn_clicked(self):
         def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
@@ -725,11 +738,18 @@ class DeckManagementDialog(QDialog):
             tooltip("Templates updated", parent=aqt.mw)
             self._update_templates_btn_state()
 
+        nids_with_updates = note_types_with_template_changes_for_deck(
+            self._selected_ah_did()
+        )
         SearchableSelectionDialog(
             aqt.mw,
-            names=lambda: self._get_note_type_names_for_deck(
-                self._selected_ah_did(), assigned_to_deck=True
-            ),
+            names=lambda: [
+                n.name
+                for n in self._get_note_type_names_and_ids_for_deck(
+                    self._selected_ah_did(), assigned_to_deck=True
+                )
+                if n.id in nids_with_updates
+            ],
             accept="Choose",
             title="Which note type do you want to update?",
             parent=self,
