@@ -1,3 +1,4 @@
+from typing import List
 from uuid import UUID
 
 
@@ -25,3 +26,13 @@ class FullSyncCancelled(Exception):
     """Raised when a full AnkiWeb sync is cancelled before an AnkiHub sync."""
 
     pass
+
+
+class ChangesRequireFullSyncError(Exception):
+    """Raised when a change will require a full sync with AnkiWeb."""
+
+    def __init__(self, changes: List[str]):
+        super().__init__(
+            f"Changes require a full sync with AnkiWeb: {', '.join(changes)}"
+        )
+        self.changes = changes

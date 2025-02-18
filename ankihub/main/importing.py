@@ -105,6 +105,7 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
         recommended_deck_settings: bool = True,
+        raise_on_full_sync_required: bool = True,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or for updating it.
