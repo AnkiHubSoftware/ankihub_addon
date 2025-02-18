@@ -1772,6 +1772,28 @@ class TestGetNoteTypesDictForDeck:
 
 
 @pytest.mark.vcr()
+class TestCreateNoteType:
+    def test_create_note_type(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_type = {
+            "id": 3,
+            "name": "New Type",
+            "flds": [{"name": "Front"}, {"name": "Back"}],
+            "tmpls": [{"name": "Card 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}],
+        }
+        new_note_type = client.create_note_type(ID_OF_DECK_OF_USER_TEST1, note_type)
+        deck = client.get_deck_by_id(ID_OF_DECK_OF_USER_TEST1)
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
+        assert len(note_types_by_id) == 2
+        new_note_type = note_types_by_id[cast(int, note_type["id"])]
+        assert new_note_type["id"] == note_type["id"]
+        assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
+
+
+@pytest.mark.vcr()
 class TestGetFeatureFlags:
     def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
