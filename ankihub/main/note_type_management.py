@@ -1,12 +1,16 @@
 import uuid
-from typing import List
+from typing import Any, Dict, List
 
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 
 from ..addon_ankihub_client import AddonAnkiHubClient
 from ..db import ankihub_db
-from .utils import modified_note_type
+from .utils import (
+    ANKIHUB_CSS_END_COMMENT_PATTERN,
+    ANKIHUB_HTML_END_COMMENT_PATTERN,
+    modified_note_type,
+)
 
 
 def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
@@ -32,12 +36,21 @@ def update_note_type_fields(note_type: NotetypeDict, fields: List[str]) -> None:
     print("update_note_type_fields", note_type["name"], fields)
 
 
+def remove_ankihub_end_comment_from_note_type(note_type: Dict[str, Any]) -> None:
+    note_type["css"] = ANKIHUB_CSS_END_COMMENT_PATTERN.sub("", note_type["css"])
+    for template in note_type["tmpls"]:
+        template["qfmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub("", template["qfmt"])
+        template["afmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub("", template["afmt"])
+
+
 def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[NotetypeId]:
     ids = []
     for mid in ankihub_db.note_types_for_ankihub_deck(ah_did):
         changed = False
         db_note_type = ankihub_db.note_type_dict(ah_did, mid)
         note_type = aqt.mw.col.models.get(mid)
+        remove_ankihub_end_comment_from_note_type(note_type)
+        remove_ankihub_end_comment_from_note_type(db_note_type)
         if note_type["css"] != db_note_type["css"]:
             changed = True
         if len(note_type["tmpls"]) != len(db_note_type["tmpls"]):
