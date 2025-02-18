@@ -133,7 +133,7 @@ def update_decks_and_media(
             parent=aqt.mw,
         )
 
-        # If not forcing full sync, attach a failure handler to check for conflicts.
+        # If not forcing full sync, attach a failure handler to handle conflicts.
         if not force_full_sync:
             op = cast(AddonQueryOp, op.failure(on_failure))
 
