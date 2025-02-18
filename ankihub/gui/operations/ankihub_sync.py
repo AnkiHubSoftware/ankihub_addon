@@ -118,18 +118,23 @@ def _on_new_deck_subscriptions_done(
 def update_decks_and_media(
     on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
 ) -> None:
-    def run_update(raise_on_full_sync_required: bool, start_media_sync: bool) -> None:
+    logged_into_ankiweb = aqt.mw.pm.sync_auth()
+
+    def run_update(force_full_sync: bool, start_media_sync: bool) -> None:
         op = AddonQueryOp(
             op=lambda _: ah_deck_updater.update_decks_and_media(
                 ah_dids,
-                raise_on_full_sync_required=raise_on_full_sync_required,
+                raise_on_full_sync_required=force_full_sync,
                 start_media_sync=start_media_sync,
             ),
-            success=lambda _: _on_sync_done(on_done=on_done),
+            success=lambda _: on_success(
+                do_full_upload=logged_into_ankiweb and force_full_sync
+            ),
             parent=aqt.mw,
         )
 
-        if raise_on_full_sync_required:
+        # If not forcing full sync, attach a failure handler to check for conflicts.
+        if not force_full_sync:
             op = cast(AddonQueryOp, op.failure(on_failure))
 
         op.with_progress().run_in_background()
@@ -144,18 +149,27 @@ def update_decks_and_media(
             changes=exception.changes,
         )
 
-        # TODO show dialog asking user to sync other devices first
+        # TODO: Show dialog asking user to sync other devices first
 
+        # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
         run_update(
-            raise_on_full_sync_required=False,
-            # The first update attempt already started the media sync if necessary.
+            force_full_sync=True,
+            # The initial attempt already started media sync if needed.
             start_media_sync=False,
         )
 
-    if aqt.mw.pm.sync_auth():
-        run_update(raise_on_full_sync_required=True, start_media_sync=start_media_sync)
+    def on_success(do_full_upload: bool) -> None:
+        if do_full_upload:
+            config.set_schema_to_do_full_upload_for_once(collection_schema())
+
+        _on_sync_done(on_done=on_done)
+
+    # When logged into AnkiWeb, first try without forcing full sync
+    # so that we can check for conflicts; if not logged in, proceed with a full sync.
+    if logged_into_ankiweb:
+        run_update(force_full_sync=False, start_media_sync=start_media_sync)
     else:
-        run_update(raise_on_full_sync_required=False, start_media_sync=start_media_sync)
+        run_update(force_full_sync=True, start_media_sync=start_media_sync)
 
 
 @pass_exceptions_to_on_done
