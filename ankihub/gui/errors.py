@@ -104,11 +104,16 @@ def upload_logs_in_background(
 
     key = f"ankihub_addon_logs_{_username_or_hash(hide_username=hide_username)}_{int(time.time())}.log"
 
-    AddonQueryOp(
-        parent=aqt.mw,
-        op=lambda _: _upload_logs(key),
-        success=on_done if on_done is not None else lambda _: None,
-    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
+    op = (
+        AddonQueryOp(
+            parent=aqt.mw,
+            op=lambda _: _upload_logs(key),
+            success=on_done if on_done is not None else lambda _: None,
+        )
+        .failure(_on_upload_logs_failure)
+        .without_collection()
+    )
+    aqt.mw.taskman.run_on_main(op.run_in_background)
 
     return key
 
@@ -124,11 +129,16 @@ def upload_logs_and_data_in_background(
     # many users use their email address as their username and may not want to share it on a forum
     key = f"ankihub_addon_debug_info_{_username_or_hash(hide_username=True)}_{int(time.time())}.zip"
 
-    AddonQueryOp(
-        parent=aqt.mw,
-        op=lambda _: _upload_logs_and_data_in_background(key),
-        success=on_done if on_done is not None else lambda _: None,
-    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
+    op = (
+        AddonQueryOp(
+            parent=aqt.mw,
+            op=lambda _: _upload_logs_and_data_in_background(key),
+            success=on_done if on_done is not None else lambda _: None,
+        )
+        .failure(_on_upload_logs_failure)
+        .without_collection()
+    )
+    aqt.mw.taskman.run_on_main(op.run_in_background)
 
     return key
 
