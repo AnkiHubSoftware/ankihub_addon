@@ -465,32 +465,32 @@ def _inject_ankihub_features_and_setup_sidebar(
         reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
-    if _check_premium_and_notify_buttons_once not in reviewer_did_show_question._hooks:
-        reviewer_did_show_question.append(_check_premium_and_notify_buttons_once)
+    if _check_access_and_notify_buttons_once not in reviewer_did_show_question._hooks:
+        reviewer_did_show_question.append(_check_access_and_notify_buttons_once)
 
-    if _check_premium_and_notify_buttons_once not in config.token_change_hook:
-        config.token_change_hook.append(_check_premium_and_notify_buttons_once)
+    if _check_access_and_notify_buttons_once not in config.token_change_hook:
+        config.token_change_hook.append(_check_access_and_notify_buttons_once)
 
 
-def _check_premium_and_notify_buttons_once(*args, **kwargs) -> None:
+def _check_access_and_notify_buttons_once(*args, **kwargs) -> None:
     card = aqt.mw.reviewer.card
 
     if card and _visible_buttons(card):
-        _check_premium_and_notify_buttons()
-        reviewer_did_show_question.remove(_check_premium_and_notify_buttons_once)
+        _check_access_and_notify_buttons()
+        reviewer_did_show_question.remove(_check_access_and_notify_buttons_once)
 
 
-def _check_premium_and_notify_buttons() -> None:
-    """Fetches the user's premium or trialing status in the background and notifies the reviewer buttons
+def _check_access_and_notify_buttons() -> None:
+    """Fetches the user's access to the reviwer extension feature in the background and notifies the reviewer buttons
     once the status is fetched."""
 
-    def fetch_is_premium_or_trialing(_) -> bool:
+    def fetch_has_reviewer_extension_access(_) -> bool:
         client = AnkiHubClient()
-        return client.is_premium_or_trialing()
+        return client.has_reviewer_extension_access()
 
-    def notify_reviewer_buttons(is_premium_or_trialing: bool) -> None:
+    def notify_reviewer_buttons(has_reviewer_extension_access: bool) -> None:
         js = _wrap_with_reviewer_buttons_check(
-            f"ankihubReviewerButtons.updateIsPremiumOrTrialing({'true' if is_premium_or_trialing else 'false'})"
+            f"ankihubReviewerButtons.updateHasReviewerExtensionAccess({'true' if has_reviewer_extension_access else 'false'})"  # noqa: E501
         )
         aqt.mw.reviewer.web.eval(js)
 
@@ -499,7 +499,9 @@ def _check_premium_and_notify_buttons() -> None:
         raise exception
 
     AddonQueryOp(
-        op=fetch_is_premium_or_trialing, success=notify_reviewer_buttons, parent=aqt.mw
+        op=fetch_has_reviewer_extension_access,
+        success=notify_reviewer_buttons,
+        parent=aqt.mw,
     ).without_collection().failure(on_failure).run_in_background()
 
 

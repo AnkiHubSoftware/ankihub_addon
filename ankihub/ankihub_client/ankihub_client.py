@@ -1293,9 +1293,9 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
-    def is_premium_or_trialing(self) -> bool:
+    def has_reviewer_extension_access(self) -> bool:
         data = self.get_user_details()
-        return data["is_premium"] or data["is_trialing"]
+        return data.get("has_reviewer_extension_access", False)
 
 
 class ThreadLocalSession:

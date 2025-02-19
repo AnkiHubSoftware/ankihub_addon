@@ -91,7 +91,7 @@ def _show_flashcard_selector_upsell_if_user_has_no_access(
     on_done: Callable[[bool], None]
 ) -> None:
     user_details = AnkiHubClient().get_user_details()
-    has_access = user_details["is_premium"] or user_details["is_trialing"]
+    has_access = user_details["has_flashcard_selector_access"]
     if has_access:
         on_done(True)
         return
