@@ -7,6 +7,7 @@ from anki.models import NotetypeDict, NotetypeId
 
 from ..addon_ankihub_client import AddonAnkiHubClient
 from ..db import ankihub_db
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
     ANKIHUB_CSS_END_COMMENT_PATTERN,
     ANKIHUB_HTML_END_COMMENT_PATTERN,
@@ -50,6 +51,20 @@ def add_note_type_fields(
         )
         if field:
             db_field["ord"] = field["ord"]
+    ankihub_id_field_idx = next(
+        (
+            idx
+            for idx, field in enumerate(db_note_type["flds"])
+            if field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME
+        ),
+        None,
+    )
+    if ankihub_id_field_idx is not None:
+        db_note_type["flds"][ankihub_id_field_idx]["ord"] = (
+            len(db_note_type["flds"]) - 1
+        )
+        ankihub_id_field = db_note_type["flds"].pop(ankihub_id_field_idx)
+        db_note_type["flds"].append(ankihub_id_field)
     db_note_type = client.update_note_type(ah_did, db_note_type)
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
 
