@@ -281,7 +281,14 @@ def type_name(
         if short:
             return typ.__qualname__  # type: ignore
         else:
-            return f"{typ.__module__}.{typ.__qualname__}"  # type: ignore
+            # patched for ankihub_addon to support module names starting with a number
+            # as Anki installs an add-on downloaded from AnkiWeb in a directory named by a number - its AnkiWeb id
+            module_name = typ.__module__
+            qualname = typ.__qualname__
+
+            if module_name[0].isdigit():
+                return f'(__import__("sys")).modules["{module_name}"].{qualname}'
+            return f"{module_name}.{qualname}"
     except AttributeError:
         return str(typ)
 
