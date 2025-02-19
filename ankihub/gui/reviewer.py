@@ -499,7 +499,9 @@ def _check_access_and_notify_buttons() -> None:
         raise exception
 
     AddonQueryOp(
-        op=fetch_has_reviewer_extension_access, success=notify_reviewer_buttons, parent=aqt.mw
+        op=fetch_has_reviewer_extension_access,
+        success=notify_reviewer_buttons,
+        parent=aqt.mw,
     ).without_collection().failure(on_failure).run_in_background()
 
 
