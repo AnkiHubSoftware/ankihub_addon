@@ -2,7 +2,8 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, cast
+from uuid import UUID
 
 import aqt
 import aqt.sync
@@ -14,12 +15,13 @@ from aqt.sync import get_sync_status
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
+from ...gui.operations import AddonQueryOp
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
-from ..exceptions import FullSyncCancelled
+from ..exceptions import ChangesRequireFullSyncError, FullSyncCancelled
 from ..utils import sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
@@ -107,17 +109,71 @@ def _on_new_deck_subscriptions_done(
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
     to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
 
-    aqt.mw.taskman.with_progress(
-        task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
-        immediate=True,
-        on_done=partial(_on_sync_done, on_done=on_done),
+    update_decks_and_media(
+        on_done=on_done, ah_dids=list(to_sync_ah_dids), start_media_sync=True
     )
 
 
 @pass_exceptions_to_on_done
-def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
-    future.result()
+def update_decks_and_media(
+    on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
+) -> None:
+    logged_into_ankiweb = aqt.mw.pm.sync_auth()
 
+    def run_update(force_full_sync: bool, start_media_sync: bool) -> None:
+        op = AddonQueryOp(
+            op=lambda _: ah_deck_updater.update_decks_and_media(
+                ah_dids,
+                raise_on_full_sync_required=force_full_sync,
+                start_media_sync=start_media_sync,
+            ),
+            success=lambda _: on_success(
+                do_full_upload=logged_into_ankiweb and force_full_sync
+            ),
+            parent=aqt.mw,
+        )
+
+        # If not forcing full sync, attach a failure handler to handle conflicts.
+        if not force_full_sync:
+            op = cast(AddonQueryOp, op.failure(on_failure))
+
+        op.with_progress().run_in_background()
+
+    def on_failure(exception: Exception) -> None:
+        if not isinstance(exception, ChangesRequireFullSyncError):
+            raise exception
+
+        LOGGER.info(
+            "Changes require full sync with AnkiWeb.",
+            ah_dids=ah_dids,
+            changes=exception.changes,
+        )
+
+        # TODO: Show dialog asking user to sync other devices first
+
+        # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
+        run_update(
+            force_full_sync=True,
+            # The initial attempt already started media sync if needed.
+            start_media_sync=False,
+        )
+
+    def on_success(do_full_upload: bool) -> None:
+        if do_full_upload:
+            config.set_schema_to_do_full_upload_for_once(collection_schema())
+
+        _on_sync_done(on_done=on_done)
+
+    # When logged into AnkiWeb, first try without forcing full sync
+    # so that we can check for conflicts; if not logged in, proceed with a full sync.
+    if logged_into_ankiweb:
+        run_update(force_full_sync=False, start_media_sync=start_media_sync)
+    else:
+        run_update(force_full_sync=True, start_media_sync=start_media_sync)
+
+
+@pass_exceptions_to_on_done
+def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     config.set_api_version_on_last_sync(API_VERSION)
 
     show_tooltip_about_last_deck_updates_results()

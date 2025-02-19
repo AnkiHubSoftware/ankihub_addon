@@ -4246,7 +4246,9 @@ class TestDeckUpdater:
 
             # Use the deck updater to update the deck
             ah_deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_on_full_sync_required=True,
             )
 
             # Assert last_update_results are accurate
@@ -4355,7 +4357,9 @@ class TestDeckUpdater:
             # Update the deck
             deck_updater = _AnkiHubDeckUpdater()
             deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_on_full_sync_required=True,
             )
 
             # Assert that the note now has the expected tags
@@ -4413,7 +4417,9 @@ class TestDeckUpdater:
             # Update the deck
             deck_updater = _AnkiHubDeckUpdater()
             deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_on_full_sync_required=True,
             )
 
             # Assert that the deck config was updated with the incoming relation
