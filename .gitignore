@@ -2,10 +2,9 @@
 ankihub/meta.json
 
 # Anki base directory
-anki_base
-
+anki_base/
 # AnkiHub base directory
-ankihub_base
+ankihub_base/
 
 # Ignore everything except the README.
 /ankihub/user_files/*
