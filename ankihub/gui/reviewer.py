@@ -490,7 +490,7 @@ def _check_access_and_notify_buttons() -> None:
 
     def notify_reviewer_buttons(has_reviewer_extension_access: bool) -> None:
         js = _wrap_with_reviewer_buttons_check(
-            f"ankihubReviewerButtons.updateHasReviewerExtensionAccess({'true' if has_reviewer_extension_access else 'false'})"
+            f"ankihubReviewerButtons.updateHasReviewerExtensionAccess({'true' if has_reviewer_extension_access else 'false'})"  # noqa: E501
         )
         aqt.mw.reviewer.web.eval(js)
 
