@@ -1061,6 +1061,22 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
+    def update_note_type(
+        self, ah_did: uuid.UUID, note_type: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        note_type = _to_ankihub_note_type(note_type.copy())
+        response = self._send_request(
+            "PATCH",
+            API.ANKIHUB,
+            f"/decks/{ah_did}/note-types/{note_type['anki_id']}/",
+            json=note_type,
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+        data = response.json()
+        result = _to_anki_note_type(data)
+        return result
+
     def get_note_types_dict_for_deck(
         self, ah_did: uuid.UUID
     ) -> Dict[int, Dict[str, Any]]:
