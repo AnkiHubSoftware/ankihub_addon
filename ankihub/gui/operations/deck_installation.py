@@ -252,6 +252,7 @@ def _install_deck(
             ankihub_did
         ),
         recommended_deck_settings=recommended_deck_settings,
+        raise_on_full_sync_required=False,
     )
 
     config.add_deck(
