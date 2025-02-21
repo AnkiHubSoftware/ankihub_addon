@@ -1794,6 +1794,31 @@ class TestCreateNoteType:
 
 
 @pytest.mark.vcr()
+class TestAddNoteTypeFields:
+    def test_add_note_type_fields(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        field_names = ["New1", "New2"]
+        for name in field_names:
+            field = note_type["flds"][0].copy()
+            field["name"] = name
+            field["ord"] = None
+            note_type["flds"].append(field)
+        note_type = client.update_note_type(
+            ID_OF_DECK_OF_USER_TEST1, note_type, ["flds"]
+        )
+        assert all(
+            field_name in [field["name"] for field in note_type["flds"]]
+            for field_name in field_names
+        )
+
+
+@pytest.mark.vcr()
 class TestGetFeatureFlags:
     def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
