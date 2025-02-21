@@ -3,7 +3,7 @@
 class AnkiHubReviewerButtons {
     constructor() {
         this.theme = "{{ THEME }}";
-        this.isPremiumOrTrialing = false;
+        this.hasReviewerExtensionAccess = false;
         this.bbCount = 0;
         this.faCount = 0;
 
@@ -142,12 +142,12 @@ class AnkiHubReviewerButtons {
         const isDark = this.theme === "dark";
 
         if (isDark && button.iconPathDarkTheme) {
-            return this.isPremiumOrTrialing && button.premiumIconPathDarkTheme
+            return this.hasReviewerExtensionAccess && button.premiumIconPathDarkTheme
                 ? button.premiumIconPathDarkTheme
                 : button.iconPathDarkTheme;
         }
 
-        return this.isPremiumOrTrialing && button.premiumIconPath
+        return this.hasReviewerExtensionAccess && button.premiumIconPath
             ? button.premiumIconPath
             : button.iconPath;
     }
@@ -339,8 +339,8 @@ class AnkiHubReviewerButtons {
         }
     }
 
-    updateIsPremiumOrTrialing(isPremiumOrTrialing) {
-        this.isPremiumOrTrialing = isPremiumOrTrialing;
+    updateHasReviewerExtensionAccess(hasReviewerExtensionAccess) {
+        this.hasReviewerExtensionAccess = hasReviewerExtensionAccess;
 
         this.updateButtons(
             this.bbCount, this.faCount, this.getVisibleButtons().map(buttonData => buttonData.name)
