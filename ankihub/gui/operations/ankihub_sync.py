@@ -17,11 +17,12 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...gui.operations import AddonQueryOp
 from ...main.deck_unsubscribtion import uninstall_deck
+from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
-from ..exceptions import ChangesRequireFullSyncError, FullSyncCancelled
+from ..exceptions import FullSyncCancelled
 from ..utils import sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions

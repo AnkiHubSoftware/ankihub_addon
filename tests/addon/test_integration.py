@@ -191,7 +191,6 @@ from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
     AnkiHubImportResult,
-    _adjust_note_types_in_anki_db,
     change_note_types_of_notes,
 )
 from ankihub.main.note_conversion import (
@@ -1692,7 +1691,7 @@ def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
             ankihub_basic_1["id"]: ankihub_basic_1,
             ankihub_basic_2["id"]: ankihub_basic_2,
         }
-        _adjust_note_types_in_anki_db(remote_note_types)
+        AnkiHubImporter()._adjust_note_types_in_anki_db(remote_note_types)
 
         assert mw.col.models.by_name("AnkiHub Basic 1") is not None
         assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"

@@ -29,6 +29,7 @@ from ..settings import (
     is_projektanki_note_types_addon_installed,
 )
 from .deck_options import set_ankihub_config_for_deck, set_recommended_preferences
+from .exceptions import ChangesRequireFullSyncError
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -138,6 +139,7 @@ class AnkiHubImporter:
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
         self._local_did = _adjust_deck(deck_name, anki_did)
+        self._raise_on_full_sync_required = raise_on_full_sync_required
 
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
@@ -188,7 +190,108 @@ class AnkiHubImporter:
 
     def _import_note_types(self, note_types: Dict[NotetypeId, NotetypeDict]) -> None:
         self._import_note_types_into_ankihub_db(note_types=note_types)
-        _adjust_note_types_in_anki_db(note_types)
+        self._adjust_note_types_in_anki_db(note_types)
+
+    def _adjust_note_types_in_anki_db(
+        self, remote_note_types: Dict[NotetypeId, NotetypeDict]
+    ) -> None:
+        # can be called when installing a deck for the first time and when synchronizing with AnkiHub
+
+        LOGGER.info("Beginning adjusting note types...")
+        _create_missing_note_types(remote_note_types)
+        _rename_note_types(remote_note_types)
+        self._ensure_local_and_remote_fields_are_same(remote_note_types)
+        self._update_templates_and_css(remote_note_types)
+
+        LOGGER.info("Adjusted note types.")
+
+    def _ensure_local_and_remote_fields_are_same(
+        self, remote_note_types: Dict[NotetypeId, NotetypeDict]
+    ) -> None:
+        def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
+            return [(field["ord"], field["name"]) for field in flds]
+
+        note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
+        for mid, remote_note_type in remote_note_types.items():
+            local_note_type = aqt.mw.col.models.get(mid)
+
+            # TODO Allow extra local fields
+            if not field_tuples(local_note_type["flds"]) == field_tuples(
+                remote_note_type["flds"]
+            ):
+                LOGGER.info(
+                    "Fields of local note type differ from remote note type.",
+                    local_note_type_name=local_note_type["name"],
+                    local_fields=field_tuples(local_note_type["flds"]),
+                    remote_fields=field_tuples(remote_note_type["flds"]),
+                )
+                note_types_with_field_conflicts.append(
+                    (local_note_type, remote_note_type)
+                )
+
+        if self._raise_on_full_sync_required and note_types_with_field_conflicts:
+            raise ChangesRequireFullSyncError(
+                changes=[
+                    f"Fields of note type {note_type[0]['name']} differ from the remote note type."
+                    for note_type in note_types_with_field_conflicts
+                ]
+            )
+
+        for local_note_type, remote_note_type in note_types_with_field_conflicts:
+            local_note_type["flds"] = _adjust_field_ords(
+                local_note_type["flds"], remote_note_type["flds"]
+            )
+            aqt.mw.col.models.update_dict(local_note_type)
+            LOGGER.info(
+                "Fields after updating the note type",
+                fields=field_tuples(
+                    aqt.mw.col.models.get(local_note_type["id"])["flds"]
+                ),
+            )
+
+    def _update_templates_and_css(
+        self, remote_note_types: Dict[NotetypeId, NotetypeDict]
+    ) -> None:
+        anking_note_types_addon_installed = is_anking_note_types_addon_installed()
+        projekt_anki_note_types_addon_installed = (
+            is_projektanki_note_types_addon_installed()
+        )
+
+        for mid, remote_note_type in remote_note_types.items():
+            local_note_type = aqt.mw.col.models.get(mid)
+
+            # We don't use new templates and css of AnKing note types if the AnKing note types addon is installed.
+            # The AnKing note types addon will handle updating the templates, while preserving the
+            # user's customizations.
+            # The same applies to ProjektAnki note types and the ProjektAnki note types addon.
+            use_new_templates_and_css = not (
+                (
+                    "anking" in remote_note_type["name"].lower()
+                    and anking_note_types_addon_installed
+                )
+                or (
+                    "projektanki" in remote_note_type["name"].lower()
+                    and projekt_anki_note_types_addon_installed
+                )
+            )
+
+            if (
+                self._raise_on_full_sync_required
+                and use_new_templates_and_css
+                and len(local_note_type["tmpls"]) != len(remote_note_type["tmpls"])
+            ):
+                raise ChangesRequireFullSyncError(
+                    changes=[
+                        f"Amount of templates of note type {local_note_type['name']} differ from the remote note type."
+                    ]
+                )
+
+            updated_note_type = note_type_with_updated_templates_and_css(
+                old_note_type=local_note_type,
+                new_note_type=remote_note_type if use_new_templates_and_css else None,
+            )
+
+            aqt.mw.col.models.update_dict(updated_note_type)
 
     def _import_note_types_into_ankihub_db(
         self, note_types: Dict[NotetypeId, NotetypeDict]
@@ -745,54 +848,6 @@ def _updated_tags(
     return result
 
 
-def _adjust_note_types_in_anki_db(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
-) -> None:
-    # can be called when installing a deck for the first time and when synchronizing with AnkiHub
-
-    LOGGER.info("Beginning adjusting note types...")
-    _create_missing_note_types(remote_note_types)
-    _rename_note_types(remote_note_types)
-    _ensure_local_and_remote_fields_are_same(remote_note_types)
-    _update_templates_and_css(remote_note_types)
-
-    LOGGER.info("Adjusted note types.")
-
-
-def _update_templates_and_css(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
-) -> None:
-    anking_note_types_addon_installed = is_anking_note_types_addon_installed()
-    projekt_anki_note_types_addon_installed = (
-        is_projektanki_note_types_addon_installed()
-    )
-
-    for mid, remote_note_type in remote_note_types.items():
-        local_note_type = aqt.mw.col.models.get(mid)
-
-        # We don't use new templates and css of AnKing note types if the AnKing note types addon is installed.
-        # The AnKing note types addon will handle updating the templates, while preserving the
-        # user's customizations.
-        # The same applies to ProjektAnki note types and the ProjektAnki note types addon.
-        use_new_templates_and_css = not (
-            (
-                "anking" in remote_note_type["name"].lower()
-                and anking_note_types_addon_installed
-            )
-            or (
-                "projektanki" in remote_note_type["name"].lower()
-                and projekt_anki_note_types_addon_installed
-            )
-        )
-
-        updated_note_type = note_type_with_updated_templates_and_css(
-            old_note_type=local_note_type,
-            new_note_type=remote_note_type if use_new_templates_and_css else None,
-        )
-
-        aqt.mw.col.models.update_dict(updated_note_type)
-
-
 def _create_missing_note_types(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
@@ -813,38 +868,6 @@ def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
             aqt.mw.col.models.ensure_name_unique(local_note_type)
             aqt.mw.col.models.update_dict(local_note_type)
             LOGGER.info("Renamed note type.", mid=mid, name=remote_note_type["name"])
-
-
-def _ensure_local_and_remote_fields_are_same(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
-) -> None:
-    def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
-        return [(field["ord"], field["name"]) for field in flds]
-
-    note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
-    for mid, remote_note_type in remote_note_types.items():
-        local_note_type = aqt.mw.col.models.get(mid)
-
-        if not field_tuples(local_note_type["flds"]) == field_tuples(
-            remote_note_type["flds"]
-        ):
-            LOGGER.info(
-                "Fields of local note type differ from remote note type.",
-                local_note_type_name=local_note_type["name"],
-                local_fields=field_tuples(local_note_type["flds"]),
-                remote_fields=field_tuples(remote_note_type["flds"]),
-            )
-            note_types_with_field_conflicts.append((local_note_type, remote_note_type))
-
-    for local_note_type, remote_note_type in note_types_with_field_conflicts:
-        local_note_type["flds"] = _adjust_field_ords(
-            local_note_type["flds"], remote_note_type["flds"]
-        )
-        aqt.mw.col.models.update_dict(local_note_type)
-        LOGGER.info(
-            "Fields after updating the note type",
-            fields=field_tuples(aqt.mw.col.models.get(local_note_type["id"])["flds"]),
-        )
 
 
 def _adjust_field_ords(
