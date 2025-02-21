@@ -1,0 +1,168 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2025-03-21T11:50:01.908628Z","token":"4fb768ae149389dfe88d9b9dec5acbe3930d0174320c299cbabb4c32ec5722ed"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Connection:
+      - close
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Fri, 21 Feb 2025 11:50:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - Werkzeug/3.0.1 Python/3.12.3
+      Server-Timing:
+      - TimerPanel_utime;dur=355.3670000000011;desc="User CPU time", TimerPanel_stime;dur=80.15899999999831;desc="System
+        CPU time", TimerPanel_total;dur=435.5259999999994;desc="Total CPU time", TimerPanel_total_time;dur=232.86115700011578;desc="Elapsed
+        time", SQLPanel_sql_time;dur=6.672032001915795;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=AZ1whBQx2dJHi0dfehbQvG7E3BiI63kM; expires=Fri, 20 Feb 2026 11:50:02
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=xj45688wkzucne5mpnhceohghqh60rsp; expires=Fri, 28 Feb 2025 11:50:02
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 68080b76d5014c23b0aced68ca11d7c6
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Authorization:
+      - Token 4fb768ae149389dfe88d9b9dec5acbe3930d0174320c299cbabb4c32ec5722ed
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/note-types/
+  response:
+    body:
+      string: '[{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"did":null,"ord":0,"afmt":"{{cloze:Text}}<br>","name":"Test","qfmt":"{{cloze:Text}}","bafmt":"","bfont":"Arial","bqfmt":"","bsize":12}],"name":"Cloze
+        (test1)","type":1,"mod":2397313664,"usn":-1,"sortf":0,"did":4269894858,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}]'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Connection:
+      - close
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '785'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Fri, 21 Feb 2025 11:50:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - Werkzeug/3.0.1 Python/3.12.3
+      Server-Timing:
+      - TimerPanel_utime;dur=121.37400000000298;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=121.37400000000298;desc="Total CPU time",
+        TimerPanel_total_time;dur=128.8450420006484;desc="Elapsed time", SQLPanel_sql_time;dur=5.712832000426715;desc="SQL
+        10 queries", CachePanel_total_time;dur=0.06740700064256089;desc="Cache 2 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 4292576c1c09480fb388dfed95696185
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"anki_id": 1, "fields": [{"ord": 0, "rtl": false, "font": "Arial", "meta":
+      null, "name": "Text", "size": 16, "media": [], "sticky": false, "collapsibleFieldsCollapseByDefault":
+      false}, {"ord": 1, "rtl": false, "font": "Arial", "meta": null, "name": "Extra",
+      "size": 16, "media": [], "sticky": false, "collapsibleFieldsCollapseByDefault":
+      false}, {"ord": 2, "rtl": false, "font": "Arial", "meta": null, "name": "ankihub_id",
+      "size": 16, "media": [], "sticky": false, "collapsibleFieldsCollapseByDefault":
+      false}, {"ord": null, "rtl": false, "font": "Arial", "meta": null, "name": "New1",
+      "size": 16, "media": [], "sticky": false, "collapsibleFieldsCollapseByDefault":
+      false}, {"ord": null, "rtl": false, "font": "Arial", "meta": null, "name": "New2",
+      "size": 16, "media": [], "sticky": false, "collapsibleFieldsCollapseByDefault":
+      false}]}'
+    headers:
+      Accept:
+      - application/json; version=21.0
+      Authorization:
+      - Token 4fb768ae149389dfe88d9b9dec5acbe3930d0174320c299cbabb4c32ec5722ed
+      Content-Length:
+      - '839'
+      Content-Type:
+      - application/json
+    method: PATCH
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/note-types/1/
+  response:
+    body:
+      string: '{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":null,"rtl":false,"font":"Arial","meta":null,"name":"New1","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":null,"rtl":false,"font":"Arial","meta":null,"name":"New2","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"did":null,"ord":0,"afmt":"{{cloze:Text}}<br>","name":"Test","qfmt":"{{cloze:Text}}","bafmt":"","bfont":"Arial","bqfmt":"","bsize":12}],"name":"Cloze
+        (test1)","type":1,"mod":2397313664,"usn":-1,"sortf":0,"did":2613191866,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}'
+    headers:
+      Allow:
+      - PUT, PATCH, OPTIONS
+      Connection:
+      - close
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '1073'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Fri, 21 Feb 2025 11:50:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - Werkzeug/3.0.1 Python/3.12.3
+      Server-Timing:
+      - TimerPanel_utime;dur=136.7479999999972;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=136.7479999999972;desc="Total CPU time", TimerPanel_total_time;dur=153.9404459999787;desc="Elapsed
+        time", SQLPanel_sql_time;dur=7.671997001125419;desc="SQL 11 queries", CachePanel_total_time;dur=0.027483999474497978;desc="Cache
+        1 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 117f0d898a4f48bda6f793abecc3dca2
+    status:
+      code: 200
+      message: OK
+version: 1

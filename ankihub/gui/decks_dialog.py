@@ -34,9 +34,9 @@ from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.note_type_management import (
     add_note_type,
+    add_note_type_fields,
     note_types_with_template_changes_for_deck,
     update_deck_templates,
-    update_note_type_fields,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
@@ -706,7 +706,7 @@ class DeckManagementDialog(QDialog):
                 if not confirm:
                     return
 
-                update_note_type_fields(note_type, new_fields)
+                add_note_type_fields(self._selected_ah_did(), note_type, new_fields)
                 tooltip("Fields published", parent=aqt.mw)
 
         SearchableSelectionDialog(

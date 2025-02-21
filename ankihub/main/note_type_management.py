@@ -7,6 +7,7 @@ from anki.models import NotetypeDict, NotetypeId
 
 from ..addon_ankihub_client import AddonAnkiHubClient
 from ..db import ankihub_db
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
     ANKIHUB_CSS_END_COMMENT_PATTERN,
     ANKIHUB_HTML_END_COMMENT_PATTERN,
@@ -33,8 +34,41 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
     return new_note_type
 
 
-def update_note_type_fields(note_type: NotetypeDict, fields: List[str]) -> None:
-    print("update_note_type_fields", note_type["name"], fields)
+def add_note_type_fields(
+    ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
+) -> NotetypeDict:
+    client = AddonAnkiHubClient()
+
+    db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+    new_fields = [
+        field for field in note_type["flds"] if field["name"] in new_field_names
+    ]
+    db_note_type["flds"].extend(new_fields)
+    for db_field in db_note_type["flds"]:
+        field = next(
+            (field for field in note_type["flds"] if field["name"] == db_field["name"]),
+            None,
+        )
+        if field:
+            db_field["ord"] = field["ord"]
+    ankihub_id_field_idx = next(
+        (
+            idx
+            for idx, field in enumerate(db_note_type["flds"])
+            if field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME
+        ),
+        None,
+    )
+    if ankihub_id_field_idx is not None:
+        db_note_type["flds"][ankihub_id_field_idx]["ord"] = (
+            len(db_note_type["flds"]) - 1
+        )
+        ankihub_id_field = db_note_type["flds"].pop(ankihub_id_field_idx)
+        db_note_type["flds"].append(ankihub_id_field)
+    db_note_type = client.update_note_type(ah_did, db_note_type, ["flds"])
+    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
+
+    return db_note_type
 
 
 def note_type_with_ankihub_end_comment_removed(
