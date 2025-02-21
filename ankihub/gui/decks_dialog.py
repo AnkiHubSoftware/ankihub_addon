@@ -662,7 +662,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=False
             ),
             accept="Choose",
-            title="Which note type do you want to publish?",
+            title="Choose note type to publish",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -691,7 +691,7 @@ class DeckManagementDialog(QDialog):
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
-                title="Which fields do you want to publish?",
+                title="Select fields to publish",
                 parent=self,
             )
             if new_fields:
@@ -713,7 +713,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=True
             ),
             accept="Choose",
-            title="Which note type do you want to edit?",
+            title="Choose note type to edit",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -751,7 +751,7 @@ class DeckManagementDialog(QDialog):
                 if n.id in mids_with_updates
             ],
             accept="Choose",
-            title="Which note type do you want to update?",
+            title="Choose note type to update",
             parent=self,
             callback=on_note_type_selected,
         )
