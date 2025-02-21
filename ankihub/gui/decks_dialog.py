@@ -82,7 +82,7 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
-        self.setMinimumHeight(700)
+        self.setMinimumHeight(750)
 
         self.box_main = QVBoxLayout()
 
@@ -647,6 +647,7 @@ class DeckManagementDialog(QDialog):
                 "<b>Proceed?</b><br><br>"
                 "Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
                 title="Publish note type to all users",
+                no_button_label="Cancel",
             )
             if not confirm:
                 return
@@ -662,7 +663,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=False
             ),
             accept="Choose",
-            title="Which note type do you want to publish?",
+            title="Choose note type to publish",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -691,7 +692,7 @@ class DeckManagementDialog(QDialog):
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
-                title="Which fields do you want to publish?",
+                title="Select fields to publish",
                 parent=self,
             )
             if new_fields:
@@ -700,6 +701,7 @@ class DeckManagementDialog(QDialog):
                     "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
                     + NOTE_TYPE_CHANGES_WARNING,
                     title="Publish fields to all users",
+                    no_button_label="Cancel",
                 )
                 if not confirm:
                     return
@@ -713,7 +715,7 @@ class DeckManagementDialog(QDialog):
                 self._selected_ah_did(), assigned_to_deck=True
             ),
             accept="Choose",
-            title="Which note type do you want to edit?",
+            title="Choose note type to edit",
             parent=self,
             callback=on_note_type_selected,
         )
@@ -730,6 +732,7 @@ class DeckManagementDialog(QDialog):
                 + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
                 + NOTE_TYPE_CHANGES_WARNING,
                 title="Publish style/template updates to all users",
+                no_button_label="Cancel",
             )
             if not confirm:
                 return
@@ -751,7 +754,7 @@ class DeckManagementDialog(QDialog):
                 if n.id in mids_with_updates
             ],
             accept="Choose",
-            title="Which note type do you want to update?",
+            title="Choose note type to update",
             parent=self,
             callback=on_note_type_selected,
         )
