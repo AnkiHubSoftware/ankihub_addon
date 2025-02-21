@@ -29,6 +29,7 @@ from ..settings import (
     url_mh_integrations_preview,
     url_view_note,
 )
+from .exceptions import ChangesRequireFullSyncError
 
 if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
@@ -224,7 +225,9 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     return aqt.mw.col.db.list(query)
 
 
-def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
+def change_note_types_of_notes(
+    nid_mid_pairs: List[Tuple[NoteId, NotetypeId]], raise_on_changes_required=False
+) -> None:
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
     # Group notes by source and target note type
@@ -238,6 +241,20 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
 
         if current_mid != mid:
             notes_grouped_by_type_change[(current_mid, mid)].append(nid)
+
+    if raise_on_changes_required and notes_grouped_by_type_change:
+        raise ChangesRequireFullSyncError(
+            changes=[
+                (
+                    f"Change note type of notes from {source_note_type_id} to {target_note_type_id} "
+                    f"for {len(note_ids)} notes."
+                )
+                for (
+                    source_note_type_id,
+                    target_note_type_id,
+                ), note_ids in notes_grouped_by_type_change.items()
+            ]
+        )
 
     # Change note types of notes for each group
     for (

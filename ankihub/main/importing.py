@@ -333,7 +333,7 @@ class AnkiHubImporter:
         )
 
         # Upsert notes into Anki DB, delete them or mark them as deleted
-        _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
+        self._reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
 
         (
             notes_to_create_by_ah_nid,
@@ -381,6 +381,16 @@ class AnkiHubImporter:
         )
         dids = dids_of_notes(notes)
         return dids
+
+    def _reset_note_types_of_notes_based_on_notes_data(
+        self, notes_data: Sequence[NoteInfo]
+    ) -> None:
+        """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
+        nid_mid_pairs = [
+            (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
+            for note_data in notes_data
+        ]
+        change_note_types_of_notes(nid_mid_pairs, raise_on_changes_required=True)
 
     def _log_note_import_summary(self) -> None:
         LOGGER.info(
@@ -900,17 +910,6 @@ def _adjust_field_ords(
             # field will be empty.
             new_field["ord"] = len(cur_model_flds) + 1
     return new_model_flds
-
-
-def _reset_note_types_of_notes_based_on_notes_data(
-    notes_data: Sequence[NoteInfo],
-) -> None:
-    """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
-    nid_mid_pairs = [
-        (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
-        for note_data in notes_data
-    ]
-    change_note_types_of_notes(nid_mid_pairs)
 
 
 def cards_by_anki_nid_dict(notes: List[Note]) -> Dict[NoteId, List[Card]]:
