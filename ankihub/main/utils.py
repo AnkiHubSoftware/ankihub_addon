@@ -442,21 +442,26 @@ def note_type_with_updated_templates_and_css(
     """
 
     updated_templates = []
-    for template_idx, old_template in enumerate(old_note_type["tmpls"]):
-        if new_note_type is not None:
+    new_template_amount = (
+        len(new_note_type["tmpls"]) if new_note_type else len(old_note_type["tmpls"])
+    )
+    for template_idx in range(new_template_amount):
+        if template_idx < len(old_note_type["tmpls"]):
+            old_template = old_note_type["tmpls"][template_idx]
+        else:
+            old_template = None
+
+        if new_note_type:
             new_template = new_note_type["tmpls"][template_idx]
             updated_template = copy.deepcopy(new_template)
         else:
+            new_template = None
             updated_template = copy.deepcopy(old_template)
 
         for template_side_name in ["qfmt", "afmt"]:
             updated_template[template_side_name] = _updated_note_type_content(
-                old_content=old_template[template_side_name],
-                new_content=(
-                    new_template[template_side_name]
-                    if new_note_type is not None
-                    else None
-                ),
+                old_content=old_template[template_side_name] if old_template else None,
+                new_content=new_template[template_side_name] if new_template else None,
                 add_view_on_ankihub_snippet=template_side_name == "afmt",
                 content_type="html",
             )
@@ -476,7 +481,7 @@ def note_type_with_updated_templates_and_css(
 
 
 def _updated_note_type_content(
-    old_content: str,
+    old_content: Optional[str],
     new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
     content_type: str,
@@ -489,6 +494,8 @@ def _updated_note_type_content(
       add_view_on_ankihub_snippet: Whether to add AnkiHub view button
       content_type: Either "html" or "css" to determine comment style
     """
+    assert old_content is not None or new_content is not None
+
     if content_type == "html":
         end_comment = ANKIHUB_HTML_END_COMMENT
         end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
@@ -496,8 +503,11 @@ def _updated_note_type_content(
         end_comment = ANKIHUB_CSS_END_COMMENT
         end_comment_pattern = ANKIHUB_CSS_END_COMMENT_PATTERN
 
-    m = re.search(end_comment_pattern, old_content)
-    text_to_migrate = m.group("text_to_migrate") if m else ""
+    if old_content:
+        m = re.search(end_comment_pattern, old_content)
+        text_to_migrate = m.group("text_to_migrate") if m else ""
+    else:
+        text_to_migrate = ""
 
     # Choose the base for the result
     result = new_content if new_content is not None else old_content
