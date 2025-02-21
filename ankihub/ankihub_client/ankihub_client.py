@@ -1061,6 +1061,30 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
+    def update_note_type(
+        self,
+        ah_did: uuid.UUID,
+        note_type: Dict[str, Any],
+        keys_to_update: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        if keys_to_update is not None:
+            note_type_id = note_type["id"]
+            note_type = {key: note_type[key] for key in keys_to_update}
+            note_type["id"] = note_type_id
+        note_type = _to_ankihub_note_type(note_type.copy())
+        response = self._send_request(
+            "PATCH",
+            API.ANKIHUB,
+            f"/decks/{ah_did}/note-types/{note_type['anki_id']}/",
+            json=note_type,
+        )
+        if response.status_code != 200:
+            print(response.json())
+            raise AnkiHubHTTPError(response)
+        data = response.json()
+        result = _to_anki_note_type(data)
+        return result
+
     def get_note_types_dict_for_deck(
         self, ah_did: uuid.UUID
     ) -> Dict[int, Dict[str, Any]]:
@@ -1378,6 +1402,8 @@ def _to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
 def _to_ankihub_note_type(note_type: Dict[str, Any]) -> Dict[str, Any]:
     """Turn NotetypeDict into the format used by AnkiHub."""
     note_type["anki_id"] = note_type.pop("id")
-    note_type["templates"] = note_type.pop("tmpls")
-    note_type["fields"] = note_type.pop("flds")
+    if "tmpls" in note_type:
+        note_type["templates"] = note_type.pop("tmpls")
+    if "flds" in note_type:
+        note_type["fields"] = note_type.pop("flds")
     return note_type
