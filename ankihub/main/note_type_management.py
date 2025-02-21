@@ -65,7 +65,7 @@ def add_note_type_fields(
         )
         ankihub_id_field = db_note_type["flds"].pop(ankihub_id_field_idx)
         db_note_type["flds"].append(ankihub_id_field)
-    db_note_type = client.update_note_type(ah_did, db_note_type)
+    db_note_type = client.update_note_type(ah_did, db_note_type, ["flds"])
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
 
     return db_note_type
