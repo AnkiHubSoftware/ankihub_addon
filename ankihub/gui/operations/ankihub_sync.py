@@ -125,7 +125,7 @@ def update_decks_and_media(
         op = AddonQueryOp(
             op=lambda _: ah_deck_updater.update_decks_and_media(
                 ah_dids,
-                raise_on_full_sync_required=force_full_sync,
+                raise_if_full_sync_required=force_full_sync,
                 start_media_sync=start_media_sync,
             ),
             success=lambda _: on_success(

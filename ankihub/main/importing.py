@@ -106,7 +106,7 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
         recommended_deck_settings: bool = True,
-        raise_on_full_sync_required: bool = True,
+        raise_if_full_sync_required: bool = True,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or for updating it.
@@ -139,7 +139,7 @@ class AnkiHubImporter:
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
         self._local_did = _adjust_deck(deck_name, anki_did)
-        self._raise_on_full_sync_required = raise_on_full_sync_required
+        self._raise_if_full_sync_required = raise_if_full_sync_required
 
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
@@ -229,7 +229,7 @@ class AnkiHubImporter:
                     (local_note_type, remote_note_type)
                 )
 
-        if self._raise_on_full_sync_required and note_types_with_field_conflicts:
+        if self._raise_if_full_sync_required and note_types_with_field_conflicts:
             raise ChangesRequireFullSyncError(
                 changes=[
                     f"Fields of note type {note_type[0]['name']} differ from the remote note type."
@@ -276,7 +276,7 @@ class AnkiHubImporter:
             )
 
             if (
-                self._raise_on_full_sync_required
+                self._raise_if_full_sync_required
                 and use_new_templates_and_css
                 and len(local_note_type["tmpls"]) != len(remote_note_type["tmpls"])
             ):
@@ -390,7 +390,7 @@ class AnkiHubImporter:
             (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
             for note_data in notes_data
         ]
-        change_note_types_of_notes(nid_mid_pairs, raise_on_changes_required=True)
+        change_note_types_of_notes(nid_mid_pairs, raise_if_changes_required=True)
 
     def _log_note_import_summary(self) -> None:
         LOGGER.info(

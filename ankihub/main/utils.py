@@ -226,7 +226,7 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def change_note_types_of_notes(
-    nid_mid_pairs: List[Tuple[NoteId, NotetypeId]], raise_on_changes_required=False
+    nid_mid_pairs: List[Tuple[NoteId, NotetypeId]], raise_if_changes_required=False
 ) -> None:
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
@@ -242,7 +242,7 @@ def change_note_types_of_notes(
         if current_mid != mid:
             notes_grouped_by_type_change[(current_mid, mid)].append(nid)
 
-    if raise_on_changes_required and notes_grouped_by_type_change:
+    if raise_if_changes_required and notes_grouped_by_type_change:
         raise ChangesRequireFullSyncError(
             changes=[
                 (

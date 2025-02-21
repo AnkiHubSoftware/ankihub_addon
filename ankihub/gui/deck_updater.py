@@ -41,7 +41,7 @@ class _AnkiHubDeckUpdater:
     def update_decks_and_media(
         self,
         ah_dids: Collection[uuid.UUID],
-        raise_on_full_sync_required: bool,
+        raise_if_full_sync_required: bool,
         start_media_sync: bool = True,
     ) -> List[AnkiHubImportResult]:
         """Fetch and apply deck updates from AnkiHub for the given decks and start the media download.
@@ -55,7 +55,7 @@ class _AnkiHubDeckUpdater:
         )
 
         self._import_results = None
-        self._raise_on_full_sync_required = raise_on_full_sync_required
+        self._raise_if_full_sync_required = raise_if_full_sync_required
 
         if not config.is_logged_in():
             LOGGER.info("User is not logged in, can't update decks.")
@@ -152,7 +152,7 @@ class _AnkiHubDeckUpdater:
             subdecks=deck_config.subdecks_enabled,
             suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
-            raise_on_full_sync_required=self._raise_on_full_sync_required,
+            raise_if_full_sync_required=self._raise_if_full_sync_required,
         )
         self._import_results.append(import_result)
 
