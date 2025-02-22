@@ -187,11 +187,11 @@ from ankihub.gui.overview import (
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
+from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
     AnkiHubImportResult,
-    _adjust_note_types_in_anki_db,
     change_note_types_of_notes,
 )
 from ankihub.main.note_conversion import (
@@ -1686,7 +1686,10 @@ class TestSuggestNotesInBulk:
             )
 
 
-def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
+@pytest.mark.parametrize("raise_if_full_sync_required", [True, False])
+def test_adjust_note_types(
+    anki_session_with_addon_data: AnkiSession, raise_if_full_sync_required: bool
+):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
@@ -1716,13 +1719,21 @@ def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
             ankihub_basic_1["id"]: ankihub_basic_1,
             ankihub_basic_2["id"]: ankihub_basic_2,
         }
-        _adjust_note_types_in_anki_db(remote_note_types)
+        importer = AnkiHubImporter()
+        importer._raise_if_full_sync_required = raise_if_full_sync_required
 
-        assert mw.col.models.by_name("AnkiHub Basic 1") is not None
-        assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
-        assert (
-            mw.col.models.get(ankihub_basic_2["id"])["name"] == "AnkiHub Basic 2 (new)"
-        )
+        if raise_if_full_sync_required:
+            with pytest.raises(ChangesRequireFullSyncError):
+                importer._adjust_note_types_in_anki_db(remote_note_types)
+        else:
+            importer._adjust_note_types_in_anki_db(remote_note_types)
+
+            assert mw.col.models.by_name("AnkiHub Basic 1") is not None
+            assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+            assert (
+                mw.col.models.get(ankihub_basic_2["id"])["name"]
+                == "AnkiHub Basic 2 (new)"
+            )
 
 
 def test_reset_note_types_of_notes(anki_session_with_addon_data: AnkiSession):
@@ -4270,7 +4281,9 @@ class TestDeckUpdater:
 
             # Use the deck updater to update the deck
             ah_deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
             )
 
             # Assert last_update_results are accurate
@@ -4379,7 +4392,9 @@ class TestDeckUpdater:
             # Update the deck
             deck_updater = _AnkiHubDeckUpdater()
             deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
             )
 
             # Assert that the note now has the expected tags
@@ -4437,7 +4452,9 @@ class TestDeckUpdater:
             # Update the deck
             deck_updater = _AnkiHubDeckUpdater()
             deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
             )
 
             # Assert that the deck config was updated with the incoming relation

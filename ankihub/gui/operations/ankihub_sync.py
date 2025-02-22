@@ -2,25 +2,41 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, cast
+from uuid import UUID
 
 import aqt
 import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
+from aqt.qt import (
+    QCheckBox,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    Qt,
+    QTextEdit,
+    QVBoxLayout,
+    qconnect,
+)
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
+from ...gui.operations import AddonQueryOp
 from ...main.deck_unsubscribtion import uninstall_deck
+from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import sync_with_ankiweb
+from ..utils import CollapsibleSection, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -32,6 +48,114 @@ class _SyncState:
 
 
 sync_state = _SyncState()
+
+
+class ChangesRequireFullSyncDialog(QDialog):
+    def __init__(
+        self,
+        changes_require_full_sync_error: ChangesRequireFullSyncError,
+        parent,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle(" ")
+        self.setMinimumWidth(400)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(8)
+
+        # Title inside the dialog
+        title_label = QLabel("<h3>Some changes require a full sync</h3>")
+        title_label.setWordWrap(True)
+        main_layout.addWidget(title_label)
+        main_layout.addSpacing(20)
+
+        # Collapsible Note Type Updates Section, with a maximum expanded height.
+        collapsible = CollapsibleSection("Note type updates", expanded_max_height=160)
+        collapsible.toggle_button.setStyleSheet(
+            collapsible.toggle_button.styleSheet() + "QToolButton { color: gray; }"
+        )
+
+        # Layout for the collapsible content
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(5, 5, 5, 5)
+        content_layout.setSpacing(5)
+
+        self.note_updates_text = QTextEdit()
+        self.note_updates_text.setText(
+            "\n".join(changes_require_full_sync_error.changes)
+        )
+        self.note_updates_text.setReadOnly(True)
+        self.note_updates_text.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        content_layout.addWidget(self.note_updates_text)
+
+        collapsible.setContentLayout(content_layout)
+        main_layout.addWidget(collapsible)
+        main_layout.addSpacing(20)
+
+        # Warning label
+        warning_label = QLabel(
+            "⚠️ <b>Prevent data loss:</b> make sure all your devices are synced with AnkiWeb before proceeding."
+        )
+        warning_label.setWordWrap(True)
+        main_layout.addWidget(warning_label)
+        main_layout.addSpacing(10)
+
+        # Checkbox to enable the full sync button
+        self.synced_checkbox = QCheckBox("I have synced my devices")
+        main_layout.addWidget(self.synced_checkbox)
+        main_layout.addSpacing(20)
+
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        main_layout.addWidget(separator)
+        main_layout.addSpacing(20)
+
+        # Mobile instructions label
+        mobile_instructions = QLabel(
+            "👉 <b>On mobile</b>, after full sync, select the appropriate option when prompted:"
+            "<ul>"
+            "<li><b>iOS</b>: “Download from AnkiWeb”</li>"
+            "<li><b>Android</b>: “AnkiWeb” or “Keep AnkiWeb collection”<br></li>"
+            "</ul>"
+        )
+        mobile_instructions.setWordWrap(True)
+        main_layout.addWidget(mobile_instructions)
+
+        main_layout.addStretch()
+
+        # Buttons layout
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        skip_button = QPushButton("Skip for now")
+        run_full_sync_button = QPushButton("Run Full Sync")
+        run_full_sync_button.setEnabled(False)
+
+        skip_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        run_full_sync_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
+
+        button_layout.addWidget(skip_button)
+        button_layout.addWidget(run_full_sync_button)
+        main_layout.addLayout(button_layout)
+
+        # Enable/disable the Run Full Sync button based on checkbox state.
+        qconnect(
+            self.synced_checkbox.checkStateChanged,
+            lambda state: run_full_sync_button.setEnabled(
+                state == Qt.CheckState.Checked
+            ),
+        )
+
+        qconnect(skip_button.clicked, self.reject)
+        qconnect(run_full_sync_button.clicked, self.accept)
+
+        self.setLayout(main_layout)
 
 
 @pass_exceptions_to_on_done
@@ -107,17 +231,78 @@ def _on_new_deck_subscriptions_done(
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
     to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
 
-    aqt.mw.taskman.with_progress(
-        task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
-        immediate=True,
-        on_done=partial(_on_sync_done, on_done=on_done),
+    update_decks_and_media(
+        on_done=on_done, ah_dids=list(to_sync_ah_dids), start_media_sync=True
     )
 
 
 @pass_exceptions_to_on_done
-def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
-    future.result()
+def update_decks_and_media(
+    on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
+) -> None:
+    logged_into_ankiweb = aqt.mw.pm.sync_auth()
 
+    def run_update(force_full_sync: bool, start_media_sync: bool) -> None:
+        op = AddonQueryOp(
+            op=lambda _: ah_deck_updater.update_decks_and_media(
+                ah_dids,
+                raise_if_full_sync_required=not force_full_sync,
+                start_media_sync=start_media_sync,
+            ),
+            success=lambda _: on_success(
+                do_full_upload=logged_into_ankiweb and force_full_sync
+            ),
+            parent=aqt.mw,
+        )
+
+        # If not forcing full sync, attach a failure handler to handle conflicts.
+        if not force_full_sync:
+            op = cast(AddonQueryOp, op.failure(on_failure))
+
+        op.with_progress().run_in_background()
+
+    def on_failure(exception: Exception) -> None:
+        if not isinstance(exception, ChangesRequireFullSyncError):
+            raise exception
+
+        LOGGER.info(
+            "Changes require full sync with AnkiWeb.",
+            ah_dids=ah_dids,
+            changes=exception.changes,
+        )
+
+        dialog = ChangesRequireFullSyncDialog(
+            changes_require_full_sync_error=exception, parent=aqt.mw
+        )
+
+        qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
+        qconnect(
+            dialog.accepted,
+            # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
+            lambda: run_update(
+                force_full_sync=True,
+                # The initial attempt already started media sync if needed.
+                start_media_sync=False,
+            ),
+        )
+        dialog.open()
+
+    def on_success(do_full_upload: bool) -> None:
+        if do_full_upload:
+            config.set_schema_to_do_full_upload_for_once(collection_schema())
+
+        _on_sync_done(on_done=on_done)
+
+    # When logged into AnkiWeb, first try without forcing full sync
+    # so that we can check for conflicts; if not logged in, proceed with a full sync.
+    if logged_into_ankiweb:
+        run_update(force_full_sync=False, start_media_sync=start_media_sync)
+    else:
+        run_update(force_full_sync=True, start_media_sync=start_media_sync)
+
+
+@pass_exceptions_to_on_done
+def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     config.set_api_version_on_last_sync(API_VERSION)
 
     show_tooltip_about_last_deck_updates_results()
