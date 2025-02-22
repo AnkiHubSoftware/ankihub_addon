@@ -2,7 +2,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Callable, List, Optional, cast
+from typing import Callable, List, Optional
 from uuid import UUID
 
 import aqt
@@ -243,26 +243,18 @@ def _on_new_deck_subscriptions_done(
 def update_decks_and_media(
     on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
 ) -> None:
-    logged_into_ankiweb = aqt.mw.pm.sync_auth()
-
-    def run_update(force_full_sync: bool, start_media_sync: bool) -> None:
-        op = AddonQueryOp(
+    def run_update(
+        raise_if_full_sync_required: bool, do_full_upload: bool, start_media_sync: bool
+    ) -> None:
+        AddonQueryOp(
             op=lambda _: ah_deck_updater.update_decks_and_media(
                 ah_dids,
-                raise_if_full_sync_required=not force_full_sync,
+                raise_if_full_sync_required=raise_if_full_sync_required,
                 start_media_sync=start_media_sync,
             ),
-            success=lambda _: on_success(
-                do_full_upload=logged_into_ankiweb and force_full_sync
-            ),
+            success=lambda _: on_success(do_full_upload=do_full_upload),
             parent=aqt.mw,
-        )
-
-        # If not forcing full sync, attach a failure handler to handle conflicts.
-        if not force_full_sync:
-            op = cast(AddonQueryOp, op.failure(on_failure))
-
-        op.with_progress().run_in_background()
+        ).failure(on_failure).with_progress().run_in_background()
 
     def on_failure(exception: Exception) -> None:
         if not isinstance(exception, ChangesRequireFullSyncError):
@@ -281,9 +273,11 @@ def update_decks_and_media(
         qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
         qconnect(
             dialog.accepted,
-            # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
+            # Retry the update, this time without raising if a full sync will be required,
+            # then do a full upload to AnkiWeb.
             lambda: run_update(
-                force_full_sync=True,
+                raise_if_full_sync_required=True,
+                do_full_upload=True,
                 # The initial attempt already started media sync if needed.
                 start_media_sync=False,
             ),
@@ -296,12 +290,19 @@ def update_decks_and_media(
 
         _on_sync_done(on_done=on_done)
 
-    # When logged into AnkiWeb, first try without forcing full sync
-    # so that we can check for conflicts; if not logged in, proceed with a full sync.
+    logged_into_ankiweb = aqt.mw.pm.sync_auth()
     if logged_into_ankiweb:
-        run_update(force_full_sync=False, start_media_sync=start_media_sync)
+        run_update(
+            raise_if_full_sync_required=True,
+            do_full_upload=False,
+            start_media_sync=start_media_sync,
+        )
     else:
-        run_update(force_full_sync=True, start_media_sync=start_media_sync)
+        run_update(
+            raise_if_full_sync_required=False,
+            do_full_upload=False,
+            start_media_sync=start_media_sync,
+        )
 
 
 @pass_exceptions_to_on_done
