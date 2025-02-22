@@ -86,7 +86,6 @@ class ChangesRequireFullSyncDialog(QDialog):
             "\n".join(changes_require_full_sync_error.changes)
         )
         self.note_updates_text.setReadOnly(True)
-        # Let the text edit handle its own scrollbar.
         self.note_updates_text.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
@@ -96,7 +95,7 @@ class ChangesRequireFullSyncDialog(QDialog):
         main_layout.addWidget(collapsible)
         main_layout.addSpacing(20)
 
-        # Warning label with emoji and word wrap
+        # Warning label
         warning_label = QLabel(
             "⚠️ <b>Prevent data loss:</b> make sure all your devices are synced with AnkiWeb before proceeding."
         )
@@ -116,7 +115,7 @@ class ChangesRequireFullSyncDialog(QDialog):
         main_layout.addWidget(separator)
         main_layout.addSpacing(20)
 
-        # Mobile instructions label with word wrap
+        # Mobile instructions label
         mobile_instructions = QLabel(
             "👉 <b>On mobile</b>, after full sync, select the appropriate option when prompted:"
             "<ul>"
