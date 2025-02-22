@@ -231,10 +231,10 @@ class AnkiHubImporter:
 
         if self._raise_if_full_sync_required and note_types_with_field_conflicts:
             raise ChangesRequireFullSyncError(
-                changes=[
-                    f"Fields of note type {note_type[0]['name']} differ from the remote note type."
-                    for note_type in note_types_with_field_conflicts
-                ]
+                affected_note_type_ids=set(
+                    remote_note_type["id"]
+                    for _, remote_note_type in note_types_with_field_conflicts
+                )
             )
 
         for local_note_type, remote_note_type in note_types_with_field_conflicts:
@@ -281,9 +281,7 @@ class AnkiHubImporter:
                 and len(local_note_type["tmpls"]) != len(remote_note_type["tmpls"])
             ):
                 raise ChangesRequireFullSyncError(
-                    changes=[
-                        f"Amount of templates of note type {local_note_type['name']} differ from the remote note type."
-                    ]
+                    affected_note_type_ids=set([remote_note_type["id"]])
                 )
 
             updated_note_type = note_type_with_updated_templates_and_css(

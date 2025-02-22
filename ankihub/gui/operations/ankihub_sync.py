@@ -83,7 +83,10 @@ class ChangesRequireFullSyncDialog(QDialog):
 
         self.note_updates_text = QTextEdit()
         self.note_updates_text.setText(
-            "\n".join(changes_require_full_sync_error.changes)
+            "\n".join(
+                aqt.mw.col.models.get(mid)["name"]
+                for mid in changes_require_full_sync_error.affected_note_type_ids
+            )
         )
         self.note_updates_text.setReadOnly(True)
         self.note_updates_text.setVerticalScrollBarPolicy(
@@ -268,7 +271,7 @@ def update_decks_and_media(
         LOGGER.info(
             "Changes require full sync with AnkiWeb.",
             ah_dids=ah_dids,
-            changes=exception.changes,
+            changes=exception.affected_note_type_ids,
         )
 
         dialog = ChangesRequireFullSyncDialog(

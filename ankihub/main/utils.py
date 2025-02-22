@@ -244,16 +244,10 @@ def change_note_types_of_notes(
 
     if raise_if_changes_required and notes_grouped_by_type_change:
         raise ChangesRequireFullSyncError(
-            changes=[
-                (
-                    f"Change note type of notes from {source_note_type_id} to {target_note_type_id} "
-                    f"for {len(note_ids)} notes."
-                )
-                for (
-                    source_note_type_id,
-                    target_note_type_id,
-                ), note_ids in notes_grouped_by_type_change.items()
-            ]
+            affected_note_type_ids=set(
+                target_note_type_id
+                for _, target_note_type_id in notes_grouped_by_type_change.keys()
+            )
         )
 
     # Change note types of notes for each group
