@@ -10,6 +10,7 @@ from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
 from aqt.qt import (
+    QAbstractAnimation,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -19,13 +20,17 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QPropertyAnimation,
     QPushButton,
     QScrollArea,
     QSize,
+    QSizePolicy,
     QStyle,
     Qt,
+    QToolButton,
     QVBoxLayout,
     QWidget,
+    pyqtSlot,
     qconnect,
 )
 from aqt.studydeck import StudyDeck
@@ -523,6 +528,73 @@ def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
     current_style_sheet = widget.styleSheet()
     new_style_sheet = f"{current_style_sheet} {tooltip_stylesheet()}"
     widget.setStyleSheet(new_style_sheet)
+
+
+class CollapsibleSection(QWidget):
+    def __init__(self, title="", parent=None, expanded_max_height=200):
+        """
+        :param title: Title for the collapsible section.
+        :param parent: Parent widget.
+        :param expanded_max_height: Maximum height (in px) for expanded content.
+        """
+        super().__init__(parent)
+        self._expanded_max_height = expanded_max_height
+
+        # Toggle button with chevron icon and title
+        self.toggle_button = QToolButton(text=title, checkable=True, checked=False)
+        self.toggle_button.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        self.toggle_button.toggled.connect(self.on_toggled)
+
+        # Instead of using QScrollArea, use a plain container widget.
+        self.content_widget = QWidget()
+        self.content_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        # Start collapsed
+        self.content_widget.setMaximumHeight(0)
+
+        # Layout for the collapsible section (toggle button + content widget)
+        lay = QVBoxLayout(self)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self.toggle_button)
+        lay.addWidget(self.content_widget)
+
+        # Animation for expanding/collapsing the content widget's maximumHeight
+        self.animation = QPropertyAnimation(self.content_widget, b"maximumHeight")
+        self.animation.setDuration(150)
+
+    def setContentLayout(self, layout):
+        """
+        Set the layout that holds the content you want to collapse/expand.
+        The layout's sizeHint is used to calculate the expanded height,
+        up to _expanded_max_height.
+        """
+        self.content_widget.setLayout(layout)
+        # Determine natural height of the content and clamp it.
+        content_height = layout.sizeHint().height()
+        self._target_height = min(content_height, self._expanded_max_height)
+        self.content_widget.setMaximumHeight(0)
+        self.animation.setStartValue(0)
+        self.animation.setEndValue(self._target_height)
+
+    @pyqtSlot(bool)
+    def on_toggled(self, checked):
+        # Update chevron icon
+        self.toggle_button.setArrowType(
+            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
+        )
+        # Set animation direction based on toggle state
+        self.animation.setDirection(
+            QAbstractAnimation.Direction.Forward
+            if checked
+            else QAbstractAnimation.Direction.Backward
+        )
+        self.animation.start()
 
 
 def check_and_prompt_for_updates_on_main_window():
