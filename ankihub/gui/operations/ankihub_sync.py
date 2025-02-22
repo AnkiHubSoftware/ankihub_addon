@@ -51,7 +51,11 @@ sync_state = _SyncState()
 
 
 class ChangesRequireFullSyncDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        changes_require_full_sync_error: ChangesRequireFullSyncError,
+        parent,
+    ):
         super().__init__(parent)
         self.setWindowTitle(" ")
         self.setMinimumWidth(400)
@@ -79,19 +83,7 @@ class ChangesRequireFullSyncDialog(QDialog):
 
         self.note_updates_text = QTextEdit()
         self.note_updates_text.setText(
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "{note type name} ({deck name}) / {username}\n"
-            "... (dummy data for note type updates) ..."
+            "\n".join(changes_require_full_sync_error.changes)
         )
         self.note_updates_text.setReadOnly(True)
         # Let the text edit handle its own scrollbar.
@@ -161,8 +153,8 @@ class ChangesRequireFullSyncDialog(QDialog):
             ),
         )
 
-        skip_button.clicked.connect(self.reject)
-        run_full_sync_button.clicked.connect(self.accept)
+        qconnect(skip_button.clicked, self.reject)
+        qconnect(run_full_sync_button.clicked, self.accept)
 
         self.setLayout(main_layout)
 
@@ -255,7 +247,7 @@ def update_decks_and_media(
         op = AddonQueryOp(
             op=lambda _: ah_deck_updater.update_decks_and_media(
                 ah_dids,
-                raise_if_full_sync_required=force_full_sync,
+                raise_if_full_sync_required=not force_full_sync,
                 start_media_sync=start_media_sync,
             ),
             success=lambda _: on_success(
@@ -280,14 +272,21 @@ def update_decks_and_media(
             changes=exception.changes,
         )
 
-        # TODO: Show dialog asking user to sync other devices first
-
-        # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
-        run_update(
-            force_full_sync=True,
-            # The initial attempt already started media sync if needed.
-            start_media_sync=False,
+        dialog = ChangesRequireFullSyncDialog(
+            changes_require_full_sync_error=exception, parent=aqt.mw
         )
+
+        qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
+        qconnect(
+            dialog.accepted,
+            # Retry the update, this time forcing a full sync (no ChangesRequireFullSyncError will be raised).
+            lambda: run_update(
+                force_full_sync=True,
+                # The initial attempt already started media sync if needed.
+                start_media_sync=False,
+            ),
+        )
+        dialog.open()
 
     def on_success(do_full_upload: bool) -> None:
         if do_full_upload:

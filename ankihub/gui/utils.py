@@ -541,13 +541,16 @@ class CollapsibleSection(QWidget):
         self._expanded_max_height = expanded_max_height
 
         # Toggle button with chevron icon and title
-        self.toggle_button = QToolButton(text=title, checkable=True, checked=False)
+        self.toggle_button = QToolButton()
+        self.toggle_button.setText(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
         self.toggle_button.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
-        self.toggle_button.toggled.connect(self.on_toggled)
+        qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
         # Instead of using QScrollArea, use a plain container widget.
         self.content_widget = QWidget()
