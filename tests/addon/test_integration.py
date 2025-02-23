@@ -2499,6 +2499,166 @@ class TestAnkiHubImporter:
             else:
                 assert deck_config["name"] != ANKIHUB_PRESET_NAME
 
+    @pytest.mark.parametrize(
+        "raise_if_full_sync_required",
+        [True, False],
+    )
+    def test_import_with_field_added_to_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        ankihub_basic_note_type: NotetypeDict,
+        import_ah_note_type: ImportAHNoteType,
+        raise_if_full_sync_required: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            import_ah_note_type(ankihub_basic_note_type, ah_did)
+
+            updated_note_type = copy.deepcopy(ankihub_basic_note_type)
+            new_field = aqt.mw.col.models.new_field("new_field")
+            updated_note_type["flds"].append(new_field)
+
+            def import_note_type(note_type: NotetypeDict) -> AnkiHubImportResult:
+                return self._import_notes(
+                    [],
+                    is_first_import_of_deck=False,
+                    ah_did=ah_did,
+                    anki_did=anki_did,
+                    note_types={note_type["id"]: note_type},
+                    raise_if_full_sync_required=raise_if_full_sync_required,
+                )
+
+            if raise_if_full_sync_required:
+                with pytest.raises(
+                    ChangesRequireFullSyncError
+                ) as changes_require_full_sync_error:
+                    import_note_type(updated_note_type)
+
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {
+                    updated_note_type["id"]
+                }
+            else:
+                import_result = import_note_type(updated_note_type)
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 0
+                assert len(import_result.deleted_nids) == 0
+
+                note_type = aqt.mw.col.models.get(NotetypeId(updated_note_type["id"]))
+                assert (
+                    len(note_type["flds"]) == len(ankihub_basic_note_type["flds"]) + 1
+                )
+                assert note_type["flds"][-1]["name"] == "new_field"
+
+    @pytest.mark.parametrize(
+        "raise_if_full_sync_required",
+        [True, False],
+    )
+    def test_import_note_type_with_changed_amount_of_templates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        ankihub_basic_note_type: NotetypeDict,
+        import_ah_note_type: ImportAHNoteType,
+        raise_if_full_sync_required: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            import_ah_note_type(ankihub_basic_note_type, ah_did)
+
+            updated_note_type = copy.deepcopy(ankihub_basic_note_type)
+            new_template = aqt.mw.col.models.new_template("new_template")
+            new_template["qfmt"] = "{{Front}} some text"
+            aqt.mw.col.models.add_template(updated_note_type, new_template)
+
+            def import_note_type(note_type: NotetypeDict) -> AnkiHubImportResult:
+                return self._import_notes(
+                    [],
+                    is_first_import_of_deck=False,
+                    ah_did=ah_did,
+                    anki_did=anki_did,
+                    note_types={note_type["id"]: note_type},
+                    raise_if_full_sync_required=raise_if_full_sync_required,
+                )
+
+            if raise_if_full_sync_required:
+                with pytest.raises(ChangesRequireFullSyncError):
+                    import_note_type(updated_note_type)
+
+                with pytest.raises(
+                    ChangesRequireFullSyncError
+                ) as changes_require_full_sync_error:
+                    import_note_type(updated_note_type)
+
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {
+                    updated_note_type["id"]
+                }
+            else:
+                import_result = import_note_type(updated_note_type)
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 0
+                assert len(import_result.deleted_nids) == 0
+
+                note_type = aqt.mw.col.models.get(NotetypeId(updated_note_type["id"]))
+                assert (
+                    len(note_type["tmpls"]) == len(ankihub_basic_note_type["tmpls"]) + 1
+                )
+                assert note_type["tmpls"][-1]["name"] == "new_template"
+
+    @pytest.mark.parametrize(
+        "raise_if_full_sync_required",
+        [True, False],
+    )
+    def test_import_note_with_changed_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        ankihub_basic_note_type: NotetypeDict,
+        import_ah_note: ImportAHNote,
+        raise_if_full_sync_required: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_data=note_info, ah_did=ah_did)
+
+            new_note_type = create_copy_of_note_type(aqt.mw, ankihub_basic_note_type)
+            note_info.mid = new_note_type["id"]
+
+            def import_note(note_info: NoteInfo) -> AnkiHubImportResult:
+                return self._import_notes(
+                    [note_info],
+                    is_first_import_of_deck=False,
+                    ah_did=ah_did,
+                    anki_did=anki_did,
+                    note_types={new_note_type["id"]: new_note_type},
+                    raise_if_full_sync_required=raise_if_full_sync_required,
+                )
+
+            if raise_if_full_sync_required:
+                with pytest.raises(
+                    ChangesRequireFullSyncError
+                ) as changes_require_full_sync_error:
+                    import_note(note_info)
+
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {
+                    new_note_type["id"]
+                }
+            else:
+                import_result = import_note(note_info)
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 0
+                assert len(import_result.deleted_nids) == 0
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
@@ -2507,6 +2667,7 @@ class TestAnkiHubImporter:
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         anki_did: Optional[DeckId] = None,
         note_types: Dict[NotetypeId, NotetypeDict] = {},
+        raise_if_full_sync_required: bool = False,
     ) -> AnkiHubImportResult:
         """Helper function to use the AnkiHubImporter to import notes with default arguments."""
         ankihub_importer = AnkiHubImporter()
@@ -2524,6 +2685,7 @@ class TestAnkiHubImporter:
                 ah_did
             ),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+            raise_if_full_sync_required=raise_if_full_sync_required,
         )
         return import_result
 
