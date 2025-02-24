@@ -150,6 +150,7 @@ from ankihub.gui.browser.custom_search_nodes import (
     AnkiHubNoteSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
     setup_config_dialog_manager,
@@ -4871,15 +4872,13 @@ class TestSyncWithAnkiHub:
                 return_value=logged_into_ankiweb,
             )
 
-            def close_dialog(self: ankihub_sync.ChangesRequireFullSyncDialog) -> None:
+            def close_dialog(self: ChangesRequireFullSyncDialog) -> None:
                 if accept_full_sync_required_dialog:
                     self.accept()
                 else:
                     self.reject()
 
-            mocker.patch.object(
-                ankihub_sync.ChangesRequireFullSyncDialog, "open", close_dialog
-            )
+            mocker.patch.object(ChangesRequireFullSyncDialog, "open", close_dialog)
 
             # Sync with AnkiHub
             sync_with_ankihub()
