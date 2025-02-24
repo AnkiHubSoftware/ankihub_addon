@@ -702,7 +702,7 @@ def active_window_or_mw() -> QWidget:
 def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
     LOGGER.info("Syncing with AnkiWeb...")
 
-    if not aqt.mw.pm.sync_auth():
+    if not logged_into_ankiweb():
         on_done()
         return
 
@@ -724,3 +724,7 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
         ),
         None,
     )
+
+
+def logged_into_ankiweb() -> bool:
+    return bool(aqt.mw.pm.sync_auth())

@@ -36,7 +36,7 @@ from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import CollapsibleSection, sync_with_ankiweb
+from ..utils import CollapsibleSection, logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -290,8 +290,7 @@ def update_decks_and_media(
 
         _on_sync_done(on_done=on_done)
 
-    logged_into_ankiweb = aqt.mw.pm.sync_auth()
-    if logged_into_ankiweb:
+    if logged_into_ankiweb():
         run_update(
             raise_if_full_sync_required=True,
             do_full_upload=False,
