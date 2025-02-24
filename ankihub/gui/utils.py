@@ -351,8 +351,6 @@ class _Dialog(QDialog):
 
     def _setup_button_box(self) -> QDialogButtonBox:
         button_box = QDialogButtonBox()
-        # Use Windows layout
-        button_box.setStyleSheet("button-layout: 0")
 
         self.default_button = None
         for button_index, button in enumerate(self.buttons):
