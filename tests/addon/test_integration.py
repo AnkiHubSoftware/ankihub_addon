@@ -4829,6 +4829,97 @@ class TestSyncWithAnkiHub:
             sync_with_ankihub()
             assert config.schema_to_do_full_upload_for_once() == updated_schema
 
+    @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "logged_into_ankiweb, accept_full_sync_required_dialog",
+        [
+            (False, None),
+            (True, True),
+            (True, False),
+        ],
+    )
+    def test_sync_with_change_requiring_full_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+        logged_into_ankiweb: bool,
+        accept_full_sync_required_dialog: Optional[bool],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            deck = DeckFactory.create()
+            install_ah_deck(ah_did=deck.ah_did)
+
+            # Mock deck update to return note with changed note type
+            nid = ankihub_db.anki_nids_for_ankihub_deck(deck.ah_did)[0]
+            note_info = ankihub_db.note_data(nid)
+            original_note_type_id = note_info.mid
+            new_note_type = import_ah_note_type(ah_did=deck.ah_did, force_new=True)
+            note_info.mid = new_note_type["id"]
+
+            self.mock_deck_update_client_methods(
+                deck=deck, notes=[note_info], mocker=mocker
+            )
+
+            config.save_token("test_token")
+
+            mocker.patch(
+                "ankihub.gui.operations.ankihub_sync.logged_into_ankiweb",
+                return_value=logged_into_ankiweb,
+            )
+
+            def close_dialog(self: ankihub_sync.ChangesRequireFullSyncDialog) -> None:
+                if accept_full_sync_required_dialog:
+                    self.accept()
+                else:
+                    self.reject()
+
+            mocker.patch.object(
+                ankihub_sync.ChangesRequireFullSyncDialog, "open", close_dialog
+            )
+
+            # Sync with AnkiHub
+            sync_with_ankihub()
+
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            if not logged_into_ankiweb or accept_full_sync_required_dialog:
+                assert note.mid == new_note_type["id"]
+
+                # If the user is logged into AnkiWeb, a full upload to AnkiWeb should be done
+                assert (
+                    bool(config.schema_to_do_full_upload_for_once())
+                    == logged_into_ankiweb
+                )
+            else:
+                assert note.mid == original_note_type_id
+                assert not config.schema_to_do_full_upload_for_once()
+
+    def mock_deck_update_client_methods(
+        self, deck: Deck, notes: List[NoteInfo], mocker: MockerFixture
+    ) -> None:
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            return_value=[deck],
+        )
+
+        mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+        latest_update = datetime.now()
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_deck_updates",
+            return_value=DeckUpdates(
+                latest_update=latest_update,
+                protected_fields={},
+                protected_tags=[],
+                notes=notes,
+            ),
+        )
+
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
     anki_session_with_addon_data: AnkiSession, install_ah_deck: InstallAHDeck
