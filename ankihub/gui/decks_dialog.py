@@ -738,7 +738,7 @@ class DeckManagementDialog(QDialog):
                 return
 
             update_deck_templates(self._selected_ah_did(), note_type)
-            tooltip("Templates updated", parent=aqt.mw)
+            tooltip("Changes updated", parent=aqt.mw)
             self._update_templates_btn_state()
 
         mids_with_updates = note_types_with_template_changes_for_deck(
