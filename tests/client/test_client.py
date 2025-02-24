@@ -1819,6 +1819,40 @@ class TestAddNoteTypeFields:
 
 
 @pytest.mark.vcr()
+class TestUpdateNoteTypeTemplatesAndStyle:
+    def test_update_note_type_templates(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        css = ".home {background: red}"
+        templates = [
+            {
+                "ord": 0,
+                "afmt": "<div>back</div>",
+                "name": "Test",
+                "qfmt": "<div>front</div>",
+                "bafmt": "{{cloze:Text}}",
+                "bqfmt": "{{cloze:Text}}",
+                "bsize": 12,
+            }
+        ]
+
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        note_type["tmpls"] = templates
+        note_type["css"] = css
+
+        data = client.update_note_type(
+            ID_OF_DECK_OF_USER_TEST1, note_type, ["tmpls", "css"]
+        )
+
+        assert data["css"] == css
+        assert data["tmpls"] == templates
+
+
+@pytest.mark.vcr()
 class TestGetFeatureFlags:
     def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
