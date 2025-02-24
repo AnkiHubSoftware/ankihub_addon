@@ -552,20 +552,17 @@ class CollapsibleSection(QWidget):
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
         qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
-        # Instead of using QScrollArea, use a plain container widget.
         self.content_widget = QWidget()
         self.content_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        # Start collapsed
         self.content_widget.setMaximumHeight(0)
 
-        # Layout for the collapsible section (toggle button + content widget)
-        lay = QVBoxLayout(self)
-        lay.setSpacing(0)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self.toggle_button)
-        lay.addWidget(self.content_widget)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content_widget)
 
         # Animation for expanding/collapsing the content widget's maximumHeight
         self.animation = QPropertyAnimation(self.content_widget, b"maximumHeight")
@@ -578,7 +575,6 @@ class CollapsibleSection(QWidget):
         up to _expanded_max_height.
         """
         self.content_widget.setLayout(layout)
-        # Determine natural height of the content and clamp it.
         content_height = layout.sizeHint().height()
         self._target_height = min(content_height, self._expanded_max_height)
         self.content_widget.setMaximumHeight(0)
