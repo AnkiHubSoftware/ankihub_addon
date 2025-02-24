@@ -107,4 +107,14 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
 
 
 def update_deck_templates(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
-    print("update_deck_templates", ah_did)
+    client = AddonAnkiHubClient()
+
+    db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+
+    db_note_type["tmpls"] = note_type["tmpls"]
+    db_note_type["css"] = note_type["css"]
+
+    db_note_type = client.update_note_type(ah_did, db_note_type, ["css", "tmpls"])
+    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
+
+    return db_note_type
