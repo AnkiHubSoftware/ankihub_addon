@@ -4838,7 +4838,7 @@ class TestSyncWithAnkiHub:
             (True, False),
         ],
     )
-    def test_sync_with_change_requiring_full_sync(
+    def test_sync_change_requiring_full_sync(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -4896,6 +4896,24 @@ class TestSyncWithAnkiHub:
             else:
                 assert note.mid == original_note_type_id
                 assert not config.schema_to_do_full_upload_for_once()
+
+    @pytest.mark.qt_no_exception_capture
+    def test_with_exception_in_deck_updater(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(
+                _AnkiHubDeckUpdater,
+                "update_decks_and_media",
+                side_effect=Exception("test exception"),
+            )
+
+            with pytest.raises(Exception, match="test exception"):
+                sync_with_ankihub()
 
     def mock_deck_update_client_methods(
         self, deck: Deck, notes: List[NoteInfo], mocker: MockerFixture
