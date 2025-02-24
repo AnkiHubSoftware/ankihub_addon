@@ -39,7 +39,7 @@ from ..exceptions import FullSyncCancelled
 from ..utils import CollapsibleSection, logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
-from .utils import future_with_result, pass_exceptions_to_on_done
+from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
 
 
 @dataclass
@@ -258,7 +258,8 @@ def update_decks_and_media(
 
     def on_failure(exception: Exception) -> None:
         if not isinstance(exception, ChangesRequireFullSyncError):
-            raise exception
+            on_done(future_with_exception(exception))
+            return
 
         LOGGER.info(
             "Changes require full sync with AnkiWeb.",
@@ -276,7 +277,7 @@ def update_decks_and_media(
             # Retry the update, this time without raising if a full sync will be required,
             # then do a full upload to AnkiWeb.
             lambda: run_update(
-                raise_if_full_sync_required=True,
+                raise_if_full_sync_required=False,
                 do_full_upload=True,
                 # The initial attempt already started media sync if needed.
                 start_media_sync=False,
