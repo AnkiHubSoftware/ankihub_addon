@@ -1,17 +1,22 @@
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Optional, Type
 
-from mashumaro.core.meta.builder import CodeBuilder
+from mashumaro.core.meta.code.builder import CodeBuilder
 from mashumaro.dialect import Dialect
 from mashumaro.exceptions import UnresolvedTypeReferenceError
 
+__all__ = [
+    "compile_mixin_packer",
+    "compile_mixin_unpacker",
+]
+
 
 def compile_mixin_packer(
-    cls,
+    cls: Type,
     format_name: str = "dict",
     dialect: Optional[Type[Dialect]] = None,
     encoder: Any = None,
-    encoder_kwargs: Optional[Dict[str, Dict[str, Tuple[str, Any]]]] = None,
-):
+    encoder_kwargs: Optional[dict[str, dict[str, tuple[str, Any]]]] = None,
+) -> None:
     builder = CodeBuilder(
         cls=cls,
         format_name=format_name,
@@ -28,11 +33,11 @@ def compile_mixin_packer(
 
 
 def compile_mixin_unpacker(
-    cls,
+    cls: Type,
     format_name: str = "dict",
     dialect: Optional[Type[Dialect]] = None,
     decoder: Any = None,
-):
+) -> None:
     builder = CodeBuilder(
         cls=cls,
         format_name=format_name,
@@ -45,6 +50,3 @@ def compile_mixin_unpacker(
     except UnresolvedTypeReferenceError:
         if not config.allow_postponed_evaluation:
             raise
-
-
-__all__ = ["compile_mixin_packer", "compile_mixin_unpacker"]

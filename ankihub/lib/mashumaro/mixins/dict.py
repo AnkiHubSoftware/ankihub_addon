@@ -1,9 +1,13 @@
-from typing import Any, Dict, Mapping, Type, TypeVar
+from collections.abc import Mapping
+from typing import Any, Type, TypeVar, final
 
 from mashumaro.core.meta.mixin import (
     compile_mixin_packer,
     compile_mixin_unpacker,
 )
+
+__all__ = ["DataClassDictMixin"]
+
 
 T = TypeVar("T", bound="DataClassDictMixin")
 
@@ -13,7 +17,8 @@ class DataClassDictMixin:
 
     __mashumaro_builder_params = {"packer": {}, "unpacker": {}}  # type: ignore
 
-    def __init_subclass__(cls: Type[T], **kwargs):
+    def __init_subclass__(cls: Type[T], **kwargs: Any):
+        super().__init_subclass__(**kwargs)
         for ancestor in cls.__mro__[-1:0:-1]:
             builder_params_ = f"_{ancestor.__name__}__mashumaro_builder_params"
             builder_params = getattr(ancestor, builder_params_, None)
@@ -21,6 +26,7 @@ class DataClassDictMixin:
                 compile_mixin_unpacker(cls, **builder_params["unpacker"])
                 compile_mixin_packer(cls, **builder_params["packer"])
 
+    @final
     def to_dict(
         self: T,
         # *
@@ -28,34 +34,35 @@ class DataClassDictMixin:
         # omit_none: bool = False
         # by_alias: bool = False
         # dialect: Type[Dialect] = None
-        **kwargs,
-    ) -> dict:
-        ...
+        **kwargs: Any,
+    ) -> dict[Any, Any]: ...
 
     @classmethod
+    @final
     def from_dict(
         cls: Type[T],
         d: Mapping,
         # *
         # keyword-only arguments that exist with the code generation options:
         # dialect: Type[Dialect] = None
-        **kwargs,
-    ) -> T:
-        ...
+        **kwargs: Any,
+    ) -> T: ...
 
     @classmethod
-    def __pre_deserialize__(cls: Type[T], d: Dict[Any, Any]) -> Dict[Any, Any]:
-        ...
+    def __pre_deserialize__(
+        cls: Type[T], d: dict[Any, Any]
+    ) -> dict[Any, Any]: ...
 
     @classmethod
-    def __post_deserialize__(cls: Type[T], obj: T) -> T:
-        ...
+    def __post_deserialize__(cls: Type[T], obj: T) -> T: ...
 
-    def __pre_serialize__(self: T) -> T:
-        ...
+    def __pre_serialize__(
+        self: T,
+        # context: Any = None,  # added with ADD_SERIALIZATION_CONTEXT option
+    ) -> T: ...
 
-    def __post_serialize__(self: T, d: Dict[Any, Any]) -> Dict[Any, Any]:
-        ...
-
-
-__all__ = ["DataClassDictMixin"]
+    def __post_serialize__(
+        self: T,
+        d: dict[Any, Any],
+        # context: Any = None,  # added with ADD_SERIALIZATION_CONTEXT option
+    ) -> dict[Any, Any]: ...
