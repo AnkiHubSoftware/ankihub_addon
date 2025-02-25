@@ -6759,7 +6759,9 @@ def test_update_note_type_templates_and_styles(
         note_type_id = ankihub_db.note_types_for_ankihub_deck(ah_did)[0]
         note_type = aqt.mw.col.models.get(note_type_id)
         css_data = ".new_css{ }"
-        tmpls_data = [{"name": "template 1"}]
+        tmpls_data = tmpls_data = [
+            {"name": "template 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}
+        ]
         aqt.mw.col.models.update_dict(note_type)
         expected_data = {**note_type, "css": css_data, "tmpls": tmpls_data}
 
