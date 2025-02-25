@@ -640,8 +640,10 @@ class DeckManagementDialog(QDialog):
         ]
 
     def _on_add_note_type_btn_clicked(self):
-        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
-            if not ret.name:
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
                 return
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
@@ -652,7 +654,7 @@ class DeckManagementDialog(QDialog):
             if not confirm:
                 return
 
-            note_type = aqt.mw.col.models.by_name(ret.name)
+            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             add_note_type(self._selected_ah_did(), note_type)
 
             tooltip("Note type published", parent=aqt.mw)
@@ -669,11 +671,13 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_add_field_btn_clicked(self) -> None:
-        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
-            if not ret.name:
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
                 return
 
-            note_type = aqt.mw.col.models.by_name(ret.name)
+            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             field_names = aqt.mw.col.models.field_names(note_type)
             ankihub_field_names = ankihub_db.note_type_field_names(
                 self._selected_ah_did(), note_type["id"]
@@ -693,7 +697,7 @@ class DeckManagementDialog(QDialog):
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
                 title="Select fields to publish",
-                parent=ret,
+                parent=note_type_selector,
             )
             if new_fields:
                 confirm = ask_user(
@@ -721,11 +725,13 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_update_templates_btn_clicked(self) -> None:
-        def on_note_type_selected(ret: SearchableSelectionDialog) -> None:
-            if not ret.name:
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
                 return
 
-            note_type = aqt.mw.col.models.by_name(ret.name)
+            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
                 "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
@@ -835,11 +841,11 @@ class DeckManagementDialog(QDialog):
         else:
             current = current_destination_deck["name"]
 
-        def update_deck_config(ret: SearchableSelectionDialog):
-            if not ret.name:
+        def update_deck_config(note_type_selector: SearchableSelectionDialog):
+            if not note_type_selector.name:
                 return
 
-            anki_did = aqt.mw.col.decks.id(ret.name)
+            anki_did = aqt.mw.col.decks.id(note_type_selector.name)
             config.set_home_deck(ankihub_did=ah_did, anki_did=anki_did)
             self._refresh_new_cards_destination_details_label(ah_did)
 
