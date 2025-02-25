@@ -74,7 +74,7 @@ STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_VERSION = 21.0
+API_VERSION = 22.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -1345,9 +1345,9 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
-    def is_premium_or_trialing(self) -> bool:
+    def has_reviewer_extension_access(self) -> bool:
         data = self.get_user_details()
-        return data["is_premium"] or data["is_trialing"]
+        return data.get("has_reviewer_extension_access", False)
 
 
 class ThreadLocalSession:

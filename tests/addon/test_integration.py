@@ -5768,8 +5768,7 @@ class TestFlashCardSelector:
                 AnkiHubClient,
                 "get_user_details",
                 return_value={
-                    "is_premium": True,
-                    "is_trialing": False,
+                    "has_flashcard_selector_access": True,
                     "show_trial_ended_message": False,
                 },
             )
@@ -5815,8 +5814,7 @@ class TestFlashCardSelector:
                 AnkiHubClient,
                 "get_user_details",
                 return_value={
-                    "is_premium": True,
-                    "is_trialing": False,
+                    "has_flashcard_selector_access": True,
                     "show_trial_ended_message": False,
                 },
             )
@@ -5883,8 +5881,7 @@ class TestFlashCardSelector:
                 AnkiHubClient,
                 "get_user_details",
                 return_value={
-                    "is_premium": False,
-                    "is_trialing": False,
+                    "has_flashcard_selector_access": False,
                     "show_trial_ended_message": show_trial_ended_message,
                 },
             )
@@ -6189,7 +6186,10 @@ def mock_using_qt5_to_return_false(mocker: MockerFixture):
 
 @pytest.fixture
 def mock_user_details(mocker: MockerFixture):
-    user_details = {"is_premium": True, "is_trialing": False}
+    user_details = {
+        "has_flashcard_selector_access": True,
+        "has_reviewer_extension_access": True,
+    }
     mocker.patch.object(AnkiHubClient, "get_user_details", return_value=user_details)
 
 
@@ -6662,7 +6662,13 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
 ):
     entry_point.run()
     message = TERMS_AGREEMENT_NOT_ACCEPTED
-    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    requests_mock.get(
+        "https://app.ankihub.net/api/users/me",
+        json={
+            "has_flashcard_selector_access": True,
+            "has_reviewer_extension_access": True,
+        },
+    )
     with anki_session_with_addon_data.profile_loaded():
         anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
@@ -6693,7 +6699,13 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
 ):
     entry_point.run()
     message = TERMS_AGREEMENT_NOT_ACCEPTED
-    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    requests_mock.get(
+        "https://app.ankihub.net/api/users/me",
+        json={
+            "has_flashcard_selector_access": True,
+            "has_reviewer_extension_access": True,
+        },
+    )
     with anki_session_with_addon_data.profile_loaded():
         anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
@@ -6724,7 +6736,13 @@ def test_terms_agreement_accepted(
 ):
     entry_point.run()
     message = TERMS_AGREEMENT_ACCEPTED
-    requests_mock.get("https://app.ankihub.net/api/users/me", json={"is_premium": True})
+    requests_mock.get(
+        "https://app.ankihub.net/api/users/me",
+        json={
+            "has_flashcard_selector_access": True,
+            "has_reviewer_extension_access": True,
+        },
+    )
     with anki_session_with_addon_data.profile_loaded():
         anki_did: DeckId = DeckId(1)
         ah_did = install_ah_deck(anki_did=anki_did)
