@@ -113,5 +113,17 @@ def new_fields_for_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> List
     return new_fields
 
 
-def update_deck_templates(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
-    print("update_deck_templates", ah_did)
+def update_note_type_templates_and_styles(
+    ah_did: uuid.UUID, note_type: NotetypeDict
+) -> NotetypeDict:
+    client = AddonAnkiHubClient()
+    note_type = note_type_with_ankihub_end_comment_removed(note_type)
+    db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+
+    db_note_type["tmpls"] = note_type["tmpls"]
+    db_note_type["css"] = note_type["css"]
+
+    db_note_type = client.update_note_type(ah_did, db_note_type, ["css", "tmpls"])
+    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
+
+    return db_note_type
