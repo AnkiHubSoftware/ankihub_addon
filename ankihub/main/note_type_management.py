@@ -110,6 +110,7 @@ def update_note_type_templates_and_styles(
     ah_did: uuid.UUID, note_type: NotetypeDict
 ) -> NotetypeDict:
     client = AddonAnkiHubClient()
+    note_type = note_type_with_ankihub_end_comment_removed(note_type)
     db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
 
     db_note_type["tmpls"] = note_type["tmpls"]
