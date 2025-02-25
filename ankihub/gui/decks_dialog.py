@@ -36,7 +36,7 @@ from ..main.note_type_management import (
     add_note_type,
     add_note_type_fields,
     note_types_with_template_changes_for_deck,
-    update_deck_templates,
+    update_note_type_templates_and_styles,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
@@ -737,7 +737,7 @@ class DeckManagementDialog(QDialog):
             if not confirm:
                 return
 
-            update_deck_templates(self._selected_ah_did(), note_type)
+            update_note_type_templates_and_styles(self._selected_ah_did(), note_type)
             tooltip("Changes updated", parent=aqt.mw)
             self._update_templates_btn_state()
 

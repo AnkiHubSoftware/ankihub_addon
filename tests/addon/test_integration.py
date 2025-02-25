@@ -205,7 +205,7 @@ from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
 from ankihub.main.note_type_management import (
     add_note_type,
     add_note_type_fields,
-    update_deck_templates,
+    update_note_type_templates_and_styles,
 )
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import (
@@ -6769,7 +6769,7 @@ def test_update_note_type_templates_and_styles(
             json=_to_ankihub_note_type(expected_data),
         )
 
-        db_note_type = update_deck_templates(
+        db_note_type = update_note_type_templates_and_styles(
             ah_did, {**note_type, "css": css_data, "tmpls": tmpls_data}
         )
         assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
