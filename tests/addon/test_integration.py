@@ -202,7 +202,11 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
-from ankihub.main.note_type_management import add_note_type, add_note_type_fields
+from ankihub.main.note_type_management import (
+    add_note_type,
+    add_note_type_fields,
+    update_note_type_templates_and_styles,
+)
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import (
     SUBDECK_TAG,
@@ -6761,3 +6765,36 @@ def test_terms_agreement_accepted(
         terms_dialog_mock.hide.assert_called_once()
         reviewer_sidebar_mock.set_needs_to_accept_terms.assert_called_once_with(False)
         reviewer_sidebar_mock.access_last_accessed_url.assert_called_once()
+
+
+def test_update_note_type_templates_and_styles(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    requests_mock: Mocker,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        _, ah_did = install_sample_ah_deck()
+        note_type_id = ankihub_db.note_types_for_ankihub_deck(ah_did)[0]
+        note_type = aqt.mw.col.models.get(note_type_id)
+        css_data = ".new_css{ }"
+        tmpls_data = tmpls_data = [
+            {"name": "template 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}
+        ]
+        aqt.mw.col.models.update_dict(note_type)
+        expected_data = {**note_type, "css": css_data, "tmpls": tmpls_data}
+
+        requests_mock.patch(
+            f"{config.api_url}/decks/{ah_did}/note-types/{note_type['id']}/",
+            status_code=200,
+            json=_to_ankihub_note_type(expected_data),
+        )
+
+        db_note_type = update_note_type_templates_and_styles(
+            ah_did, {**note_type, "css": css_data, "tmpls": tmpls_data}
+        )
+        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+            "tmpls"
+        ) == db_note_type.get("tmpls")
+        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+            "css"
+        ) == db_note_type.get("css")
