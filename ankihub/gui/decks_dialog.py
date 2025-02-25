@@ -693,7 +693,7 @@ class DeckManagementDialog(QDialog):
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
                 title="Select fields to publish",
-                parent=self,
+                parent=ret,
             )
             if new_fields:
                 confirm = ask_user(
