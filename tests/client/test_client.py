@@ -1819,8 +1819,8 @@ class TestAddNoteTypeFields:
 
 
 @pytest.mark.vcr()
-class TestUpdateNoteTypeTemplatesAndStyle:
-    def test_update_note_type_templates(
+class TestUpdateNoteTypeTemplatesAndStyles:
+    def test_update_note_type_templates_and_styles(
         self, authorized_client_for_user_test1: AnkiHubClient
     ):
         css = ".home {background: red}"
