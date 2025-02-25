@@ -106,5 +106,12 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
     return ids
 
 
+def new_fields_for_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> List[str]:
+    field_names = aqt.mw.col.models.field_names(note_type)
+    ankihub_field_names = ankihub_db.note_type_field_names(ah_did, note_type["id"])
+    new_fields = [name for name in field_names if name not in ankihub_field_names]
+    return new_fields
+
+
 def update_deck_templates(ah_did: uuid.UUID, note_type: NotetypeDict) -> None:
     print("update_deck_templates", ah_did)
