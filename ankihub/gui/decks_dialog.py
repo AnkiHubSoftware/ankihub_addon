@@ -648,7 +648,7 @@ class DeckManagementDialog(QDialog):
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
                 "Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
-                title="Publish note type to all users",
+                title="Publish note type",
                 no_button_label="Cancel",
             )
             if not confirm:
@@ -704,7 +704,7 @@ class DeckManagementDialog(QDialog):
                     "<b>Proceed?</b><br><br>"
                     "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
                     + NOTE_TYPE_CHANGES_WARNING,
-                    title="Publish fields to all users",
+                    title="Publish fields",
                     no_button_label="Cancel",
                 )
                 if not confirm:
@@ -737,7 +737,7 @@ class DeckManagementDialog(QDialog):
                 "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
                 + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
                 + NOTE_TYPE_CHANGES_WARNING,
-                title="Publish style/template updates to all users",
+                title="Publish style/template updates",
                 no_button_label="Cancel",
             )
             if not confirm:
