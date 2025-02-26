@@ -257,14 +257,13 @@ class AnkiHubImporter:
             is_projektanki_note_types_addon_installed()
         )
 
+        should_use_new_templates_by_mid: Dict[NotetypeId, bool] = {}
         for mid, remote_note_type in remote_note_types.items():
-            local_note_type = aqt.mw.col.models.get(mid)
-
             # We don't use new templates and css of AnKing note types if the AnKing note types addon is installed.
             # The AnKing note types addon will handle updating the templates, while preserving the
             # user's customizations.
             # The same applies to ProjektAnki note types and the ProjektAnki note types addon.
-            use_new_templates_and_css = not (
+            should_use_new_templates_by_mid[mid] = not (
                 (
                     "anking" in remote_note_type["name"].lower()
                     and anking_note_types_addon_installed
@@ -275,18 +274,26 @@ class AnkiHubImporter:
                 )
             )
 
-            if (
-                self._raise_if_full_sync_required
-                and use_new_templates_and_css
-                and len(local_note_type["tmpls"]) != len(remote_note_type["tmpls"])
-            ):
+        if self._raise_if_full_sync_required:
+            mids_with_template_count_change = [
+                mid
+                for mid, remote_note_type in remote_note_types.items()
+                if len(aqt.mw.col.models.get(mid)["tmpls"])
+                != len(remote_note_type["tmpls"])
+                and should_use_new_templates_by_mid[mid]
+            ]
+            if mids_with_template_count_change:
                 raise ChangesRequireFullSyncError(
-                    affected_note_type_ids=set([remote_note_type["id"]])
+                    affected_note_type_ids=set(mids_with_template_count_change)
                 )
 
+        for mid, remote_note_type in remote_note_types.items():
+            local_note_type = aqt.mw.col.models.get(mid)
             updated_note_type = note_type_with_updated_templates_and_css(
                 old_note_type=local_note_type,
-                new_note_type=remote_note_type if use_new_templates_and_css else None,
+                new_note_type=(
+                    remote_note_type if should_use_new_templates_by_mid[mid] else None
+                ),
             )
 
             aqt.mw.col.models.update_dict(updated_note_type)
