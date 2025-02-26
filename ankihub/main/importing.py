@@ -389,7 +389,7 @@ class AnkiHubImporter:
             for note_data in notes_data
         ]
         change_note_types_of_notes(
-            nid_mid_pairs, raise_if_changes_required=self._raise_if_full_sync_required
+            nid_mid_pairs, raise_if_full_sync_required=self._raise_if_full_sync_required
         )
 
     def _log_note_import_summary(self) -> None:
