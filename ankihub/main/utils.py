@@ -29,6 +29,7 @@ from ..settings import (
     url_mh_integrations_preview,
     url_view_note,
 )
+from .exceptions import ChangesRequireFullSyncError
 
 if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
@@ -224,7 +225,9 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     return aqt.mw.col.db.list(query)
 
 
-def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
+def change_note_types_of_notes(
+    nid_mid_pairs: List[Tuple[NoteId, NotetypeId]], raise_if_full_sync_required=False
+) -> None:
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
     # Group notes by source and target note type
@@ -238,6 +241,14 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
 
         if current_mid != mid:
             notes_grouped_by_type_change[(current_mid, mid)].append(nid)
+
+    if raise_if_full_sync_required and notes_grouped_by_type_change:
+        raise ChangesRequireFullSyncError(
+            affected_note_type_ids=set(
+                target_note_type_id
+                for _, target_note_type_id in notes_grouped_by_type_change.keys()
+            )
+        )
 
     # Change note types of notes for each group
     for (
@@ -442,21 +453,26 @@ def note_type_with_updated_templates_and_css(
     """
 
     updated_templates = []
-    for template_idx, old_template in enumerate(old_note_type["tmpls"]):
-        if new_note_type is not None:
+    new_template_amount = (
+        len(new_note_type["tmpls"]) if new_note_type else len(old_note_type["tmpls"])
+    )
+    for template_idx in range(new_template_amount):
+        if template_idx < len(old_note_type["tmpls"]):
+            old_template = old_note_type["tmpls"][template_idx]
+        else:
+            old_template = None
+
+        if new_note_type:
             new_template = new_note_type["tmpls"][template_idx]
             updated_template = copy.deepcopy(new_template)
         else:
+            new_template = None
             updated_template = copy.deepcopy(old_template)
 
         for template_side_name in ["qfmt", "afmt"]:
             updated_template[template_side_name] = _updated_note_type_content(
-                old_content=old_template[template_side_name],
-                new_content=(
-                    new_template[template_side_name]
-                    if new_note_type is not None
-                    else None
-                ),
+                old_content=old_template[template_side_name] if old_template else None,
+                new_content=new_template[template_side_name] if new_template else None,
                 add_view_on_ankihub_snippet=template_side_name == "afmt",
                 content_type="html",
             )
@@ -476,7 +492,7 @@ def note_type_with_updated_templates_and_css(
 
 
 def _updated_note_type_content(
-    old_content: str,
+    old_content: Optional[str],
     new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
     content_type: str,
@@ -489,6 +505,8 @@ def _updated_note_type_content(
       add_view_on_ankihub_snippet: Whether to add AnkiHub view button
       content_type: Either "html" or "css" to determine comment style
     """
+    assert old_content is not None or new_content is not None
+
     if content_type == "html":
         end_comment = ANKIHUB_HTML_END_COMMENT
         end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
@@ -496,8 +514,11 @@ def _updated_note_type_content(
         end_comment = ANKIHUB_CSS_END_COMMENT
         end_comment_pattern = ANKIHUB_CSS_END_COMMENT_PATTERN
 
-    m = re.search(end_comment_pattern, old_content)
-    text_to_migrate = m.group("text_to_migrate") if m else ""
+    if old_content:
+        m = re.search(end_comment_pattern, old_content)
+        text_to_migrate = m.group("text_to_migrate") if m else ""
+    else:
+        text_to_migrate = ""
 
     # Choose the base for the result
     result = new_content if new_content is not None else old_content

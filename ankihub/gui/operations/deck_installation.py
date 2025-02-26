@@ -24,7 +24,12 @@ from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import deck_download_progress_cb, show_dialog, tooltip_icon
+from ..utils import (
+    deck_download_progress_cb,
+    logged_into_ankiweb,
+    show_dialog,
+    tooltip_icon,
+)
 from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -133,7 +138,7 @@ def _show_deck_import_summary_dialog(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
         import_results=import_results,
-        logged_to_ankiweb=aqt.mw.pm.sync_auth(),
+        logged_to_ankiweb=logged_into_ankiweb(),
     )
 
     def on_button_clicked(button_index: int) -> None:
@@ -252,6 +257,7 @@ def _install_deck(
             ankihub_did
         ),
         recommended_deck_settings=recommended_deck_settings,
+        raise_if_full_sync_required=False,
     )
 
     config.add_deck(
