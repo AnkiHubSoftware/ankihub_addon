@@ -95,12 +95,13 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
         )
         if note_type["css"] != db_note_type["css"]:
             changed = True
-        if len(note_type["tmpls"]) != len(db_note_type["tmpls"]):
+        elif len(note_type["tmpls"]) != len(db_note_type["tmpls"]):
             changed = True
-        for i, tmpl in enumerate(note_type["tmpls"]):
-            if tmpl != db_note_type["tmpls"][i]:
-                changed = True
-                break
+        else:
+            for i, tmpl in enumerate(note_type["tmpls"]):
+                if tmpl != db_note_type["tmpls"][i]:
+                    changed = True
+                    break
         if changed:
             ids.append(mid)
     return ids
