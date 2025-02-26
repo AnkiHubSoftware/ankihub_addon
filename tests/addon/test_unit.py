@@ -2991,6 +2991,68 @@ class TestNoteTypeWithUpdatedTemplates:
             options=NamerFactory.with_parameters("css", use_new_templates),
         )
 
+    @pytest.mark.parametrize("use_new_templates", [True, False])
+    def test_with_added_template(self, use_new_templates: bool):
+        old_template_content = "old content"
+        old_note_type = {
+            "tmpls": [{"qfmt": old_template_content, "afmt": old_template_content}],
+            "css": "",
+        }
+
+        new_template1_content = "new content 1"
+        new_template2_content = "new content 2"
+        new_note_type = {
+            "tmpls": [
+                {"qfmt": new_template1_content, "afmt": new_template1_content},
+                {"qfmt": new_template2_content, "afmt": new_template2_content},
+            ],
+            "css": "",
+        }
+
+        updated_note_type = note_type_with_updated_templates_and_css(
+            old_note_type=old_note_type,
+            new_note_type=new_note_type if use_new_templates else None,
+        )
+        if use_new_templates:
+            assert len(updated_note_type["tmpls"]) == 2
+            assert new_template1_content in updated_note_type["tmpls"][0]["qfmt"]
+            assert new_template2_content in updated_note_type["tmpls"][1]["qfmt"]
+        else:
+            assert len(updated_note_type["tmpls"]) == 1
+            assert old_template_content in updated_note_type["tmpls"][0]["qfmt"]
+
+    @pytest.mark.parametrize("use_new_templates", [True, False])
+    def test_with_removed_template(self, use_new_templates: bool):
+        old_template1_content = "old content 1"
+        old_template2_content = "old content 2"
+        old_note_type = {
+            "tmpls": [
+                {"qfmt": old_template1_content, "afmt": old_template1_content},
+                {"qfmt": old_template2_content, "afmt": old_template2_content},
+            ],
+            "css": "",
+        }
+
+        new_template_content = "new content"
+        new_note_type = {
+            "tmpls": [
+                {"qfmt": new_template_content, "afmt": new_template_content},
+            ],
+            "css": "",
+        }
+
+        updated_note_type = note_type_with_updated_templates_and_css(
+            old_note_type=old_note_type,
+            new_note_type=new_note_type if use_new_templates else None,
+        )
+        if use_new_templates:
+            assert len(updated_note_type["tmpls"]) == 1
+            assert new_template_content in updated_note_type["tmpls"][0]["qfmt"]
+        else:
+            assert len(updated_note_type["tmpls"]) == 2
+            assert old_template1_content in updated_note_type["tmpls"][0]["qfmt"]
+            assert old_template2_content in updated_note_type["tmpls"][1]["qfmt"]
+
 
 def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_data):
     with anki_session_with_addon_data.profile_loaded():

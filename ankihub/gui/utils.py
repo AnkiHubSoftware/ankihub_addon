@@ -10,6 +10,7 @@ from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
 from aqt.qt import (
+    QAbstractAnimation,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -19,13 +20,17 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QPropertyAnimation,
     QPushButton,
     QScrollArea,
     QSize,
+    QSizePolicy,
     QStyle,
     Qt,
+    QToolButton,
     QVBoxLayout,
     QWidget,
+    pyqtSlot,
     qconnect,
 )
 from aqt.studydeck import StudyDeck
@@ -523,6 +528,72 @@ def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
     widget.setStyleSheet(new_style_sheet)
 
 
+class CollapsibleSection(QWidget):
+    def __init__(self, title="", parent=None, expanded_max_height=200):
+        """
+        :param title: Title for the collapsible section.
+        :param parent: Parent widget.
+        :param expanded_max_height: Maximum height (in px) for expanded content.
+        """
+        super().__init__(parent)
+        self._expanded_max_height = expanded_max_height
+
+        # Toggle button with chevron icon and title
+        self.toggle_button = QToolButton()
+        self.toggle_button.setText(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
+        self.toggle_button.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
+
+        self.content_widget = QWidget()
+        self.content_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.content_widget.setMaximumHeight(0)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content_widget)
+
+        # Animation for expanding/collapsing the content widget's maximumHeight
+        self.animation = QPropertyAnimation(self.content_widget, b"maximumHeight")
+        self.animation.setDuration(150)
+
+    def setContentLayout(self, layout):
+        """
+        Set the layout that holds the content you want to collapse/expand.
+        The layout's sizeHint is used to calculate the expanded height,
+        up to _expanded_max_height.
+        """
+        self.content_widget.setLayout(layout)
+        content_height = layout.sizeHint().height()
+        self._target_height = min(content_height, self._expanded_max_height)
+        self.content_widget.setMaximumHeight(0)
+        self.animation.setStartValue(0)
+        self.animation.setEndValue(self._target_height)
+
+    @pyqtSlot(bool)
+    def on_toggled(self, checked):
+        # Update chevron icon
+        self.toggle_button.setArrowType(
+            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
+        )
+        # Set animation direction based on toggle state
+        self.animation.setDirection(
+            QAbstractAnimation.Direction.Forward
+            if checked
+            else QAbstractAnimation.Direction.Backward
+        )
+        self.animation.start()
+
+
 def check_and_prompt_for_updates_on_main_window():
     check_and_prompt_for_updates(
         parent=aqt.mw,
@@ -625,7 +696,7 @@ def active_window_or_mw() -> QWidget:
 def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
     LOGGER.info("Syncing with AnkiWeb...")
 
-    if not aqt.mw.pm.sync_auth():
+    if not logged_into_ankiweb():
         on_done()
         return
 
@@ -647,3 +718,7 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
         ),
         None,
     )
+
+
+def logged_into_ankiweb() -> bool:
+    return bool(aqt.mw.pm.sync_auth())

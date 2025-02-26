@@ -10,7 +10,7 @@ from ... import LOGGER
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
-from ..utils import show_dialog, sync_with_ankiweb
+from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -48,7 +48,7 @@ def check_and_install_new_deck_subscriptions(
     confirmation_dialog = show_dialog(
         title="AnkiHub | Sync",
         text=messages.deck_install_confirmation(
-            decks, logged_to_ankiweb=aqt.mw.pm.sync_auth()
+            decks, logged_to_ankiweb=logged_into_ankiweb()
         ),
         parent=aqt.mw,
         buttons=[
