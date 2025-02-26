@@ -35,6 +35,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.note_type_management import (
     add_note_type,
     add_note_type_fields,
+    new_fields_for_note_type,
     note_types_with_template_changes_for_deck,
     update_note_type_templates_and_styles,
 )
@@ -589,13 +590,15 @@ class DeckManagementDialog(QDialog):
         self.note_types_label = QLabel("<b>📝 Note Types</b>")
         self.add_note_type_btn = QPushButton("Publish note type")
         qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
+        self._update_add_note_type_btn_state()
         self.add_field_btn = QPushButton("Publish field")
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
+        self._update_add_field_btn_state()
         self.update_templates_btn = QPushButton("Publish style/template updates")
-        self._update_templates_btn_state()
         qconnect(
             self.update_templates_btn.clicked, self._on_update_templates_btn_clicked
         )
+        self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
         box.addWidget(self.add_note_type_btn)
         box.addWidget(self.add_field_btn)
@@ -603,10 +606,53 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _update_templates_btn_state(self):
-        self.update_templates_btn.setEnabled(
-            bool(note_types_with_template_changes_for_deck(self._selected_ah_did()))
+    def _update_note_type_btn_state(self, button: QPushButton, enabled: bool):
+        button.setEnabled(enabled)
+        if enabled:
+            button.setToolTip("")
+        else:
+            button.setToolTip("Nothing to update to AnkiHub")
+
+    def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
+        return self._get_note_type_names_for_deck(
+            self._selected_ah_did(), assigned_to_deck=False
         )
+
+    def _update_add_note_type_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_add_note_type_btn())
+        self._update_note_type_btn_state(self.add_note_type_btn, enabled)
+
+    def _get_note_type_names_for_add_field_type_btn(self) -> List[str]:
+        names_and_ids = self._get_note_type_names_and_ids_for_deck(
+            self._selected_ah_did(), assigned_to_deck=True
+        )
+        filtered_names = []
+        for name_and_id in names_and_ids:
+            note_type = aqt.mw.col.models.get(NotetypeId(name_and_id.id))
+            if new_fields_for_note_type(self._selected_ah_did(), note_type):
+                filtered_names.append(name_and_id.name)
+
+        return filtered_names
+
+    def _update_add_field_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_add_field_type_btn())
+        self._update_note_type_btn_state(self.add_field_btn, enabled)
+
+    def _get_note_type_names_for_update_templates_btn(self) -> List[str]:
+        mids_with_updates = note_types_with_template_changes_for_deck(
+            self._selected_ah_did()
+        )
+        return [
+            n.name
+            for n in self._get_note_type_names_and_ids_for_deck(
+                self._selected_ah_did(), assigned_to_deck=True
+            )
+            if n.id in mids_with_updates
+        ]
+
+    def _update_templates_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_update_templates_btn())
+        self._update_note_type_btn_state(self.update_templates_btn, enabled)
 
     def _get_note_type_names_and_ids_for_deck(
         self, deck_id: UUID, assigned_to_deck: bool
@@ -658,12 +704,11 @@ class DeckManagementDialog(QDialog):
             add_note_type(self._selected_ah_did(), note_type)
 
             tooltip("Note type published", parent=aqt.mw)
+            self._update_add_note_type_btn_state()
 
         SearchableSelectionDialog(
             aqt.mw,
-            names=lambda: self._get_note_type_names_for_deck(
-                self._selected_ah_did(), assigned_to_deck=False
-            ),
+            names=self._get_note_type_names_for_add_note_type_btn,
             accept="Choose",
             title="Choose note type to publish",
             parent=self,
@@ -676,18 +721,8 @@ class DeckManagementDialog(QDialog):
         ) -> None:
             if not note_type_selector.name:
                 return
-
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
-            field_names = aqt.mw.col.models.field_names(note_type)
-            ankihub_field_names = ankihub_db.note_type_field_names(
-                self._selected_ah_did(), note_type["id"]
-            )
-            new_fields = [
-                name for name in field_names if name not in ankihub_field_names
-            ]
-            if not new_fields:
-                tooltip("No new fields to publish", parent=aqt.mw)
-                return
+            new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
             new_fields = choose_subset(
                 "",
                 choices=new_fields,
@@ -712,12 +747,11 @@ class DeckManagementDialog(QDialog):
 
                 add_note_type_fields(self._selected_ah_did(), note_type, new_fields)
                 tooltip("Fields published", parent=aqt.mw)
+                self._update_add_field_btn_state()
 
         SearchableSelectionDialog(
             aqt.mw,
-            names=lambda: self._get_note_type_names_for_deck(
-                self._selected_ah_did(), assigned_to_deck=True
-            ),
+            names=self._get_note_type_names_for_add_field_type_btn,
             accept="Choose",
             title="Choose note type to edit",
             parent=self,
@@ -747,18 +781,9 @@ class DeckManagementDialog(QDialog):
             tooltip("Changes updated", parent=aqt.mw)
             self._update_templates_btn_state()
 
-        mids_with_updates = note_types_with_template_changes_for_deck(
-            self._selected_ah_did()
-        )
         SearchableSelectionDialog(
             aqt.mw,
-            names=lambda: [
-                n.name
-                for n in self._get_note_type_names_and_ids_for_deck(
-                    self._selected_ah_did(), assigned_to_deck=True
-                )
-                if n.id in mids_with_updates
-            ],
+            names=self._get_note_type_names_for_update_templates_btn,
             accept="Choose",
             title="Choose note type to update",
             parent=self,
