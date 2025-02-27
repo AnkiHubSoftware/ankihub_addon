@@ -15,7 +15,7 @@ from aqt.qt import (
 )
 
 from ..main.exceptions import ChangesRequireFullSyncError
-from .utils import CollapsibleSection, using_qt5
+from .utils import CollapsibleSection
 
 
 class ChangesRequireFullSyncDialog(QDialog):
@@ -118,9 +118,9 @@ class ChangesRequireFullSyncDialog(QDialog):
         # Enable/disable the Run Full Sync button based on checkbox state.
         qconnect(
             (
-                self.synced_checkbox.stateChanged
-                if using_qt5()
-                else self.synced_checkbox.checkStateChanged
+                self.synced_checkbox.checkStateChanged
+                if hasattr(self.synced_checkbox, "checkStateChanged")
+                else self.synced_checkbox.stateChanged
             ),
             lambda state: run_full_sync_button.setEnabled(
                 state == Qt.CheckState.Checked
