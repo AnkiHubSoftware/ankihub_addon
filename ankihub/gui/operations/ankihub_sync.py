@@ -161,7 +161,7 @@ def update_decks_and_media(
                 start_media_sync=False,
             ),
         )
-        dialog.open()
+        dialog.show()
 
     def on_success(do_full_upload: bool) -> None:
         if do_full_upload:
