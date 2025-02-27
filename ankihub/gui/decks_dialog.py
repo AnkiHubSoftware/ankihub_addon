@@ -703,7 +703,7 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             add_note_type(self._selected_ah_did(), note_type)
 
-            tooltip("Changes updated", parent=aqt.mw)
+            tooltip("Changes updated", parent=self)
             self._update_add_note_type_btn_state()
 
         SearchableSelectionDialog(
@@ -746,7 +746,7 @@ class DeckManagementDialog(QDialog):
                     return
 
                 add_note_type_fields(self._selected_ah_did(), note_type, new_fields)
-                tooltip("Changes updated", parent=aqt.mw)
+                tooltip("Changes updated", parent=self)
                 self._update_add_field_btn_state()
 
         SearchableSelectionDialog(
@@ -778,7 +778,7 @@ class DeckManagementDialog(QDialog):
                 return
 
             update_note_type_templates_and_styles(self._selected_ah_did(), note_type)
-            tooltip("Changes updated", parent=aqt.mw)
+            tooltip("Changes updated", parent=self)
             self._update_templates_btn_state()
 
         SearchableSelectionDialog(
