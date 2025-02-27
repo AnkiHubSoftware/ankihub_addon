@@ -536,18 +536,23 @@ class CollapsibleSection(QWidget):
         :param expanded_max_height: Maximum height (in px) for expanded content.
         """
         super().__init__(parent)
+        self._title = title
         self._expanded_max_height = expanded_max_height
+        self._expanded = False
 
         # Toggle button with chevron icon and title
         self.toggle_button = QToolButton()
-        self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(False)
-        self.toggle_button.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        self.toggle_button.setStyleSheet(
+            """
+            QToolButton {
+                border: none;
+                font-size: 14px;
+            }
+            """
         )
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
-        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        self.update_title()
         qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
         self.content_widget = QWidget()
@@ -566,6 +571,15 @@ class CollapsibleSection(QWidget):
         self.animation = QPropertyAnimation(self.content_widget, b"maximumHeight")
         self.animation.setDuration(150)
 
+    def update_title(self) -> None:
+        arrow = (
+            # U+FE0E is a text presentation selector to prevent emoji rendering
+            "▼\uFE0E"
+            if self._expanded
+            else "▶\uFE0E"
+        )
+        self.toggle_button.setText(f"{arrow} {self._title}")
+
     def setContentLayout(self, layout):
         """
         Set the layout that holds the content you want to collapse/expand.
@@ -582,9 +596,9 @@ class CollapsibleSection(QWidget):
     @pyqtSlot(bool)
     def on_toggled(self, checked):
         # Update chevron icon
-        self.toggle_button.setArrowType(
-            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
-        )
+        self._expanded = checked
+        self.update_title()
+
         # Set animation direction based on toggle state
         self.animation.setDirection(
             QAbstractAnimation.Direction.Forward
