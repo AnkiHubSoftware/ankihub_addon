@@ -544,11 +544,13 @@ class CollapsibleSection(QWidget):
         self.toggle_button = QToolButton()
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(False)
+        toggle_button_font = self.toggle_button.font()
+        toggle_button_font.setPointSize(toggle_button_font.pointSize() + 1)
+        self.toggle_button.setFont(toggle_button_font)
         self.toggle_button.setStyleSheet(
             """
             QToolButton {
                 border: none;
-                font-size: 14px;
             }
             """
         )
