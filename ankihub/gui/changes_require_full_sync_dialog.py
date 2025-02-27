@@ -2,6 +2,7 @@ import aqt
 import aqt.sync
 from aqt.qt import (
     QCheckBox,
+    QColor,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -50,6 +51,7 @@ class ChangesRequireFullSyncDialog(QDialog):
         content_layout.setSpacing(5)
 
         self.note_updates_text = QTextEdit()
+        self.note_updates_text.setTextColor(QColor("#808080"))
         self.note_updates_text.setText(
             "\n".join(
                 aqt.mw.col.models.get(mid)["name"]
