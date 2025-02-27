@@ -122,8 +122,8 @@ class ChangesRequireFullSyncDialog(QDialog):
                 if hasattr(self.synced_checkbox, "checkStateChanged")
                 else self.synced_checkbox.stateChanged
             ),
-            lambda state: run_full_sync_button.setEnabled(
-                state == Qt.CheckState.Checked
+            lambda *_: run_full_sync_button.setEnabled(
+                self.synced_checkbox.isChecked()
             ),
         )
 
