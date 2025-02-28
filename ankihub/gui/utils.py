@@ -98,6 +98,7 @@ def choose_subset(
     buttons: Optional[Sequence[ButtonParam]] = None,
     title: str = "AnkiHub",
     parent: Any = None,
+    require_at_least_one: bool = False,
 ) -> Optional[List[str]]:
     if not parent:
         parent = active_window_or_mw()
@@ -161,6 +162,30 @@ def choose_subset(
         list_widget.setMinimumHeight(
             list_widget.sizeHintForRow(0) * list_widget.count() + 20
         )
+
+    def update_accept_button_state():
+        accept_button = next(
+            (
+                button
+                for button in button_box.buttons()
+                if button_box.buttonRole(button)
+                == QDialogButtonBox.ButtonRole.AcceptRole
+            ),
+            None,
+        )
+        if not accept_button:
+            return
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                accept_button.setEnabled(True)
+                return
+
+        accept_button.setEnabled(False)
+
+    if require_at_least_one:
+        qconnect(list_widget.itemChanged, lambda _: update_accept_button_state())
+        update_accept_button_state()
 
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None

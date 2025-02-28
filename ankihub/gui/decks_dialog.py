@@ -733,6 +733,7 @@ class DeckManagementDialog(QDialog):
                 ],
                 title="Select fields to publish",
                 parent=note_type_selector,
+                require_at_least_one=True,
             )
             if new_fields:
                 confirm = ask_user(
