@@ -576,9 +576,9 @@ class CollapsibleSection(QWidget):
     def update_title(self) -> None:
         arrow = (
             # U+FE0E is a text presentation selector to prevent emoji rendering
-            "▼\uFE0E"
+            "⯆\uFE0E"
             if self._expanded
-            else "▶\uFE0E"
+            else "⯈\uFE0E"
         )
         self.toggle_button.setText(f"{arrow} {self._title}")
 
