@@ -154,6 +154,7 @@ def choose_subset(
     else:
         button_box.addButton(QDialogButtonBox.StandardButton.Ok)
     qconnect(button_box.accepted, dialog.accept)
+    qconnect(button_box.rejected, dialog.reject)
     layout.addWidget(button_box)
 
     if adjust_height_to_content:
