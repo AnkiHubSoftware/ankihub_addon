@@ -293,13 +293,29 @@ class PromptPreviewDialog(QDialog):
             local_template_path = (
                 TemplateManager._local_templates_dir / f"{self.template_name}.yaml"
             )
-            self.template_content = local_template_path.read_text(encoding="utf-8")
-            self.yaml_data = yaml.safe_load(self.template_content)
-            if not isinstance(self.yaml_data, dict):
-                self.yaml_data = {}
-            self._update_editors()  # Update the editors with the reset content
-            TemplateManager.save_template(self.template_name, self.template_content)
-            tooltip("Template reset.", parent=self)
+
+            if not local_template_path.exists():
+                QMessageBox.warning(
+                    self,
+                    "Template Not Found",
+                    f"No local template found for {self.template_name}. Cannot reset to original version.",
+                )
+                return
+
+            try:
+                self.template_content = local_template_path.read_text(encoding="utf-8")
+                self.yaml_data = yaml.safe_load(self.template_content)
+                if not isinstance(self.yaml_data, dict):
+                    self.yaml_data = {}
+                self._update_editors()  # Update the editors with the reset content
+                TemplateManager.save_template(self.template_name, self.template_content)
+                tooltip("Template reset.", parent=self)
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Reset Failed",
+                    f"Failed to reset template: {str(e)}",
+                )
 
 
 def _check_and_install_uv() -> None:
