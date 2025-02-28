@@ -60,9 +60,6 @@ from .utils import (
     tooltip_stylesheet,
 )
 
-NOTE_TYPE_CHANGES_WARNING = "⚠️ Note type changes require a full sync and \
-<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>"
-
 
 class DeckManagementDialog(QDialog):
     _window: Optional["DeckManagementDialog"] = None
@@ -738,7 +735,8 @@ class DeckManagementDialog(QDialog):
                 confirm = ask_user(
                     "<b>Proceed?</b><br><br>"
                     "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
-                    + NOTE_TYPE_CHANGES_WARNING,
+                    + "⚠️ Note type changes require a full sync and \
+<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>",
                     title="Publish fields",
                     no_button_label="Cancel",
                 )
@@ -769,8 +767,7 @@ class DeckManagementDialog(QDialog):
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
                 "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
-                + "⚠️ Please note that <b>certain changes may break the note type</b> so proceed with caution.<br><br>"
-                + NOTE_TYPE_CHANGES_WARNING,
+                + "⚠️ <b>Certain changes may break the note type</b> so proceed with caution.<br><br>",
                 title="Publish style/template updates",
                 no_button_label="Cancel",
             )
