@@ -721,15 +721,15 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
             new_fields = choose_subset(
-                "",
+                prompt="Select fields to publish",
                 choices=new_fields,
                 current=[],
                 buttons=[
                     ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
                     ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
                 ],
-                title="Select fields to publish",
                 parent=note_type_selector,
+                require_at_least_one=True,
             )
             if new_fields:
                 confirm = ask_user(
