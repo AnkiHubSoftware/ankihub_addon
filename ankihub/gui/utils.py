@@ -569,7 +569,7 @@ class CollapsibleSection(QWidget):
         )
         self.chevron_down_icon = chevron_down_icon()
         self.chevron_up_icon = chevron_up_icon()
-        self.toggle_button.setIcon(self.chevron_up_icon)
+        self.toggle_button.setIcon(self.chevron_down_icon)
         self.toggle_button.setIconSize(QSize(16, 16))
         qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
@@ -606,7 +606,7 @@ class CollapsibleSection(QWidget):
     def on_toggled(self, checked):
         # Update chevron icon
         self.toggle_button.setIcon(
-            self.chevron_down_icon if checked else self.chevron_up_icon
+            self.chevron_up_icon if checked else self.chevron_down_icon
         )
 
         # Set animation direction based on toggle state
