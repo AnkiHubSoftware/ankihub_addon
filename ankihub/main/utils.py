@@ -547,28 +547,23 @@ def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
         if note_type is None:
             continue
 
-        undo_note_type_modification(note_type)
+        note_type = note_type_without_ankihub_modifications(note_type)
         aqt.mw.col.models.update_dict(note_type)
 
-
-def undo_note_type_modification(note_type: Dict) -> None:
-    """Removes the AnkiHub Field from the Note Type and modifies the template to
-    remove the field.
-    """
-    LOGGER.info(
-        "Undoing modification of note type",
-        note_type_name=note_type["name"],
-        note_type_id=note_type["id"],
-    )
-
-    undo_fields_modification(note_type)
-
-    templates = note_type["tmpls"]
-    for template in templates:
-        undo_template_modification(template)
+        LOGGER.info(
+            "Removed AnkiHub modifications from note type.",
+            note_type_name=note_type["name"],
+            note_type_id=note_type["id"],
+        )
 
 
-def undo_fields_modification(note_type: Dict) -> None:
+def note_type_without_ankihub_modifications(note_type: NotetypeDict) -> NotetypeDict:
+    note_type = note_type_without_template_and_style_modifications(note_type)
+    remove_ankihub_id_field(note_type)
+    return note_type
+
+
+def remove_ankihub_id_field(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in field_names:
@@ -576,12 +571,25 @@ def undo_fields_modification(note_type: Dict) -> None:
     fields.pop(field_names.index(settings.ANKIHUB_NOTE_TYPE_FIELD_NAME))
 
 
-def undo_template_modification(template: Dict) -> None:
-    template["afmt"] = re.sub(
-        r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
-        "",
-        template["afmt"],
-    )
+def note_type_without_template_and_style_modifications(
+    note_type: Dict[str, Any]
+) -> NotetypeDict:
+    note_type = copy.deepcopy(note_type)
+    note_type["css"] = ANKIHUB_CSS_END_COMMENT_PATTERN.sub("", note_type["css"]).strip()
+    for template in note_type["tmpls"]:
+        template["qfmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub(
+            "", template["qfmt"]
+        ).strip()
+        template["afmt"] = re.sub(
+            r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
+            "",
+            template["afmt"],
+        )
+        template["afmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub(
+            "", template["afmt"]
+        ).strip()
+
+    return note_type
 
 
 # backup
