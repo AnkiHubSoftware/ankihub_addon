@@ -34,12 +34,12 @@ def add_note_type_fields(
 ) -> NotetypeDict:
     client = AddonAnkiHubClient()
 
-    db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
     new_fields = [
         field for field in note_type["flds"] if field["name"] in new_field_names
     ]
-    db_note_type["flds"].extend(new_fields)
-    for db_field in db_note_type["flds"]:
+    ah_note_type["flds"].extend(new_fields)
+    for db_field in ah_note_type["flds"]:
         field = next(
             (field for field in note_type["flds"] if field["name"] == db_field["name"]),
             None,
@@ -49,21 +49,21 @@ def add_note_type_fields(
     ankihub_id_field_idx = next(
         (
             idx
-            for idx, field in enumerate(db_note_type["flds"])
+            for idx, field in enumerate(ah_note_type["flds"])
             if field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME
         ),
         None,
     )
     if ankihub_id_field_idx is not None:
-        db_note_type["flds"][ankihub_id_field_idx]["ord"] = (
-            len(db_note_type["flds"]) - 1
+        ah_note_type["flds"][ankihub_id_field_idx]["ord"] = (
+            len(ah_note_type["flds"]) - 1
         )
-        ankihub_id_field = db_note_type["flds"].pop(ankihub_id_field_idx)
-        db_note_type["flds"].append(ankihub_id_field)
-    db_note_type = client.update_note_type(ah_did, db_note_type, ["flds"])
-    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
+        ankihub_id_field = ah_note_type["flds"].pop(ankihub_id_field_idx)
+        ah_note_type["flds"].append(ankihub_id_field)
+    ah_note_type = client.update_note_type(ah_did, ah_note_type, ["flds"])
+    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ah_note_type)
 
-    return db_note_type
+    return ah_note_type
 
 
 def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[NotetypeId]:
@@ -104,12 +104,12 @@ def update_note_type_templates_and_styles(
 ) -> NotetypeDict:
     client = AddonAnkiHubClient()
     note_type = note_type_without_ankihub_modifications(note_type)
-    db_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
 
-    db_note_type["tmpls"] = note_type["tmpls"]
-    db_note_type["css"] = note_type["css"]
+    ah_note_type["tmpls"] = note_type["tmpls"]
+    ah_note_type["css"] = note_type["css"]
 
-    db_note_type = client.update_note_type(ah_did, db_note_type, ["css", "tmpls"])
-    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=db_note_type)
+    ah_note_type = client.update_note_type(ah_did, ah_note_type, ["css", "tmpls"])
+    ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ah_note_type)
 
-    return db_note_type
+    return ah_note_type
