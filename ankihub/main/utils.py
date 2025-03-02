@@ -22,10 +22,7 @@ from ..db import ankihub_db
 from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
-    ANKIHUB_CSS_END_COMMENT,
-    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     url_mh_integrations_preview,
     url_view_note,
 )
@@ -34,13 +31,35 @@ from .exceptions import ChangesRequireFullSyncError
 if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
 
-# Pattern for the AnkiHub end comment in card templates.
+# The following constants are used to identify AnkiHub modifications in note types.
+ANKIHUB_SNIPPET_MARKER = "ANKIHUB MODFICATIONS"
+ANKIHUB_SNIPPET_RE = (
+    f"<!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->"
+    r"[\w\W]*"
+    f"<!-- END {ANKIHUB_SNIPPET_MARKER} -->"
+)
+
 # The end comment is used to allow users to add their own content below it without it being overwritten
 # when the template is updated.
-ANKIHUB_HTML_END_COMMENT_PATTERN = re.compile(
+ANKIHUB_HTML_END_COMMENT = (
+    "<!--\n"
+    "ANKIHUB_END\n"
+    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
+    "Do not edit or remove this comment if you want to protect the content below.\n"
+    "-->"
+)
+ANKIHUB_CSS_END_COMMENT = (
+    "/*\n"
+    "ANKIHUB_END\n"
+    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
+    "Do not edit or remove this comment if you want to protect the content below.\n"
+    "*/"
+)
+
+ANKIHUB_HTML_END_COMMENT_RE = re.compile(
     rf"{re.escape(ANKIHUB_HTML_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
 )
-ANKIHUB_CSS_END_COMMENT_PATTERN = re.compile(
+ANKIHUB_CSS_COMMENT_RE = re.compile(
     rf"{re.escape(ANKIHUB_CSS_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
 )
 
@@ -306,12 +325,6 @@ def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeI
 
 # ... note type modifications
 
-ANKIHUB_TEMPLATE_SNIPPET_RE = (
-    f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-    r"[\w\W]*"
-    f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-)
-
 
 def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
     """Returns a modified version of the note type with the AnkiHub field added and
@@ -356,7 +369,7 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
     """Return template html with the AnkiHub view note snippet added to it."""
     snippet = dedent(
         f"""
-        <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <a class='ankihub-view-note'
             href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
@@ -411,14 +424,14 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
         </script>
 
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        <!-- END {ANKIHUB_SNIPPET_MARKER} -->
         """
     ).strip("\n")
 
     snippet_pattern = (
-        f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+        f"<!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->"
         r"[\w\W]*"
-        f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+        f"<!-- END {ANKIHUB_SNIPPET_MARKER} -->"
     )
 
     if not re.search(snippet_pattern, template_side):
@@ -509,10 +522,10 @@ def _updated_note_type_content(
 
     if content_type == "html":
         end_comment = ANKIHUB_HTML_END_COMMENT
-        end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
+        end_comment_pattern = ANKIHUB_HTML_END_COMMENT_RE
     else:
         end_comment = ANKIHUB_CSS_END_COMMENT
-        end_comment_pattern = ANKIHUB_CSS_END_COMMENT_PATTERN
+        end_comment_pattern = ANKIHUB_CSS_COMMENT_RE
 
     if old_content:
         m = re.search(end_comment_pattern, old_content)
@@ -575,19 +588,15 @@ def note_type_without_template_and_style_modifications(
     note_type: Dict[str, Any]
 ) -> NotetypeDict:
     note_type = copy.deepcopy(note_type)
-    note_type["css"] = ANKIHUB_CSS_END_COMMENT_PATTERN.sub("", note_type["css"]).strip()
+    note_type["css"] = ANKIHUB_CSS_COMMENT_RE.sub("", note_type["css"]).strip()
     for template in note_type["tmpls"]:
-        template["qfmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub(
-            "", template["qfmt"]
-        ).strip()
+        template["qfmt"] = ANKIHUB_HTML_END_COMMENT_RE.sub("", template["qfmt"]).strip()
         template["afmt"] = re.sub(
-            r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
+            r"\n{0,2}" + ANKIHUB_SNIPPET_RE,
             "",
             template["afmt"],
         )
-        template["afmt"] = ANKIHUB_HTML_END_COMMENT_PATTERN.sub(
-            "", template["afmt"]
-        ).strip()
+        template["afmt"] = ANKIHUB_HTML_END_COMMENT_RE.sub("", template["afmt"]).strip()
 
     return note_type
 

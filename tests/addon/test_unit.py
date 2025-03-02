@@ -146,6 +146,8 @@ from ankihub.main.subdecks import (
 )
 from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
+    ANKIHUB_CSS_END_COMMENT,
+    ANKIHUB_HTML_END_COMMENT,
     Resource,
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
@@ -154,14 +156,7 @@ from ankihub.main.utils import (
     note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import (
-    ANKIHUB_CSS_END_COMMENT,
-    ANKIHUB_HTML_END_COMMENT,
-    ANKIWEB_ID,
-    DatadogLogHandler,
-    config,
-    log_file_path,
-)
+from ankihub.settings import ANKIWEB_ID, DatadogLogHandler, config, log_file_path
 
 
 @pytest.fixture
