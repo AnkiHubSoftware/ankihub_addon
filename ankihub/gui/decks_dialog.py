@@ -721,7 +721,7 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
             new_fields = choose_subset(
-                prompt="Select fields to publish",
+                prompt="<b>Select fields to publish</b>",
                 choices=new_fields,
                 current=[],
                 buttons=[
