@@ -223,16 +223,18 @@ from ankihub.main.suggestions import (
     suggest_notes_in_bulk,
 )
 from ankihub.main.utils import (
-    ANKIHUB_TEMPLATE_SNIPPET_RE,
+    ANKIHUB_CSS_COMMENT_RE,
+    ANKIHUB_HTML_END_COMMENT,
+    ANKIHUB_HTML_END_COMMENT_RE,
+    ANKIHUB_SNIPPET_MARKER,
+    ANKIHUB_SNIPPET_RE,
     all_dids,
     get_note_types_in_deck,
     md5_file_hash,
     note_type_contains_field,
 )
 from ankihub.settings import (
-    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -2137,7 +2139,7 @@ class TestAnkiHubImporter:
                 assert new_css not in updated_note_type["css"]
             assert ANKIHUB_HTML_END_COMMENT in updated_afmt
             # This is only on the back template (afmt)
-            assert ANKIHUB_NOTE_TYPE_MODIFICATION_STRING in updated_afmt
+            assert ANKIHUB_SNIPPET_MARKER in updated_afmt
 
             # Check that there were no unwanted changes
             assert len(import_result.created_nids) == 0
@@ -2884,17 +2886,14 @@ def test_unsubscribe_from_deck(
     mocker: MockerFixture,
     requests_mock: Mocker,
 ):
-    anki_session = anki_session_with_addon_data
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
-
+    with anki_session_with_addon_data.profile_loaded():
         anki_deck_id, ah_did = install_sample_ah_deck()
-
+        deck = aqt.mw.col.decks.get(anki_deck_id)
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
 
         mocker.patch.object(config, "is_logged_in", return_value=True)
-        deck = mw.col.decks.get(anki_deck_id)
+
         requests_mock.get(
             f"{DEFAULT_API_URL}/decks/subscriptions/",
             status_code=200,
@@ -2914,11 +2913,15 @@ def test_unsubscribe_from_deck(
                 }
             ],
         )
+
+        # Check that the note types have modifications before unsubscribing
+        assert_ankihub_modifications_in_note_types(
+            mids, should_have_modifications=True, mw=aqt.mw
+        )
+
+        # Open the dialog
         dialog = DeckManagementDialog()
-        decks_list = dialog.decks_list
-        deck_item_index = 0
-        deck_item = decks_list.item(deck_item_index)
-        deck_item.setSelected(True)
+
         mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=True)
 
         requests_mock.get(
@@ -2928,26 +2931,57 @@ def test_unsubscribe_from_deck(
             AnkiHubClient,
             "unsubscribe_from_deck",
         )
+
+        # Unsubscribe from the deck
+        deck_item = dialog.decks_list.item(0)
+        deck_item.setSelected(True)
         qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
         unsubscribe_from_deck_mock.assert_called_once()
 
+        # Check that the deck was removed from the dialog
         assert dialog.decks_list.count() == 0
 
-        # check if note type modifications were removed
-        assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
-        assert all(
-            not re.search(
-                ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
-            )
-            for mid in mids
+        # check that note type modifications were removed
+        assert_ankihub_modifications_in_note_types(
+            mids, should_have_modifications=False, mw=aqt.mw
         )
 
-        # check if the deck was removed from the db
+        # check that the deck was removed from the db
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 0
 
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         assert len(nids) == 0
+
+
+def assert_ankihub_modifications_in_note_types(
+    mids: List[NotetypeId], should_have_modifications: bool, mw: AnkiQt
+):
+    assert all(
+        note_type_contains_field(mw.col.models.get(mid)) == should_have_modifications
+        for mid in mids
+    )
+    assert all(
+        bool(re.search(ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]))
+        == should_have_modifications
+        for mid in mids
+    )
+    assert all(
+        bool(
+            re.search(
+                ANKIHUB_HTML_END_COMMENT_RE,
+                mw.col.models.get(mid)["tmpls"][0][template_side],
+            )
+        )
+        == should_have_modifications
+        for template_side in ["qfmt", "afmt"]
+        for mid in mids
+    )
+    assert all(
+        bool(re.search(ANKIHUB_CSS_COMMENT_RE, mw.col.models.get(mid)["css"]))
+        == should_have_modifications
+        for mid in mids
+    )
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):
@@ -6345,7 +6379,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
         assert all(
             not re.search(
-                ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
+                ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
             )
             for mid in mids
         )
