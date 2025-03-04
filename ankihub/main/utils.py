@@ -23,6 +23,7 @@ from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    config,
     url_mh_integrations_preview,
     url_view_note,
 )
@@ -324,6 +325,18 @@ def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeI
 
 
 # ... note type modifications
+
+
+def note_type_name_without_ankihub_modifications(name: str) -> str:
+    return re.sub(r" \(.*? / .*?\)", "", name)
+
+
+def modified_ankihub_note_type_name(note_type_name: str, deck_name) -> str:
+    name_without_modifications = note_type_name_without_ankihub_modifications(
+        note_type_name
+    )
+    name = f"{name_without_modifications} ({deck_name} / {config.username_or_email()})"
+    return name
 
 
 def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
