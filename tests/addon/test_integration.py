@@ -4916,7 +4916,7 @@ class TestSyncWithAnkiHub:
                 else:
                     self.reject()
 
-            mocker.patch.object(ChangesRequireFullSyncDialog, "open", close_dialog)
+            mocker.patch.object(ChangesRequireFullSyncDialog, "show", close_dialog)
 
             # Sync with AnkiHub
             sync_with_ankihub()
