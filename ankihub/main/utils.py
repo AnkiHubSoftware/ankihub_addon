@@ -328,7 +328,7 @@ def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeI
 
 
 def note_type_name_without_ankihub_modifications(name: str) -> str:
-    return re.sub(r" \(.*? / .*?\)", "", name)
+    return re.sub(r"(\s*\([^()]+ / [^()]+\))+\s*$", "", name)
 
 
 def modified_ankihub_note_type_name(note_type_name: str, deck_name) -> str:
