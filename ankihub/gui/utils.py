@@ -1,6 +1,7 @@
 import inspect
 import uuid
 from functools import partial
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
@@ -39,6 +40,8 @@ from aqt.utils import disable_help_button, tooltip
 
 from .. import LOGGER
 from ..settings import config
+
+ICONS_PATH = Path(__file__).parent / "icons"
 
 ButtonParam = Union[
     QDialogButtonBox.StandardButton,
@@ -514,6 +517,14 @@ def ask_user(
         return None
 
 
+def chevron_up_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "chevron-up.svg").absolute()))
+
+
+def chevron_down_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "chevron-down.svg").absolute()))
+
+
 def tooltip_icon() -> QIcon:
     return QIcon(
         QApplication.style().standardIcon(
@@ -566,14 +577,26 @@ class CollapsibleSection(QWidget):
 
         # Toggle button with chevron icon and title
         self.toggle_button = QToolButton()
-        self.toggle_button.setText(title)
+        self.toggle_button.setText(f" {title}")  # Add space between icon and title
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(False)
+        toggle_button_font = self.toggle_button.font()
+        toggle_button_font.setPointSize(toggle_button_font.pointSize() + 1)
+        self.toggle_button.setFont(toggle_button_font)
         self.toggle_button.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
-        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        self.toggle_button.setStyleSheet(
+            """
+            QToolButton {
+                border: none;
+            }
+            """
+        )
+        self.chevron_down_icon = chevron_down_icon()
+        self.chevron_up_icon = chevron_up_icon()
+        self.toggle_button.setIcon(self.chevron_down_icon)
+        self.toggle_button.setIconSize(QSize(16, 16))
         qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
         self.content_widget = QWidget()
@@ -608,9 +631,10 @@ class CollapsibleSection(QWidget):
     @pyqtSlot(bool)
     def on_toggled(self, checked):
         # Update chevron icon
-        self.toggle_button.setArrowType(
-            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
+        self.toggle_button.setIcon(
+            self.chevron_up_icon if checked else self.chevron_down_icon
         )
+
         # Set animation direction based on toggle state
         self.animation.setDirection(
             QAbstractAnimation.Direction.Forward

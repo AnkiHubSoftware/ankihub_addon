@@ -2,7 +2,7 @@ import aqt
 import aqt.sync
 from aqt.qt import (
     QCheckBox,
-    QDialog,
+    QColor,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -14,11 +14,12 @@ from aqt.qt import (
     qconnect,
 )
 
+from ..gui.webview import AlwaysOnTopOfParentDialog
 from ..main.exceptions import ChangesRequireFullSyncError
 from .utils import CollapsibleSection
 
 
-class ChangesRequireFullSyncDialog(QDialog):
+class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
     def __init__(
         self,
         changes_require_full_sync_error: ChangesRequireFullSyncError,
@@ -50,6 +51,7 @@ class ChangesRequireFullSyncDialog(QDialog):
         content_layout.setSpacing(5)
 
         self.note_updates_text = QTextEdit()
+        self.note_updates_text.setTextColor(QColor("#808080"))
         self.note_updates_text.setText(
             "\n".join(
                 aqt.mw.col.models.get(mid)["name"]
@@ -122,8 +124,8 @@ class ChangesRequireFullSyncDialog(QDialog):
                 if hasattr(self.synced_checkbox, "checkStateChanged")
                 else self.synced_checkbox.stateChanged
             ),
-            lambda state: run_full_sync_button.setEnabled(
-                state == Qt.CheckState.Checked
+            lambda *_: run_full_sync_button.setEnabled(
+                self.synced_checkbox.isChecked()
             ),
         )
 
