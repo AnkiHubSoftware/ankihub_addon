@@ -104,7 +104,7 @@ def note_type_had_templates_added_or_removed(
 ) -> bool:
     ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
 
-    if len(ah_note_type["tmpls"]) != len(note_type["tmpls"]):
+    if len(note_type["tmpls"]) != len(ah_note_type["tmpls"]):
         return True
 
     for anki_tmpl, ah_tmpl in zip(note_type["tmpls"], ah_note_type["tmpls"]):
