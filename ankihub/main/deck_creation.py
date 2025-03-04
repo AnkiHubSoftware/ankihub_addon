@@ -91,7 +91,7 @@ def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]
         name_without_modifications = _note_type_name_without_ankihub_modifications(
             new_model["name"]
         )
-        name = f"{name_without_modifications} ({aqt.mw.col.decks.name(deck_id)} / {config.user()})"
+        name = f"{name_without_modifications} ({aqt.mw.col.decks.name(deck_id)} / {config.username_or_email()})"
         new_model["name"] = name
         aqt.mw.col.models.ensure_name_unique(new_model)
         new_model["id"] = 0
