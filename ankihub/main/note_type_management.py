@@ -32,34 +32,49 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
 def add_note_type_fields(
     ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
 ) -> NotetypeDict:
-    client = AddonAnkiHubClient()
-
     ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
-    new_fields = [
-        field for field in note_type["flds"] if field["name"] in new_field_names
+
+    existing_ah_field_names = set(field["name"] for field in ah_note_type["flds"])
+    combined_ah_field_names = existing_ah_field_names | set(new_field_names)
+
+    # Create ordered list of field names based on Anki note type ordering
+    ordered_field_names = [
+        field["name"]
+        for field in note_type["flds"]
+        if field["name"] in combined_ah_field_names
     ]
-    ah_note_type["flds"].extend(new_fields)
-    for db_field in ah_note_type["flds"]:
-        field = next(
-            (field for field in note_type["flds"] if field["name"] == db_field["name"]),
-            None,
+
+    # ... Add fields missing from the Anki note type to the end
+    missing_fields_names = combined_ah_field_names - set(ordered_field_names)
+    ordered_field_names.extend(missing_fields_names)
+
+    # Ensure ANKIHUB_NOTE_TYPE_FIELD_NAME is the last field
+    if ANKIHUB_NOTE_TYPE_FIELD_NAME in ordered_field_names:
+        ordered_field_names.remove(ANKIHUB_NOTE_TYPE_FIELD_NAME)
+        ordered_field_names.append(ANKIHUB_NOTE_TYPE_FIELD_NAME)
+
+    # Assemble fields in order, taking new fields from the Anki note type,
+    # and existing fields from the AnkiHub note type
+    updated_fields = []
+    for field_name in ordered_field_names:
+        source_fields = (
+            ah_note_type["flds"]
+            if field_name in existing_ah_field_names
+            else note_type["flds"]
         )
-        if field:
-            db_field["ord"] = field["ord"]
-    ankihub_id_field_idx = next(
-        (
-            idx
-            for idx, field in enumerate(ah_note_type["flds"])
-            if field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME
-        ),
-        None,
-    )
-    if ankihub_id_field_idx is not None:
-        ah_note_type["flds"][ankihub_id_field_idx]["ord"] = (
-            len(ah_note_type["flds"]) - 1
+        updated_fields.append(
+            next(field for field in source_fields if field["name"] == field_name)
         )
-        ankihub_id_field = ah_note_type["flds"].pop(ankihub_id_field_idx)
-        ah_note_type["flds"].append(ankihub_id_field)
+
+    # Update field ordinals
+    for idx, field in enumerate(updated_fields):
+        field["ord"] = idx
+
+    # Update AnkiHub note type with new fields
+    ah_note_type["flds"] = updated_fields
+
+    # Update remote and local database
+    client = AddonAnkiHubClient()
     ah_note_type = client.update_note_type(ah_did, ah_note_type, ["flds"])
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ah_note_type)
 

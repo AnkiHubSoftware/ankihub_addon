@@ -1079,7 +1079,6 @@ class AnkiHubClient:
             json=note_type,
         )
         if response.status_code != 200:
-            print(response.json())
             raise AnkiHubHTTPError(response)
         data = response.json()
         result = _to_anki_note_type(data)
