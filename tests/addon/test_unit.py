@@ -3281,7 +3281,7 @@ class TestAddNoteTypeFields:
             ),
         ],
     )
-    def test_basic(
+    def test_add_note_type_fields(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
