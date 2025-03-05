@@ -380,7 +380,11 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     except JSONDecodeError:
         return False
 
-    error_message = response_data.get("detail")
+    try:
+        error_message = response_data.get("detail")
+    except:
+        return False
+
     if error_message:
         LOGGER.info("AnkiHubRequestError was handled", error_message=error_message)
         show_error_dialog(error_message, title="Oh no!")
