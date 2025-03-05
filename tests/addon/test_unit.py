@@ -132,6 +132,7 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
+from ankihub.main.note_type_management import add_note_type_fields
 from ankihub.main.review_data import (
     _get_first_and_last_review_datetime_for_ah_deck,
     _get_review_count_for_ah_deck_since,
@@ -3226,3 +3227,121 @@ def test_mh_tag_to_resource_title_and_slug(
     tag: str, expected_resource: Optional[Resource]
 ):
     assert mh_tag_to_resource(tag) == expected_resource
+
+
+class TestAddNoteTypeFields:
+    @pytest.mark.parametrize(
+        "ah_field_names, anki_field_names, new_field_names, expected_field_names",
+        [
+            # Add a single field
+            (
+                ["Text", "ankihub_id"],
+                ["Text", "new_field", "ankihub_id"],
+                ["new_field"],
+                ["Text", "new_field", "ankihub_id"],
+            ),
+            # ... Using the order from the Anki note type
+            (
+                ["Text", "ankihub_id"],
+                ["new_field", "Text", "ankihub_id"],
+                ["new_field"],
+                ["new_field", "Text", "ankihub_id"],
+            ),
+            # ... ankihub_id should always be the last field
+            (
+                ["Text", "ankihub_id"],
+                [
+                    "ankihub_id",
+                    "new_field",
+                    "Text",
+                ],
+                ["new_field"],
+                ["new_field", "Text", "ankihub_id"],
+            ),
+            # ... Ignore new fields not mentioned in the new_field_names
+            (
+                ["Text", "ankihub_id"],
+                ["Text", "new_field", "ankihub_id", "extra_field"],
+                ["new_field"],
+                ["Text", "new_field", "ankihub_id"],
+            ),
+            # ... When the anki note type misses some fields, add them to the end (but before ankihub_id)
+            (
+                ["Text", "Extra", "ankihub_id"],
+                ["Text", "new_field", "ankihub_id"],
+                ["new_field"],
+                ["Text", "new_field", "Extra", "ankihub_id"],
+            ),
+            # Add multiple fields
+            (
+                ["Text", "ankihub_id"],
+                ["Text", "new_field1", "new_field2", "ankihub_id"],
+                ["new_field1", "new_field2"],
+                ["Text", "new_field1", "new_field2", "ankihub_id"],
+            ),
+        ],
+    )
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
+        ankihub_db: _AnkiHubDB,
+        ah_field_names: List[str],
+        anki_field_names: List[str],
+        new_field_names: List[str],
+        expected_field_names: List[str],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+
+            ah_note_type = self.note_type_with_field_names(ah_field_names)
+            ah_note_type = import_ah_note_type(
+                ah_did=ah_did, note_type=ah_note_type, force_new=True
+            )
+
+            anki_note_type = self.note_type_with_field_names(anki_field_names)
+            anki_note_type["id"] = ah_note_type["id"]
+
+            # Mock udpate_note_type client method to return the note type passed to it
+            update_note_type_mock = mocker.patch.object(
+                AnkiHubClient,
+                "update_note_type",
+                side_effect=lambda _, note_type, __: note_type,
+            )
+
+            add_note_type_fields(
+                ah_did=ah_did,
+                note_type=anki_note_type,
+                new_field_names=new_field_names,
+            )
+
+            ah_db_note_type = ankihub_db.note_type_dict(ah_did, ah_note_type["id"])
+
+            # Assert field names are correct
+            assert [
+                field["name"] for field in ah_db_note_type["flds"]
+            ] == expected_field_names
+
+            # Assert field ord values go from 0 to n-1
+            assert [field["ord"] for field in ah_db_note_type["flds"]] == list(
+                range(len(ah_db_note_type["flds"]))
+            )
+
+            # Assert client method was called with the same note type as the one in the db
+            note_type_passed_to_client = update_note_type_mock.call_args[0][1]
+            assert note_type_passed_to_client == ah_db_note_type
+
+    def note_type_with_field_names(self, field_names: List[str]) -> NotetypeDict:
+        note_type = aqt.mw.col.models.new("test note type")
+        for idx, field_name in enumerate(field_names):
+            field = aqt.mw.col.models.new_field(field_name)
+            field["ord"] = idx
+            aqt.mw.col.models.add_field(note_type, field)
+
+        template = aqt.mw.col.models.new_template("Card 1")
+        template["qfmt"] = "{{" + field_names[0] + "}}"
+        note_type["tmpls"] = [template]
+
+        return note_type
