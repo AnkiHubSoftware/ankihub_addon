@@ -99,6 +99,29 @@ def new_fields_for_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> List
     return new_fields
 
 
+def note_type_had_templates_added_or_removed(
+    ah_did: uuid.UUID, note_type: NotetypeDict
+) -> bool:
+    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+
+    if len(note_type["tmpls"]) != len(ah_note_type["tmpls"]):
+        return True
+
+    for anki_tmpl, ah_tmpl in zip(note_type["tmpls"], ah_note_type["tmpls"]):
+        if anki_tmpl["name"] != ah_tmpl["name"]:
+            return True
+
+        # Ids were added in a recent Anki version, so we need to check if they exist
+        if (
+            anki_tmpl.get("id")
+            and ah_tmpl.get("id")
+            and anki_tmpl["id"] != ah_tmpl["id"]
+        ):
+            return True
+
+    return False
+
+
 def update_note_type_templates_and_styles(
     ah_did: uuid.UUID, note_type: NotetypeDict
 ) -> NotetypeDict:

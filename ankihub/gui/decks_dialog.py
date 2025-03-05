@@ -36,6 +36,7 @@ from ..main.note_type_management import (
     add_note_type,
     add_note_type_fields,
     new_fields_for_note_type,
+    note_type_had_templates_added_or_removed,
     note_types_with_template_changes_for_deck,
     update_note_type_templates_and_styles,
 )
@@ -56,6 +57,7 @@ from .utils import (
     choose_subset,
     clear_layout,
     set_styled_tooltip,
+    show_dialog,
     tooltip_icon,
     tooltip_stylesheet,
 )
@@ -764,6 +766,22 @@ class DeckManagementDialog(QDialog):
                 return
 
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+
+            if note_type_had_templates_added_or_removed(
+                ah_did=self._selected_ah_did(), note_type=note_type
+            ):
+                show_dialog(
+                    (
+                        "<h3>Issue with note type templates</h3>"
+                        "⚠️ <b>Adding or removing templates is not supported</b> in this publishing flow.<br><br>"
+                        "If you've recently created or deleted a template, sync with AnkiHub to reset "
+                        "the templates before publishing any style or template updates."
+                    ),
+                    title=" ",
+                    buttons=[("Close", QDialogButtonBox.ButtonRole.AcceptRole)],
+                )
+                return
+
             confirm = ask_user(
                 "<b>Proceed?</b><br><br>"
                 "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
