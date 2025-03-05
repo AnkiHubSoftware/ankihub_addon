@@ -1065,11 +1065,10 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         note_type: Dict[str, Any],
-        keys_to_update: Optional[List[str]] = None,
+        keys_to_update: List[str],
     ) -> Dict[str, Any]:
         note_type_id = note_type["id"]
-        if keys_to_update is not None:
-            note_type = {key: note_type[key] for key in keys_to_update}
+        note_type = {key: note_type[key] for key in keys_to_update}
         note_type = _to_ankihub_note_type(note_type.copy())
         response = self._send_request(
             "PATCH",
