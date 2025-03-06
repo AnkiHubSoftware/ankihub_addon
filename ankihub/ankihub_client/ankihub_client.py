@@ -347,6 +347,7 @@ class AnkiHubClient:
                 "anki_id": anki_deck_id,
                 "is_private": private,
             },
+            is_long_running=True,
         )
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
@@ -546,6 +547,7 @@ class AnkiHubClient:
                 url_suffix=url_suffix,
                 data=s3_presigned_info["fields"],
                 files={"file": (filepath.name, data)},
+                is_long_running=True,
             )
 
         if s3_response.status_code != 204:
@@ -676,7 +678,9 @@ class AnkiHubClient:
                 s3_url_suffix, download_progress_cb
             )
         else:
-            s3_response = self._send_request("GET", API.S3, s3_url_suffix)
+            s3_response = self._send_request(
+                "GET", API.S3, s3_url_suffix, is_long_running=True
+            )
             if s3_response.status_code != 200:
                 raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
@@ -700,7 +704,9 @@ class AnkiHubClient:
     def _download_with_progress_cb(
         self, s3_url_suffix: str, progress_cb: Callable[[int], None]
     ) -> bytes:
-        with self._send_request("GET", API.S3, s3_url_suffix, stream=True) as response:
+        with self._send_request(
+            "GET", API.S3, s3_url_suffix, stream=True, is_long_running=True
+        ) as response:
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
 
@@ -811,6 +817,7 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url_suffix,
                 params=params if first_request else None,
+                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -878,6 +885,7 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url_suffix,
                 params=params if first_request else None,
+                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -896,7 +904,10 @@ class AnkiHubClient:
         self, ah_did: uuid.UUID
     ) -> List[NotesAction]:
         response = self._send_request(
-            "GET", API.ANKIHUB, f"/decks/{ah_did}/notes-actions/"
+            "GET",
+            API.ANKIHUB,
+            f"/decks/{ah_did}/notes-actions/",
+            is_long_running=True,
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -996,6 +1007,7 @@ class AnkiHubClient:
                 "suggestions": [d.to_dict() for d in suggestions],
                 "auto_accept": auto_accept,
             },
+            is_long_running=True,
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1209,6 +1221,7 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url,
                 params=params if i == 0 else None,
+                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -1282,6 +1295,7 @@ class AnkiHubClient:
                 "auto_accept": auto_accept,
                 "suggestions": [suggestion.to_dict() for suggestion in suggestions],
             },
+            is_long_running=True,
         )
 
         if response.status_code != 201:
@@ -1339,6 +1353,7 @@ class AnkiHubClient:
             API.ANKIHUB,
             "/users/card-review-data/",
             json=[review.to_dict() for review in card_review_data],
+            is_long_running=True,
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1351,6 +1366,7 @@ class AnkiHubClient:
             API.ANKIHUB,
             "/users/daily-card-review-summary/",
             json=[summary.to_dict() for summary in daily_card_review_summaries],
+            is_long_running=True,
         )
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
