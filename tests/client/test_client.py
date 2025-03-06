@@ -561,9 +561,20 @@ def test_upload_deck(
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
-    upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
     mocker.patch.object(
         client, "_presigned_url_suffix_from_key", return_value="fake_key"
+    )
+
+    response_mock_1 = Mock()
+    response_mock_1.status_code = 200
+
+    response_mock_2 = Mock()
+    response_mock_2.status_code = 201
+    deck_id = uuid.uuid4()
+    response_mock_2.json = lambda: {"deck_id": str(deck_id)}
+
+    send_request_mock = mocker.patch.object(
+        client, "_send_request", side_effect=[response_mock_1, response_mock_2]
     )
 
     client.upload_deck(
@@ -574,10 +585,11 @@ def test_upload_deck(
         private=False,
     )
 
-    # check that the deck would be uploaded to s3
-    assert upload_to_s3_mock.call_count == 1
+    # Check that the deck would be uploaded to s3
     payload = json.loads(
-        gzip.decompress(upload_to_s3_mock.call_args[0][1]).decode("utf-8")
+        gzip.decompress(send_request_mock.call_args_list[0].kwargs["data"]).decode(
+            "utf-8"
+        )
     )
     assert len(payload["notes"]) == 1
     note_from_payload = payload["notes"][0]
