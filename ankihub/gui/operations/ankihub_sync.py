@@ -87,13 +87,7 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
 
         return subscribed_decks
 
-    def on_subscriptions_fetched(future: Future) -> None:
-        try:
-            subscribed_decks = future.result()
-        except Exception as e:
-            on_done(future_with_exception(e))
-            return
-
+    def on_subscriptions_fetched(subscribed_decks: List[Deck]) -> None:
         sync_state.schema_before_new_decks_installation = collection_schema()
 
         check_and_install_new_deck_subscriptions(
@@ -105,9 +99,13 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
             ),
         )
 
-    aqt.mw.taskman.run_in_background(
-        get_subscriptions_and_clean_up, on_done=on_subscriptions_fetched
-    )
+    AddonQueryOp(
+        op=lambda _: get_subscriptions_and_clean_up(),
+        success=on_subscriptions_fetched,
+        parent=aqt.mw,
+    ).failure(
+        lambda e: on_done(future_with_exception(e))
+    ).with_progress().run_in_background()
 
 
 @pass_exceptions_to_on_done
