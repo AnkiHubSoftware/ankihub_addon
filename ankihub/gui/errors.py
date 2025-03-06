@@ -286,7 +286,7 @@ def _try_handle_exception(
                 if isinstance(exc_value, ReadTimeout)
                 else (
                     "🚧 AnkiHub is undergoing routine maintenance.<br>"
-                    "Please visit ankihub.net/status and check your email for details."
+                    "Please check your email for details."
                 )
             )
             show_tooltip(message, period=5000)
