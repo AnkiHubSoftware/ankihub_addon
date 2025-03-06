@@ -96,8 +96,6 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
     socket.timeout,
 )
 
-# Status codes for which we should retry the request.
-RETRY_STATUS_CODES = {429}
 
 IMAGE_FILE_EXTENSIONS = [
     ".png",
@@ -111,8 +109,6 @@ IMAGE_FILE_EXTENSIONS = [
     ".webp",
 ]
 
-TIMEOUT_SECONDS = 20
-
 
 # Adapted from the default max_workers calculation in ThreadPoolExecutor.
 # By default, it uses min(32, os.cpu_count() + 4), but we want to use a lower number,
@@ -120,11 +116,18 @@ TIMEOUT_SECONDS = 20
 THREAD_POOL_MAX_WORKERS = min(32, (os.cpu_count() or 1) + 1)
 
 
+CONNECTION_TIMEOUT = 3
+STANDARD_READ_TIMEOUT = 10
+LONG_READ_TIMEOUT = 30
+S3_TIMEOUT = (10, 120)
+
+STANDARD_MAX_RETRIES = 1
+LONG_RUNNING_MAX_RETRIES = 2
+
+
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
-    result = response.status_code in RETRY_STATUS_CODES or (
-        500 <= response.status_code < 600
-    )
+    result = response.status_code == 429 or (500 <= response.status_code < 600)
     return result
 
 
@@ -197,6 +200,7 @@ class AnkiHubClient:
         files=None,
         params=None,
         stream=False,
+        is_long_running=False,
     ) -> Response:
         """Send a request to an API. This method should be used for all requests.
         Logs the request and response.
@@ -235,48 +239,57 @@ class AnkiHubClient:
             hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
         prepped = request.prepare()
-        response = self._send_request_with_retry(
+
+        return self._send_request_with_retry(
             prepped,
             stream=stream,
-            timeout=TIMEOUT_SECONDS if api == API.ANKIHUB else None,
+            api=api,
+            is_long_running=is_long_running,
         )
 
-        return response
-
     def _send_request_with_retry(
-        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
+        self,
+        request: PreparedRequest,
+        stream: bool,
+        api: API,
+        is_long_running: bool,
     ) -> Response:
         """
-        This method is only used in the _send_request method.
-        Send a request, retrying if necessary.
+        Handle request sending with appropriate timeouts and retries based on operation type.
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
         """
-        try:
-            response = self._send_request_with_retry_inner(
+        if api == API.ANKIHUB:
+            read_timeout = (
+                LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
+            )
+            timeout = (CONNECTION_TIMEOUT, read_timeout)
+        else:
+            timeout = S3_TIMEOUT
+
+        max_retries = (
+            LONG_RUNNING_MAX_RETRIES if is_long_running else STANDARD_MAX_RETRIES
+        )
+
+        @retry(
+            stop=stop_after_attempt(max_retries),
+            wait=wait_exponential(multiplier=1, max=10),
+            retry=RETRY_CONDITION,
+        )
+        def send_with_retry() -> Response:
+            return self.thread_local_session.get().send(
                 request, stream=stream, timeout=timeout
             )
+
+        try:
+            return send_with_retry()
         except RetryError as e:
-            # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
-            # If the last attempt failed because of an exception, this will raise that exception.
             try:
                 response = last_attempt.result()
             except Exception as e:
                 raise AnkiHubRequestException(e) from e
-        return response
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, max=10),
-        retry=RETRY_CONDITION,
-    )
-    def _send_request_with_retry_inner(
-        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
-    ) -> Response:
-        return self.thread_local_session.get().send(
-            request, stream=stream, timeout=timeout
-        )
+            return response
 
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
