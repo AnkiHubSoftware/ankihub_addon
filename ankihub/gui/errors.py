@@ -119,7 +119,7 @@ def upload_logs_in_background(
 
 
 def upload_logs_and_data_in_background(
-    on_done: Optional[Callable[[str], None]] = None
+    on_done: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
@@ -279,15 +279,8 @@ def _try_handle_exception(
             )
         else:
             message = (
-                (
-                    "🚧 We're having trouble connecting to AnkiHub. Please try again later.<br>"
-                    "Visit community.ankihub.net and check your email for details."
-                )
-                if isinstance(exc_value, ReadTimeout)
-                else (
-                    "🚧 AnkiHub is undergoing routine maintenance.<br>"
-                    "Please check your email for details."
-                )
+                "🚧 We’re unable to reach AnkiHub due to planned maintenance or an unexpected issue.<br> "
+                "For details, see https://community.ankihub.net/c/announcements."
             )
             show_tooltip(message, period=5000)
         return True
