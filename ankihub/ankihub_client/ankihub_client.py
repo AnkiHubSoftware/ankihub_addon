@@ -13,7 +13,6 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from enum import Enum
-from io import BufferedReader
 from pathlib import Path
 from typing import (
     Any,
@@ -25,7 +24,6 @@ from typing import (
     Sequence,
     Set,
     TypedDict,
-    Union,
     cast,
 )
 from zipfile import ZipFile
@@ -335,7 +333,15 @@ class AnkiHubClient:
             ),
         )
 
-        self._upload_to_s3(s3_url_suffix, data)
+        s3_response = self._send_request(
+            "PUT",
+            API.S3,
+            s3_url_suffix,
+            data=data,
+            is_long_running=True,
+        )
+        if s3_response.status_code != 200:
+            raise AnkiHubHTTPError(s3_response)
 
         response = self._send_request(
             "POST",
@@ -347,7 +353,6 @@ class AnkiHubClient:
                 "anki_id": anki_deck_id,
                 "is_private": private,
             },
-            is_long_running=True,
         )
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
@@ -368,18 +373,6 @@ class AnkiHubClient:
     def _gzip_decompress_string(self, string: bytes) -> str:
         result = gzip.decompress(string).decode("utf-8")
         return result
-
-    def _upload_to_s3(
-        self, s3_url_suffix: str, data: Union[bytes, BufferedReader]
-    ) -> None:
-        s3_response = self._send_request(
-            "PUT",
-            API.S3,
-            s3_url_suffix,
-            data=data,
-        )
-        if s3_response.status_code != 200:
-            raise AnkiHubHTTPError(s3_response)
 
     def generate_media_files_with_hashed_names(
         self, media_file_paths: Sequence[Path]
