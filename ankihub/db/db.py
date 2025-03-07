@@ -643,29 +643,10 @@ class _AnkiHubDB:
         result = [
             field["name"]
             for field in sorted(
-                (
-                    field
-                    for field in self.note_type_dict(note_type_id=anki_note_type_id)[
-                        "flds"
-                    ]
-                ),
+                (field for field in self.note_type_dict(anki_note_type_id)["flds"]),
                 key=lambda f: f["ord"],
             )
         ]
-        return result
-
-    def note_type_field_ords_and_names(
-        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
-    ) -> List[Tuple[int, str]]:
-        """Returns a sorted list of (ord, name) tuples of the fields of the note type."""
-        result = sorted(
-            (
-                (field["ord"], field["name"])
-                for field in self.note_type_dict(note_type_id=anki_note_type_id)["flds"]
-            ),
-            key=lambda f: f[0],
-        )
-
         return result
 
 
