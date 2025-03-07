@@ -448,7 +448,9 @@ def show_dialog(
     if not parent:
         parent = active_window_or_mw()
 
-    if is_mac:
+    # Some callers pass " " as title to avoid the default title "AnkiHub",
+    # in this case we don't want to add the title to the text
+    if is_mac and title.strip():
         if text_format == Qt.TextFormat.PlainText:
             text = f"{title}\n\n{text}"
         else:
