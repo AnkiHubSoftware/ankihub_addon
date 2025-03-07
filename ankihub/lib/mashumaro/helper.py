@@ -1,8 +1,15 @@
-from typing import Any, Callable, Optional, Union
+from collections.abc import Callable
+from typing import Any, Optional, TypeVar, Union
 
 from typing_extensions import Literal
 
 from mashumaro.types import SerializationStrategy
+
+__all__ = [
+    "field_options",
+    "pass_through",
+]
+
 
 NamedTupleDeserializationEngine = Literal["as_dict", "as_list"]
 DateTimeDeserializationEngine = Literal["ciso8601", "pendulum"]
@@ -11,7 +18,13 @@ AnyDeserializationEngine = Literal[
 ]
 
 NamedTupleSerializationEngine = Literal["as_dict", "as_list"]
-AnySerializationEngine = NamedTupleSerializationEngine
+OmitSerializationEngine = Literal["omit"]
+AnySerializationEngine = Union[
+    NamedTupleSerializationEngine, OmitSerializationEngine
+]
+
+
+T = TypeVar("T")
 
 
 def field_options(
@@ -23,7 +36,7 @@ def field_options(
     ] = None,
     serialization_strategy: Optional[SerializationStrategy] = None,
     alias: Optional[str] = None,
-):
+) -> dict[str, Any]:
     return {
         "serialize": serialize,
         "deserialize": deserialize,
@@ -33,17 +46,14 @@ def field_options(
 
 
 class _PassThrough(SerializationStrategy):
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    def serialize(self, value):
+    def serialize(self, value: T) -> T:
         return value
 
-    def deserialize(self, value):
+    def deserialize(self, value: T) -> T:
         return value
 
 
 pass_through = _PassThrough()
-
-
-__all__ = ["field_options", "pass_through"]

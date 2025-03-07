@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from datetime import date, datetime, time
-from typing import Any, Callable, Dict, Type, TypeVar
+from typing import Any, Type, TypeVar, final
 
 import tomli_w
 
@@ -17,10 +18,12 @@ T = TypeVar("T", bound="DataClassTOMLMixin")
 
 EncodedData = str
 Encoder = Callable[[Any], EncodedData]
-Decoder = Callable[[EncodedData], Dict[Any, Any]]
+Decoder = Callable[[EncodedData], dict[Any, Any]]
 
 
 class TOMLDialect(Dialect):
+    no_copy_collections = (list, dict)
+    omit_none = True
     serialization_strategy = {
         datetime: pass_through,
         date: pass_through,
@@ -44,18 +47,18 @@ class DataClassTOMLMixin(DataClassDictMixin):
         },
     }
 
+    @final
     def to_toml(
         self: T,
         encoder: Encoder = tomli_w.dumps,
-        **to_dict_kwargs,
-    ) -> EncodedData:
-        ...
+        **to_dict_kwargs: Any,
+    ) -> EncodedData: ...
 
     @classmethod
+    @final
     def from_toml(
         cls: Type[T],
         data: EncodedData,
         decoder: Decoder = tomllib.loads,
-        **from_dict_kwargs,
-    ) -> T:
-        ...
+        **from_dict_kwargs: Any,
+    ) -> T: ...

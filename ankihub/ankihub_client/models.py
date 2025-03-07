@@ -150,7 +150,7 @@ class DeckUpdates(DataClassJSONMixinWithConfig):
     )
     protected_fields: Dict[int, List[str]]
     protected_tags: List[str]
-    notes: List[NoteInfo]
+    notes: Optional[List[NoteInfo]]
 
 
 @dataclass
