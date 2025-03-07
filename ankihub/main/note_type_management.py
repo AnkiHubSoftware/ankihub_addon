@@ -16,11 +16,15 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
     new_note_type = modified_note_type(note_type)
     new_note_type["id"] = 0
     # Add note type first to get a unique ID
-    new_mid = aqt.mw.col.models.add_dict(new_note_type).id
-    new_note_type = aqt.mw.col.models.get(NotetypeId(new_mid))
+    new_mid = NotetypeId(aqt.mw.col.models.add_dict(new_note_type).id)
+    new_note_type = aqt.mw.col.models.get(new_mid)
     # Send base name to AnkiHub, as it will take care of adding the deck name and username
     new_note_type["name"] = note_type["name"]
-    new_name = client.create_note_type(ah_did, new_note_type)["name"]
+    try:
+        new_name = client.create_note_type(ah_did, new_note_type)["name"]
+    except Exception as e:
+        aqt.mw.col.models.remove(new_mid)
+        raise e
     new_note_type["name"] = new_name
     aqt.mw.col.models.update_dict(new_note_type)
     new_note_type = aqt.mw.col.models.get(NotetypeId(new_mid))
