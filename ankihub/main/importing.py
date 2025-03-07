@@ -795,7 +795,11 @@ class AnkiHubImporter:
 
         changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
-        for field in fields:
+        for field_name in note.keys():
+            field = next(
+                (f for f in fields if f.name == field_name),
+                Field(name=field_name, order=0, value=""),
+            )
             protected_fields_for_model = protected_fields.get(
                 aqt.mw.col.models.get(note.mid)["id"], []
             )
