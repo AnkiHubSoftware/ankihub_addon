@@ -136,7 +136,7 @@ class _AnkiHubDB:
         for note_data in notes_data:
             # Prepare fields and tags for insertion
             field_values = []
-            for (_, field_name) in self.note_type_field_ords_and_names(
+            for field_name in self.note_type_field_names(
                 ankihub_did=ankihub_did, anki_note_type_id=NotetypeId(note_data.mid)
             ):
                 field = next(
@@ -640,26 +640,16 @@ class _AnkiHubDB:
         """Returns the names of the fields of the note type."""
         result = [
             field["name"]
-            for field in self.note_type_dict(
-                ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-            )["flds"]
+            for field in sorted(
+                (
+                    field
+                    for field in self.note_type_dict(
+                        ankihub_did=ankihub_did, note_type_id=anki_note_type_id
+                    )["flds"]
+                ),
+                key=lambda f: f["ord"],
+            )
         ]
-        return result
-
-    def note_type_field_ords_and_names(
-        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
-    ) -> List[Tuple[int, str]]:
-        """Returns a sorted list of (ord, name) tuples of the fields of the note type."""
-        result = sorted(
-            (
-                (field["ord"], field["name"])
-                for field in self.note_type_dict(
-                    ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-                )["flds"]
-            ),
-            key=lambda f: f[0],
-        )
-
         return result
 
 
