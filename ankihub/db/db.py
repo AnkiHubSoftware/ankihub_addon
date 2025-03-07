@@ -134,14 +134,16 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         note_dicts = []
         for note_data in notes_data:
-
             # Prepare fields and tags for insertion
-            fields = join_fields(
-                [
-                    field.value
-                    for field in sorted(note_data.fields, key=lambda field: field.order)
-                ]
-            )
+            field_values = []
+            for (_, field_name) in self.note_type_field_ords_and_names(
+                ankihub_did=ankihub_did, anki_note_type_id=NotetypeId(note_data.mid)
+            ):
+                field = next(
+                    (f for f in note_data.fields if f.name == field_name), None
+                )
+                field_values.append(field.value if field else "")
+            fields = join_fields(field_values)
             tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
             note_dicts.append(
@@ -642,6 +644,22 @@ class _AnkiHubDB:
                 ankihub_did=ankihub_did, note_type_id=anki_note_type_id
             )["flds"]
         ]
+        return result
+
+    def note_type_field_ords_and_names(
+        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
+    ) -> List[Tuple[int, str]]:
+        """Returns a sorted list of (ord, name) tuples of the fields of the note type."""
+        result = sorted(
+            (
+                (field["ord"], field["name"])
+                for field in self.note_type_dict(
+                    ankihub_did=ankihub_did, note_type_id=anki_note_type_id
+                )["flds"]
+            ),
+            key=lambda f: f[0],
+        )
+
         return result
 
 
