@@ -2690,6 +2690,39 @@ class TestAnkiHubImporter:
                 assert len(import_result.updated_nids) == 0
                 assert len(import_result.deleted_nids) == 0
 
+    def test_import_note_with_missing_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_nid = NoteId(1)
+            mid = ankihub_basic_note_type["id"]
+            ah_did = next_deterministic_uuid()
+            note_info = NoteInfoFactory.create(
+                anki_nid=anki_nid,
+                mid=mid,
+                fields=[Field(name="Front", value="f", order=0)],
+            )
+            self._import_notes(
+                [note_info],
+                is_first_import_of_deck=True,
+                ah_did=ah_did,
+                note_types={mid: ankihub_basic_note_type},
+            )
+            # Fields missing from source note are treated as empty fields
+            expected_note_info = NoteInfoFactory.create(
+                ah_nid=note_info.ah_nid,
+                anki_nid=anki_nid,
+                mid=mid,
+                fields=[
+                    Field(name="Front", value="f", order=0),
+                    Field(name="Back", value="", order=1),
+                ],
+            )
+            assert ankihub_db.note_data(anki_nid) == expected_note_info
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
