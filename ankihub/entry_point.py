@@ -29,6 +29,7 @@ from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .gui.operations.ankihub_sync import setup_full_sync_patch
+from .gui.operations.username import fetch_username_in_background
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
@@ -231,8 +232,10 @@ def _general_setup():
     # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
     # which would cause the callbacks to not be called.
     update_feature_flags_in_background()
+    fetch_username_in_background()
 
     config.token_change_hook.append(update_feature_flags_in_background)
+    config.token_change_hook.append(fetch_username_in_background)
 
     LOGGER.info(
         "Set up feature flag fetching (flags will be fetched in the background)."
