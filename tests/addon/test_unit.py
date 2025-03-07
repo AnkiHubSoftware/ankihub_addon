@@ -45,6 +45,7 @@ from ..fixtures import (  # type: ignore
     add_basic_anki_note_to_deck,
     assert_datetime_equal_ignore_milliseconds,
     create_anki_deck,
+    note_type_with_field_names,
     record_review_for_anki_nid,
 )
 
@@ -3294,12 +3295,12 @@ class TestAddNoteTypeFields:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
 
-            ah_note_type = self.note_type_with_field_names(ah_field_names)
+            ah_note_type = note_type_with_field_names(ah_field_names)
             ah_note_type = import_ah_note_type(
                 ah_did=ah_did, note_type=ah_note_type, force_new=True
             )
 
-            anki_note_type = self.note_type_with_field_names(anki_field_names)
+            anki_note_type = note_type_with_field_names(anki_field_names)
             anki_note_type["id"] = ah_note_type["id"]
 
             # Mock udpate_note_type client method to return the note type passed to it
@@ -3330,16 +3331,3 @@ class TestAddNoteTypeFields:
             # Assert client method was called with the same note type as the one in the db
             note_type_passed_to_client = update_note_type_mock.call_args[0][1]
             assert note_type_passed_to_client == ah_db_note_type
-
-    def note_type_with_field_names(self, field_names: List[str]) -> NotetypeDict:
-        note_type = aqt.mw.col.models.new("test note type")
-        for idx, field_name in enumerate(field_names):
-            field = aqt.mw.col.models.new_field(field_name)
-            field["ord"] = idx
-            aqt.mw.col.models.add_field(note_type, field)
-
-        template = aqt.mw.col.models.new_template("Card 1")
-        template["qfmt"] = "{{" + field_names[0] + "}}"
-        note_type["tmpls"] = [template]
-
-        return note_type
