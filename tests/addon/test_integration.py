@@ -3202,6 +3202,13 @@ def prepare_note(
     if guid is None:
         guid = note.guid
 
+    # Treat missing fields as unchanged
+    for field_name in note.keys():
+        field = next((f for f in fields if f.name == field_name), None)
+        if not field:
+            field = Field(name=field_name, order=0, value=note[field_name])
+            fields.append(field)
+
     note_data = NoteInfo(
         ah_nid=ankihub_nid,
         anki_nid=note.id,
