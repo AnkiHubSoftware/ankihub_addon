@@ -1,6 +1,7 @@
 """Import NoteInfo objects and note types into Anki and the AnkiHub database,
 create/update decks and note types in the Anki collection if necessary"""
 
+import copy
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -202,30 +203,34 @@ class AnkiHubImporter:
         LOGGER.info("Beginning adjusting note types...")
         _create_missing_note_types(remote_note_types)
         _rename_note_types(remote_note_types)
-        self._ensure_local_and_remote_fields_are_same(remote_note_types)
+        self._ensure_local_fields_align_with_remote(remote_note_types)
         self._update_templates_and_css(remote_note_types)
 
         LOGGER.info("Adjusted note types.")
 
-    def _ensure_local_and_remote_fields_are_same(
+    def _ensure_local_fields_align_with_remote(
         self, remote_note_types: Dict[NotetypeId, NotetypeDict]
     ) -> None:
-        def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
-            return [(field["ord"], field["name"]) for field in flds]
 
         note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
         for mid, remote_note_type in remote_note_types.items():
             local_note_type = aqt.mw.col.models.get(mid)
 
-            # TODO Allow extra local fields
-            if not field_tuples(local_note_type["flds"]) == field_tuples(
-                remote_note_type["flds"]
-            ):
+            local_field_names = [field["name"] for field in local_note_type["flds"]]
+            remote_field_names = [field["name"] for field in remote_note_type["flds"]]
+            common_field_names_in_local_order = [
+                name for name in local_field_names if name in remote_field_names
+            ]
+            if common_field_names_in_local_order != remote_field_names:
+                missing_fields = [
+                    name for name in remote_field_names if name not in local_field_names
+                ]
                 LOGGER.info(
-                    "Fields of local note type differ from remote note type.",
+                    "Field mismatch: local note type doesn't contain all remote fields in the same order",
                     local_note_type_name=local_note_type["name"],
-                    local_fields=field_tuples(local_note_type["flds"]),
-                    remote_fields=field_tuples(remote_note_type["flds"]),
+                    local_fields=local_field_names,
+                    remote_fields=remote_field_names,
+                    missing_fields=missing_fields if missing_fields else None,
                 )
                 note_types_with_field_conflicts.append(
                     (local_note_type, remote_note_type)
@@ -251,9 +256,7 @@ class AnkiHubImporter:
             aqt.mw.col.models.update_dict(local_note_type)
             LOGGER.info(
                 "Fields after updating the note type",
-                fields=field_tuples(
-                    aqt.mw.col.models.get(local_note_type["id"])["flds"]
-                ),
+                fields=[field["name"] for field in local_note_type["flds"]],
             )
 
     def _update_templates_and_css(
@@ -910,35 +913,47 @@ def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
 
 
 def _adjust_field_ords(
-    cur_model_flds: List[Dict], new_model_flds: List[Dict]
+    cur_model_fields: List[Dict], new_model_fields: List[Dict]
 ) -> List[Dict]:
-    """This makes sure that when fields get added or are moved field contents end up
-    in the field with the same name as before.
-    Note that the result will have exactly the same field names in the same order as the new_model,
-    just the ords of the fields will be adjusted.
     """
-    # By setting the ord value of a field to x we cause Anki to move the contents of current field x
-    # to this field.
-    for new_field in new_model_flds:
-        if (
-            cur_ord := next(
-                (
-                    old_field["ord"]
-                    for old_field in cur_model_flds
-                    if old_field["name"].lower() == new_field["name"].lower()
-                ),
-                None,
-            )
-        ) is not None:
-            # If a field with the same name exists in the current model, use its ord.
-            new_field["ord"] = cur_ord
+    Prepares note type fields for updates by merging fields from the current and new models.
+
+    This function handles several operations when updating note types:
+    1. Maintains field content mapping by assigning appropriate 'ord' values to matching fields
+    2. Assigns high 'ord' values to new fields so they start empty
+    3. Appends fields that only exist locally to the new model
+    4. Ensures the ankihub_id field remains at the end
+
+    Returns:
+        Updated note type fields
+    """
+    new_model_fields = copy.deepcopy(new_model_fields)
+
+    cur_model_field_map = {
+        field["name"].lower(): field["ord"] for field in cur_model_fields
+    }
+
+    # Set appropriate ord values for each new field
+    for new_model_field in new_model_fields:
+        field_name_lower = new_model_field["name"].lower()
+        if field_name_lower in cur_model_field_map:
+            # If field exists in current model, preserve its ord value
+            new_model_field["ord"] = cur_model_field_map[field_name_lower]
         else:
-            # If a field with the same name doesn't exist in the current model, we don't wan't Anki to
-            # move the contents of any current field to this field, so we set the ord to a value that
-            # is larger than the number of fields in the current model. This way the contents of this
-            # field will be empty.
-            new_field["ord"] = len(cur_model_flds) + 1
-    return new_model_flds
+            # For new fields, set ord to a value outside the range of current fields
+            new_model_field["ord"] = len(cur_model_fields) + 1
+
+    # Append fields that only exist locally to the new model, while keeping the ankihub_id field at the end
+    new_model_field_names = {field["name"].lower() for field in new_model_fields}
+    only_local_fields = [
+        field
+        for field in cur_model_fields
+        if field["name"].lower() not in new_model_field_names
+    ]
+    ankihub_id_field = new_model_fields[-1]
+    final_fields = new_model_fields[:-1] + only_local_fields + [ankihub_id_field]
+
+    return final_fields
 
 
 def cards_by_anki_nid_dict(notes: List[Note]) -> Dict[NoteId, List[Card]]:
