@@ -14,7 +14,7 @@ def _fetch_username_in_background() -> None:
         try:
             username = client.get_user_details()["username"]
         except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-            LOGGER.error(f"Failed to fetch username: {exc}")
+            LOGGER.warning(f"Failed to fetch username: {exc}")
     config.save_username(username)
 
 
