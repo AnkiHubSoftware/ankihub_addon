@@ -40,7 +40,7 @@ from ..main.note_type_management import (
     update_note_type_templates_and_styles,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..main.utils import modified_ankihub_note_type_name, truncate_string
+from ..main.utils import note_type_name_without_ankihub_modifications, truncate_string
 from ..settings import (
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
@@ -611,18 +611,21 @@ class DeckManagementDialog(QDialog):
             button.setToolTip("Nothing to update to AnkiHub")
 
     def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
-        deck_name = config.deck_config(self._selected_ah_did()).name
-        ankihub_note_type_names = self._get_note_type_names_for_deck(
+        ah_note_type_names = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=True
         )
-        names = []
-        for name in self._get_note_type_names_for_deck(
+        other_note_type_names = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=False
-        ):
-            modified_name = modified_ankihub_note_type_name(name, deck_name)
-            if modified_name not in ankihub_note_type_names:
-                names.append(name)
-
+        )
+        ah_note_type_names_without_ah_modifications = {
+            note_type_name_without_ankihub_modifications(name)
+            for name in ah_note_type_names
+        }
+        names = [
+            name
+            for name in other_note_type_names
+            if name not in ah_note_type_names_without_ah_modifications
+        ]
         return names
 
     def _update_add_note_type_btn_state(self):
