@@ -104,17 +104,19 @@ class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
         # Buttons layout
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        skip_button = QPushButton("Skip for now")
-        run_full_sync_button = QPushButton("Run Full Sync")
-        run_full_sync_button.setEnabled(False)
+        self.skip_button = QPushButton("Skip for now")
+        self.run_full_sync_button = QPushButton("Run Full Sync")
+        self.update_run_full_sync_button()
 
-        skip_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        run_full_sync_button.setSizePolicy(
+        self.skip_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
+        self.run_full_sync_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
 
-        button_layout.addWidget(skip_button)
-        button_layout.addWidget(run_full_sync_button)
+        button_layout.addWidget(self.skip_button)
+        button_layout.addWidget(self.run_full_sync_button)
         main_layout.addLayout(button_layout)
 
         # Enable/disable the Run Full Sync button based on checkbox state.
@@ -124,12 +126,17 @@ class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
                 if hasattr(self.synced_checkbox, "checkStateChanged")
                 else self.synced_checkbox.stateChanged
             ),
-            lambda *_: run_full_sync_button.setEnabled(
-                self.synced_checkbox.isChecked()
-            ),
+            lambda *_: self.update_run_full_sync_button(),
         )
 
-        qconnect(skip_button.clicked, self.reject)
-        qconnect(run_full_sync_button.clicked, self.accept)
+        qconnect(self.skip_button.clicked, self.reject)
+        qconnect(self.run_full_sync_button.clicked, self.accept)
 
         self.setLayout(main_layout)
+
+    def update_run_full_sync_button(self):
+        is_checked = self.synced_checkbox.isChecked()
+        self.run_full_sync_button.setEnabled(is_checked)
+        self.run_full_sync_button.setStyleSheet(
+            "color: white; background-color: #306bec" if is_checked else ""
+        )
