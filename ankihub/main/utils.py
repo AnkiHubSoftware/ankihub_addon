@@ -263,12 +263,15 @@ def change_note_types_of_notes(
             notes_grouped_by_type_change[(current_mid, mid)].append(nid)
 
     if raise_if_full_sync_required and notes_grouped_by_type_change:
-        raise ChangesRequireFullSyncError(
-            affected_note_type_ids=set(
-                target_note_type_id
-                for _, target_note_type_id in notes_grouped_by_type_change.keys()
-            )
+        affected_note_type_ids = set(
+            target_note_type_id
+            for _, target_note_type_id in notes_grouped_by_type_change.keys()
         )
+        LOGGER.info(
+            "Changing note types of notes requires full sync.",
+            affected_note_type_ids=affected_note_type_ids,
+        )
+        raise ChangesRequireFullSyncError(affected_note_type_ids=affected_note_type_ids)
 
     # Change note types of notes for each group
     for (
@@ -598,7 +601,7 @@ def remove_ankihub_id_field(note_type: Dict) -> None:
 
 
 def note_type_without_template_and_style_modifications(
-    note_type: Dict[str, Any]
+    note_type: Dict[str, Any],
 ) -> NotetypeDict:
     note_type = copy.deepcopy(note_type)
     note_type["css"] = ANKIHUB_CSS_COMMENT_RE.sub("", note_type["css"]).strip()
