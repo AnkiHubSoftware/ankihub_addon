@@ -6514,6 +6514,7 @@ def mock_user_details(mocker: MockerFixture):
     user_details = {
         "has_flashcard_selector_access": True,
         "has_reviewer_extension_access": True,
+        "username": "test_user",
     }
     mocker.patch.object(AnkiHubClient, "get_user_details", return_value=user_details)
 

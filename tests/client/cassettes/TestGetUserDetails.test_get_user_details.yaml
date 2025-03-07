@@ -1,0 +1,106 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=22.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2025-04-01T16:31:08.760064Z","token":"126202544fe5ad370b97b364d4146582ebf55b79b94095f21c75c59898ea40b5"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Connection:
+      - close
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Tue, 04 Mar 2025 16:31:08 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - Werkzeug/3.0.1 Python/3.12.3
+      Server-Timing:
+      - TimerPanel_utime;dur=285.6089999999938;desc="User CPU time", TimerPanel_stime;dur=14.525000000000787;desc="System
+        CPU time", TimerPanel_total;dur=300.13399999999456;desc="Total CPU time",
+        TimerPanel_total_time;dur=213.18933700013076;desc="Elapsed time", SQLPanel_sql_time;dur=7.449931999872206;desc="SQL
+        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Set-Cookie:
+      - csrftoken=Se8FS25NW7UfISFkCVm5FnfV9C3kKFT2; expires=Tue, 03 Mar 2026 16:31:08
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=3r1szcghz7iyn808z7w6rlddlcnkn7v7; expires=Tue, 11 Mar 2025 16:31:08
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - e2c745e5e21848ad95c7ff30e971ea71
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=22.0
+      Authorization:
+      - Token 126202544fe5ad370b97b364d4146582ebf55b79b94095f21c75c59898ea40b5
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/users/me
+  response:
+    body:
+      string: '{"username":"test1","email":"test1@email.com","name":"","subscribed_decks":[],"created_decks":[{"id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","name":"Optional
+        tangible orchestration #0","anki_id":849814700,"is_private":false,"notes_count":13,"subscribers_count":0,"description":"","updates_count":0}],"maintained_decks":[],"memberships":[{"start_date":null,"end_date":null,"status":"active","issuer":null}],"show_trial_ended_message":false,"has_flashcard_selector_access":true,"has_reviewer_extension_access":true}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Connection:
+      - close
+      Content-Language:
+      - en-us
+      Content-Length:
+      - '512'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - unsafe-none
+      Date:
+      - Tue, 04 Mar 2025 16:31:09 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - Werkzeug/3.0.1 Python/3.12.3
+      Server-Timing:
+      - TimerPanel_utime;dur=270.55099999999754;desc="User CPU time", TimerPanel_stime;dur=4.541999999998936;desc="System
+        CPU time", TimerPanel_total;dur=275.0929999999965;desc="Total CPU time", TimerPanel_total_time;dur=278.7255749999531;desc="Elapsed
+        time", SQLPanel_sql_time;dur=11.683042000186106;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 5b8d908d493d449f88fe6b1019f2dfc0
+    status:
+      code: 200
+      message: OK
+version: 1

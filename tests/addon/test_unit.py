@@ -119,10 +119,7 @@ from ankihub.gui.utils import (
     show_error_dialog,
 )
 from ankihub.main import suggestions
-from ankihub.main.deck_creation import (
-    DeckCreationResult,
-    _note_type_name_without_ankihub_modifications,
-)
+from ankihub.main.deck_creation import DeckCreationResult
 from ankihub.main.exporting import _prepared_field_html
 from ankihub.main.importing import _updated_tags
 from ankihub.main.note_conversion import (
@@ -154,6 +151,7 @@ from ankihub.main.utils import (
     lowest_level_common_ancestor_deck_name,
     mh_tag_to_resource,
     mids_of_notes,
+    note_type_name_without_ankihub_modifications,
     note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
 )
@@ -471,13 +469,13 @@ def test_prepared_field_html():
 
 def test_remove_note_type_name_modifications():
     name = "Basic (deck_name / user_name)"
-    assert _note_type_name_without_ankihub_modifications(name) == "Basic"
+    assert note_type_name_without_ankihub_modifications(name) == "Basic"
 
     name = "Basic (deck_name / user_name) (deck_name2 / user_name2)"
-    assert _note_type_name_without_ankihub_modifications(name) == "Basic"
+    assert note_type_name_without_ankihub_modifications(name) == "Basic"
 
     name = "Basic (deck_name/user_name)"
-    assert _note_type_name_without_ankihub_modifications(name) == name
+    assert note_type_name_without_ankihub_modifications(name) == name
 
 
 class TestDeckContainsSubdeckTags:

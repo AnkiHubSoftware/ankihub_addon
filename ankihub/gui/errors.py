@@ -144,8 +144,10 @@ def upload_logs_and_data_in_background(
 
 
 def _username_or_hash(hide_username: bool) -> str:
-    # Many users use their email address as their username and may not want to share it on a forum
     if config.user():
+        if config.username():
+            return config.username()
+        # Many users use their email address for login and may not want to share it on a forum
         return checksum(config.user())[:5] if hide_username else config.user()
     else:
         return "not_signed_in"
@@ -479,7 +481,7 @@ def _report_exception(
 
     with push_scope() as scope:
         scope.level = "error"
-        scope.user = {"id": config.user()}
+        scope.user = {"id": config.username_or_email()}
         scope.set_tag("os", sys.platform)
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})

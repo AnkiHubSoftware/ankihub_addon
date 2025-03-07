@@ -1862,6 +1862,14 @@ class TestGetFeatureFlags:
 
 
 @pytest.mark.vcr()
+class TestGetUserDetails:
+    def test_get_user_details(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.get_user_details()
+        # This test just makes sure that the method does not throw an exception
+
+
+@pytest.mark.vcr()
 class TestSendCardReviewData:
     def test_basic(
         self,
