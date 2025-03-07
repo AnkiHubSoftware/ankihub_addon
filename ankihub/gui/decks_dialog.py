@@ -783,7 +783,7 @@ class DeckManagementDialog(QDialog):
             if note_type_had_templates_added_or_removed(
                 ah_did=self._selected_ah_did(), note_type=note_type
             ):
-                show_dialog(
+                dialog = show_dialog(
                     (
                         "<h3>Issue with note type templates</h3>"
                         "⚠️ <b>Adding or removing templates is not supported</b> in this publishing flow.<br><br>"
@@ -792,7 +792,10 @@ class DeckManagementDialog(QDialog):
                     ),
                     title=" ",
                     buttons=[("Close", QDialogButtonBox.ButtonRole.AcceptRole)],
+                    parent=self,
+                    open_dialog=False,
                 )
+                dialog.show()
                 return
 
             confirm = ask_user(
