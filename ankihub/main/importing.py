@@ -230,11 +230,16 @@ class AnkiHubImporter:
                 )
 
         if self._raise_if_full_sync_required and note_types_with_field_conflicts:
+            affected_note_type_ids = set(
+                remote_note_type["id"]
+                for _, remote_note_type in note_types_with_field_conflicts
+            )
+            LOGGER.info(
+                "Note type field conflicts require full sync.",
+                affected_note_type_ids=affected_note_type_ids,
+            )
             raise ChangesRequireFullSyncError(
-                affected_note_type_ids=set(
-                    remote_note_type["id"]
-                    for _, remote_note_type in note_types_with_field_conflicts
-                )
+                affected_note_type_ids=affected_note_type_ids
             )
 
         for local_note_type, remote_note_type in note_types_with_field_conflicts:
@@ -283,6 +288,10 @@ class AnkiHubImporter:
                 and should_use_new_templates_by_mid[mid]
             ]
             if mids_with_template_count_change:
+                LOGGER.info(
+                    "Template count changes require full sync.",
+                    affected_note_type_ids=mids_with_template_count_change,
+                )
                 raise ChangesRequireFullSyncError(
                     affected_note_type_ids=set(mids_with_template_count_change)
                 )
@@ -866,7 +875,7 @@ def _updated_tags(
 
 
 def _create_missing_note_types(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
+    remote_note_types: Dict[NotetypeId, NotetypeDict],
 ) -> None:
     missings_mids = set(
         mid for mid in remote_note_types.keys() if aqt.mw.col.models.get(mid) is None
