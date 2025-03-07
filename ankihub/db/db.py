@@ -40,6 +40,7 @@ from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError
 from .models import (
     AnkiHubNote,
@@ -139,6 +140,8 @@ class _AnkiHubDB:
             for field_name in self.note_type_field_names(
                 ankihub_did=ankihub_did, anki_note_type_id=NotetypeId(note_data.mid)
             ):
+                if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
+                    continue
                 field = next(
                     (f for f in note_data.fields if f.name == field_name), None
                 )

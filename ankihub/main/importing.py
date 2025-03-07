@@ -796,6 +796,8 @@ class AnkiHubImporter:
         changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field_name in note.keys():
+            if field_name == settings.ANKIHUB_NOTE_TYPE_FIELD_NAME:
+                continue
             field = next(
                 (f for f in fields if f.name == field_name),
                 Field(name=field_name, order=0, value=""),
