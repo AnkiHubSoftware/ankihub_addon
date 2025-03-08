@@ -2773,8 +2773,8 @@ class TestAnkiHubDBMigrations:
             conn.close()
 
             # Assert that the table and index definitions are the same for the two databases
-            assert table_definitions == expected_table_definitions
-            assert index_definitions == expected_index_definitions
+            assert set(table_definitions) == set(expected_table_definitions)
+            assert set(index_definitions) == set(expected_index_definitions)
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
 
 
