@@ -105,8 +105,10 @@ class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         self.skip_button = QPushButton("Skip for now")
+        self.skip_button.setDefault(False)
+        self.skip_button.setAutoDefault(False)
         self.run_full_sync_button = QPushButton("Run Full Sync")
-        self.update_run_full_sync_button()
+        self.push_button_style_sheet = self.run_full_sync_button.styleSheet()
 
         self.skip_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
@@ -115,28 +117,36 @@ class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
 
+        # Add hidden button so that the skip button is not styled as default button.
+        self.hidden_button = QPushButton("")
+        self.hidden_button.setEnabled(False)
+        self.hidden_button.setVisible(False)
+
         button_layout.addWidget(self.skip_button)
         button_layout.addWidget(self.run_full_sync_button)
+        button_layout.addWidget(self.hidden_button)
         main_layout.addLayout(button_layout)
 
         # Enable/disable the Run Full Sync button based on checkbox state.
+        self._on_checkbox_state_changed()
         qconnect(
             (
                 self.synced_checkbox.checkStateChanged
                 if hasattr(self.synced_checkbox, "checkStateChanged")
                 else self.synced_checkbox.stateChanged
             ),
-            lambda *_: self.update_run_full_sync_button(),
+            lambda *_: self._on_checkbox_state_changed(),
         )
 
         qconnect(self.skip_button.clicked, self.reject)
         qconnect(self.run_full_sync_button.clicked, self.accept)
 
         self.setLayout(main_layout)
+        self.adjustSize()
 
-    def update_run_full_sync_button(self):
+    def _on_checkbox_state_changed(self):
         is_checked = self.synced_checkbox.isChecked()
         self.run_full_sync_button.setEnabled(is_checked)
-        self.run_full_sync_button.setStyleSheet(
-            "color: white; background-color: #306bec" if is_checked else ""
-        )
+        self.run_full_sync_button.setDefault(is_checked)
+        self.hidden_button.setDefault(not is_checked)
+        self.skip_button.setDefault(False)
