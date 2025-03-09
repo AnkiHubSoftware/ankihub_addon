@@ -4512,6 +4512,12 @@ class TestDeckUpdater:
                 return_value=DeckFactory.create(ah_did=ah_did),
             )
 
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_note_types_dict_for_deck",
+                return_value={note_info.mid: aqt.mw.col.models.get(note_info.mid)},
+            )
+
             # Use the deck updater to update the deck
             ah_deck_updater.update_decks_and_media(
                 ah_dids=[ah_did],
@@ -4932,7 +4938,7 @@ class TestSyncWithAnkiHub:
             note_info.mid = new_note_type["id"]
 
             self.mock_deck_update_client_methods(
-                deck=deck, notes=[note_info], mocker=mocker
+                deck=deck, notes=[note_info], note_types=[new_note_type], mocker=mocker
             )
 
             config.save_token("test_token")
@@ -4985,7 +4991,11 @@ class TestSyncWithAnkiHub:
                 sync_with_ankihub()
 
     def mock_deck_update_client_methods(
-        self, deck: Deck, notes: List[NoteInfo], mocker: MockerFixture
+        self,
+        deck: Deck,
+        notes: List[NoteInfo],
+        note_types: List[NotetypeDict],
+        mocker: MockerFixture,
     ) -> None:
         mocker.patch.object(
             AnkiHubClient,
@@ -4994,6 +5004,12 @@ class TestSyncWithAnkiHub:
         )
 
         mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_note_types_dict_for_deck",
+            return_value={note_type["id"]: note_type for note_type in note_types},
+        )
 
         latest_update = datetime.now()
         mocker.patch.object(
