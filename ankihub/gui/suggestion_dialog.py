@@ -335,7 +335,7 @@ def _determine_ah_did_for_nids_to_be_suggested(
         return None
     if len(ah_dids) != 1:
         LOGGER.info(
-            "User tried to submit suggestions for notes that belong to multiple AnkiHub decks.."
+            "User tried to submit suggestions for notes that belong to multiple AnkiHub decks."
         )
         show_info("Please choose notes for one AnkiHub deck only.", parent=parent)
         return None
