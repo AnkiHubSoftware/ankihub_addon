@@ -297,7 +297,7 @@ class _AnkiHubDB:
             return None
 
         field_names = self.note_type_field_names(
-            ankihub_did=note.ankihub_deck_id, anki_note_type_id=note.anki_note_type_id
+            anki_note_type_id=note.anki_note_type_id
         )
 
         return self._build_note_info(note, {note.anki_note_type_id: field_names})
@@ -317,7 +317,6 @@ class _AnkiHubDB:
         for note in notes:
             if note.anki_note_type_id not in field_names_by_mid:
                 field_names_by_mid[note.anki_note_type_id] = self.note_type_field_names(
-                    ankihub_did=cast(uuid.UUID, note.ankihub_deck_id),
                     anki_note_type_id=cast(NotetypeId, note.anki_note_type_id),
                 )
 
@@ -593,14 +592,11 @@ class _AnkiHubDB:
                 .execute()
             )
 
-    def note_type_dict(
-        self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
-    ) -> NotetypeDict:
+    def note_type_dict(self, note_type_id: NotetypeId) -> NotetypeDict:
         return (
             AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict)
             .filter(
                 anki_note_type_id=note_type_id,
-                ankihub_deck_id=ankihub_did,
             )
             .scalar()
         )
@@ -622,25 +618,18 @@ class _AnkiHubDB:
             .objects(flat)
         )
 
-    def ankihub_dids_for_note_type(
-        self, anki_note_type_id: NotetypeId
-    ) -> Set[uuid.UUID]:
-        """Returns the AnkiHub deck ids that use the given note type."""
-        return set(
+    def ankihub_did_for_note_type(self, anki_note_type_id: NotetypeId) -> uuid.UUID:
+        return (
             AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
             .filter(anki_note_type_id=anki_note_type_id)
-            .objects(flat)
+            .scalar()
         )
 
-    def note_type_field_names(
-        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
-    ) -> List[str]:
+    def note_type_field_names(self, anki_note_type_id: NotetypeId) -> List[str]:
         """Returns the names of the fields of the note type."""
         result = [
             field["name"]
-            for field in self.note_type_dict(
-                ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-            )["flds"]
+            for field in self.note_type_dict(note_type_id=anki_note_type_id)["flds"]
         ]
         return result
 
