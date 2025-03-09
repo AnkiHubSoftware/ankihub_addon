@@ -996,8 +996,8 @@ def test_add_note_type_fields(
             json=_to_ankihub_note_type(expected_data),
         )
         db_note_type = add_note_type_fields(ah_did, note_type, ["New1"])
-        assert ankihub_db.note_type_dict(ah_did, note_type_id) == db_note_type
-        assert "New1" in ankihub_db.note_type_field_names(ah_did, note_type_id)
+        assert ankihub_db.note_type_dict(note_type_id) == db_note_type
+        assert "New1" in ankihub_db.note_type_field_names(note_type_id)
 
 
 class TestDownloadAndInstallDecks:
@@ -7114,9 +7114,9 @@ def test_update_note_type_templates_and_styles(
         db_note_type = update_note_type_templates_and_styles(
             ah_did, {**note_type, "css": css_data, "tmpls": tmpls_data}
         )
-        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+        assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get(
             "tmpls"
-        ) == db_note_type.get("tmpls")
-        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+        )
+        assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get(
             "css"
-        ) == db_note_type.get("css")
+        )

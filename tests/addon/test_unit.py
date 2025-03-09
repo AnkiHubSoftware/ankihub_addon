@@ -105,7 +105,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionMetadata,
     SuggestionSource,
     _on_suggest_notes_in_bulk_done,
-    get_anki_nid_to_possible_ah_dids_dict,
+    get_anki_nid_to_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
@@ -845,8 +845,8 @@ class TestSuggestionDialog:
         assert dialog.auto_accept_cb.isVisible() == can_submit_without_review
 
 
-class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
-    def test_with_existing_note_belonging_to_single_deck(
+class TestSuggestionDialogGetAnkiNidToAHDidsDict:
+    def test_with_existing_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
@@ -856,11 +856,9 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             ah_did = next_deterministic_uuid()
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
-            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
-                note_info.anki_nid: {ah_did}
-            }
+            assert get_anki_nid_to_ah_dids_dict(nids) == {note_info.anki_nid: ah_did}
 
-    def test_with_new_note_belonging_to_single_deck(
+    def test_with_new_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
@@ -872,50 +870,7 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             note_type = import_ah_note_type(ah_did=ah_did)
             note = add_anki_note(note_type=note_type)
             nids = [note.id]
-            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {note.id: {ah_did}}
-
-    def test_with_new_note_with_two_possible_decks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        import_ah_note_type: ImportAHNoteType,
-        add_anki_note: AddAnkiNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
-            note_type = import_ah_note_type(ah_did=ah_did_1)
-
-            ah_did_2 = next_deterministic_uuid()
-            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
-
-            # The note type of the new note is used in two decks, so the note could be suggested for either of them.
-            note = add_anki_note(note_type=note_type)
-            nids = [note.id]
-            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
-                note.id: {ah_did_1, ah_did_2}
-            }
-
-    def test_with_existing_note_with_note_type_used_in_two_decks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        import_ah_note: ImportAHNote,
-        import_ah_note_type: ImportAHNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
-            note_type = import_ah_note_type(ah_did=ah_did_1)
-            note_info = import_ah_note(ah_did=ah_did_1, mid=note_type["id"])
-
-            ah_did_2 = next_deterministic_uuid()
-            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
-
-            # The note type of the new note is used in two decks, but the note exists in one of them,
-            # so the note belongs to that deck.
-            nids = [NoteId(note_info.anki_nid)]
-            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
-                note_info.anki_nid: {ah_did_1}
-            }
+            assert get_anki_nid_to_ah_dids_dict(nids) == {note.id: ah_did}
 
 
 class MockDependenciesForSuggestionDialog(Protocol):
@@ -960,7 +915,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
             (False, False),
         ],
     )
-    def test_with_existing_note_belonging_to_single_deck(
+    def test_with_existing_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
@@ -996,30 +951,17 @@ class TestOpenSuggestionDialogForSingleSuggestion:
 
                 suggest_new_note_mock.assert_not_called()
 
-    @pytest.mark.parametrize(
-        "user_cancels",
-        [
-            True,
-            False,
-        ],
-    )
-    def test_with_new_note_which_could_belong_to_two_decks(
+    def test_with_new_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         add_anki_note: AddAnkiNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
-        mocker: MockerFixture,
-        user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
-
-            # Add the note type to a second deck
-            ah_did_2 = install_ah_deck()
-            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
 
             note = add_anki_note(note_type=note_type)
 
@@ -1028,26 +970,12 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=False)
 
-            choose_ankihub_deck_mock = mocker.patch(
-                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
-                return_value=None if user_cancels else ah_did_1,
-            )
-
             open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
-            if user_cancels:
-                suggest_note_update_mock.assert_not_called()
-                suggest_new_note_mock.assert_not_called()
-            else:
-                # There are two options for the deck, so the user has to choose one.
-                _, kwargs = choose_ankihub_deck_mock.call_args
-                assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
+            _, kwargs = suggest_new_note_mock.call_args
+            assert kwargs.get("note") == note
 
-                # The note should be suggested for the chosen deck.
-                _, kwargs = suggest_new_note_mock.call_args
-                assert kwargs.get("note") == note
-
-                suggest_note_update_mock.assert_not_called()
+            suggest_note_update_mock.assert_not_called()
 
 
 class MockDependenciesForBulkSuggestionDialog(Protocol):
@@ -1086,7 +1014,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             False,
         ],
     )
-    def test_with_existing_note_belonging_to_single_deck(
+    def test_with_existing_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -1115,7 +1043,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
                 assert kwargs.get("ankihub_did") == ah_did
                 assert {note.id for note in kwargs.get("notes")} == set(nids)
 
-    def test_with_two_new_notes_without_decks_in_common(
+    def test_with_two_new_notes_from_different_decks(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -1142,50 +1070,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
             qtbot.wait(500)
 
-            # The note suggestions can't be for the same deck, so the suggestion dialog should not be shown.
+            # No suggestion should be created, because the notes need to belong to the same deck.
             suggest_notes_in_bulk_mock.assert_not_called()
-
-    def test_with_two_new_notes_with_decks_in_common(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note_type: ImportAHNoteType,
-        add_anki_note: AddAnkiNote,
-        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
-        mocker: MockerFixture,
-        qtbot: QtBot,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = install_ah_deck()
-            note_type = import_ah_note_type(ah_did=ah_did_1)
-            note_1 = add_anki_note(note_type=note_type)
-
-            ah_did_2 = install_ah_deck()
-            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
-            note_2 = add_anki_note(note_type=note_type)
-
-            nids = [note_1.id, note_2.id]
-
-            choose_ankihub_deck_mock = mocker.patch(
-                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
-                return_value=ah_did_1,
-            )
-            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
-                user_cancels=False
-            )
-
-            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
-            qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
-
-            # There are two options for the deck the note suggestions can be for, so the user should be asked
-            # to choose between them.
-            _, kwargs = choose_ankihub_deck_mock.call_args
-            assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
-
-            # After the user has chosen the deck, the suggestion dialog should be shown for the chosen deck.
-            _, kwargs = suggest_notes_in_bulk_mock.call_args
-            assert kwargs.get("ankihub_did") == ah_did_1
-            assert {note.id for note in kwargs.get("notes")} == set(nids)
 
 
 class TestOnSuggestNotesInBulkDone:
@@ -1373,14 +1259,9 @@ class TestAnkiHubDBRemoveDeck:
         # Assert that everything is removed
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
         assert ankihub_db.note_types_for_ankihub_deck(ankihub_did=ah_did) == []
-        assert (
-            ankihub_db.note_type_dict(
-                ankihub_did=ah_did, note_type_id=ankihub_basic_note_type["id"]
-            )
-            is None
-        )
+        assert ankihub_db.note_type_dict(ankihub_basic_note_type["id"]) is None
         assert not (
-            ankihub_db.ankihub_dids_for_note_type(
+            ankihub_db.ankihub_did_for_note_type(
                 anki_note_type_id=ankihub_basic_note_type["id"]
             )
         )
@@ -2773,8 +2654,8 @@ class TestAnkiHubDBMigrations:
             conn.close()
 
             # Assert that the table and index definitions are the same for the two databases
-            assert table_definitions == expected_table_definitions
-            assert index_definitions == expected_index_definitions
+            assert set(table_definitions) == set(expected_table_definitions)
+            assert set(index_definitions) == set(expected_index_definitions)
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
 
 
@@ -3315,7 +3196,7 @@ class TestAddNoteTypeFields:
                 new_field_names=new_field_names,
             )
 
-            ah_db_note_type = ankihub_db.note_type_dict(ah_did, ah_note_type["id"])
+            ah_db_note_type = ankihub_db.note_type_dict(ah_note_type["id"])
 
             # Assert field names are correct
             assert [

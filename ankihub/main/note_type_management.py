@@ -36,7 +36,7 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
 def add_note_type_fields(
     ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
 ) -> NotetypeDict:
-    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+    ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
     existing_ah_field_names = set(field["name"] for field in ah_note_type["flds"])
     combined_ah_field_names = existing_ah_field_names | set(new_field_names)
@@ -90,7 +90,7 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
     for mid in ankihub_db.note_types_for_ankihub_deck(ah_did):
         changed = False
         ah_note_type = note_type_without_ankihub_modifications(
-            ankihub_db.note_type_dict(ah_did, mid)
+            ankihub_db.note_type_dict(mid)
         )
         anki_note_type = note_type_without_ankihub_modifications(
             aqt.mw.col.models.get(mid)
@@ -113,15 +113,13 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
 
 def new_fields_for_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> List[str]:
     field_names = aqt.mw.col.models.field_names(note_type)
-    ankihub_field_names = ankihub_db.note_type_field_names(ah_did, note_type["id"])
+    ankihub_field_names = ankihub_db.note_type_field_names(note_type["id"])
     new_fields = [name for name in field_names if name not in ankihub_field_names]
     return new_fields
 
 
-def note_type_had_templates_added_or_removed(
-    ah_did: uuid.UUID, note_type: NotetypeDict
-) -> bool:
-    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+def note_type_had_templates_added_or_removed(note_type: NotetypeDict) -> bool:
+    ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
     if len(note_type["tmpls"]) != len(ah_note_type["tmpls"]):
         return True
@@ -146,7 +144,7 @@ def update_note_type_templates_and_styles(
 ) -> NotetypeDict:
     client = AddonAnkiHubClient()
     note_type = note_type_without_ankihub_modifications(note_type)
-    ah_note_type = ankihub_db.note_type_dict(ah_did, note_type["id"])
+    ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
     ah_note_type["tmpls"] = note_type["tmpls"]
     ah_note_type["css"] = note_type["css"]

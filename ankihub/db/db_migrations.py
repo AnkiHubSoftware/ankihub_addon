@@ -167,37 +167,7 @@ def migrate_ankihub_db():
                 DeckMedia,  # type: ignore
             ]
             for model in models_to_migrate:
-                table_name = model._meta.table_name
-                temp_table_name = f"temp_{table_name}"
-
-                # Rename the current table if it exists
-                try:
-                    get_peewee_database().execute_sql(
-                        f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
-                    )
-                except Exception as e:
-                    # Renaming a table can't be rolled back in SQLite. If a previous run of this migration
-                    # was interrupted after renaming the table, the table will still be have the temp_ prefix.
-                    # All other changes in this migration will be rolled back in this case.
-                    # This means we can just ignore the error here and continue with the migration.
-                    LOGGER.warning(
-                        "Failed to rename table",
-                        table_name=table_name,
-                        temp_table_name=temp_table_name,
-                        exc_info=e,
-                    )
-
-                # Create the new table using peewee
-                model.bind(get_peewee_database())
-                model.create_table()
-
-                # Copy the data to the new table
-                get_peewee_database().execute_sql(
-                    f"INSERT INTO {table_name} SELECT * FROM {temp_table_name}"
-                )
-
-                # Drop the old table
-                get_peewee_database().execute_sql(f"DROP TABLE {temp_table_name}")
+                _recreate_peewee_table(model, on_conflict="IGNORE")
 
             peewee_db.pragma("user_version", 11)
 
@@ -205,6 +175,64 @@ def migrate_ankihub_db():
             "AnkiHub DB migrated to schema version",
             schema_version=ankihub_db.schema_version(),
         )
+
+    if schema_version < 12:
+        # Migrate AnkiHubNoteType table to change primary key from
+        # (anki_note_id, ankihub_deck_id) to anki_note_id.
+        with peewee_db.atomic():
+            _recreate_peewee_table(AnkiHubNoteType, on_conflict="IGNORE")  # type: ignore
+
+            peewee_db.pragma("user_version", 12)
+
+        LOGGER.info(
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
+        )
+
+
+def _recreate_peewee_table(model: Model, on_conflict: str = "ABORT") -> None:
+    """
+    Recreates a peewee table while preserving its data.
+
+    SQLite doesn't support many ALTER TABLE operations This function implements
+    the recommended SQLite pattern for schema changes by:
+
+    1. Renaming the existing table to a temporary name
+    2. Creating a new table with the updated schema from the model
+    3. Copying all data from the temporary table to the new table
+    4. Dropping the temporary table
+    """
+    table_name = model._meta.table_name
+    temp_table_name = f"temp_{table_name}"
+
+    # Rename the current table if it exists
+    try:
+        get_peewee_database().execute_sql(
+            f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
+        )
+    except Exception as e:
+        # Renaming a table can't be rolled back in SQLite. If a previous run of this migration
+        # was interrupted after renaming the table, the table will still have the temp_ prefix.
+        # All other changes in this migration will be rolled back in this case.
+        # This means we can just ignore the error here and continue with the migration.
+        LOGGER.warning(
+            "Failed to rename table",
+            table_name=table_name,
+            temp_table_name=temp_table_name,
+            exc_info=e,
+        )
+
+    # Create the new table using peewee
+    model.bind(get_peewee_database())
+    model.create_table()
+
+    # Copy the data to the new table
+    get_peewee_database().execute_sql(
+        f"INSERT OR {on_conflict} INTO {table_name} SELECT * FROM {temp_table_name}"
+    )
+
+    # Drop the old table
+    get_peewee_database().execute_sql(f"DROP TABLE {temp_table_name}")
 
 
 def _setup_note_types_table(peewee_db: Database) -> None:
