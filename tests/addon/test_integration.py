@@ -4515,7 +4515,9 @@ class TestDeckUpdater:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_note_types_dict_for_deck",
-                return_value={note_info.mid: aqt.mw.col.models.get(note_info.mid)},
+                return_value={
+                    note_info.mid: aqt.mw.col.models.get(NotetypeId(note_info.mid))
+                },
             )
 
             # Use the deck updater to update the deck
