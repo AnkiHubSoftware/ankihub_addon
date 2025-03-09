@@ -438,9 +438,7 @@ class _AnkiHubDB:
             AnkiHubNote.delete().where(
                 AnkiHubNote.ankihub_deck_id == ankihub_did
             ).execute()
-            AnkiHubNoteType.delete().where(
-                AnkiHubNoteType.ankihub_deck_id == ankihub_did
-            ).execute()
+            self.remove_note_types_of_deck(ankihub_did)
             DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
@@ -591,6 +589,12 @@ class _AnkiHubDB:
                 .on_conflict_replace()
                 .execute()
             )
+
+    def remove_note_types_of_deck(self, ankihub_did: uuid.UUID) -> None:
+        with self.write_lock:
+            AnkiHubNoteType.delete().where(
+                AnkiHubNoteType.ankihub_deck_id == ankihub_did
+            ).execute()
 
     def note_type_dict(self, note_type_id: NotetypeId) -> NotetypeDict:
         return (

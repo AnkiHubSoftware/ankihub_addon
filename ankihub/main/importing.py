@@ -107,6 +107,7 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only: bool = False,
         recommended_deck_settings: bool = True,
         raise_if_full_sync_required: bool = True,
+        clear_ah_note_types_before_import: bool = False,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or for updating it.
@@ -140,6 +141,7 @@ class AnkiHubImporter:
         self._protected_tags = protected_tags
         self._local_did = _adjust_deck(deck_name, anki_did)
         self._raise_if_full_sync_required = raise_if_full_sync_required
+        self._clear_note_types_before_import = clear_ah_note_types_before_import
 
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
@@ -310,6 +312,9 @@ class AnkiHubImporter:
     def _import_note_types_into_ankihub_db(
         self, note_types: Dict[NotetypeId, NotetypeDict]
     ) -> None:
+        if self._clear_note_types_before_import:
+            ankihub_db.remove_note_types_of_deck(self._ankihub_did)
+
         for note_type in note_types.values():
             ankihub_db.upsert_note_type(
                 ankihub_did=self._ankihub_did, note_type=note_type
