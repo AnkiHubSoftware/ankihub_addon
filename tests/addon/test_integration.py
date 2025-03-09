@@ -1669,7 +1669,7 @@ class TestSuggestNotesInBulk:
             assert bulk_suggestions_method_mock.call_count == 1
 
             def get_ah_nids_from_suggestions(
-                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]]
+                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]],
             ) -> List[uuid.UUID]:
                 return [suggestion.ah_nid for suggestion in suggestions]
 
@@ -2690,6 +2690,36 @@ class TestAnkiHubImporter:
                 assert len(import_result.updated_nids) == 0
                 assert len(import_result.deleted_nids) == 0
 
+    def test_with_clear_ah_note_types_before_import(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            note_type = import_ah_note_type(ah_did=ah_did, force_new=True)
+
+            # One note type was added for install_ah_deck, and one for import_ah_note_type
+            assert len(ankihub_db.note_types_for_ankihub_deck(ah_did)) == 2
+
+            import_result = self._import_notes(
+                [],
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=config.deck_config(ah_did).anki_id,
+                note_types={note_type["id"]: note_type},
+                clear_ah_note_types_before_import=True,
+            )
+
+            # Note types not in the import are removed
+            assert ankihub_db.note_types_for_ankihub_deck(ah_did) == [note_type]
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.deleted_nids) == 0
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
@@ -2699,6 +2729,7 @@ class TestAnkiHubImporter:
         anki_did: Optional[DeckId] = None,
         note_types: Dict[NotetypeId, NotetypeDict] = {},
         raise_if_full_sync_required: bool = False,
+        clear_ah_note_types_before_import: bool = False,
     ) -> AnkiHubImportResult:
         """Helper function to use the AnkiHubImporter to import notes with default arguments."""
         ankihub_importer = AnkiHubImporter()
@@ -2717,6 +2748,7 @@ class TestAnkiHubImporter:
             ),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             raise_if_full_sync_required=raise_if_full_sync_required,
+            clear_ah_note_types_before_import=clear_ah_note_types_before_import,
         )
         return import_result
 
