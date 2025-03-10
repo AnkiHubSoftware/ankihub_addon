@@ -317,6 +317,7 @@ def import_ah_note_type(
         note_type: Optional[NotetypeDict] = None,
         ah_did: Optional[uuid.UUID] = None,
         force_new: bool = False,
+        raise_if_full_sync_required=False,
     ) -> NotetypeDict:
         if note_type is None:
             note_type = copy.deepcopy(default_note_type)
@@ -342,6 +343,7 @@ def import_ah_note_type(
                 ah_did
             ),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+            raise_if_full_sync_required=raise_if_full_sync_required,
         )
         return note_type
 

@@ -221,12 +221,18 @@ class AnkiHubImporter:
             common_field_names_in_local_order = [
                 name for name in local_field_names if name in remote_field_names
             ]
-            if common_field_names_in_local_order != remote_field_names:
+            if (
+                common_field_names_in_local_order != remote_field_names
+                or local_field_names[-1] != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
+            ):
                 missing_fields = [
                     name for name in remote_field_names if name not in local_field_names
                 ]
                 LOGGER.info(
-                    "Field mismatch: local note type doesn't contain all remote fields in the same order",
+                    (
+                        "Field mismatch: local note type doesn't contain all remote fields in the same order,"
+                        "or the last field is not the AnkiHub ID field."
+                    ),
                     local_note_type_name=local_note_type["name"],
                     local_fields=local_field_names,
                     remote_fields=remote_field_names,

@@ -1747,6 +1747,12 @@ class TestAdjustNoteTypes:
                 ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
                 ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
             ),
+            # Local field is after ankihub_id field
+            (
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME, "Extra"],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
             # Local-only field positioned before remote field (no adjustment needed)
             (
                 ["Extra", "Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
