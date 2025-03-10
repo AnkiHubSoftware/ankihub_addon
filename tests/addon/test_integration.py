@@ -2723,6 +2723,55 @@ class TestAnkiHubImporter:
             )
             assert ankihub_db.note_data(anki_nid) == expected_note_info
 
+    def test_missing_fields_are_cleared(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_nid = NoteId(1)
+            mid = ankihub_basic_note_type["id"]
+            ah_did = next_deterministic_uuid()
+            # Import a note with contents in the Back field
+            note_info = NoteInfoFactory.create(
+                anki_nid=anki_nid,
+                mid=mid,
+                fields=[
+                    Field(name="Front", value="f", order=0),
+                    Field(name="Back", value="b", order=1),
+                ],
+            )
+            self._import_notes(
+                [note_info],
+                is_first_import_of_deck=True,
+                ah_did=ah_did,
+                note_types={mid: ankihub_basic_note_type},
+            )
+            # Import the note again with a missing Back field
+            note_info = NoteInfoFactory.create(
+                anki_nid=anki_nid,
+                mid=mid,
+                fields=[Field(name="Front", value="f", order=0)],
+            )
+            self._import_notes(
+                [note_info],
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                note_types={mid: ankihub_basic_note_type},
+            )
+            # Old contents of the Back field should be cleared
+            expected_note_info = NoteInfoFactory.create(
+                ah_nid=note_info.ah_nid,
+                anki_nid=anki_nid,
+                mid=mid,
+                fields=[
+                    Field(name="Front", value="f", order=0),
+                    Field(name="Back", value="", order=1),
+                ],
+            )
+            assert ankihub_db.note_data(anki_nid) == expected_note_info
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
