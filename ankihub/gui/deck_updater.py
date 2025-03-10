@@ -153,6 +153,7 @@ class _AnkiHubDeckUpdater:
             suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
             raise_if_full_sync_required=self._raise_if_full_sync_required,
+            clear_ah_note_types_before_import=True,
         )
         self._import_results.append(import_result)
 

@@ -996,8 +996,8 @@ def test_add_note_type_fields(
             json=_to_ankihub_note_type(expected_data),
         )
         db_note_type = add_note_type_fields(ah_did, note_type, ["New1"])
-        assert ankihub_db.note_type_dict(ah_did, note_type_id) == db_note_type
-        assert "New1" in ankihub_db.note_type_field_names(ah_did, note_type_id)
+        assert ankihub_db.note_type_dict(note_type_id) == db_note_type
+        assert "New1" in ankihub_db.note_type_field_names(note_type_id)
 
 
 class TestDownloadAndInstallDecks:
@@ -1669,7 +1669,7 @@ class TestSuggestNotesInBulk:
             assert bulk_suggestions_method_mock.call_count == 1
 
             def get_ah_nids_from_suggestions(
-                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]]
+                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]],
             ) -> List[uuid.UUID]:
                 return [suggestion.ah_nid for suggestion in suggestions]
 
@@ -2690,6 +2690,36 @@ class TestAnkiHubImporter:
                 assert len(import_result.updated_nids) == 0
                 assert len(import_result.deleted_nids) == 0
 
+    def test_with_clear_ah_note_types_before_import(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            note_type = import_ah_note_type(ah_did=ah_did, force_new=True)
+
+            # One note type was added for install_ah_deck, and one for import_ah_note_type
+            assert len(ankihub_db.note_types_for_ankihub_deck(ah_did)) == 2
+
+            import_result = self._import_notes(
+                [],
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=config.deck_config(ah_did).anki_id,
+                note_types={note_type["id"]: note_type},
+                clear_ah_note_types_before_import=True,
+            )
+
+            # Note types not in the import are removed
+            assert ankihub_db.note_types_for_ankihub_deck(ah_did) == [note_type]
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.deleted_nids) == 0
+
     def test_import_note_with_missing_fields(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2781,6 +2811,7 @@ class TestAnkiHubImporter:
         anki_did: Optional[DeckId] = None,
         note_types: Dict[NotetypeId, NotetypeDict] = {},
         raise_if_full_sync_required: bool = False,
+        clear_ah_note_types_before_import: bool = False,
     ) -> AnkiHubImportResult:
         """Helper function to use the AnkiHubImporter to import notes with default arguments."""
         ankihub_importer = AnkiHubImporter()
@@ -2799,6 +2830,7 @@ class TestAnkiHubImporter:
             ),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             raise_if_full_sync_required=raise_if_full_sync_required,
+            clear_ah_note_types_before_import=clear_ah_note_types_before_import,
         )
         return import_result
 
@@ -4569,6 +4601,14 @@ class TestDeckUpdater:
                 return_value=DeckFactory.create(ah_did=ah_did),
             )
 
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_note_types_dict_for_deck",
+                return_value={
+                    note_info.mid: aqt.mw.col.models.get(NotetypeId(note_info.mid))
+                },
+            )
+
             # Use the deck updater to update the deck
             ah_deck_updater.update_decks_and_media(
                 ah_dids=[ah_did],
@@ -4994,7 +5034,7 @@ class TestSyncWithAnkiHub:
             note_info.mid = new_note_type["id"]
 
             self.mock_deck_update_client_methods(
-                deck=deck, notes=[note_info], mocker=mocker
+                deck=deck, notes=[note_info], note_types=[new_note_type], mocker=mocker
             )
 
             config.save_token("test_token")
@@ -5047,7 +5087,11 @@ class TestSyncWithAnkiHub:
                 sync_with_ankihub()
 
     def mock_deck_update_client_methods(
-        self, deck: Deck, notes: List[NoteInfo], mocker: MockerFixture
+        self,
+        deck: Deck,
+        notes: List[NoteInfo],
+        note_types: List[NotetypeDict],
+        mocker: MockerFixture,
     ) -> None:
         mocker.patch.object(
             AnkiHubClient,
@@ -5056,6 +5100,12 @@ class TestSyncWithAnkiHub:
         )
 
         mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_note_types_dict_for_deck",
+            return_value={note_type["id"]: note_type for note_type in note_types},
+        )
 
         latest_update = datetime.now()
         mocker.patch.object(
@@ -7208,9 +7258,9 @@ def test_update_note_type_templates_and_styles(
         db_note_type = update_note_type_templates_and_styles(
             ah_did, {**note_type, "css": css_data, "tmpls": tmpls_data}
         )
-        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+        assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get(
             "tmpls"
-        ) == db_note_type.get("tmpls")
-        assert ankihub_db.note_type_dict(ah_did, note_type_id).get(
+        )
+        assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get(
             "css"
-        ) == db_note_type.get("css")
+        )

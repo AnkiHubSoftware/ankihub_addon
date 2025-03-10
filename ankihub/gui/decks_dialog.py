@@ -780,9 +780,7 @@ class DeckManagementDialog(QDialog):
 
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
 
-            if note_type_had_templates_added_or_removed(
-                ah_did=self._selected_ah_did(), note_type=note_type
-            ):
+            if note_type_had_templates_added_or_removed(note_type=note_type):
                 dialog = show_dialog(
                     (
                         "<h3>Issue with note type templates</h3>"
