@@ -77,22 +77,35 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
 @pass_exceptions_to_on_done
 def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
-    client = AnkiHubClient()
-    subscribed_decks = client.get_deck_subscriptions()
+    def get_subscriptions_and_clean_up() -> List[Deck]:
+        client = AnkiHubClient()
+        subscribed_decks = client.get_deck_subscriptions()
 
-    _uninstall_decks_the_user_is_not_longer_subscribed_to(
-        subscribed_decks=subscribed_decks
-    )
+        _uninstall_decks_the_user_is_not_longer_subscribed_to(
+            subscribed_decks=subscribed_decks
+        )
 
-    sync_state.schema_before_new_decks_installation = collection_schema()
-    check_and_install_new_deck_subscriptions(
-        subscribed_decks=subscribed_decks,
-        on_done=partial(
-            _on_new_deck_subscriptions_done,
+        return subscribed_decks
+
+    def on_subscriptions_fetched(subscribed_decks: List[Deck]) -> None:
+        sync_state.schema_before_new_decks_installation = collection_schema()
+
+        check_and_install_new_deck_subscriptions(
             subscribed_decks=subscribed_decks,
-            on_done=on_done,
-        ),
-    )
+            on_done=partial(
+                _on_new_deck_subscriptions_done,
+                subscribed_decks=subscribed_decks,
+                on_done=on_done,
+            ),
+        )
+
+    AddonQueryOp(
+        op=lambda _: get_subscriptions_and_clean_up(),
+        success=on_subscriptions_fetched,
+        parent=aqt.mw,
+    ).failure(
+        lambda e: on_done(future_with_exception(e))
+    ).with_progress().run_in_background()
 
 
 @pass_exceptions_to_on_done
