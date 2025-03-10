@@ -1,5 +1,7 @@
 """Convert Anki notes to NoteInfo objects.
-This is used for exporting notes from Anki to AnkiHub, e.g. when creating suggestions or creating new AnkiHub decks."""
+This is used for exporting notes from Anki to AnkiHub, e.g. when creating suggestions or creating new AnkiHub decks.
+"""
+
 import re
 import uuid
 from typing import List, Optional
@@ -8,6 +10,7 @@ from anki.notes import Note
 
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .note_conversion import (
     get_fields_protected_by_tags,
     is_internal_tag,
@@ -40,22 +43,38 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
 
 
 def _prepare_fields(note: Note) -> List[Field]:
+    note_data = ankihub_db.note_data(note.id)
+    note_type = ankihub_db.note_type_dict(
+        # Using mid from the AnkiHub DB if available (for change note suggestions),
+        # because note type might have been changed in the Anki DB.
+        # For new note suggestions we use the note's mid.
+        note_type_id=note_data.mid
+        if note_data
+        else note.mid
+    )
+    if note_type is None:
+        # When creating a deck the note type is not yet in the AnkiHub DB
+        note_type = note.note_type()
 
-    # Exclude the AnkiHub ID field since we don't want to expose this as an
-    # editable field in AnkiHub suggestion forms.
-    field_vals = list(note.fields[:-1])
-    fields_metadata = note.note_type()["flds"][:-1]
-
-    result = [
-        Field(name=field_metadata["name"], order=field_metadata["ord"], value=val)
-        for field_metadata, val in zip(fields_metadata, field_vals)
-    ]
-
-    for field in result:
-        field.value = _prepared_field_html(field.value)
-
+    note_fields_dict = dict(note.items())
     fields_protected_by_tags = get_fields_protected_by_tags(note)
-    result = [field for field in result if field.name not in fields_protected_by_tags]
+
+    result = []
+    for field in note_type["flds"]:
+        field_name = field["name"]
+        if (
+            field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
+            and field_name not in fields_protected_by_tags
+            and (value := note_fields_dict.get(field_name))
+        ):
+            result.append(
+                Field(
+                    name=field_name,
+                    order=field["ord"],
+                    value=_prepared_field_html(value),
+                )
+            )
+
     return result
 
 

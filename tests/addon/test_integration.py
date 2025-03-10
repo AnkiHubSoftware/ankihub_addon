@@ -1520,7 +1520,6 @@ class TestSuggestNotesInBulk:
                         anki_nid=new_note.id,
                         fields=[
                             Field(name="Front", order=0, value="front"),
-                            Field(name="Back", order=1, value=""),
                         ],
                         tags=[],
                         guid=new_note.guid,
