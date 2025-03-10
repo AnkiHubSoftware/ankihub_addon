@@ -40,6 +40,7 @@ from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError
 from .models import (
     AnkiHubNote,
@@ -134,14 +135,18 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         note_dicts = []
         for note_data in notes_data:
-
             # Prepare fields and tags for insertion
-            fields = join_fields(
-                [
-                    field.value
-                    for field in sorted(note_data.fields, key=lambda field: field.order)
-                ]
-            )
+            field_values = []
+            for field_name in self.note_type_field_names(
+                ankihub_did=ankihub_did, anki_note_type_id=NotetypeId(note_data.mid)
+            ):
+                if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
+                    continue
+                field = next(
+                    (f for f in note_data.fields if f.name == field_name), None
+                )
+                field_values.append(field.value if field else "")
+            fields = join_fields(field_values)
             tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
             note_dicts.append(
@@ -638,9 +643,15 @@ class _AnkiHubDB:
         """Returns the names of the fields of the note type."""
         result = [
             field["name"]
-            for field in self.note_type_dict(
-                ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-            )["flds"]
+            for field in sorted(
+                (
+                    field
+                    for field in self.note_type_dict(
+                        ankihub_did=ankihub_did, note_type_id=anki_note_type_id
+                    )["flds"]
+                ),
+                key=lambda f: f["ord"],
+            )
         ]
         return result
 
