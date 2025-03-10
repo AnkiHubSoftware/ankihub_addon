@@ -102,6 +102,7 @@ from ..fixtures import (
     MockSuggestionDialog,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
+    add_field_to_local_note_type,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
     note_type_with_field_names,
@@ -1495,10 +1496,15 @@ class TestSuggestNotesInBulk:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
-            # Add a new note
+            # Add a new note where the note type has an extra local field which should be ignored
             note_type = import_ah_note_type(ah_did=ah_did)
+            add_field_to_local_note_type(
+                note_type=note_type, field_name="New Field", position=1
+            )
+
             new_note = add_anki_note(note_type=note_type)
             new_note["Front"] = "front"
+            new_note["New Field"] = "new_field"
 
             ah_nid = next_deterministic_uuid()
             mocker.patch("uuid.uuid4", return_value=ah_nid)
@@ -1561,10 +1567,18 @@ class TestSuggestNotesInBulk:
             ah_did = install_ah_deck()
 
             ah_note = import_ah_note(ah_did=ah_did)
+
+            # Update note type to add an extra local field which should be ignored
+            note_type = aqt.mw.col.models.get(NotetypeId(ah_note.mid))
+            add_field_to_local_note_type(
+                note_type=note_type, field_name="New Field", position=1
+            )
+
             changed_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
             if note_has_changes:
                 changed_note["Front"] = "new front"
+                changed_note["New Field"] = "new_field"
                 changed_note.tags += ["test"]
                 changed_note.flush()
 

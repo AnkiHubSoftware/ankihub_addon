@@ -6,6 +6,7 @@ import re
 import uuid
 from typing import List, Optional
 
+from anki.models import NotetypeId
 from anki.notes import Note
 
 from ..ankihub_client import Field, NoteInfo
@@ -48,7 +49,7 @@ def _prepare_fields(note: Note) -> List[Field]:
         # Using mid from the AnkiHub DB if available (for change note suggestions),
         # because note type might have been changed in the Anki DB.
         # For new note suggestions we use the note's mid.
-        note_type_id=note_data.mid
+        note_type_id=NotetypeId(note_data.mid)
         if note_data
         else note.mid
     )

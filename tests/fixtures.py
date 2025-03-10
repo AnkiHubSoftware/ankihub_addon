@@ -741,3 +741,11 @@ def note_type_with_field_names(field_names: List[str]) -> NotetypeDict:
     note_type["tmpls"] = [template]
 
     return note_type
+
+
+def add_field_to_local_note_type(
+    note_type: NotetypeDict, field_name: str, position: int
+) -> None:
+    new_field = aqt.mw.col.models.new_field(field_name)
+    note_type["flds"].insert(position, new_field)
+    aqt.mw.col.models.update_dict(note_type)
