@@ -5047,7 +5047,10 @@ class TestSyncWithAnkiHub:
                 assert not cards_of_note_are_unsuspended()
 
     def test_exception_is_not_backpropagated_to_caller(
-        self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a client function which is called in sync_with_ankihub to raise an exception.
@@ -5068,6 +5071,8 @@ class TestSyncWithAnkiHub:
 
             # Call sync_with_ankihub. This shouldn't raise an exception.
             ankihub_sync.sync_with_ankihub(on_done=on_done)
+
+            qtbot.wait_until(lambda: future is not None)
 
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
