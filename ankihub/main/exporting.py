@@ -44,15 +44,7 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
 
 
 def _prepare_fields(note: Note) -> List[Field]:
-    note_data = ankihub_db.note_data(note.id)
-    note_type = ankihub_db.note_type_dict(
-        # Using mid from the AnkiHub DB if available (for change note suggestions),
-        # because note type might have been changed in the Anki DB.
-        # For new note suggestions we use the note's mid.
-        note_type_id=NotetypeId(note_data.mid)
-        if note_data
-        else note.mid
-    )
+    note_type = ankihub_db.note_type_dict(note_type_id=NotetypeId(note.mid))
     if note_type is None:
         # When creating a deck the note type is not yet in the AnkiHub DB
         note_type = note.note_type()
