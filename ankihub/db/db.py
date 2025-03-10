@@ -34,7 +34,7 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from peewee import DQ
+from peewee import DQ, SqliteDatabase
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
@@ -90,6 +90,10 @@ class _AnkiHubDB:
 
             migrate_ankihub_db()
             bind_peewee_models()
+
+    @property
+    def db(self) -> SqliteDatabase:
+        return get_peewee_database()
 
     def schema_version(self) -> int:
         return get_peewee_database().pragma("user_version")
@@ -164,7 +168,7 @@ class _AnkiHubDB:
 
         # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
         # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             for chunk in chunks(note_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
                 AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
@@ -216,7 +220,7 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             execute_modifying_query_in_chunks(
                 lambda ah_nids: (
                     AnkiHubNote.delete()
@@ -253,7 +257,7 @@ class _AnkiHubDB:
             note = AnkiHubNote(ankihub_note_id=note_data.ah_nid, mod=mod)
             notes.append(note)
 
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each entry. The purpose is to avoid the "too many SQL variables" error.
             AnkiHubNote.bulk_update(
@@ -434,7 +438,7 @@ class _AnkiHubDB:
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             AnkiHubNote.delete().where(
                 AnkiHubNote.ankihub_deck_id == ankihub_did
             ).execute()
@@ -480,7 +484,7 @@ class _AnkiHubDB:
             for deck_media in media_list
         ]
 
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
             for chunk in chunks(deck_media_dicts, int(DEFAULT_CHUNK_SIZE / 10)):

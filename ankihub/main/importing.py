@@ -312,13 +312,15 @@ class AnkiHubImporter:
     def _import_note_types_into_ankihub_db(
         self, note_types: Dict[NotetypeId, NotetypeDict]
     ) -> None:
-        if self._clear_note_types_before_import:
-            ankihub_db.remove_note_types_of_deck(self._ankihub_did)
 
-        for note_type in note_types.values():
-            ankihub_db.upsert_note_type(
-                ankihub_did=self._ankihub_did, note_type=note_type
-            )
+        with ankihub_db.db.atomic():
+            if self._clear_note_types_before_import:
+                ankihub_db.remove_note_types_of_deck(self._ankihub_did)
+
+            for note_type in note_types.values():
+                ankihub_db.upsert_note_type(
+                    ankihub_did=self._ankihub_did, note_type=note_type
+                )
 
     def _import_notes(
         self,
