@@ -674,19 +674,27 @@ class DeckManagementDialog(QDialog):
     ) -> List[NotetypeNameId]:
         """
         Returns a sorted list of note type names and IDs filtered by whether they are assigned to the deck.
+        For AnkiHub note types, the name from the AnkiHub DB is returned, even if it's different in Anki.
 
         Args:
             deck_id: The ID of the selected AnkiHub deck.
             assigned_to_deck: If True, return note types that are already assigned to the deck.
                             If False, return note types that are not yet assigned.
         """
-        mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+        if assigned_to_deck:
+            names_and_ids = [
+                NotetypeNameId(name=name, id=id)
+                for name, id in ankihub_db.note_type_names_and_ids_for_ankihub_deck(
+                    deck_id
+                )
+            ]
+        else:
+            mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+            names_and_ids = [
+                n for n in aqt.mw.col.models.all_names_and_ids() if n.id not in mids
+            ]
         return sorted(
-            (
-                n
-                for n in aqt.mw.col.models.all_names_and_ids()
-                if (NotetypeId(n.id) in mids) == assigned_to_deck
-            ),
+            names_and_ids,
             key=lambda n: n.name,
         )
 
@@ -736,7 +744,8 @@ class DeckManagementDialog(QDialog):
         ) -> None:
             if not note_type_selector.name:
                 return
-            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
             new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
             new_fields = choose_subset(
                 prompt="<b>Select fields to publish</b>",
@@ -781,7 +790,8 @@ class DeckManagementDialog(QDialog):
             if not note_type_selector.name:
                 return
 
-            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
 
             if note_type_had_templates_added_or_removed(note_type=note_type):
                 dialog = show_dialog(

@@ -613,6 +613,13 @@ class _AnkiHubDB:
             .scalar()
         )
 
+    def note_type_id_by_name(self, name: str) -> Optional[NotetypeId]:
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
+            .filter(AnkiHubNoteType.name == name)
+            .scalar()
+        )
+
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
         return AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).objects(flat)
 
@@ -628,6 +635,17 @@ class _AnkiHubDB:
             AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
             .filter(ankihub_deck_id=ankihub_did)
             .objects(flat)
+        )
+
+    def note_type_names_and_ids_for_ankihub_deck(
+        self, ankihub_did: uuid.UUID
+    ) -> List[Tuple[str, NotetypeId]]:
+        return (
+            AnkiHubNoteType.select(
+                AnkiHubNoteType.name, AnkiHubNoteType.anki_note_type_id
+            )
+            .filter(ankihub_deck_id=ankihub_did)
+            .objects(lambda name, anki_note_type_id: (name, anki_note_type_id))
         )
 
     def ankihub_did_for_note_type(self, anki_note_type_id: NotetypeId) -> uuid.UUID:
