@@ -1740,6 +1740,18 @@ class TestAdjustNoteTypes:
                 ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
                 ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
             ),
+            # Same as previous, with field names in different case
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "extra", "text"],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Same as previous, with field names in yet different case
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "EXTRA", "TEXT"],
+                ["text", "extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["text", "extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
             # The order of the fields differs, and local note type has an extra field
             (
                 [ANKIHUB_NOTE_TYPE_FIELD_NAME, "Extra", "Text"],
@@ -1801,19 +1813,49 @@ class TestAdjustNoteTypes:
             # Reload the note to check field content preservation
             updated_note = aqt.mw.col.get_note(note.id)
 
-            # Assert that the field contents of the note are correct
-            expected_values = {}
-            for field_name in local_field_names:
-                expected_values[field_name] = field_name
-            added_field_names = [
-                name for name in expected_field_names if name not in local_field_names
-            ]
-            for field_name in added_field_names:
-                expected_values[field_name] = ""
-
+            expected_fields = self._build_expected_fields(
+                local_field_names, expected_field_names, remote_note_type
+            )
             assert (
-                dict(updated_note.items()) == expected_values
+                dict(updated_note.items()) == expected_fields
             ), "Field contents were not preserved correctly"
+
+    def _build_expected_fields(
+        self,
+        local_field_names: List[str],
+        expected_field_names: List[str],
+        remote_note_type: NotetypeDict,
+    ) -> Dict[str, str]:
+        def with_casing_from_remote_note_type(field_name: str) -> str:
+            # The field name is normalized to match the field name in the remote note type,
+            # if it exists.
+            remote_note_type_field_names = [
+                field["name"] for field in remote_note_type["flds"]
+            ]
+            return next(
+                (
+                    name
+                    for name in remote_note_type_field_names
+                    if field_name.lower() == name.lower()
+                ),
+                field_name,
+            )
+
+        result = {}
+        for field_name in local_field_names:
+            result[with_casing_from_remote_note_type(field_name)] = field_name
+        added_field_names = [
+            name
+            for name in expected_field_names
+            if with_casing_from_remote_note_type(name)
+            not in [
+                with_casing_from_remote_note_type(name) for name in local_field_names
+            ]
+        ]
+        for field_name in added_field_names:
+            result[with_casing_from_remote_note_type(field_name)] = ""
+
+        return result
 
     @pytest.mark.parametrize("raise_if_full_sync_required", [True, False])
     def test_adjusts_multiple_note_types(

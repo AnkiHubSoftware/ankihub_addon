@@ -256,7 +256,7 @@ class AnkiHubImporter:
             )
 
         for local_note_type, remote_note_type in note_types_with_field_conflicts:
-            local_note_type["flds"] = _adjust_field_ords(
+            local_note_type["flds"] = _adjust_fields(
                 local_note_type["flds"], remote_note_type["flds"]
             )
             aqt.mw.col.models.update_dict(local_note_type)
@@ -918,7 +918,7 @@ def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
             LOGGER.info("Renamed note type.", mid=mid, name=remote_note_type["name"])
 
 
-def _adjust_field_ords(
+def _adjust_fields(
     cur_model_fields: List[Dict], new_model_fields: List[Dict]
 ) -> List[Dict]:
     """
