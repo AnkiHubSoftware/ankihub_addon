@@ -102,8 +102,10 @@ from ..fixtures import (
     MockSuggestionDialog,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
+    add_field_to_local_note_type,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
+    note_type_with_field_names,
     record_review,
     record_review_for_anki_nid,
 )
@@ -1494,10 +1496,15 @@ class TestSuggestNotesInBulk:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
-            # Add a new note
+            # Add a new note where the note type has an extra local field which should be ignored
             note_type = import_ah_note_type(ah_did=ah_did)
+            add_field_to_local_note_type(
+                note_type=note_type, field_name="New Field", position=1
+            )
+
             new_note = add_anki_note(note_type=note_type)
             new_note["Front"] = "front"
+            new_note["New Field"] = "new_field"
 
             ah_nid = next_deterministic_uuid()
             mocker.patch("uuid.uuid4", return_value=ah_nid)
@@ -1519,7 +1526,6 @@ class TestSuggestNotesInBulk:
                         anki_nid=new_note.id,
                         fields=[
                             Field(name="Front", order=0, value="front"),
-                            Field(name="Back", order=1, value=""),
                         ],
                         tags=[],
                         guid=new_note.guid,
@@ -1561,10 +1567,18 @@ class TestSuggestNotesInBulk:
             ah_did = install_ah_deck()
 
             ah_note = import_ah_note(ah_did=ah_did)
+
+            # Update note type to add an extra local field which should be ignored
+            note_type = aqt.mw.col.models.get(NotetypeId(ah_note.mid))
+            add_field_to_local_note_type(
+                note_type=note_type, field_name="New Field", position=1
+            )
+
             changed_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
             if note_has_changes:
                 changed_note["Front"] = "new front"
+                changed_note["New Field"] = "new_field"
                 changed_note.tags += ["test"]
                 changed_note.flush()
 
@@ -1693,54 +1707,209 @@ class TestSuggestNotesInBulk:
             )
 
 
-@pytest.mark.parametrize("raise_if_full_sync_required", [True, False])
-def test_adjust_note_types(
-    anki_session_with_addon_data: AnkiSession, raise_if_full_sync_required: bool
-):
-    anki_session = anki_session_with_addon_data
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
+class TestAdjustNoteTypes:
+    @pytest.mark.parametrize(
+        "local_field_names, remote_field_names, expected_field_names",
+        [
+            # No changes
+            (
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Remote note type has an extra field
+            (
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Local note type has an extra field
+            (
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Remote note type has an extra field, and local note type has an extra field
+            (
+                ["Text", "Lecture Notes", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", "Lecture Notes", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # The order of the fields differs
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "Extra", "Text"],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Same as previous, with field names in different case
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "extra", "text"],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Same as previous, with field names in yet different case
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "EXTRA", "TEXT"],
+                ["text", "extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["text", "extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # The order of the fields differs, and local note type has an extra field
+            (
+                [ANKIHUB_NOTE_TYPE_FIELD_NAME, "Extra", "Text"],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Local field is after ankihub_id field
+            (
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME, "Extra"],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", "Extra", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+            # Local-only field positioned before remote field (no adjustment needed)
+            (
+                ["Extra", "Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ["Extra", "Text", ANKIHUB_NOTE_TYPE_FIELD_NAME],
+            ),
+        ],
+    )
+    def test_align_local_fields_with_remote(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        local_field_names: List[str],
+        remote_field_names: List[str],
+        expected_field_names: List[str],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Create the note type with local field structure
+            local_note_type = note_type_with_field_names(local_field_names)
+            local_note_type = import_ah_note_type(local_note_type, force_new=True)
+            mid = local_note_type["id"]
 
-        # for testing creating missing note type
-        ankihub_basic_1 = copy.deepcopy(mw.col.models.by_name("Basic"))
-        ankihub_basic_1["id"] = 1
-        ankihub_basic_1["name"] = "AnkiHub Basic 1"
-        ankihub_basic_1 = modified_note_type(ankihub_basic_1)
+            # Create a note with field values that match the field names for easy verification
+            note = aqt.mw.col.new_note(local_note_type)
+            for field_name in local_field_names:
+                note[field_name] = field_name
+            aqt.mw.col.add_note(note, DeckId(1))
 
-        # for testing updating existing note type
-        ankihub_basic_2 = copy.deepcopy(mw.col.models.by_name("Basic"))
-        ankihub_basic_2["name"] = "AnkiHub Basic 2"
-        ankihub_basic_2 = modified_note_type(ankihub_basic_2)
-        # ... save the note type
-        ankihub_basic_2["id"] = 0
-        changes = mw.col.models.add_dict(ankihub_basic_2)
-        ankihub_basic_2["id"] = changes.id
-        # ... then add a field
-        new_field = mw.col.models.new_field("foo")
-        new_field["ord"] = 2
-        mw.col.models.add_field(ankihub_basic_2, new_field)
-        # ... and change the name
-        ankihub_basic_2["name"] = "AnkiHub Basic 2 (new)"
+            # Prepare remote note type for import
+            remote_note_type = note_type_with_field_names(remote_field_names)
+            remote_note_type["id"] = mid
+            importer = AnkiHubImporter()
+            importer._raise_if_full_sync_required = False
+            remote_note_types = {
+                mid: remote_note_type,
+            }
 
-        remote_note_types = {
-            ankihub_basic_1["id"]: ankihub_basic_1,
-            ankihub_basic_2["id"]: ankihub_basic_2,
-        }
-        importer = AnkiHubImporter()
-        importer._raise_if_full_sync_required = raise_if_full_sync_required
+            # Perform the note type adjustment
+            importer._adjust_note_types_in_anki_db(remote_note_types=remote_note_types)
 
-        if raise_if_full_sync_required:
-            with pytest.raises(ChangesRequireFullSyncError):
-                importer._adjust_note_types_in_anki_db(remote_note_types)
-        else:
-            importer._adjust_note_types_in_anki_db(remote_note_types)
+            # Verify field structure was updated correctly
+            updated_note_type = aqt.mw.col.models.get(mid)
+            assert [
+                field["name"] for field in updated_note_type["flds"]
+            ] == expected_field_names
 
-            assert mw.col.models.by_name("AnkiHub Basic 1") is not None
-            assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
-            assert (
-                mw.col.models.get(ankihub_basic_2["id"])["name"]
-                == "AnkiHub Basic 2 (new)"
+            # Reload the note to check field content preservation
+            updated_note = aqt.mw.col.get_note(note.id)
+
+            expected_fields = self._build_expected_fields(
+                local_field_names, expected_field_names, remote_note_type
             )
+            assert (
+                dict(updated_note.items()) == expected_fields
+            ), "Field contents were not preserved correctly"
+
+    def _build_expected_fields(
+        self,
+        local_field_names: List[str],
+        expected_field_names: List[str],
+        remote_note_type: NotetypeDict,
+    ) -> Dict[str, str]:
+        def with_casing_from_remote_note_type(field_name: str) -> str:
+            # The field name is normalized to match the field name in the remote note type,
+            # if it exists.
+            remote_note_type_field_names = [
+                field["name"] for field in remote_note_type["flds"]
+            ]
+            return next(
+                (
+                    name
+                    for name in remote_note_type_field_names
+                    if field_name.lower() == name.lower()
+                ),
+                field_name,
+            )
+
+        result = {}
+        for field_name in local_field_names:
+            result[with_casing_from_remote_note_type(field_name)] = field_name
+        added_field_names = [
+            name
+            for name in expected_field_names
+            if with_casing_from_remote_note_type(name)
+            not in [
+                with_casing_from_remote_note_type(name) for name in local_field_names
+            ]
+        ]
+        for field_name in added_field_names:
+            result[with_casing_from_remote_note_type(field_name)] = ""
+
+        return result
+
+    @pytest.mark.parametrize("raise_if_full_sync_required", [True, False])
+    def test_adjusts_multiple_note_types(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        raise_if_full_sync_required: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            # for testing creating missing note type
+            ankihub_basic_1 = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
+            ankihub_basic_1["id"] = 1
+            ankihub_basic_1["name"] = "AnkiHub Basic 1"
+            ankihub_basic_1 = modified_note_type(ankihub_basic_1)
+
+            # for testing updating existing note type
+            ankihub_basic_2 = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
+            ankihub_basic_2["name"] = "AnkiHub Basic 2"
+            ankihub_basic_2 = modified_note_type(ankihub_basic_2)
+            # ... save the note type
+            ankihub_basic_2["id"] = 0
+            changes = aqt.mw.col.models.add_dict(ankihub_basic_2)
+            ankihub_basic_2["id"] = changes.id
+            # ... then add a field
+            new_field = aqt.mw.col.models.new_field("foo")
+            new_field["ord"] = 2
+            aqt.mw.col.models.add_field(ankihub_basic_2, new_field)
+            # ... and change the name
+            ankihub_basic_2["name"] = "AnkiHub Basic 2 (new)"
+
+            remote_note_types = {
+                ankihub_basic_1["id"]: ankihub_basic_1,
+                ankihub_basic_2["id"]: ankihub_basic_2,
+            }
+            importer = AnkiHubImporter()
+            importer._raise_if_full_sync_required = raise_if_full_sync_required
+
+            if raise_if_full_sync_required:
+                with pytest.raises(ChangesRequireFullSyncError):
+                    importer._adjust_note_types_in_anki_db(remote_note_types)
+            else:
+                importer._adjust_note_types_in_anki_db(remote_note_types)
+
+                assert aqt.mw.col.models.by_name("AnkiHub Basic 1") is not None
+                assert (
+                    aqt.mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"]
+                    == "foo"
+                )
+                assert (
+                    aqt.mw.col.models.get(ankihub_basic_2["id"])["name"]
+                    == "AnkiHub Basic 2 (new)"
+                )
 
 
 def test_reset_note_types_of_notes(anki_session_with_addon_data: AnkiSession):

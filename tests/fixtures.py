@@ -317,6 +317,7 @@ def import_ah_note_type(
         note_type: Optional[NotetypeDict] = None,
         ah_did: Optional[uuid.UUID] = None,
         force_new: bool = False,
+        raise_if_full_sync_required=False,
     ) -> NotetypeDict:
         if note_type is None:
             note_type = copy.deepcopy(default_note_type)
@@ -342,6 +343,7 @@ def import_ah_note_type(
                 ah_did
             ),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+            raise_if_full_sync_required=raise_if_full_sync_required,
         )
         return note_type
 
@@ -727,3 +729,25 @@ def assert_datetime_equal_ignore_milliseconds(dt1: datetime, dt2: datetime) -> N
     dt1 = dt1.replace(microsecond=dt1.microsecond // 1000 * 1000)
     dt2 = dt2.replace(microsecond=dt2.microsecond // 1000 * 1000)
     assert dt1 == dt2
+
+
+def note_type_with_field_names(field_names: List[str]) -> NotetypeDict:
+    note_type = aqt.mw.col.models.new("test note type")
+    for idx, field_name in enumerate(field_names):
+        field = aqt.mw.col.models.new_field(field_name)
+        field["ord"] = idx
+        aqt.mw.col.models.add_field(note_type, field)
+
+    template = aqt.mw.col.models.new_template("Card 1")
+    template["qfmt"] = "{{" + field_names[0] + "}}"
+    note_type["tmpls"] = [template]
+
+    return note_type
+
+
+def add_field_to_local_note_type(
+    note_type: NotetypeDict, field_name: str, position: int
+) -> None:
+    new_field = aqt.mw.col.models.new_field(field_name)
+    note_type["flds"].insert(position, new_field)
+    aqt.mw.col.models.update_dict(note_type)

@@ -643,12 +643,7 @@ class _AnkiHubDB:
         result = [
             field["name"]
             for field in sorted(
-                (
-                    field
-                    for field in self.note_type_dict(note_type_id=anki_note_type_id)[
-                        "flds"
-                    ]
-                ),
+                (field for field in self.note_type_dict(anki_note_type_id)["flds"]),
                 key=lambda f: f["ord"],
             )
         ]
