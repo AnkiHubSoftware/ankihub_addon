@@ -613,20 +613,23 @@ class DeckManagementDialog(QDialog):
             button.setToolTip("Nothing to update to AnkiHub")
 
     def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
-        ah_note_type_names = self._get_note_type_names_for_deck(
+        note_type_names_for_deck = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=True
         )
         other_note_type_names = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=False
         )
-        ah_note_type_names_without_ah_modifications = {
+        note_type_names_for_deck_without_ah_modifcations = {
             note_type_name_without_ankihub_modifications(name)
-            for name in ah_note_type_names
+            for name in note_type_names_for_deck
         }
         names = [
             name
             for name in other_note_type_names
-            if name not in ah_note_type_names_without_ah_modifications
+            if (
+                note_type_name_without_ankihub_modifications(name)
+                not in note_type_names_for_deck_without_ah_modifcations
+            )
         ]
         return names
 
