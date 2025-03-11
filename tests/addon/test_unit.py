@@ -1303,10 +1303,9 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
         note_info = NoteInfoFactory.create(
             mid=self.mid,
             fields=[
-                Field(value="test <img src='test1.jpg'>", order=0, name="Front"),
+                Field(value="test <img src='test1.jpg'>", name="Front"),
                 Field(
                     value="test <img src='test2.jpg'> [sound:test3.mp3]",
-                    order=1,
                     name="Back",
                 ),
             ],

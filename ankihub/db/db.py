@@ -345,7 +345,6 @@ class _AnkiHubDB:
                         i
                     ],
                     value=value,
-                    order=i,
                 )
                 for i, value in enumerate(split_fields(cast(str, note.fields)))
             ],
