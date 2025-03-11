@@ -9,6 +9,8 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
+from aqt import gui_hooks
+from aqt.operations import OpChanges
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
@@ -139,6 +141,17 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
         sync_with_ankiweb(on_done=partial(on_done, future=future_with_result(None)))
     else:
         on_done(future_with_result(None))
+
+    changes = OpChanges(
+        notetype=True,
+        note=True,
+        note_text=True,
+        browser_sidebar=True,
+    )
+    gui_hooks.operation_did_execute(
+        changes=changes,
+        handler=None,
+    )
 
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
