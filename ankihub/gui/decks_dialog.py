@@ -613,20 +613,23 @@ class DeckManagementDialog(QDialog):
             button.setToolTip("Nothing to update to AnkiHub")
 
     def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
-        ah_note_type_names = self._get_note_type_names_for_deck(
+        note_type_names_for_deck = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=True
         )
         other_note_type_names = self._get_note_type_names_for_deck(
             self._selected_ah_did(), assigned_to_deck=False
         )
-        ah_note_type_names_without_ah_modifications = {
+        note_type_names_for_deck_without_ah_modifcations = {
             note_type_name_without_ankihub_modifications(name)
-            for name in ah_note_type_names
+            for name in note_type_names_for_deck
         }
         names = [
             name
             for name in other_note_type_names
-            if name not in ah_note_type_names_without_ah_modifications
+            if (
+                note_type_name_without_ankihub_modifications(name)
+                not in note_type_names_for_deck_without_ah_modifcations
+            )
         ]
         return names
 
@@ -671,19 +674,27 @@ class DeckManagementDialog(QDialog):
     ) -> List[NotetypeNameId]:
         """
         Returns a sorted list of note type names and IDs filtered by whether they are assigned to the deck.
+        For AnkiHub note types, the name from the AnkiHub DB is returned, even if it's different in Anki.
 
         Args:
             deck_id: The ID of the selected AnkiHub deck.
             assigned_to_deck: If True, return note types that are already assigned to the deck.
                             If False, return note types that are not yet assigned.
         """
-        mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+        if assigned_to_deck:
+            names_and_ids = [
+                NotetypeNameId(name=name, id=id)
+                for name, id in ankihub_db.note_type_names_and_ids_for_ankihub_deck(
+                    deck_id
+                )
+            ]
+        else:
+            mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+            names_and_ids = [
+                n for n in aqt.mw.col.models.all_names_and_ids() if n.id not in mids
+            ]
         return sorted(
-            (
-                n
-                for n in aqt.mw.col.models.all_names_and_ids()
-                if (NotetypeId(n.id) in mids) == assigned_to_deck
-            ),
+            names_and_ids,
             key=lambda n: n.name,
         )
 
@@ -733,7 +744,8 @@ class DeckManagementDialog(QDialog):
         ) -> None:
             if not note_type_selector.name:
                 return
-            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
             new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
             new_fields = choose_subset(
                 prompt="<b>Select fields to publish</b>",
@@ -778,7 +790,8 @@ class DeckManagementDialog(QDialog):
             if not note_type_selector.name:
                 return
 
-            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
 
             if note_type_had_templates_added_or_removed(note_type=note_type):
                 dialog = show_dialog(
