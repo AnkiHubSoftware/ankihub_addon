@@ -48,7 +48,6 @@ class DataClassJSONMixinWithConfig(DataClassJSONMixin):
 @dataclass
 class Field(DataClassJSONMixinWithConfig):
     name: str
-    order: int
     value: str
 
 

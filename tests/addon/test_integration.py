@@ -929,8 +929,8 @@ def test_create_collaborative_deck_and_upload(
             ah_nid=ah_nid,
             anki_nid=note.id,
             fields=[
-                Field(name="Front", value="front", order=0),
-                Field(name="Back", value="back", order=1),
+                Field(name="Front", value="front"),
+                Field(name="Back", value="back"),
             ],
             tags=[],
             mid=note.mid,
@@ -1410,7 +1410,7 @@ def test_suggest_note_update(
                 anki_nid=note.id,
                 ah_nid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
-                fields=[Field(name="Front", value="updated", order=0)],
+                fields=[Field(name="Front", value="updated")],
                 # Even though the tag comparison is case-insensitive (e.g. the "stays" -> "STAYS" change is not sent),
                 # the tags should be sent in the same case as they are in the note when a new tag is added.
                 added_tags=["added" if not change_tags_to_upper_case else "ADDED"],
@@ -1525,7 +1525,7 @@ class TestSuggestNotesInBulk:
                         ah_nid=ah_nid,
                         anki_nid=new_note.id,
                         fields=[
-                            Field(name="Front", order=0, value="front"),
+                            Field(name="Front", value="front"),
                         ],
                         tags=[],
                         guid=new_note.guid,
@@ -1606,7 +1606,6 @@ class TestSuggestNotesInBulk:
                             fields=[
                                 Field(
                                     name="Front",
-                                    order=0,
                                     value="new front",
                                 ),
                             ],
@@ -2860,7 +2859,7 @@ class TestAnkiHubImporter:
             note_info = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 mid=mid,
-                fields=[Field(name="Front", value="f", order=0)],
+                fields=[Field(name="Front", value="f")],
             )
             self._import_notes(
                 [note_info],
@@ -2874,8 +2873,8 @@ class TestAnkiHubImporter:
                 anki_nid=anki_nid,
                 mid=mid,
                 fields=[
-                    Field(name="Front", value="f", order=0),
-                    Field(name="Back", value="", order=1),
+                    Field(name="Front", value="f"),
+                    Field(name="Back", value=""),
                 ],
             )
             assert ankihub_db.note_data(anki_nid) == expected_note_info
@@ -2895,8 +2894,8 @@ class TestAnkiHubImporter:
                 anki_nid=anki_nid,
                 mid=mid,
                 fields=[
-                    Field(name="Front", value="f", order=0),
-                    Field(name="Back", value="b", order=1),
+                    Field(name="Front", value="f"),
+                    Field(name="Back", value="b"),
                 ],
             )
             self._import_notes(
@@ -2909,7 +2908,7 @@ class TestAnkiHubImporter:
             note_info = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 mid=mid,
-                fields=[Field(name="Front", value="f", order=0)],
+                fields=[Field(name="Front", value="f")],
             )
             self._import_notes(
                 [note_info],
@@ -2923,8 +2922,8 @@ class TestAnkiHubImporter:
                 anki_nid=anki_nid,
                 mid=mid,
                 fields=[
-                    Field(name="Front", value="f", order=0),
-                    Field(name="Back", value="", order=1),
+                    Field(name="Front", value="f"),
+                    Field(name="Back", value=""),
                 ],
             )
             assert ankihub_db.note_data(anki_nid) == expected_note_info
@@ -3054,7 +3053,7 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         note_data = NoteInfoFactory.create(
             anki_nid=note.id,
             ah_nid=ah_nid,
-            fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
+            fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}")],
             mid=ankihub_cloze["id"],
         )
         import_ah_note(note_data=note_data, mid=ankihub_cloze["id"], ah_did=ah_did)
@@ -3251,8 +3250,8 @@ class TestPrepareNote:
             ankihub_nid = next_deterministic_uuid()
 
             new_fields = [
-                Field(name="Front", value="new front", order=0),
-                Field(name="Back", value="new back", order=1),
+                Field(name="Front", value="new front"),
+                Field(name="Back", value="new back"),
             ]
             new_tags = ["c", "d"]
 
@@ -3297,7 +3296,7 @@ class TestPrepareNote:
             note["Front"] = "old front"
             note_was_changed_6 = prepare_note(
                 note,
-                fields=[Field(name="Front", value="new front", order=0)],
+                fields=[Field(name="Front", value="new front")],
             )
             assert not note_was_changed_6
             assert note["Front"] == "old front"
@@ -3308,8 +3307,8 @@ class TestPrepareNote:
             note_was_changed_7 = prepare_note(
                 note,
                 fields=[
-                    Field(name="Front", value="new front", order=0),
-                    Field(name="Back", value="new back", order=1),
+                    Field(name="Front", value="new front"),
+                    Field(name="Back", value="new back"),
                 ],
             )
             assert not note_was_changed_7
@@ -3322,8 +3321,8 @@ class TestPrepareNote:
             note_was_changed_7 = prepare_note(
                 note,
                 fields=[
-                    Field(name="Front", value="new front", order=0),
-                    Field(name="Back", value="new back", order=1),
+                    Field(name="Front", value="new front"),
+                    Field(name="Back", value="new back"),
                 ],
             )
             assert not note_was_changed_7
@@ -3375,7 +3374,7 @@ class TestPrepareNote:
             note_changed = prepare_note(
                 note=note,
                 ankihub_nid=ankihub_nid,
-                fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
+                fields=[Field(name=field_name_with_spaces, value="new front")],
             )
             assert not note_changed
             assert note[field_name_with_spaces] == "old field name with spaces"
@@ -3388,7 +3387,7 @@ class TestPrepareNote:
             note_changed = prepare_note(
                 note=note,
                 ankihub_nid=ankihub_nid,
-                fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
+                fields=[Field(name=field_name_with_spaces, value="new front")],
             )
             assert note_changed
             assert note[field_name_with_spaces] == "new front"
@@ -3414,7 +3413,7 @@ def prepare_note(
     for field_name in note.keys():
         field = next((f for f in fields if f.name == field_name), None)
         if not field:
-            field = Field(name=field_name, order=0, value=note[field_name])
+            field = Field(name=field_name, value=note[field_name])
             fields.append(field)
 
     note_data = NoteInfo(
@@ -4420,7 +4419,6 @@ class TestBuildSubdecksAndMoveCardsToThem:
                 FilteredDeckConfig.SearchTerm(
                     search="deck:Testdeck",
                     limit=100,
-                    order=0,  # type: ignore
                 )
             )
             mw.col.sched.add_or_update_filtered_deck(filtered_deck)
@@ -5889,9 +5887,10 @@ class TestSuggestionsWithMedia:
             import_ah_note(
                 note_data=NoteInfoFactory.create(
                     fields=[
-                        Field(name="Front", value="front", order=0),
+                        Field(name="Front", value="front"),
                         Field(
-                            name="Back", value=f"[sound:{existing_media_name}]", order=1
+                            name="Back",
+                            value=f"[sound:{existing_media_name}]",
                         ),
                     ]
                 )
