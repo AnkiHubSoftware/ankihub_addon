@@ -63,7 +63,6 @@ def _prepare_fields(note: Note) -> List[Field]:
             result.append(
                 Field(
                     name=field_name,
-                    order=field["ord"],
                     value=_prepared_field_html(value),
                 )
             )
