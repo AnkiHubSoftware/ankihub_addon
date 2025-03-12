@@ -783,7 +783,6 @@ def refresh_anki_ui() -> None:
         note_text=True,
         browser_table=True,
         browser_sidebar=True,
-        deck=True,
         study_queues=True,
     )
     # Anki's UI componennts subscribe to this hook to refresh themselves when needed.
