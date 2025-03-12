@@ -1,3 +1,4 @@
+import copy
 import uuid
 from typing import List
 
@@ -38,6 +39,7 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
 def add_note_type_fields(
     ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
 ) -> NotetypeDict:
+    note_type = copy.deepcopy(note_type)
     ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
     existing_ah_field_names = set(field["name"] for field in ah_note_type["flds"])
