@@ -142,19 +142,21 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     else:
         on_done(future_with_result(None))
 
+    LOGGER.info("Sync with AnkiHub done.")
+    config.log_private_config()
+
+    # Refresh Anki UI
     changes = OpChanges(
         notetype=True,
         note=True,
         note_text=True,
+        browser_table=True,
         browser_sidebar=True,
     )
     gui_hooks.operation_did_execute(
         changes=changes,
         handler=None,
     )
-
-    LOGGER.info("Sync with AnkiHub done.")
-    config.log_private_config()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
