@@ -10,7 +10,7 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
-from aqt.qt import qconnect
+from aqt.qt import QTimer, qconnect
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
@@ -223,7 +223,7 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
-    refresh_anki_ui()
+    QTimer.singleShot(500, lambda: refresh_anki_ui())
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
