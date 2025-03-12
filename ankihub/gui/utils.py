@@ -1,6 +1,7 @@
 import inspect
 import uuid
 from functools import partial
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
@@ -11,6 +12,7 @@ from aqt.addons import check_and_prompt_for_updates
 from aqt.operations import OpChanges
 from aqt.progress import ProgressDialog
 from aqt.qt import (
+    QAbstractAnimation,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -20,20 +22,46 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QPropertyAnimation,
     QPushButton,
     QScrollArea,
     QSize,
+    QSizePolicy,
     QStyle,
     Qt,
+    QToolButton,
     QVBoxLayout,
     QWidget,
+    pyqtSlot,
     qconnect,
 )
+from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, tooltip
 
 from .. import LOGGER
 from ..settings import config
+
+ICONS_PATH = Path(__file__).parent / "icons"
+
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
+def add_button_from_param(
+    button_box: QDialogButtonBox, button: ButtonParam
+) -> QPushButton:
+    if isinstance(button, str):
+        button = button_box.addButton(button, QDialogButtonBox.ButtonRole.ActionRole)
+    elif isinstance(button, QDialogButtonBox.StandardButton):
+        button = button_box.addButton(button)
+    elif isinstance(button, tuple):
+        button = button_box.addButton(*button)
+
+    return button
 
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
@@ -71,19 +99,24 @@ def choose_subset(
     current: List[str] = [],
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
+    buttons: Optional[Sequence[ButtonParam]] = None,
+    title: str = "AnkiHub",
     parent: Any = None,
+    require_at_least_one: bool = False,
 ) -> Optional[List[str]]:
     if not parent:
         parent = active_window_or_mw()
 
     dialog = QDialog(parent)
     disable_help_button(dialog)
+    dialog.setWindowTitle(title)
 
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     layout = QVBoxLayout()
     dialog.setLayout(layout)
     label = QLabel(prompt)
     label.setOpenExternalLinks(True)
+    label.setWordWrap(True)
     layout.addWidget(label)
     list_widget = CustomListWidget()
     layout.addWidget(list_widget)
@@ -119,14 +152,44 @@ def choose_subset(
 
     layout.addSpacing(10)
 
-    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    button_box = QDialogButtonBox()
+    if buttons:
+        for button_param in buttons:
+            add_button_from_param(button_box, button_param)
+    else:
+        button_box.addButton(QDialogButtonBox.StandardButton.Ok)
     qconnect(button_box.accepted, dialog.accept)
+    qconnect(button_box.rejected, dialog.reject)
     layout.addWidget(button_box)
 
     if adjust_height_to_content:
         list_widget.setMinimumHeight(
             list_widget.sizeHintForRow(0) * list_widget.count() + 20
         )
+
+    def update_accept_button_state():
+        accept_button = next(
+            (
+                button
+                for button in button_box.buttons()
+                if button_box.buttonRole(button)
+                == QDialogButtonBox.ButtonRole.AcceptRole
+            ),
+            None,
+        )
+        if not accept_button:
+            return
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                accept_button.setEnabled(True)
+                return
+
+        accept_button.setEnabled(False)
+
+    if require_at_least_one:
+        qconnect(list_widget.itemChanged, lambda _: update_accept_button_state())
+        update_accept_button_state()
 
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None
@@ -137,6 +200,17 @@ def choose_subset(
         if list_widget.item(i).checkState() == Qt.CheckState.Checked
     ]
     return result
+
+
+class SearchableSelectionDialog(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        if kwargs.get("buttons") is None:
+            kwargs["buttons"] = []  # This removes the "Add" button
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
 
 
 class CustomListWidget(QListWidget):
@@ -226,13 +300,6 @@ def choose_ankihub_deck(
     return chosen_deck_ah_did
 
 
-ButtonParam = Union[
-    QDialogButtonBox.StandardButton,
-    str,
-    Tuple[str, QDialogButtonBox.ButtonRole],
-]
-
-
 class _Dialog(QDialog):
     """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
     the callback is called with the index of the clicked button.
@@ -319,20 +386,10 @@ class _Dialog(QDialog):
 
     def _setup_button_box(self) -> QDialogButtonBox:
         button_box = QDialogButtonBox()
-        # Use Windows layout
-        button_box.setStyleSheet("button-layout: 0")
 
         self.default_button = None
         for button_index, button in enumerate(self.buttons):
-            if isinstance(button, str):
-                button = button_box.addButton(
-                    button, QDialogButtonBox.ButtonRole.ActionRole
-                )
-            elif isinstance(button, QDialogButtonBox.StandardButton):
-                button = button_box.addButton(button)
-            elif isinstance(button, tuple):
-                button = button_box.addButton(*button)
-
+            button = add_button_from_param(button_box, button)
             qconnect(
                 button.clicked,
                 partial(self._on_btn_clicked_or_dialog_rejected, button_index),
@@ -392,7 +449,9 @@ def show_dialog(
     if not parent:
         parent = active_window_or_mw()
 
-    if is_mac:
+    # Some callers pass " " as title to avoid the default title "AnkiHub",
+    # in this case we don't want to add the title to the text
+    if is_mac and title.strip():
         if text_format == Qt.TextFormat.PlainText:
             text = f"{title}\n\n{text}"
         else:
@@ -461,6 +520,14 @@ def ask_user(
         return None
 
 
+def chevron_up_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "chevron-up.svg").absolute()))
+
+
+def chevron_down_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "chevron-down.svg").absolute()))
+
+
 def tooltip_icon() -> QIcon:
     return QIcon(
         QApplication.style().standardIcon(
@@ -499,6 +566,85 @@ def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
     current_style_sheet = widget.styleSheet()
     new_style_sheet = f"{current_style_sheet} {tooltip_stylesheet()}"
     widget.setStyleSheet(new_style_sheet)
+
+
+class CollapsibleSection(QWidget):
+    def __init__(self, title="", parent=None, expanded_max_height=200):
+        """
+        :param title: Title for the collapsible section.
+        :param parent: Parent widget.
+        :param expanded_max_height: Maximum height (in px) for expanded content.
+        """
+        super().__init__(parent)
+        self._expanded_max_height = expanded_max_height
+
+        # Toggle button with chevron icon and title
+        self.toggle_button = QToolButton()
+        self.toggle_button.setText(f" {title}")  # Add space between icon and title
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
+        toggle_button_font = self.toggle_button.font()
+        toggle_button_font.setPointSize(toggle_button_font.pointSize() + 1)
+        self.toggle_button.setFont(toggle_button_font)
+        self.toggle_button.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.toggle_button.setStyleSheet(
+            """
+            QToolButton {
+                border: none;
+            }
+            """
+        )
+        self.chevron_down_icon = chevron_down_icon()
+        self.chevron_up_icon = chevron_up_icon()
+        self.toggle_button.setIcon(self.chevron_down_icon)
+        self.toggle_button.setIconSize(QSize(16, 16))
+        qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
+
+        self.content_widget = QWidget()
+        self.content_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.content_widget.setMaximumHeight(0)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content_widget)
+
+        # Animation for expanding/collapsing the content widget's maximumHeight
+        self.animation = QPropertyAnimation(self.content_widget, b"maximumHeight")
+        self.animation.setDuration(150)
+
+    def setContentLayout(self, layout):
+        """
+        Set the layout that holds the content you want to collapse/expand.
+        The layout's sizeHint is used to calculate the expanded height,
+        up to _expanded_max_height.
+        """
+        self.content_widget.setLayout(layout)
+        content_height = layout.sizeHint().height()
+        self._target_height = min(content_height, self._expanded_max_height)
+        self.content_widget.setMaximumHeight(0)
+        self.animation.setStartValue(0)
+        self.animation.setEndValue(self._target_height)
+
+    @pyqtSlot(bool)
+    def on_toggled(self, checked):
+        # Update chevron icon
+        self.toggle_button.setIcon(
+            self.chevron_up_icon if checked else self.chevron_down_icon
+        )
+
+        # Set animation direction based on toggle state
+        self.animation.setDirection(
+            QAbstractAnimation.Direction.Forward
+            if checked
+            else QAbstractAnimation.Direction.Backward
+        )
+        self.animation.start()
 
 
 def check_and_prompt_for_updates_on_main_window():
@@ -603,7 +749,7 @@ def active_window_or_mw() -> QWidget:
 def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
     LOGGER.info("Syncing with AnkiWeb...")
 
-    if not aqt.mw.pm.sync_auth():
+    if not logged_into_ankiweb():
         on_done()
         return
 
@@ -625,6 +771,10 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
         ),
         None,
     )
+
+
+def logged_into_ankiweb() -> bool:
+    return bool(aqt.mw.pm.sync_auth())
 
 
 def refresh_anki_ui() -> None:

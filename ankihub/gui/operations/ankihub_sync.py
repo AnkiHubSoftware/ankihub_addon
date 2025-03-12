@@ -3,27 +3,32 @@ from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 from typing import Callable, List, Optional
+from uuid import UUID
 
 import aqt
 import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
+from aqt.qt import qconnect
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
+from ...gui.operations import AddonQueryOp
 from ...main.deck_unsubscribtion import uninstall_deck
+from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
+from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import refresh_anki_ui, sync_with_ankiweb
+from ..utils import logged_into_ankiweb, refresh_anki_ui, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
-from .utils import future_with_result, pass_exceptions_to_on_done
+from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
 
 
 @dataclass
@@ -72,22 +77,35 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
 @pass_exceptions_to_on_done
 def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
-    client = AnkiHubClient()
-    subscribed_decks = client.get_deck_subscriptions()
+    def get_subscriptions_and_clean_up() -> List[Deck]:
+        client = AnkiHubClient()
+        subscribed_decks = client.get_deck_subscriptions()
 
-    _uninstall_decks_the_user_is_not_longer_subscribed_to(
-        subscribed_decks=subscribed_decks
-    )
+        _uninstall_decks_the_user_is_not_longer_subscribed_to(
+            subscribed_decks=subscribed_decks
+        )
 
-    sync_state.schema_before_new_decks_installation = collection_schema()
-    check_and_install_new_deck_subscriptions(
-        subscribed_decks=subscribed_decks,
-        on_done=partial(
-            _on_new_deck_subscriptions_done,
+        return subscribed_decks
+
+    def on_subscriptions_fetched(subscribed_decks: List[Deck]) -> None:
+        sync_state.schema_before_new_decks_installation = collection_schema()
+
+        check_and_install_new_deck_subscriptions(
             subscribed_decks=subscribed_decks,
-            on_done=on_done,
-        ),
-    )
+            on_done=partial(
+                _on_new_deck_subscriptions_done,
+                subscribed_decks=subscribed_decks,
+                on_done=on_done,
+            ),
+        )
+
+    AddonQueryOp(
+        op=lambda _: get_subscriptions_and_clean_up(),
+        success=on_subscriptions_fetched,
+        parent=aqt.mw,
+    ).failure(
+        lambda e: on_done(future_with_exception(e))
+    ).with_progress().run_in_background()
 
 
 @pass_exceptions_to_on_done
@@ -107,17 +125,79 @@ def _on_new_deck_subscriptions_done(
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
     to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
 
-    aqt.mw.taskman.with_progress(
-        task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
-        immediate=True,
-        on_done=partial(_on_sync_done, on_done=on_done),
+    update_decks_and_media(
+        on_done=on_done, ah_dids=list(to_sync_ah_dids), start_media_sync=True
     )
 
 
 @pass_exceptions_to_on_done
-def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
-    future.result()
+def update_decks_and_media(
+    on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
+) -> None:
+    def run_update(
+        raise_if_full_sync_required: bool, do_full_upload: bool, start_media_sync: bool
+    ) -> None:
+        AddonQueryOp(
+            op=lambda _: ah_deck_updater.update_decks_and_media(
+                ah_dids,
+                raise_if_full_sync_required=raise_if_full_sync_required,
+                start_media_sync=start_media_sync,
+            ),
+            success=lambda _: on_success(do_full_upload=do_full_upload),
+            parent=aqt.mw,
+        ).failure(on_failure).with_progress().run_in_background()
 
+    def on_failure(exception: Exception) -> None:
+        if not isinstance(exception, ChangesRequireFullSyncError):
+            on_done(future_with_exception(exception))
+            return
+
+        LOGGER.info(
+            "Changes require full sync with AnkiWeb.",
+            ah_dids=ah_dids,
+            changes=exception.affected_note_type_ids,
+        )
+
+        dialog = ChangesRequireFullSyncDialog(
+            changes_require_full_sync_error=exception, parent=aqt.mw
+        )
+
+        qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
+        qconnect(
+            dialog.accepted,
+            # Retry the update, this time without raising if a full sync will be required,
+            # then do a full upload to AnkiWeb.
+            lambda: run_update(
+                raise_if_full_sync_required=False,
+                do_full_upload=True,
+                # The initial attempt already started media sync if needed.
+                start_media_sync=False,
+            ),
+        )
+        dialog.show()
+
+    def on_success(do_full_upload: bool) -> None:
+        if do_full_upload:
+            config.set_schema_to_do_full_upload_for_once(collection_schema())
+
+        _on_sync_done(on_done=on_done)
+
+    if logged_into_ankiweb():
+        run_update(
+            raise_if_full_sync_required=True,
+            do_full_upload=False,
+            start_media_sync=start_media_sync,
+        )
+    else:
+        run_update(
+            raise_if_full_sync_required=False,
+            do_full_upload=False,
+            start_media_sync=start_media_sync,
+        )
+
+
+@pass_exceptions_to_on_done
+def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     config.set_api_version_on_last_sync(API_VERSION)
 
     show_tooltip_about_last_deck_updates_results()

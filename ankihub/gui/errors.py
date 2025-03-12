@@ -119,7 +119,7 @@ def upload_logs_in_background(
 
 
 def upload_logs_and_data_in_background(
-    on_done: Optional[Callable[[str], None]] = None
+    on_done: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
@@ -144,8 +144,10 @@ def upload_logs_and_data_in_background(
 
 
 def _username_or_hash(hide_username: bool) -> str:
-    # Many users use their email address as their username and may not want to share it on a forum
     if config.user():
+        if config.username():
+            return config.username()
+        # Many users use their email address for login and may not want to share it on a forum
         return checksum(config.user())[:5] if hide_username else config.user()
     else:
         return "not_signed_in"
@@ -279,15 +281,8 @@ def _try_handle_exception(
             )
         else:
             message = (
-                (
-                    "🚧 We're having trouble connecting to AnkiHub. Please try again later.<br>"
-                    "Visit community.ankihub.net and check your email for details."
-                )
-                if isinstance(exc_value, ReadTimeout)
-                else (
-                    "🚧 AnkiHub is undergoing routine maintenance.<br>"
-                    "Please visit ankihub.net/status and check your email for details."
-                )
+                "🚧 We’re unable to reach AnkiHub due to planned maintenance or an unexpected issue.<br> "
+                "For details, see https://community.ankihub.net/c/announcements."
             )
             show_tooltip(message, period=5000)
         return True
@@ -380,7 +375,11 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     except JSONDecodeError:
         return False
 
-    error_message = response_data.get("detail")
+    try:
+        error_message = response_data.get("detail")
+    except:
+        return False
+
     if error_message:
         LOGGER.info("AnkiHubRequestError was handled", error_message=error_message)
         show_error_dialog(error_message, title="Oh no!")
@@ -475,7 +474,7 @@ def _report_exception(
 
     with push_scope() as scope:
         scope.level = "error"
-        scope.user = {"id": config.user()}
+        scope.user = {"id": config.username_or_email()}
         scope.set_tag("os", sys.platform)
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})

@@ -5,9 +5,10 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from functools import partial
-from typing import Callable, List
+from typing import Callable, Dict, List, cast
 
 import aqt
+from anki.models import NotetypeDict, NotetypeId
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import QDialogButtonBox
 
@@ -17,14 +18,18 @@ from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import Deck, UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
-from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
 from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import deck_download_progress_cb, show_dialog, tooltip_icon
+from ..utils import (
+    deck_download_progress_cb,
+    logged_into_ankiweb,
+    show_dialog,
+    tooltip_icon,
+)
 from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -133,7 +138,7 @@ def _show_deck_import_summary_dialog(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
         import_results=import_results,
-        logged_to_ankiweb=aqt.mw.pm.sync_auth(),
+        logged_to_ankiweb=logged_into_ankiweb(),
     )
 
     def on_button_clicked(button_index: int) -> None:
@@ -234,7 +239,10 @@ def _install_deck(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ankihub_did)
     protected_tags = client.get_protected_tags(ah_did=ankihub_did)
-    note_types = fetch_note_types_based_on_notes(notes_data=notes_data)
+    note_types = cast(
+        Dict[NotetypeId, NotetypeDict],
+        client.get_note_types_dict_for_deck(ankihub_did),
+    )
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
         notes=notes_data,
@@ -249,6 +257,7 @@ def _install_deck(
             ankihub_did
         ),
         recommended_deck_settings=recommended_deck_settings,
+        raise_if_full_sync_required=False,
     )
 
     config.add_deck(
