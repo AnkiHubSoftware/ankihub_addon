@@ -148,7 +148,6 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     # Refresh Anki UI
     changes = OpChanges(
         notetype=True,
-        note=True,
         note_text=True,
         browser_table=True,
         browser_sidebar=True,
