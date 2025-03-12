@@ -79,7 +79,10 @@ def add_note_type_fields(
     # Update AnkiHub note type with new fields
     ah_note_type["flds"] = updated_fields
 
-    # Update remote and local database
+    # Update note type in Anki DB
+    aqt.mw.col.models.update_dict(ah_note_type)
+
+    # Update remote and local AnkiHub database
     client = AddonAnkiHubClient()
     ah_note_type = client.update_note_type(ah_did, ah_note_type, ["flds"])
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ah_note_type)
