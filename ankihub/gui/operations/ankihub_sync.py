@@ -9,8 +9,6 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
-from aqt import gui_hooks
-from aqt.operations import OpChanges
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
@@ -22,7 +20,7 @@ from ...main.utils import collection_schema
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import sync_with_ankiweb
+from ..utils import refresh_anki_ui, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -145,17 +143,7 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
-    # Refresh Anki UI
-    changes = OpChanges(
-        notetype=True,
-        note_text=True,
-        browser_table=True,
-        browser_sidebar=True,
-    )
-    gui_hooks.operation_did_execute(
-        changes=changes,
-        handler=None,
-    )
+    refresh_anki_ui()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:

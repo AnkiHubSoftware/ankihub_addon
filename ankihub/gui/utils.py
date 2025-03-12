@@ -6,8 +6,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import aqt
 from anki.decks import DeckId
 from anki.utils import is_mac
-from aqt import sync
+from aqt import gui_hooks, sync
 from aqt.addons import check_and_prompt_for_updates
+from aqt.operations import OpChanges
 from aqt.progress import ProgressDialog
 from aqt.qt import (
     QApplication,
@@ -623,4 +624,21 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
             if (ah_did := config.get_deck_uuid_by_did(anki_did))
         ),
         None,
+    )
+
+
+def refresh_anki_ui() -> None:
+    changes = OpChanges(
+        notetype=True,
+        note_text=True,
+        browser_table=True,
+        browser_sidebar=True,
+        deck=True,
+        study_queues=True,
+    )
+    # Anki's UI componennts subscribe to this hook to refresh themselves when needed.
+    # This is the mechanism that Anki uses to update the UI when its backend makes changes to the collection.
+    gui_hooks.operation_did_execute(
+        changes=changes,
+        handler=None,
     )
