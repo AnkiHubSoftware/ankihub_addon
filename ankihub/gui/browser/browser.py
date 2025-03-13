@@ -445,8 +445,7 @@ def _on_reset_deck_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-
-        browser.model.reset()
+        aqt.mw.reset()
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
@@ -499,8 +498,7 @@ def _on_reset_subdecks_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-        browser.sidebar.refresh()
-        aqt.mw.deckBrowser.refresh()
+        aqt.mw.reset()
         tooltip("Rebuilt subdecks and moved cards.")
 
     aqt.mw.taskman.with_progress(
