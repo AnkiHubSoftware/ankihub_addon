@@ -10,6 +10,7 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
+from aqt import QWidget, gui_hooks
 from aqt.qt import qconnect
 from aqt.sync import get_sync_status
 
@@ -210,20 +211,37 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     else:
         on_done(future_with_result(None))
 
+    _schedule_post_sync_ui_refresh_and_tasks()
+
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
-    aqt.mw.reset()
 
-    aqt.mw.taskman.run_in_background(
-        aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
-    )
+def _schedule_post_sync_ui_refresh_and_tasks() -> None:
+    """Schedule Anki UI refresh and background tasks to run after the next focus change."""
 
-    aqt.mw.taskman.run_in_background(
-        send_review_data, on_done=_on_send_review_data_done
-    )
+    # Using focus_did_change hook to ensure proper UI refresh timing:
+    # 1. aqt.mw.reset() refreshes the Anki UI, but some UI elements are only
+    #    marked for refresh and won't actually update until they receive focus
+    # 2. The background tasks (clearing tags, sending review data/summaries)
+    #    involve potentially heavy database queries
+    # 3. By using this hook, we ensure the UI refresh happens before these
+    #    heavier operations, preventing the UI refresh from being blocked
+    # 4. The hook removes itself after execution to ensure it only runs once
+    def refresh_ui_and_start_after_sync_tasks_once(new: QWidget, old: QWidget) -> None:
+        if new is None:
+            return
+        aqt.mw.reset()
+        aqt.mw.taskman.run_in_background(
+            aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
+        )
+        aqt.mw.taskman.run_in_background(
+            send_review_data, on_done=_on_send_review_data_done
+        )
+        _maybe_send_daily_review_summaries()
+        gui_hooks.focus_did_change.remove(refresh_ui_and_start_after_sync_tasks_once)
 
-    _maybe_send_daily_review_summaries()
+    gui_hooks.focus_did_change.append(refresh_ui_and_start_after_sync_tasks_once)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
