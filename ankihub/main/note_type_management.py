@@ -1,3 +1,4 @@
+import copy
 import uuid
 from typing import List
 
@@ -38,6 +39,7 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
 def add_note_type_fields(
     ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
 ) -> NotetypeDict:
+    note_type = copy.deepcopy(note_type)
     ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
     existing_ah_field_names = set(field["name"] for field in ah_note_type["flds"])
@@ -79,7 +81,10 @@ def add_note_type_fields(
     # Update AnkiHub note type with new fields
     ah_note_type["flds"] = updated_fields
 
-    # Update remote and local database
+    # Update note type in Anki DB
+    aqt.mw.col.models.update_dict(ah_note_type)
+
+    # Update remote and local AnkiHub database
     client = AddonAnkiHubClient()
     ah_note_type = client.update_note_type(ah_did, ah_note_type, ["flds"])
     ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ah_note_type)
@@ -113,7 +118,7 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
     return ids
 
 
-def new_fields_for_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> List[str]:
+def new_fields_for_note_type(note_type: NotetypeDict) -> List[str]:
     field_names = aqt.mw.col.models.field_names(note_type)
     ankihub_field_names = ankihub_db.note_type_field_names(note_type["id"])
     new_fields = [name for name in field_names if name not in ankihub_field_names]

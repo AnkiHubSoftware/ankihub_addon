@@ -644,7 +644,7 @@ class DeckManagementDialog(QDialog):
         filtered_names = []
         for name_and_id in names_and_ids:
             note_type = aqt.mw.col.models.get(NotetypeId(name_and_id.id))
-            if new_fields_for_note_type(self._selected_ah_did(), note_type):
+            if new_fields_for_note_type(note_type):
                 filtered_names.append(name_and_id.name)
 
         return filtered_names
@@ -746,7 +746,7 @@ class DeckManagementDialog(QDialog):
                 return
             mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
             note_type = aqt.mw.col.models.get(mid)
-            new_fields = new_fields_for_note_type(self._selected_ah_did(), note_type)
+            new_fields = new_fields_for_note_type(note_type)
             new_fields = choose_subset(
                 prompt="<b>Select fields to publish</b>",
                 choices=new_fields,
