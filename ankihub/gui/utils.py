@@ -792,7 +792,7 @@ def refresh_anki_ui() -> None:
     )
 
     # Study queue related UI is refreshed when focus is not None.
-    # This prevents the deck browser from fading out.
+    # This prevents the deck browser from fading out when the main window temporarily loses focus.
 
     def refresh_study_queues_once(new: QWidget, old: QWidget) -> None:
         if old is not None:
