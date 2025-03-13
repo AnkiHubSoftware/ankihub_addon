@@ -102,6 +102,7 @@ def choose_subset(
     title: str = "AnkiHub",
     parent: Any = None,
     require_at_least_one: bool = False,
+    select_all_text: str = "Select All",
 ) -> Optional[List[str]]:
     if not parent:
         parent = active_window_or_mw()
@@ -121,22 +122,6 @@ def choose_subset(
     layout.addWidget(list_widget)
     layout.addSpacing(5)
 
-    # add a "select all" button
-    def select_all():
-        all_selected = all(
-            list_widget.item(i).checkState() == Qt.CheckState.Checked
-            for i in range(list_widget.count())
-        )
-        if all_selected:
-            for i in range(list_widget.count()):
-                list_widget.item(i).setCheckState(Qt.CheckState.Unchecked)
-        else:
-            for i in range(list_widget.count()):
-                list_widget.item(i).setCheckState(Qt.CheckState.Checked)
-
-    button = QPushButton("Select All")
-    qconnect(button.clicked, select_all)
-    layout.addWidget(button)
     for choice in choices:
         item = QListWidgetItem(choice)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)  # type: ignore
@@ -152,11 +137,31 @@ def choose_subset(
     layout.addSpacing(10)
 
     button_box = QDialogButtonBox()
+
+    # Add a "Select All" button
+    def select_all() -> None:
+        all_selected = all(
+            list_widget.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(list_widget.count())
+        )
+        if all_selected:
+            for i in range(list_widget.count()):
+                list_widget.item(i).setCheckState(Qt.CheckState.Unchecked)
+        else:
+            for i in range(list_widget.count()):
+                list_widget.item(i).setCheckState(Qt.CheckState.Checked)
+
+    select_all_button = QPushButton(select_all_text)
+    qconnect(select_all_button.clicked, select_all)
+    button_box.addButton(select_all_button, QDialogButtonBox.ButtonRole.ActionRole)
+
+    # Add other buttons
     if buttons:
         for button_param in buttons:
             add_button_from_param(button_box, button_param)
     else:
         button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+
     qconnect(button_box.accepted, dialog.accept)
     qconnect(button_box.rejected, dialog.reject)
     layout.addWidget(button_box)

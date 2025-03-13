@@ -757,6 +757,7 @@ class DeckManagementDialog(QDialog):
                 ],
                 parent=note_type_selector,
                 require_at_least_one=True,
+                select_all_text="Select all fields",
             )
             if new_fields:
                 confirm = ask_user(
