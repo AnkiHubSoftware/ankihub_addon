@@ -762,8 +762,8 @@ class DeckManagementDialog(QDialog):
                 confirm = ask_user(
                     "<b>Proceed?</b><br><br>"
                     "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
-                    + "⚠️ Note type changes require a full sync and \
-<b>users will be asked to sync all their devices before going through the AnkiHub Sync.</b>",
+                    "⚠️ Note type changes require a full sync and "
+                    "<b>users will be asked to sync all their devices</b> before going through the AnkiHub Sync.",
                     title="Publish fields",
                     no_button_label="Cancel",
                 )
