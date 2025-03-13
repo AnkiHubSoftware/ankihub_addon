@@ -7,9 +7,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import aqt
 from anki.decks import DeckId
 from anki.utils import is_mac
-from aqt import gui_hooks, sync
+from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
-from aqt.operations import OpChanges
 from aqt.progress import ProgressDialog
 from aqt.qt import (
     QAbstractAnimation,
@@ -775,37 +774,3 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
 
 def logged_into_ankiweb() -> bool:
     return bool(aqt.mw.pm.sync_auth())
-
-
-def refresh_anki_ui() -> None:
-    changes = OpChanges(
-        notetype=True,
-        note_text=True,
-        browser_table=True,
-        browser_sidebar=True,
-    )
-    # Anki's UI componennts subscribe to this hook to refresh themselves when needed.
-    # This is the mechanism that Anki uses to update the UI when its backend makes changes to the collection.
-    gui_hooks.operation_did_execute(
-        changes=changes,
-        handler=None,
-    )
-
-    # Study queue related UI is refreshed when focus is not None.
-    # This prevents the deck browser from fading out when the main window temporarily loses focus.
-
-    def refresh_study_queues_ui_once(new: QWidget, old: QWidget) -> None:
-        if old is not None:
-            return
-
-        changes = OpChanges(
-            study_queues=True,
-        )
-        gui_hooks.operation_did_execute(
-            changes=changes,
-            handler=None,
-        )
-
-        gui_hooks.focus_did_change.remove(refresh_study_queues_ui_once)
-
-    gui_hooks.focus_did_change.append(refresh_study_queues_ui_once)

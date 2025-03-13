@@ -25,7 +25,7 @@ from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import logged_into_ankiweb, refresh_anki_ui, sync_with_ankiweb
+from ..utils import logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
@@ -203,16 +203,6 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     show_tooltip_about_last_deck_updates_results()
     maybe_check_databases()
 
-    aqt.mw.taskman.run_in_background(
-        aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
-    )
-
-    aqt.mw.taskman.run_in_background(
-        send_review_data, on_done=_on_send_review_data_done
-    )
-
-    _maybe_send_daily_review_summaries()
-
     if config.schema_to_do_full_upload_for_once():
         # Sync with AnkiWeb to resolve the pending full upload immediately.
         # Otherwise, Anki's Sync button will be red, and clicking it will trigger a full upload.
@@ -223,7 +213,17 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
-    refresh_anki_ui()
+    aqt.mw.reset()
+
+    aqt.mw.taskman.run_in_background(
+        aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
+    )
+
+    aqt.mw.taskman.run_in_background(
+        send_review_data, on_done=_on_send_review_data_done
+    )
+
+    _maybe_send_daily_review_summaries()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:

@@ -52,13 +52,7 @@ from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ..utils import (
-    ask_user,
-    choose_ankihub_deck,
-    choose_list,
-    choose_subset,
-    refresh_anki_ui,
-)
+from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
     EditedAfterSyncColumn,
@@ -451,7 +445,7 @@ def _on_reset_deck_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-        refresh_anki_ui()
+        aqt.mw.reset()
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
@@ -504,7 +498,7 @@ def _on_reset_subdecks_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-        refresh_anki_ui()
+        aqt.mw.reset()
         tooltip("Rebuilt subdecks and moved cards.")
 
     aqt.mw.taskman.with_progress(
