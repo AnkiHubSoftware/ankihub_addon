@@ -783,7 +783,6 @@ def refresh_anki_ui() -> None:
         note_text=True,
         browser_table=True,
         browser_sidebar=True,
-        study_queues=True,
     )
     # Anki's UI componennts subscribe to this hook to refresh themselves when needed.
     # This is the mechanism that Anki uses to update the UI when its backend makes changes to the collection.
@@ -791,3 +790,22 @@ def refresh_anki_ui() -> None:
         changes=changes,
         handler=None,
     )
+
+    # Study queue related UI is refreshed when focus is not None.
+    # This prevents the deck browser from fading out.
+
+    def refresh_study_queues_once(new: QWidget, old: QWidget) -> None:
+        if old is not None:
+            return
+
+        changes = OpChanges(
+            study_queues=True,
+        )
+        gui_hooks.operation_did_execute(
+            changes=changes,
+            handler=None,
+        )
+
+        gui_hooks.focus_did_change.remove(refresh_study_queues_once)
+
+    gui_hooks.focus_did_change.append(refresh_study_queues_once)
