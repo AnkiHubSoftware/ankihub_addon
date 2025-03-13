@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test1", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=21.0
+      - application/json; version=22.0
       Content-Length:
       - '41'
       Content-Type:
@@ -12,12 +12,10 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2025-03-24T15:59:44.710213Z","token":"3e2b53d765a282d53de815a55a77c72d9c04883b25e5b10b512f3240c5fe8127"}'
+      string: '{"expiry":"2025-04-10T16:03:46.182989Z","token":"583d044f1c318dc72f873ed0f5b17fb9fe0c3f44b3ba45654d5d6057628b484b"}'
     headers:
       Allow:
       - POST, OPTIONS
-      Connection:
-      - close
       Content-Language:
       - en-us
       Content-Length:
@@ -27,20 +25,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Mon, 24 Feb 2025 15:59:44 GMT
+      - Thu, 13 Mar 2025 16:03:46 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - Werkzeug/3.0.1 Python/3.12.3
+      - WSGIServer/0.2 CPython/3.12.2
       Server-Timing:
-      - TimerPanel_utime;dur=360.96200000000067;desc="User CPU time", TimerPanel_stime;dur=28.527999999999665;desc="System
-        CPU time", TimerPanel_total;dur=389.49000000000035;desc="Total CPU time",
-        TimerPanel_total_time;dur=253.54195099998833;desc="Elapsed time", SQLPanel_sql_time;dur=9.803860000147324;desc="SQL
-        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=229.0700000000001;desc="User CPU time", TimerPanel_stime;dur=29.910000000000103;desc="System
+        CPU time", TimerPanel_total;dur=258.9800000000002;desc="Total CPU time", TimerPanel_total_time;dur=101.58515500006615;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.518428995856084;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Set-Cookie:
-      - csrftoken=QTUkRj4JkoS3FV8rBN0hYujmxMg5SYoU; expires=Mon, 23 Feb 2026 15:59:44
+      - csrftoken=2Bs9BtC1DDjOD1Wj1cZ4cUkjET5Gpfc2; expires=Thu, 12 Mar 2026 16:03:46
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=fa1rr72024ghfvsqj022inr4ix577iz5; expires=Mon, 03 Mar 2025 15:59:44
+      - sessionid=9jc6qu4boaqbsa2g034gy9o4mi5lzb3q; expires=Thu, 20 Mar 2025 16:03:46
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, origin
@@ -49,7 +47,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - b67ae619a3444a658926ea5a4bb9aaa4
+      - 274e160ce4f5424e89720c3abcd6ac45
     status:
       code: 200
       message: OK
@@ -57,9 +55,9 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=21.0
+      - application/json; version=22.0
       Authorization:
-      - Token 3e2b53d765a282d53de815a55a77c72d9c04883b25e5b10b512f3240c5fe8127
+      - Token 583d044f1c318dc72f873ed0f5b17fb9fe0c3f44b3ba45654d5d6057628b484b
       Content-Type:
       - application/json
     method: GET
@@ -67,31 +65,29 @@ interactions:
   response:
     body:
       string: '[{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"did":null,"ord":0,"afmt":"{{cloze:Text}}<br>","name":"Test","qfmt":"{{cloze:Text}}","bafmt":"","bfont":"Arial","bqfmt":"","bsize":12}],"name":"Cloze
-        (test1)","type":1,"mod":1284334356,"usn":-1,"sortf":0,"did":263282276,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}]'
+        (test1)","type":1,"mod":1736158212,"usn":-1,"sortf":0,"did":1683691727,"css":"","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}]'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
-      Connection:
-      - close
       Content-Language:
       - en-us
       Content-Length:
-      - '784'
+      - '785'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Mon, 24 Feb 2025 15:59:45 GMT
+      - Thu, 13 Mar 2025 16:03:46 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - Werkzeug/3.0.1 Python/3.12.3
+      - WSGIServer/0.2 CPython/3.12.2
       Server-Timing:
-      - TimerPanel_utime;dur=131.04799999999983;desc="User CPU time", TimerPanel_stime;dur=7.150000000000212;desc="System
-        CPU time", TimerPanel_total;dur=138.19800000000004;desc="Total CPU time",
-        TimerPanel_total_time;dur=139.80265700001837;desc="Elapsed time", SQLPanel_sql_time;dur=7.3429839999334945;desc="SQL
-        10 queries", CachePanel_total_time;dur=0.06748099997366808;desc="Cache 2 Calls"
+      - TimerPanel_utime;dur=19.009000000000498;desc="User CPU time", TimerPanel_stime;dur=1.4300000000000423;desc="System
+        CPU time", TimerPanel_total;dur=20.43900000000054;desc="Total CPU time", TimerPanel_total_time;dur=25.443850998271955;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.6138040013611317;desc="SQL 9 queries", CachePanel_total_time;dur=0.012893000530311838;desc="Cache
+        1 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, origin
       X-Content-Type-Options:
@@ -99,21 +95,21 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - fa1c67e5b7294f68bdaec41e71802a9d
+      - a1a51786fc0c4a6fa9f5637af26d201a
     status:
       code: 200
       message: OK
 - request:
-    body: '{"css": ".home {background: red}", "anki_id": 1, "templates": [{"ord":
-      0, "afmt": "<div>back</div>", "name": "Test", "qfmt": "<div>front</div>", "bafmt":
-      "{{cloze:Text}}", "bqfmt": "{{cloze:Text}}", "bsize": 12}]}'
+    body: '{"css": ".home {background: red}", "templates": [{"ord": 0, "afmt": "<div>back</div>",
+      "name": "Test", "qfmt": "<div>front</div>", "bafmt": "{{cloze:Text}}", "bqfmt":
+      "{{cloze:Text}}", "bsize": 12}]}'
     headers:
       Accept:
-      - application/json; version=21.0
+      - application/json; version=22.0
       Authorization:
-      - Token 3e2b53d765a282d53de815a55a77c72d9c04883b25e5b10b512f3240c5fe8127
+      - Token 583d044f1c318dc72f873ed0f5b17fb9fe0c3f44b3ba45654d5d6057628b484b
       Content-Length:
-      - '213'
+      - '199'
       Content-Type:
       - application/json
     method: PATCH
@@ -121,13 +117,11 @@ interactions:
   response:
     body:
       string: '{"id":1,"anki_id":1,"fields":[{"ord":0,"rtl":false,"font":"Arial","meta":null,"name":"Text","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":1,"rtl":false,"font":"Arial","meta":null,"name":"Extra","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false},{"ord":2,"rtl":false,"font":"Arial","meta":null,"name":"ankihub_id","size":16,"media":[],"sticky":false,"collapsibleFieldsCollapseByDefault":false}],"templates":[{"ord":0,"afmt":"<div>back</div>","name":"Test","qfmt":"<div>front</div>","bafmt":"{{cloze:Text}}","bqfmt":"{{cloze:Text}}","bsize":12}],"name":"Cloze
-        (test1)","type":1,"mod":1284334356,"usn":-1,"sortf":0,"did":2429706970,"css":".home
+        (test1)","type":1,"mod":1736158212,"usn":-1,"sortf":0,"did":1683691727,"css":".home
         {background: red}","latexPre":"","latexPost":"","latexsvg":false,"req":[],"tags":[],"vers":[]}'
     headers:
       Allow:
       - PUT, PATCH, OPTIONS
-      Connection:
-      - close
       Content-Language:
       - en-us
       Content-Length:
@@ -137,16 +131,16 @@ interactions:
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Mon, 24 Feb 2025 15:59:45 GMT
+      - Thu, 13 Mar 2025 16:03:46 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - Werkzeug/3.0.1 Python/3.12.3
+      - WSGIServer/0.2 CPython/3.12.2
       Server-Timing:
-      - TimerPanel_utime;dur=162.46000000000294;desc="User CPU time", TimerPanel_stime;dur=4.481000000000179;desc="System
-        CPU time", TimerPanel_total;dur=166.9410000000031;desc="Total CPU time", TimerPanel_total_time;dur=171.86192300005132;desc="Elapsed
-        time", SQLPanel_sql_time;dur=8.558477000292442;desc="SQL 11 queries", CachePanel_total_time;dur=0.03479600002265215;desc="Cache
-        1 Calls"
+      - TimerPanel_utime;dur=20.830000000000126;desc="User CPU time", TimerPanel_stime;dur=2.1480000000000388;desc="System
+        CPU time", TimerPanel_total;dur=22.978000000000165;desc="Total CPU time",
+        TimerPanel_total_time;dur=29.775020000670338;desc="Elapsed time", SQLPanel_sql_time;dur=3.530745001626201;desc="SQL
+        11 queries", CachePanel_total_time;dur=0.03871899752994068;desc="Cache 1 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, origin
       X-Content-Type-Options:
@@ -154,7 +148,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - b87f4db3659944f99add5fd38cc088d6
+      - 0e4eefdf10d746619c2df5d3f74a6ba3
     status:
       code: 200
       message: OK
