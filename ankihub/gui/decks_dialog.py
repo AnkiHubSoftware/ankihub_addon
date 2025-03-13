@@ -80,6 +80,7 @@ class DeckManagementDialog(QDialog):
             self.show()
 
     def _setup_ui(self):
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
         self.setMinimumHeight(750)
@@ -883,6 +884,7 @@ class DeckManagementDialog(QDialog):
             f"Unsubscribe from deck <b>{deck_name}</b>?<br>"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
             title="Unsubscribe from AnkiHub Deck",
+            parent=self,
         )
         if not confirm:
             return

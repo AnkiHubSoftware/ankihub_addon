@@ -3,6 +3,7 @@ import aqt.sync
 from aqt.qt import (
     QCheckBox,
     QColor,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -14,18 +15,18 @@ from aqt.qt import (
     qconnect,
 )
 
-from ..gui.webview import AlwaysOnTopOfParentDialog
 from ..main.exceptions import ChangesRequireFullSyncError
 from .utils import CollapsibleSection
 
 
-class ChangesRequireFullSyncDialog(AlwaysOnTopOfParentDialog):
+class ChangesRequireFullSyncDialog(QDialog):
     def __init__(
         self,
         changes_require_full_sync_error: ChangesRequireFullSyncError,
         parent,
     ):
         super().__init__(parent)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle(" ")
         self.setMinimumWidth(400)
 
