@@ -507,11 +507,11 @@ def _check_access_and_notify_buttons() -> None:
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
     ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(note.id)
-    ah_did_of_note_type = ankihub_db.ankihub_did_for_note_type(note.mid)
+    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(note.mid)
     ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
         aqt.mw.col.decks.current()["id"]
     )
-    ah_dids = {ah_did_of_note, ah_did_of_deck, ah_did_of_note_type} - {None}
+    ah_dids = {ah_did_of_note, ah_did_of_deck, *ah_dids_of_note_type} - {None}
     return any(
         (
             (deck_config := config.deck_config(ah_did))

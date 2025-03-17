@@ -212,32 +212,34 @@ def suggest_notes_in_bulk(
     return result
 
 
-def get_anki_nid_to_ah_dids_dict(
+def get_anki_nid_to_possible_ah_dids_dict(
     anki_nids: Collection[NoteId],
-) -> Dict[NoteId, uuid.UUID]:
-    """Returns a dictionary that maps anki note ids to AnkiHub deck ids they could be suggested to.
-    Whether a note could be suggested to a deck is determined in this manner:
+) -> Dict[NoteId, Set[uuid.UUID]]:
+    """Returns a dictionary that maps anki note ids to the set of deck ids that the note could
+    be suggested to. Whether a note could be suggested to a deck is determined in this manner:
     - If the note is on AnkiHub already, the deck id can be looked up in database by the note id.
-    - Otherwise the note type is used to determine the deck id.
+    - Otherwise the note type is used to determine the possible deck ids.
     """
-    # Get deck ids for existing AnkiHub notes
-    anki_nid_to_ah_did_for_existing = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
+    # Get definite deck ids for existing AnkiHub notes
+    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
 
-    # Get deck ids for notes that are not on AnkiHub yet by looking at their note type
-    nids_without_ah_note = set(anki_nids) - anki_nid_to_ah_did_for_existing.keys()
+    # Get possible deck ids for notes that are not on AnkiHub yet by looking at the note type
+    nids_without_ah_note = set(anki_nids) - anki_nid_to_ah_did.keys()
     anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
-    mid_to_ah_did = {
-        mid: ankihub_db.ankihub_did_for_note_type(mid)
+    mid_to_ah_dids = {
+        mid: ankihub_db.ankihub_dids_for_note_type(mid)
         for mid in set(anki_nid_to_mid.values())
     }
-    anki_nid_to_ah_did_for_new = {
-        nid: mid_to_ah_did[mid] for nid, mid in anki_nid_to_mid.items()
+    anki_nid_to_possible_ah_dids = {
+        nid: mid_to_ah_dids[mid] for nid, mid in anki_nid_to_mid.items()
     }
 
-    return {
-        **anki_nid_to_ah_did_for_existing,
-        **anki_nid_to_ah_did_for_new,
+    # Merge definite and possible deck ids
+    result = {
+        **{nid: {did} for nid, did in anki_nid_to_ah_did.items()},
+        **anki_nid_to_possible_ah_dids,
     }
+    return result
 
 
 def _suggestions_for_notes(
