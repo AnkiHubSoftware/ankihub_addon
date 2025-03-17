@@ -73,13 +73,14 @@ class AnkiHubNote(Model):
 
 
 class AnkiHubNoteType(Model):
-    anki_note_type_id = IntegerField(primary_key=True)
+    anki_note_type_id = IntegerField()
     ankihub_deck_id = UUIDField()
     name = TextField()
     note_type_dict = JSONField(column_name="note_type_dict_json")
 
     class Meta:
         table_name = "notetypes"
+        primary_key = CompositeKey("anki_note_type_id", "ankihub_deck_id")
 
 
 class DeckMedia(Model):

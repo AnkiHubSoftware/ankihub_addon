@@ -1,5 +1,6 @@
 """Code for creating an AnkiHub deck from an existing deck in Anki."""
 
+import re
 import typing
 import uuid
 from dataclasses import dataclass
@@ -14,14 +15,13 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client.models import NoteInfo
 from ..db import ankihub_db
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .exporting import to_note_data
 from .subdecks import add_subdeck_tags_to_notes
 from .utils import (
     change_note_types_of_notes,
     create_backup,
     get_note_types_in_deck,
-    modified_ankihub_note_type_name,
     modified_note_type,
 )
 
@@ -88,14 +88,20 @@ def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:
         new_model = modified_note_type(aqt.mw.col.models.get(mid))
-        new_model["name"] = modified_ankihub_note_type_name(
-            new_model["name"], aqt.mw.col.decks.name(deck_id)
+        name_without_modifications = _note_type_name_without_ankihub_modifications(
+            new_model["name"]
         )
+        name = f"{name_without_modifications} ({aqt.mw.col.decks.name(deck_id)} / {config.user()})"
+        new_model["name"] = name
         aqt.mw.col.models.ensure_name_unique(new_model)
         new_model["id"] = 0
         aqt.mw.col.models.add_dict(new_model)
         result[mid] = aqt.mw.col.models.by_name(new_model["name"])["id"]
     return result
+
+
+def _note_type_name_without_ankihub_modifications(name: str) -> str:
+    return re.sub(r" \(.*? / .*?\)", "", name)
 
 
 def _change_note_types_of_notes(

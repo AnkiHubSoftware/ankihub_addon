@@ -197,10 +197,6 @@ class AnkiHubLogin(QWidget):
 
         config.save_token(token)
         config.save_user_email(username_or_email)
-        username = ""
-        if not self._is_email(username_or_email):
-            username = username_or_email
-        config.save_username(username)
         LOGGER.info("User signed into AnkiHub.", user=username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=aqt.mw)

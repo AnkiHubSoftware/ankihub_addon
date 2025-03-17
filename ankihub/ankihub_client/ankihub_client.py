@@ -13,6 +13,7 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from enum import Enum
+from io import BufferedReader
 from pathlib import Path
 from typing import (
     Any,
@@ -24,6 +25,7 @@ from typing import (
     Sequence,
     Set,
     TypedDict,
+    Union,
     cast,
 )
 from zipfile import ZipFile
@@ -94,6 +96,8 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
     socket.timeout,
 )
 
+# Status codes for which we should retry the request.
+RETRY_STATUS_CODES = {429}
 
 IMAGE_FILE_EXTENSIONS = [
     ".png",
@@ -107,6 +111,8 @@ IMAGE_FILE_EXTENSIONS = [
     ".webp",
 ]
 
+TIMEOUT_SECONDS = 20
+
 
 # Adapted from the default max_workers calculation in ThreadPoolExecutor.
 # By default, it uses min(32, os.cpu_count() + 4), but we want to use a lower number,
@@ -114,18 +120,11 @@ IMAGE_FILE_EXTENSIONS = [
 THREAD_POOL_MAX_WORKERS = min(32, (os.cpu_count() or 1) + 1)
 
 
-CONNECTION_TIMEOUT = 3
-STANDARD_READ_TIMEOUT = 10
-LONG_READ_TIMEOUT = 30
-S3_TIMEOUT = (10, 120)
-
-STANDARD_MAX_RETRIES = 1
-LONG_RUNNING_MAX_RETRIES = 2
-
-
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
-    result = response.status_code == 429 or (500 <= response.status_code < 600)
+    result = response.status_code in RETRY_STATUS_CODES or (
+        500 <= response.status_code < 600
+    )
     return result
 
 
@@ -198,7 +197,6 @@ class AnkiHubClient:
         files=None,
         params=None,
         stream=False,
-        is_long_running=False,
     ) -> Response:
         """Send a request to an API. This method should be used for all requests.
         Logs the request and response.
@@ -237,57 +235,48 @@ class AnkiHubClient:
             hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
         prepped = request.prepare()
-
-        return self._send_request_with_retry(
+        response = self._send_request_with_retry(
             prepped,
             stream=stream,
-            api=api,
-            is_long_running=is_long_running,
+            timeout=TIMEOUT_SECONDS if api == API.ANKIHUB else None,
         )
 
+        return response
+
     def _send_request_with_retry(
-        self,
-        request: PreparedRequest,
-        stream: bool,
-        api: API,
-        is_long_running: bool,
+        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
     ) -> Response:
         """
-        Handle request sending with appropriate timeouts and retries based on operation type.
+        This method is only used in the _send_request method.
+        Send a request, retrying if necessary.
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
         """
-        if api == API.ANKIHUB:
-            read_timeout = (
-                LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
-            )
-            timeout = (CONNECTION_TIMEOUT, read_timeout)
-        else:
-            timeout = S3_TIMEOUT
-
-        max_retries = (
-            LONG_RUNNING_MAX_RETRIES if is_long_running else STANDARD_MAX_RETRIES
-        )
-
-        @retry(
-            stop=stop_after_attempt(max_retries),
-            wait=wait_exponential(multiplier=1, max=10),
-            retry=RETRY_CONDITION,
-        )
-        def send_with_retry() -> Response:
-            return self.thread_local_session.get().send(
+        try:
+            response = self._send_request_with_retry_inner(
                 request, stream=stream, timeout=timeout
             )
-
-        try:
-            return send_with_retry()
         except RetryError as e:
+            # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
+            # If the last attempt failed because of an exception, this will raise that exception.
             try:
                 response = last_attempt.result()
             except Exception as e:
                 raise AnkiHubRequestException(e) from e
-            return response
+        return response
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=10),
+        retry=RETRY_CONDITION,
+    )
+    def _send_request_with_retry_inner(
+        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
+    ) -> Response:
+        return self.thread_local_session.get().send(
+            request, stream=stream, timeout=timeout
+        )
 
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
@@ -333,15 +322,7 @@ class AnkiHubClient:
             ),
         )
 
-        s3_response = self._send_request(
-            "PUT",
-            API.S3,
-            s3_url_suffix,
-            data=data,
-            is_long_running=True,
-        )
-        if s3_response.status_code != 200:
-            raise AnkiHubHTTPError(s3_response)
+        self._upload_to_s3(s3_url_suffix, data)
 
         response = self._send_request(
             "POST",
@@ -373,6 +354,18 @@ class AnkiHubClient:
     def _gzip_decompress_string(self, string: bytes) -> str:
         result = gzip.decompress(string).decode("utf-8")
         return result
+
+    def _upload_to_s3(
+        self, s3_url_suffix: str, data: Union[bytes, BufferedReader]
+    ) -> None:
+        s3_response = self._send_request(
+            "PUT",
+            API.S3,
+            s3_url_suffix,
+            data=data,
+        )
+        if s3_response.status_code != 200:
+            raise AnkiHubHTTPError(s3_response)
 
     def generate_media_files_with_hashed_names(
         self, media_file_paths: Sequence[Path]
@@ -540,7 +533,6 @@ class AnkiHubClient:
                 url_suffix=url_suffix,
                 data=s3_presigned_info["fields"],
                 files={"file": (filepath.name, data)},
-                is_long_running=True,
             )
 
         if s3_response.status_code != 204:
@@ -671,9 +663,7 @@ class AnkiHubClient:
                 s3_url_suffix, download_progress_cb
             )
         else:
-            s3_response = self._send_request(
-                "GET", API.S3, s3_url_suffix, is_long_running=True
-            )
+            s3_response = self._send_request("GET", API.S3, s3_url_suffix)
             if s3_response.status_code != 200:
                 raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
@@ -697,9 +687,7 @@ class AnkiHubClient:
     def _download_with_progress_cb(
         self, s3_url_suffix: str, progress_cb: Callable[[int], None]
     ) -> bytes:
-        with self._send_request(
-            "GET", API.S3, s3_url_suffix, stream=True, is_long_running=True
-        ) as response:
+        with self._send_request("GET", API.S3, s3_url_suffix, stream=True) as response:
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
 
@@ -810,7 +798,6 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url_suffix,
                 params=params if first_request else None,
-                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -878,7 +865,6 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url_suffix,
                 params=params if first_request else None,
-                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -897,10 +883,7 @@ class AnkiHubClient:
         self, ah_did: uuid.UUID
     ) -> List[NotesAction]:
         response = self._send_request(
-            "GET",
-            API.ANKIHUB,
-            f"/decks/{ah_did}/notes-actions/",
-            is_long_running=True,
+            "GET", API.ANKIHUB, f"/decks/{ah_did}/notes-actions/"
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1000,7 +983,6 @@ class AnkiHubClient:
                 "suggestions": [d.to_dict() for d in suggestions],
                 "auto_accept": auto_accept,
             },
-            is_long_running=True,
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1065,55 +1047,6 @@ class AnkiHubClient:
         data = response.json()
         result = _to_anki_note_type(data)
         return result
-
-    def create_note_type(
-        self, ah_did: uuid.UUID, note_type: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        note_type = _to_ankihub_note_type(note_type.copy())
-        response = self._send_request(
-            "POST", API.ANKIHUB, f"/decks/{ah_did}/create-note-type/", json=note_type
-        )
-        if response.status_code != 200:
-            raise AnkiHubHTTPError(response)
-        data = response.json()
-        result = _to_anki_note_type(data)
-        return result
-
-    def update_note_type(
-        self,
-        ah_did: uuid.UUID,
-        note_type: Dict[str, Any],
-        keys_to_update: List[str],
-    ) -> Dict[str, Any]:
-        note_type_id = note_type["id"]
-        note_type = {key: note_type[key] for key in keys_to_update}
-        note_type = _to_ankihub_note_type(note_type.copy())
-        response = self._send_request(
-            "PATCH",
-            API.ANKIHUB,
-            f"/decks/{ah_did}/note-types/{note_type_id}/",
-            json=note_type,
-        )
-        if response.status_code != 200:
-            raise AnkiHubHTTPError(response)
-        data = response.json()
-        result = _to_anki_note_type(data)
-        return result
-
-    def get_note_types_dict_for_deck(
-        self, ah_did: uuid.UUID
-    ) -> Dict[int, Dict[str, Any]]:
-        response = self._send_request(
-            "GET", API.ANKIHUB, f"/decks/{ah_did}/note-types/"
-        )
-        if response.status_code != 200:
-            raise AnkiHubHTTPError(response)
-
-        data = response.json()
-        return {
-            note_type_data["anki_id"]: _to_anki_note_type(note_type_data)
-            for note_type_data in data
-        }
 
     def get_protected_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
@@ -1214,7 +1147,6 @@ class AnkiHubClient:
                 API.ANKIHUB,
                 url,
                 params=params if i == 0 else None,
-                is_long_running=True,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -1288,7 +1220,6 @@ class AnkiHubClient:
                 "auto_accept": auto_accept,
                 "suggestions": [suggestion.to_dict() for suggestion in suggestions],
             },
-            is_long_running=True,
         )
 
         if response.status_code != 201:
@@ -1346,7 +1277,6 @@ class AnkiHubClient:
             API.ANKIHUB,
             "/users/card-review-data/",
             json=[review.to_dict() for review in card_review_data],
-            is_long_running=True,
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1359,7 +1289,6 @@ class AnkiHubClient:
             API.ANKIHUB,
             "/users/daily-card-review-summary/",
             json=[summary.to_dict() for summary in daily_card_review_summaries],
-            is_long_running=True,
         )
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
@@ -1416,14 +1345,3 @@ def _to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     note_type_data["tmpls"] = note_type_data.pop("templates")
     note_type_data["flds"] = note_type_data.pop("fields")
     return note_type_data
-
-
-def _to_ankihub_note_type(note_type: Dict[str, Any]) -> Dict[str, Any]:
-    """Turn NotetypeDict into the format used by AnkiHub."""
-    if "id" in note_type:
-        note_type["anki_id"] = note_type.pop("id")
-    if "tmpls" in note_type:
-        note_type["templates"] = note_type.pop("tmpls")
-    if "flds" in note_type:
-        note_type["fields"] = note_type.pop("flds")
-    return note_type

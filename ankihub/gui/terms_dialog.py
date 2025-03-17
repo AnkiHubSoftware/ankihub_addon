@@ -1,13 +1,13 @@
 from typing import Any, Optional
 
-from aqt.qt import QColor, QDialog, Qt, QUrl, QVBoxLayout
+from aqt.qt import QColor, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebPage, AnkiWebView
 
-from ..gui.webview import AuthenticationRequestInterceptor
+from ..gui.webview import AlwaysOnTopOfParentDialog, AuthenticationRequestInterceptor
 from ..settings import config
 
 
-class TermsAndConditionsDialog(QDialog):
+class TermsAndConditionsDialog(AlwaysOnTopOfParentDialog):
     dialog: Optional["TermsAndConditionsDialog"] = None
 
     def __init__(self, parent: Any = None) -> None:
@@ -15,7 +15,6 @@ class TermsAndConditionsDialog(QDialog):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("Settings")
         self.resize(1000, 800)
 

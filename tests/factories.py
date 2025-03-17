@@ -51,8 +51,8 @@ class NoteInfoFactory(BaseFactory[NoteInfo]):
     mid = 1
     fields: List[Field] = factory.LazyAttribute(  # type: ignore
         lambda _: [
-            Field(name="Front", value="front"),
-            Field(name="Back", value="back"),
+            Field(name="Front", value="front", order=0),
+            Field(name="Back", value="back", order=1),
         ]
     )
     tags: List[str] = []

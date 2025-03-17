@@ -3,105 +3,116 @@ interactions:
     body: '{"username": "test1", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=22.0
+      - application/json; version=6.0
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
       Content-Length:
       - '41'
       Content-Type:
       - application/json
+      User-Agent:
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2025-04-02T16:22:22.181229Z","token":"4cad466d79f227e6a28d1916b30ee2c77b11981224d4580434569bc98f138562"}'
+      string: '{"expiry":"2023-02-25T23:46:58.471333Z","token":"444bf2805c3bf71bfff42018c4aba0ee198e96938f3f517ed126f52c0b64c2f2"}'
     headers:
       Allow:
       - POST, OPTIONS
       Content-Language:
-      - en-us
+      - en
       Content-Length:
       - '115'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
-      - unsafe-none
+      - same-origin
       Date:
-      - Wed, 05 Mar 2025 16:22:22 GMT
+      - Sat, 18 Feb 2023 23:46:58 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.12.2
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=259.4530000000006;desc="User CPU time", TimerPanel_stime;dur=68.75300000000007;desc="System
-        CPU time", TimerPanel_total;dur=328.2060000000007;desc="Total CPU time", TimerPanel_total_time;dur=97.87935700296657;desc="Elapsed
-        time", SQLPanel_sql_time;dur=5.13019199934206;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=437.57600000000707;desc="User CPU time", TimerPanel_stime;dur=70.66099999999942;desc="System
+        CPU time", TimerPanel_total;dur=508.2370000000065;desc="Total CPU time", TimerPanel_total_time;dur=254.72712516784668;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.848169326782227;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=TeA1pXLzE4tlAYoqq12DYqgLNYgYAFbQ; expires=Wed, 04 Mar 2026 16:22:22
+      - csrftoken=VasrckPQwNYQDCa48smEjcBKtvpeBs3F; expires=Sat, 17 Feb 2024 23:46:58
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=yybofneeh9mmuwjw8woinje61zy27mgn; expires=Wed, 12 Mar 2025 16:22:22
+      - sessionid=jnwzj6n8fh96awmdfv6lyhx22djit4fw; expires=Sat, 25 Feb 2023 23:46:58
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
-      - Accept, Cookie, Accept-Language, origin
+      - Accept, Cookie, Accept-Language, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 31cbaa0629c6470f8e9584e59ffa165e
+      - bce2342b548c49239103bbc1d10cb845
     status:
       code: 200
       message: OK
 - request:
     body: '{"suggestions": [{"ankihub_id": "00000000-0000-0000-0000-000000000001",
-      "anki_id": 1, "fields": [{"name": "Text", "order": 0, "value": "text1"}, {"name":
-      "Extra", "order": 1, "value": "extra1"}], "comment": "comment1", "deck_id":
-      "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b", "note_type": "Cloze (test1)", "note_type_id":
-      1, "tags": ["tag1", "tag2"], "guid": "asdf"}], "auto_accept": true}'
+      "anki_id": 1, "fields": [{"name": "Front", "order": 0, "value": "front1"}, {"name":
+      "Back", "order": 1, "value": "back1"}], "tags": ["tag1", "tag2"], "comment":
+      "comment1", "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b", "note_type":
+      "Basic", "note_type_id": 1, "guid": "asdf"}], "auto_accept": true}'
     headers:
       Accept:
-      - application/json; version=22.0
+      - application/json; version=6.0
+      Accept-Encoding:
+      - gzip, deflate
       Authorization:
-      - Token 4cad466d79f227e6a28d1916b30ee2c77b11981224d4580434569bc98f138562
+      - Token 444bf2805c3bf71bfff42018c4aba0ee198e96938f3f517ed126f52c0b64c2f2
+      Connection:
+      - keep-alive
       Content-Length:
-      - '383'
+      - '375'
       Content-Type:
       - application/json
+      User-Agent:
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/notes/bulk-new-note-suggestions/
   response:
     body:
-      string: '[{"ankihub_id":"00000000-0000-0000-0000-000000000001","anki_id":1,"fields":[{"name":"Text","order":0,"value":"text1"},{"name":"Extra","order":1,"value":"extra1"}],"comment":"comment1","deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_type":"Cloze
-        (test1)","note_type_id":1,"tags":["tag1","tag2"],"guid":"asdf","id":1}]'
+      string: '[{"ankihub_id":"00000000-0000-0000-0000-000000000001","anki_id":1,"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"tags":["tag1","tag2"],"comment":"comment1","deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_type":"Basic","note_type_id":1,"guid":"asdf","id":1}]'
     headers:
       Allow:
       - POST, OPTIONS
       Content-Language:
-      - en-us
+      - en
       Content-Length:
-      - '323'
+      - '315'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
-      - unsafe-none
+      - same-origin
       Date:
-      - Wed, 05 Mar 2025 16:22:22 GMT
+      - Sat, 18 Feb 2023 23:46:59 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.12.2
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=53.782;desc="User CPU time", TimerPanel_stime;dur=1.4279999999997628;desc="System
-        CPU time", TimerPanel_total;dur=55.20999999999976;desc="Total CPU time", TimerPanel_total_time;dur=64.75379800031078;desc="Elapsed
-        time", SQLPanel_sql_time;dur=6.55688099868712;desc="SQL 36 queries", CachePanel_total_time;dur=0.03535400173859671;desc="Cache
-        1 Calls"
+      - TimerPanel_utime;dur=600.7430000000227;desc="User CPU time", TimerPanel_stime;dur=3.505999999999787;desc="System
+        CPU time", TimerPanel_total;dur=604.2490000000224;desc="Total CPU time", TimerPanel_total_time;dur=601.2499332427979;desc="Elapsed
+        time", SQLPanel_sql_time;dur=8.149385452270508;desc="SQL 23 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, origin
+      - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - d7ed88205532423c835a81924ab4f195
+      - 71af523f9e3b409e9eeabae57f4c3207
     status:
       code: 200
       message: OK
@@ -109,99 +120,110 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=22.0
+      - application/json; version=6.0
+      Accept-Encoding:
+      - gzip, deflate
       Authorization:
-      - Token 4cad466d79f227e6a28d1916b30ee2c77b11981224d4580434569bc98f138562
+      - Token 444bf2805c3bf71bfff42018c4aba0ee198e96938f3f517ed126f52c0b64c2f2
+      Connection:
+      - keep-alive
       Content-Type:
       - application/json
+      User-Agent:
+      - python-requests/2.28.2
     method: GET
     uri: http://localhost:8000/api/notes/00000000-0000-0000-0000-000000000001
   response:
     body:
-      string: '{"deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_id":"00000000-0000-0000-0000-000000000001","anki_id":1,"guid":"asdf","fields":[{"name":"Text","order":0,"value":"text1"},{"name":"Extra","order":1,"value":"extra1"}],"note_type":"Cloze
-        (test1)","note_type_id":1,"last_update_type":"new_note","tags":["tag1","tag2"],"deleted":null}'
+      string: '{"deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_id":"00000000-0000-0000-0000-000000000001","anki_id":1,"guid":"asdf","fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"note_type":"Basic","note_type_id":1,"last_update_type":"new_note","tags":["tag1","tag2"]}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
-      - en-us
+      - en
       Content-Length:
-      - '335'
+      - '312'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
-      - unsafe-none
+      - same-origin
       Date:
-      - Wed, 05 Mar 2025 16:22:22 GMT
+      - Sat, 18 Feb 2023 23:46:59 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.12.2
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=19.64899999999936;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
-        CPU time", TimerPanel_total;dur=19.64899999999936;desc="Total CPU time", TimerPanel_total_time;dur=25.159278000501217;desc="Elapsed
-        time", SQLPanel_sql_time;dur=3.58991800021613;desc="SQL 9 queries", CachePanel_total_time;dur=0.042862000555032864;desc="Cache
-        2 Calls"
+      - TimerPanel_utime;dur=147.30900000000702;desc="User CPU time", TimerPanel_stime;dur=0.15499999999946112;desc="System
+        CPU time", TimerPanel_total;dur=147.46400000000648;desc="Total CPU time",
+        TimerPanel_total_time;dur=145.65205574035645;desc="Elapsed time", SQLPanel_sql_time;dur=2.7511119842529297;desc="SQL
+        6 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, origin
+      - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - ab8c26ddb3844e5e8cff4f0053fab17a
+      - f793b1c7364547309013910f2c6a073a
     status:
       code: 200
       message: OK
 - request:
     body: '{"ankihub_id": "00000000-0000-0000-0000-000000000001", "anki_id": 1, "fields":
-      [{"name": "Text", "order": 0, "value": "text2"}], "comment": "comment1", "added_tags":
-      ["tag3", "tag4"], "removed_tags": [], "change_type": "updated_content", "note_id":
-      "00000000-0000-0000-0000-000000000001", "auto_accept": true}'
+      [{"name": "Front", "order": 0, "value": "front2"}], "tags": ["tag3", "tag4"],
+      "comment": "comment1", "change_type": "updated_content", "note_id": "00000000-0000-0000-0000-000000000001",
+      "auto_accept": true}'
     headers:
       Accept:
-      - application/json; version=22.0
+      - application/json; version=6.0
+      Accept-Encoding:
+      - gzip, deflate
       Authorization:
-      - Token 4cad466d79f227e6a28d1916b30ee2c77b11981224d4580434569bc98f138562
+      - Token 444bf2805c3bf71bfff42018c4aba0ee198e96938f3f517ed126f52c0b64c2f2
+      Connection:
+      - keep-alive
       Content-Length:
-      - '309'
+      - '285'
       Content-Type:
       - application/json
+      User-Agent:
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/notes/00000000-0000-0000-0000-000000000001/suggestion/
   response:
     body:
-      string: '{"id":1,"fields":[{"name":"Text","order":0,"value":"text2"}],"state":"pending","rejection_reason":"","bulk_id":null,"bulk_creation_time":null,"state_change_responsible":null,"author":1,"related_note":"00000000-0000-0000-0000-000000000001","change_type":"updated_content","original_note_fields":[{"name":"Text","order":0,"value":"text1"},{"name":"Extra","order":1,"value":"extra1"}],"added_tags":["tag3","tag4"],"removed_tags":[],"comment":"comment1","created":"2025-03-05T16:22:22.457159Z","modified":"2025-03-05T16:22:22.457159Z"}'
+      string: '{"id":1,"comment":"comment1","related_note":"00000000-0000-0000-0000-000000000001","author":1,"created":"2023-02-18T23:46:59.515106Z","modified":"2023-02-18T23:46:59.515106Z","fields":[{"name":"Front","order":0,"value":"front2"}],"state":"pending","rejection_reason":"","bulk_id":null,"bulk_creation_time":null,"change_type":"updated_content","original_note_fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"added_tags":["tag4","tag3"],"removed_tags":["tag1","tag2"],"state_change_responsible":null}'
     headers:
       Allow:
       - POST, OPTIONS
       Content-Language:
-      - en-us
+      - en
       Content-Length:
-      - '531'
+      - '546'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
-      - unsafe-none
+      - same-origin
       Date:
-      - Wed, 05 Mar 2025 16:22:22 GMT
+      - Sat, 18 Feb 2023 23:47:00 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.12.2
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=99.38999999999965;desc="User CPU time", TimerPanel_stime;dur=0.6789999999998741;desc="System
-        CPU time", TimerPanel_total;dur=100.06899999999952;desc="Total CPU time",
-        TimerPanel_total_time;dur=135.1959359999455;desc="Elapsed time", SQLPanel_sql_time;dur=19.39250700525008;desc="SQL
-        40 queries", CachePanel_total_time;dur=0.10564900003373623;desc="Cache 1 Calls"
+      - TimerPanel_utime;dur=634.0119999999843;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=634.0119999999843;desc="Total CPU time", TimerPanel_total_time;dur=629.650354385376;desc="Elapsed
+        time", SQLPanel_sql_time;dur=12.852668762207031;desc="SQL 35 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, origin
+      - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 7c8e27fb40504282b171de667f221d0b
+      - a1ea384358234f379b7ab16eee6fa914
     status:
       code: 201
       message: Created

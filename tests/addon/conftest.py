@@ -109,24 +109,12 @@ def anki_session_with_addon_data(
                 _profile_setup()
 
         _mock_all_feature_flags_to_default_values(monkeypatch)
-        _mock_user_details(requests_mock)
 
         yield anki_session
 
 
 def _mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(AnkiHubClient, "get_feature_flags", lambda *args, **kwargs: {})
-
-
-def _mock_user_details(request_mock: Mocker) -> None:
-    request_mock.get(
-        "https://app.ankihub.net/api/users/me",
-        json={
-            "has_flashcard_selector_access": False,
-            "has_reviewer_extension_access": False,
-            "username": "test_user",
-        },
-    )
 
 
 @pytest.fixture
