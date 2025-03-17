@@ -8,6 +8,7 @@ from aqt.qt import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLa
 from aqt.utils import showWarning, tooltip
 
 from ...gui.utils import active_window_or_mw
+from ..llm.llm import run_llm_script
 
 
 class SecretsDialog(QDialog):
@@ -29,14 +30,8 @@ class SecretsDialog(QDialog):
     def _get_keys_file_path(self) -> Path:
         """Get the path to the keys.json file."""
         try:
-            script_path = Path(__file__).parent.parent / "llm" / "llm.sh"
-            result = subprocess.run(
-                [str(script_path), "get_keys_path"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return Path(result.stdout.strip())
+            result = run_llm_script("get_keys_path")
+            return Path(result.strip())
         except subprocess.CalledProcessError as e:
             raise Exception(
                 "Failed to get LLM keys path. Please run 'llm setup' in your terminal first.\n\n"
