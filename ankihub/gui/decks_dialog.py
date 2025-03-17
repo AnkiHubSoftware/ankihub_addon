@@ -2,10 +2,11 @@
 
 import uuid
 from concurrent.futures import Future
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 import aqt
+from anki.models import NotetypeId, NotetypeNameId
 from aqt.qt import (
     QBoxLayout,
     QCheckBox,
@@ -22,16 +23,25 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
-from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client.models import UserDeckRelation
+from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
+from ..main.note_type_management import (
+    add_note_type,
+    add_note_type_fields,
+    new_fields_for_note_type,
+    note_type_had_templates_added_or_removed,
+    note_types_with_template_changes_for_deck,
+    update_note_type_templates_and_styles,
+)
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..main.utils import truncate_string
+from ..main.utils import note_type_name_without_ankihub_modifications, truncate_string
 from ..settings import (
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
@@ -42,9 +52,12 @@ from ..settings import (
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import (
+    SearchableSelectionDialog,
     ask_user,
+    choose_subset,
     clear_layout,
     set_styled_tooltip,
+    show_dialog,
     tooltip_icon,
     tooltip_stylesheet,
 )
@@ -67,9 +80,10 @@ class DeckManagementDialog(QDialog):
             self.show()
 
     def _setup_ui(self):
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
-        self.setMinimumHeight(650)
+        self.setMinimumHeight(750)
 
         self.box_main = QVBoxLayout()
 
@@ -175,6 +189,11 @@ class DeckManagementDialog(QDialog):
             selected_ah_did
         )
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
+        self.box_bottom_right.addStretch()
+
+        # Note Types
+        self.box_note_types = self._setup_box_note_types(selected_ah_did)
+        self.box_bottom_right.addLayout(self.box_note_types)
         self.box_bottom_right.addStretch()
 
     def _setup_box_deck_actions(self) -> QVBoxLayout:
@@ -560,6 +579,261 @@ class DeckManagementDialog(QDialog):
 
         return box
 
+    def _setup_box_note_types(
+        self, selected_ah_did: uuid.UUID
+    ) -> Optional[QVBoxLayout]:
+        box = QVBoxLayout()
+        deck_config = config.deck_config(selected_ah_did)
+        if deck_config.user_relation != UserDeckRelation.OWNER:
+            return box
+
+        self.note_types_label = QLabel("<b>📝 Note Types</b>")
+        self.add_note_type_btn = QPushButton("Publish note type")
+        qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
+        self._update_add_note_type_btn_state()
+        self.add_field_btn = QPushButton("Publish field")
+        qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
+        self._update_add_field_btn_state()
+        self.update_templates_btn = QPushButton("Publish style/template updates")
+        qconnect(
+            self.update_templates_btn.clicked, self._on_update_templates_btn_clicked
+        )
+        self._update_templates_btn_state()
+        box.addWidget(self.note_types_label)
+        box.addWidget(self.add_note_type_btn)
+        box.addWidget(self.add_field_btn)
+        box.addWidget(self.update_templates_btn)
+
+        return box
+
+    def _update_note_type_btn_state(self, button: QPushButton, enabled: bool):
+        button.setEnabled(enabled)
+        if enabled:
+            button.setToolTip("")
+        else:
+            button.setToolTip("Nothing to update to AnkiHub")
+
+    def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
+        note_type_names_for_deck = self._get_note_type_names_for_deck(
+            self._selected_ah_did(), assigned_to_deck=True
+        )
+        other_note_type_names = self._get_note_type_names_for_deck(
+            self._selected_ah_did(), assigned_to_deck=False
+        )
+        note_type_names_for_deck_without_ah_modifcations = {
+            note_type_name_without_ankihub_modifications(name)
+            for name in note_type_names_for_deck
+        }
+        names = [
+            name
+            for name in other_note_type_names
+            if (
+                note_type_name_without_ankihub_modifications(name)
+                not in note_type_names_for_deck_without_ah_modifcations
+            )
+        ]
+        return names
+
+    def _update_add_note_type_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_add_note_type_btn())
+        self._update_note_type_btn_state(self.add_note_type_btn, enabled)
+
+    def _get_note_type_names_for_add_field_type_btn(self) -> List[str]:
+        names_and_ids = self._get_note_type_names_and_ids_for_deck(
+            self._selected_ah_did(), assigned_to_deck=True
+        )
+        filtered_names = []
+        for name_and_id in names_and_ids:
+            note_type = aqt.mw.col.models.get(NotetypeId(name_and_id.id))
+            if new_fields_for_note_type(note_type):
+                filtered_names.append(name_and_id.name)
+
+        return filtered_names
+
+    def _update_add_field_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_add_field_type_btn())
+        self._update_note_type_btn_state(self.add_field_btn, enabled)
+
+    def _get_note_type_names_for_update_templates_btn(self) -> List[str]:
+        mids_with_updates = note_types_with_template_changes_for_deck(
+            self._selected_ah_did()
+        )
+        return [
+            n.name
+            for n in self._get_note_type_names_and_ids_for_deck(
+                self._selected_ah_did(), assigned_to_deck=True
+            )
+            if n.id in mids_with_updates
+        ]
+
+    def _update_templates_btn_state(self):
+        enabled = bool(self._get_note_type_names_for_update_templates_btn())
+        self._update_note_type_btn_state(self.update_templates_btn, enabled)
+
+    def _get_note_type_names_and_ids_for_deck(
+        self, deck_id: UUID, assigned_to_deck: bool
+    ) -> List[NotetypeNameId]:
+        """
+        Returns a sorted list of note type names and IDs filtered by whether they are assigned to the deck.
+        For AnkiHub note types, the name from the AnkiHub DB is returned, even if it's different in Anki.
+
+        Args:
+            deck_id: The ID of the selected AnkiHub deck.
+            assigned_to_deck: If True, return note types that are already assigned to the deck.
+                            If False, return note types that are not yet assigned.
+        """
+        if assigned_to_deck:
+            names_and_ids = [
+                NotetypeNameId(name=name, id=id)
+                for name, id in ankihub_db.note_type_names_and_ids_for_ankihub_deck(
+                    deck_id
+                )
+            ]
+        else:
+            mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
+            names_and_ids = [
+                n for n in aqt.mw.col.models.all_names_and_ids() if n.id not in mids
+            ]
+        return sorted(
+            names_and_ids,
+            key=lambda n: n.name,
+        )
+
+    def _get_note_type_names_for_deck(
+        self, deck_id: UUID, assigned_to_deck: bool
+    ) -> List[str]:
+        return [
+            n.name
+            for n in self._get_note_type_names_and_ids_for_deck(
+                deck_id, assigned_to_deck
+            )
+        ]
+
+    def _on_add_note_type_btn_clicked(self):
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
+                return
+            confirm = ask_user(
+                "<b>Proceed?</b><br><br>"
+                "Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
+                title="Publish note type",
+                no_button_label="Cancel",
+            )
+            if not confirm:
+                return
+
+            note_type = aqt.mw.col.models.by_name(note_type_selector.name)
+            add_note_type(self._selected_ah_did(), note_type)
+
+            tooltip("Changes updated", parent=self)
+            self._update_add_note_type_btn_state()
+
+        SearchableSelectionDialog(
+            aqt.mw,
+            names=self._get_note_type_names_for_add_note_type_btn,
+            accept="Choose",
+            title="Choose note type to publish",
+            parent=self,
+            callback=on_note_type_selected,
+        )
+
+    def _on_add_field_btn_clicked(self) -> None:
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
+                return
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
+            new_fields = new_fields_for_note_type(note_type)
+            new_fields = choose_subset(
+                prompt="<b>Select fields to publish</b>",
+                choices=new_fields,
+                current=[],
+                buttons=[
+                    ("Proceed", QDialogButtonBox.ButtonRole.AcceptRole),
+                    ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
+                ],
+                parent=note_type_selector,
+                require_at_least_one=True,
+                select_all_text="Select all fields",
+            )
+            if new_fields:
+                confirm = ask_user(
+                    "<b>Proceed?</b><br><br>"
+                    "Confirm to publish the fields to all AnkiHub users of your deck.<br><br>"
+                    "⚠️ Note type changes require a full sync and "
+                    "<b>users will be asked to sync all their devices</b> before going through the AnkiHub Sync.",
+                    title="Publish fields",
+                    no_button_label="Cancel",
+                )
+                if not confirm:
+                    return
+
+                add_note_type_fields(self._selected_ah_did(), note_type, new_fields)
+                tooltip("Changes updated", parent=self)
+                self._update_add_field_btn_state()
+
+        SearchableSelectionDialog(
+            aqt.mw,
+            names=self._get_note_type_names_for_add_field_type_btn,
+            accept="Choose",
+            title="Choose note type to edit",
+            parent=self,
+            callback=on_note_type_selected,
+        )
+
+    def _on_update_templates_btn_clicked(self) -> None:
+        def on_note_type_selected(
+            note_type_selector: SearchableSelectionDialog,
+        ) -> None:
+            if not note_type_selector.name:
+                return
+
+            mid = ankihub_db.note_type_id_by_name(note_type_selector.name)
+            note_type = aqt.mw.col.models.get(mid)
+
+            if note_type_had_templates_added_or_removed(note_type=note_type):
+                dialog = show_dialog(
+                    (
+                        "<h3>Issue with note type templates</h3>"
+                        "⚠️ <b>Adding or removing templates is not supported</b> in this publishing flow.<br><br>"
+                        "If you've recently created or deleted a template, sync with AnkiHub to reset "
+                        "the templates before publishing any style or template updates."
+                    ),
+                    title=" ",
+                    buttons=[("Close", QDialogButtonBox.ButtonRole.AcceptRole)],
+                    parent=self,
+                    open_dialog=False,
+                )
+                dialog.show()
+                return
+
+            confirm = ask_user(
+                "<b>Proceed?</b><br><br>"
+                "Confirm to update note styling and templates for all AnkiHub users of your deck.<br><br>"
+                + "⚠️ <b>Certain changes may break the note type</b> so proceed with caution.<br><br>",
+                title="Publish style/template updates",
+                no_button_label="Cancel",
+            )
+            if not confirm:
+                return
+
+            update_note_type_templates_and_styles(self._selected_ah_did(), note_type)
+            tooltip("Changes updated", parent=self)
+            self._update_templates_btn_state()
+
+        SearchableSelectionDialog(
+            aqt.mw,
+            names=self._get_note_type_names_for_update_templates_btn,
+            accept="Choose",
+            title="Choose note type to update",
+            parent=self,
+            callback=on_note_type_selected,
+        )
+
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
         destination_anki_did = deck_config.anki_id
@@ -610,6 +884,7 @@ class DeckManagementDialog(QDialog):
             f"Unsubscribe from deck <b>{deck_name}</b>?<br>"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
             title="Unsubscribe from AnkiHub Deck",
+            parent=self,
         )
         if not confirm:
             return
@@ -636,23 +911,22 @@ class DeckManagementDialog(QDialog):
         else:
             current = current_destination_deck["name"]
 
-        def update_deck_config(ret: StudyDeck):
-            if not ret.name:
+        def update_deck_config(note_type_selector: SearchableSelectionDialog):
+            if not note_type_selector.name:
                 return
 
-            anki_did = aqt.mw.col.decks.id(ret.name)
+            anki_did = aqt.mw.col.decks.id(note_type_selector.name)
             config.set_home_deck(ankihub_did=ah_did, anki_did=anki_did)
             self._refresh_new_cards_destination_details_label(ah_did)
 
         # this lets the user pick a deck
-        StudyDeckWithoutHelpButton(
+        SearchableSelectionDialog(
             aqt.mw,
             current=current,
             accept="Confirm Destination for New Cards",
             title="Select Destination for New Cards",
             parent=self,
             callback=update_deck_config,
-            buttons=[],  # This removes the "Add" button
         )
 
     def _on_toggle_subdecks(self):
@@ -702,12 +976,3 @@ class DeckManagementDialog(QDialog):
     def closeEvent(self, event) -> None:
         super().closeEvent(event)
         config.log_private_config()
-
-
-class StudyDeckWithoutHelpButton(StudyDeck):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.form.buttonBox.removeButton(
-            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
-        )

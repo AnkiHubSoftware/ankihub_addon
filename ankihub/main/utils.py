@@ -22,24 +22,45 @@ from ..db import ankihub_db
 from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
-    ANKIHUB_CSS_END_COMMENT,
-    ANKIHUB_HTML_END_COMMENT,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
+    config,
     url_mh_integrations_preview,
     url_view_note,
 )
+from .exceptions import ChangesRequireFullSyncError
 
 if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
 
-# Pattern for the AnkiHub end comment in card templates.
+# The following constants are used to identify AnkiHub modifications in note types.
+ANKIHUB_SNIPPET_MARKER = "ANKIHUB MODFICATIONS"
+ANKIHUB_SNIPPET_RE = (
+    f"<!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->"
+    r"[\w\W]*"
+    f"<!-- END {ANKIHUB_SNIPPET_MARKER} -->"
+)
+
 # The end comment is used to allow users to add their own content below it without it being overwritten
 # when the template is updated.
-ANKIHUB_HTML_END_COMMENT_PATTERN = re.compile(
+ANKIHUB_HTML_END_COMMENT = (
+    "<!--\n"
+    "ANKIHUB_END\n"
+    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
+    "Do not edit or remove this comment if you want to protect the content below.\n"
+    "-->"
+)
+ANKIHUB_CSS_END_COMMENT = (
+    "/*\n"
+    "ANKIHUB_END\n"
+    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
+    "Do not edit or remove this comment if you want to protect the content below.\n"
+    "*/"
+)
+
+ANKIHUB_HTML_END_COMMENT_RE = re.compile(
     rf"{re.escape(ANKIHUB_HTML_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
 )
-ANKIHUB_CSS_END_COMMENT_PATTERN = re.compile(
+ANKIHUB_CSS_COMMENT_RE = re.compile(
     rf"{re.escape(ANKIHUB_CSS_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
 )
 
@@ -224,7 +245,9 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     return aqt.mw.col.db.list(query)
 
 
-def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
+def change_note_types_of_notes(
+    nid_mid_pairs: List[Tuple[NoteId, NotetypeId]], raise_if_full_sync_required=False
+) -> None:
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
     # Group notes by source and target note type
@@ -238,6 +261,17 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
 
         if current_mid != mid:
             notes_grouped_by_type_change[(current_mid, mid)].append(nid)
+
+    if raise_if_full_sync_required and notes_grouped_by_type_change:
+        affected_note_type_ids = set(
+            target_note_type_id
+            for _, target_note_type_id in notes_grouped_by_type_change.keys()
+        )
+        LOGGER.info(
+            "Changing note types of notes requires full sync.",
+            affected_note_type_ids=affected_note_type_ids,
+        )
+        raise ChangesRequireFullSyncError(affected_note_type_ids=affected_note_type_ids)
 
     # Change note types of notes for each group
     for (
@@ -295,11 +329,17 @@ def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeI
 
 # ... note type modifications
 
-ANKIHUB_TEMPLATE_SNIPPET_RE = (
-    f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-    r"[\w\W]*"
-    f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-)
+
+def note_type_name_without_ankihub_modifications(name: str) -> str:
+    return re.sub(r"(\s*\([^()]+ / [^()]+\))+\s*$", "", name)
+
+
+def modified_ankihub_note_type_name(note_type_name: str, deck_name) -> str:
+    name_without_modifications = note_type_name_without_ankihub_modifications(
+        note_type_name
+    )
+    name = f"{name_without_modifications} ({deck_name} / {config.username_or_email()})"
+    return name
 
 
 def modified_note_type(note_type: NotetypeDict) -> NotetypeDict:
@@ -345,7 +385,7 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
     """Return template html with the AnkiHub view note snippet added to it."""
     snippet = dedent(
         f"""
-        <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <a class='ankihub-view-note'
             href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
@@ -400,14 +440,14 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
         </script>
 
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        <!-- END {ANKIHUB_SNIPPET_MARKER} -->
         """
     ).strip("\n")
 
     snippet_pattern = (
-        f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+        f"<!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->"
         r"[\w\W]*"
-        f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+        f"<!-- END {ANKIHUB_SNIPPET_MARKER} -->"
     )
 
     if not re.search(snippet_pattern, template_side):
@@ -442,21 +482,26 @@ def note_type_with_updated_templates_and_css(
     """
 
     updated_templates = []
-    for template_idx, old_template in enumerate(old_note_type["tmpls"]):
-        if new_note_type is not None:
+    new_template_amount = (
+        len(new_note_type["tmpls"]) if new_note_type else len(old_note_type["tmpls"])
+    )
+    for template_idx in range(new_template_amount):
+        if template_idx < len(old_note_type["tmpls"]):
+            old_template = old_note_type["tmpls"][template_idx]
+        else:
+            old_template = None
+
+        if new_note_type:
             new_template = new_note_type["tmpls"][template_idx]
             updated_template = copy.deepcopy(new_template)
         else:
+            new_template = None
             updated_template = copy.deepcopy(old_template)
 
         for template_side_name in ["qfmt", "afmt"]:
             updated_template[template_side_name] = _updated_note_type_content(
-                old_content=old_template[template_side_name],
-                new_content=(
-                    new_template[template_side_name]
-                    if new_note_type is not None
-                    else None
-                ),
+                old_content=old_template[template_side_name] if old_template else None,
+                new_content=new_template[template_side_name] if new_template else None,
                 add_view_on_ankihub_snippet=template_side_name == "afmt",
                 content_type="html",
             )
@@ -476,7 +521,7 @@ def note_type_with_updated_templates_and_css(
 
 
 def _updated_note_type_content(
-    old_content: str,
+    old_content: Optional[str],
     new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
     content_type: str,
@@ -489,15 +534,20 @@ def _updated_note_type_content(
       add_view_on_ankihub_snippet: Whether to add AnkiHub view button
       content_type: Either "html" or "css" to determine comment style
     """
+    assert old_content is not None or new_content is not None
+
     if content_type == "html":
         end_comment = ANKIHUB_HTML_END_COMMENT
-        end_comment_pattern = ANKIHUB_HTML_END_COMMENT_PATTERN
+        end_comment_pattern = ANKIHUB_HTML_END_COMMENT_RE
     else:
         end_comment = ANKIHUB_CSS_END_COMMENT
-        end_comment_pattern = ANKIHUB_CSS_END_COMMENT_PATTERN
+        end_comment_pattern = ANKIHUB_CSS_COMMENT_RE
 
-    m = re.search(end_comment_pattern, old_content)
-    text_to_migrate = m.group("text_to_migrate") if m else ""
+    if old_content:
+        m = re.search(end_comment_pattern, old_content)
+        text_to_migrate = m.group("text_to_migrate") if m else ""
+    else:
+        text_to_migrate = ""
 
     # Choose the base for the result
     result = new_content if new_content is not None else old_content
@@ -526,28 +576,23 @@ def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
         if note_type is None:
             continue
 
-        undo_note_type_modification(note_type)
+        note_type = note_type_without_ankihub_modifications(note_type)
         aqt.mw.col.models.update_dict(note_type)
 
-
-def undo_note_type_modification(note_type: Dict) -> None:
-    """Removes the AnkiHub Field from the Note Type and modifies the template to
-    remove the field.
-    """
-    LOGGER.info(
-        "Undoing modification of note type",
-        note_type_name=note_type["name"],
-        note_type_id=note_type["id"],
-    )
-
-    undo_fields_modification(note_type)
-
-    templates = note_type["tmpls"]
-    for template in templates:
-        undo_template_modification(template)
+        LOGGER.info(
+            "Removed AnkiHub modifications from note type.",
+            note_type_name=note_type["name"],
+            note_type_id=note_type["id"],
+        )
 
 
-def undo_fields_modification(note_type: Dict) -> None:
+def note_type_without_ankihub_modifications(note_type: NotetypeDict) -> NotetypeDict:
+    note_type = note_type_without_template_and_style_modifications(note_type)
+    remove_ankihub_id_field(note_type)
+    return note_type
+
+
+def remove_ankihub_id_field(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in field_names:
@@ -555,12 +600,21 @@ def undo_fields_modification(note_type: Dict) -> None:
     fields.pop(field_names.index(settings.ANKIHUB_NOTE_TYPE_FIELD_NAME))
 
 
-def undo_template_modification(template: Dict) -> None:
-    template["afmt"] = re.sub(
-        r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
-        "",
-        template["afmt"],
-    )
+def note_type_without_template_and_style_modifications(
+    note_type: Dict[str, Any],
+) -> NotetypeDict:
+    note_type = copy.deepcopy(note_type)
+    note_type["css"] = ANKIHUB_CSS_COMMENT_RE.sub("", note_type["css"]).strip()
+    for template in note_type["tmpls"]:
+        template["qfmt"] = ANKIHUB_HTML_END_COMMENT_RE.sub("", template["qfmt"]).strip()
+        template["afmt"] = re.sub(
+            r"\n{0,2}" + ANKIHUB_SNIPPET_RE,
+            "",
+            template["afmt"],
+        )
+        template["afmt"] = ANKIHUB_HTML_END_COMMENT_RE.sub("", template["afmt"]).strip()
+
+    return note_type
 
 
 # backup

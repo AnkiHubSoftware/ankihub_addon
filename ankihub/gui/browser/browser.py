@@ -45,7 +45,8 @@ from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
-from ..deck_updater import NotLoggedInError, ah_deck_updater
+from ..deck_updater import NotLoggedInError
+from ..operations.ankihub_sync import update_decks_and_media
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
@@ -444,8 +445,7 @@ def _on_reset_deck_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-
-        browser.model.reset()
+        aqt.mw.reset()
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
@@ -498,8 +498,7 @@ def _on_reset_subdecks_action(browser: Browser):
 
     def on_done(future: Future) -> None:
         future.result()
-        browser.sidebar.refresh()
-        aqt.mw.deckBrowser.refresh()
+        aqt.mw.reset()
         tooltip("Rebuilt subdecks and moved cards.")
 
     aqt.mw.taskman.with_progress(
@@ -569,8 +568,11 @@ def _reset_optional_tag_group(extension_id: int) -> None:
     # reset the latest extension update to sync all content for the deck extension on the next sync
     config.save_latest_extension_update(extension_id=extension_id, latest_update=None)
 
-    ah_deck_updater.update_decks_and_media(
-        ah_dids=[extension_config.ah_did], start_media_sync=False
+    def on_done(future: Future) -> None:
+        future.result()
+
+    update_decks_and_media(
+        on_done=on_done, ah_dids=[extension_config.ah_did], start_media_sync=False
     )
 
 

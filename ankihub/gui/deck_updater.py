@@ -3,10 +3,11 @@
 import uuid
 from datetime import datetime
 from functools import cached_property
-from typing import Collection, List, Optional
+from typing import Collection, Dict, List, Optional, cast
 
 import aqt
 from anki.errors import NotFoundError
+from anki.models import NotetypeDict, NotetypeId
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
@@ -16,7 +17,6 @@ from ..ankihub_client.models import NotesActionChoices
 from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import is_tag_for_group
-from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
@@ -39,7 +39,10 @@ class _AnkiHubDeckUpdater:
         return AnkiHubClient()
 
     def update_decks_and_media(
-        self, ah_dids: Collection[uuid.UUID], start_media_sync: bool = True
+        self,
+        ah_dids: Collection[uuid.UUID],
+        raise_if_full_sync_required: bool,
+        start_media_sync: bool = True,
     ) -> List[AnkiHubImportResult]:
         """Fetch and apply deck updates from AnkiHub for the given decks and start the media download.
         Also updates deck extensions.
@@ -52,6 +55,7 @@ class _AnkiHubDeckUpdater:
         )
 
         self._import_results = None
+        self._raise_if_full_sync_required = raise_if_full_sync_required
 
         if not config.is_logged_in():
             LOGGER.info("User is not logged in, can't update decks.")
@@ -130,27 +134,33 @@ class _AnkiHubDeckUpdater:
             LOGGER.info("User cancelled deck update.")
             return False
 
-        if deck_updates.notes:
-            note_types = fetch_note_types_based_on_notes(notes_data=deck_updates.notes)
-            import_result = self._importer.import_ankihub_deck(
-                ankihub_did=ankihub_did,
-                notes=deck_updates.notes,
-                note_types=note_types,
-                deck_name=deck_config.name,
-                is_first_import_of_deck=False,
-                behavior_on_remote_note_deleted=deck_config.behavior_on_remote_note_deleted,
-                anki_did=deck_config.anki_id,
-                protected_fields=deck_updates.protected_fields,
-                protected_tags=deck_updates.protected_tags,
-                subdecks=deck_config.subdecks_enabled,
-                suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
-                suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
-            )
-            self._import_results.append(import_result)
+        note_types = cast(
+            Dict[NotetypeId, NotetypeDict],
+            self._client.get_note_types_dict_for_deck(ankihub_did),
+        )
 
+        import_result = self._importer.import_ankihub_deck(
+            ankihub_did=ankihub_did,
+            notes=deck_updates.notes,
+            note_types=note_types,
+            deck_name=deck_config.name,
+            is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=deck_config.behavior_on_remote_note_deleted,
+            anki_did=deck_config.anki_id,
+            protected_fields=deck_updates.protected_fields,
+            protected_tags=deck_updates.protected_tags,
+            subdecks=deck_config.subdecks_enabled,
+            suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
+            raise_if_full_sync_required=self._raise_if_full_sync_required,
+            clear_ah_note_types_before_import=True,
+        )
+        self._import_results.append(import_result)
+
+        if deck_updates.latest_update:
+            # latest_update is None if there were no notes in the updates
             config.save_latest_deck_update(ankihub_did, deck_updates.latest_update)
-        else:
-            LOGGER.info("No new updates for deck", ah_did=ankihub_did)
+
         return True
 
     def fetch_and_apply_pending_notes_actions_for_deck(
@@ -289,7 +299,7 @@ def show_tooltip_about_last_deck_updates_results() -> None:
     total = created_nids_amount + updated_nids_amount
 
     if total == 0:
-        tooltip("AnkiHub: No new updates")
+        tooltip("AnkiHub: No new updates", parent=aqt.mw)
     else:
         tooltip(
             f"AnkiHub: Updated {total} note{'' if total == 1 else 's'}.",

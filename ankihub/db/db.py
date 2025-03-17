@@ -34,12 +34,13 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from peewee import DQ
+from peewee import DQ, SqliteDatabase
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError
 from .models import (
     AnkiHubNote,
@@ -91,6 +92,10 @@ class _AnkiHubDB:
             migrate_ankihub_db()
             bind_peewee_models()
 
+    @property
+    def db(self) -> SqliteDatabase:
+        return get_peewee_database()
+
     def schema_version(self) -> int:
         return get_peewee_database().pragma("user_version")
 
@@ -134,14 +139,18 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         note_dicts = []
         for note_data in notes_data:
-
             # Prepare fields and tags for insertion
-            fields = join_fields(
-                [
-                    field.value
-                    for field in sorted(note_data.fields, key=lambda field: field.order)
-                ]
-            )
+            field_values = []
+            for field_name in self.note_type_field_names(
+                anki_note_type_id=NotetypeId(note_data.mid)
+            ):
+                if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
+                    continue
+                field = next(
+                    (f for f in note_data.fields if f.name == field_name), None
+                )
+                field_values.append(field.value if field else "")
+            fields = join_fields(field_values)
             tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
             note_dicts.append(
@@ -164,7 +173,7 @@ class _AnkiHubDB:
 
         # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
         # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             for chunk in chunks(note_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
                 AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
@@ -216,7 +225,7 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             execute_modifying_query_in_chunks(
                 lambda ah_nids: (
                     AnkiHubNote.delete()
@@ -253,7 +262,7 @@ class _AnkiHubDB:
             note = AnkiHubNote(ankihub_note_id=note_data.ah_nid, mod=mod)
             notes.append(note)
 
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each entry. The purpose is to avoid the "too many SQL variables" error.
             AnkiHubNote.bulk_update(
@@ -296,8 +305,8 @@ class _AnkiHubDB:
         if not note:
             return None
 
-        field_names = self._note_type_field_names(
-            ankihub_did=note.ankihub_deck_id, anki_note_type_id=note.anki_note_type_id
+        field_names = self.note_type_field_names(
+            anki_note_type_id=note.anki_note_type_id
         )
 
         return self._build_note_info(note, {note.anki_note_type_id: field_names})
@@ -316,10 +325,7 @@ class _AnkiHubDB:
         field_names_by_mid: Dict[NotetypeId, List[str]] = {}
         for note in notes:
             if note.anki_note_type_id not in field_names_by_mid:
-                field_names_by_mid[
-                    note.anki_note_type_id
-                ] = self._note_type_field_names(
-                    ankihub_did=cast(uuid.UUID, note.ankihub_deck_id),
+                field_names_by_mid[note.anki_note_type_id] = self.note_type_field_names(
                     anki_note_type_id=cast(NotetypeId, note.anki_note_type_id),
                 )
 
@@ -339,7 +345,6 @@ class _AnkiHubDB:
                         i
                     ],
                     value=value,
-                    order=i,
                 )
                 for i, value in enumerate(split_fields(cast(str, note.fields)))
             ],
@@ -437,13 +442,11 @@ class _AnkiHubDB:
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             AnkiHubNote.delete().where(
                 AnkiHubNote.ankihub_deck_id == ankihub_did
             ).execute()
-            AnkiHubNoteType.delete().where(
-                AnkiHubNoteType.ankihub_deck_id == ankihub_did
-            ).execute()
+            self.remove_note_types_of_deck(ankihub_did)
             DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
@@ -485,7 +488,7 @@ class _AnkiHubDB:
             for deck_media in media_list
         ]
 
-        with self.write_lock, get_peewee_database().atomic():
+        with self.write_lock, self.db.atomic():
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
             for chunk in chunks(deck_media_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
@@ -595,15 +598,25 @@ class _AnkiHubDB:
                 .execute()
             )
 
-    def note_type_dict(
-        self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
-    ) -> NotetypeDict:
+    def remove_note_types_of_deck(self, ankihub_did: uuid.UUID) -> None:
+        with self.write_lock:
+            AnkiHubNoteType.delete().where(
+                AnkiHubNoteType.ankihub_deck_id == ankihub_did
+            ).execute()
+
+    def note_type_dict(self, note_type_id: NotetypeId) -> NotetypeDict:
         return (
             AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict)
             .filter(
                 anki_note_type_id=note_type_id,
-                ankihub_deck_id=ankihub_did,
             )
+            .scalar()
+        )
+
+    def note_type_id_by_name(self, name: str) -> Optional[NotetypeId]:
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
+            .filter(AnkiHubNoteType.name == name)
             .scalar()
         )
 
@@ -624,25 +637,32 @@ class _AnkiHubDB:
             .objects(flat)
         )
 
-    def ankihub_dids_for_note_type(
-        self, anki_note_type_id: NotetypeId
-    ) -> Set[uuid.UUID]:
-        """Returns the AnkiHub deck ids that use the given note type."""
-        return set(
-            AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
-            .filter(anki_note_type_id=anki_note_type_id)
-            .objects(flat)
+    def note_type_names_and_ids_for_ankihub_deck(
+        self, ankihub_did: uuid.UUID
+    ) -> List[Tuple[str, NotetypeId]]:
+        return (
+            AnkiHubNoteType.select(
+                AnkiHubNoteType.name, AnkiHubNoteType.anki_note_type_id
+            )
+            .filter(ankihub_deck_id=ankihub_did)
+            .objects(lambda name, anki_note_type_id: (name, anki_note_type_id))
         )
 
-    def _note_type_field_names(
-        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
-    ) -> List[str]:
+    def ankihub_did_for_note_type(self, anki_note_type_id: NotetypeId) -> uuid.UUID:
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
+            .filter(anki_note_type_id=anki_note_type_id)
+            .scalar()
+        )
+
+    def note_type_field_names(self, anki_note_type_id: NotetypeId) -> List[str]:
         """Returns the names of the fields of the note type."""
         result = [
             field["name"]
-            for field in self.note_type_dict(
-                ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-            )["flds"]
+            for field in sorted(
+                (field for field in self.note_type_dict(anki_note_type_id)["flds"]),
+                key=lambda f: f["ord"],
+            )
         ]
         return result
 

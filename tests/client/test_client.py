@@ -336,8 +336,8 @@ def new_note_suggestion(
         ah_nid=ah_nid,
         anki_nid=1,
         fields=[
-            Field(name="Text", value="text1", order=0),
-            Field(name="Extra", value="extra1", order=1),
+            Field(name="Text", value="text1"),
+            Field(name="Extra", value="extra1"),
         ],
         tags=["tag1", "tag2"],
         guid="asdf",
@@ -356,8 +356,8 @@ def new_note_suggestion_note_info(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Text", value="text1", order=0),
-            Field(name="Extra", value="extra1", order=1),
+            Field(name="Text", value="text1"),
+            Field(name="Extra", value="extra1"),
         ],
         tags=["tag1", "tag2"],
         mid=1,
@@ -374,8 +374,8 @@ def change_note_suggestion(
         ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
-            Field(name="Text", value="text2", order=0),
-            Field(name="Extra", value="extra2", order=1),
+            Field(name="Text", value="text2"),
+            Field(name="Extra", value="extra2"),
         ],
         added_tags=["tag3", "tag4"],
         removed_tags=[],
@@ -561,9 +561,20 @@ def test_upload_deck(
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
-    upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
     mocker.patch.object(
         client, "_presigned_url_suffix_from_key", return_value="fake_key"
+    )
+
+    response_mock_1 = Mock()
+    response_mock_1.status_code = 200
+
+    response_mock_2 = Mock()
+    response_mock_2.status_code = 201
+    deck_id = uuid.uuid4()
+    response_mock_2.json = lambda: {"deck_id": str(deck_id)}
+
+    send_request_mock = mocker.patch.object(
+        client, "_send_request", side_effect=[response_mock_1, response_mock_2]
     )
 
     client.upload_deck(
@@ -574,10 +585,11 @@ def test_upload_deck(
         private=False,
     )
 
-    # check that the deck would be uploaded to s3
-    assert upload_to_s3_mock.call_count == 1
+    # Check that the deck would be uploaded to s3
     payload = json.loads(
-        gzip.decompress(upload_to_s3_mock.call_args[0][1]).decode("utf-8")
+        gzip.decompress(send_request_mock.call_args_list[0].kwargs["data"]).decode(
+            "utf-8"
+        )
     )
     assert len(payload["notes"]) == 1
     note_from_payload = payload["notes"][0]
@@ -610,7 +622,7 @@ class TestCreateSuggestion:
         cns: ChangeNoteSuggestion = change_note_suggestion
         cns.ah_nid = new_note_suggestion.ah_nid
         cns.fields = [
-            Field(name="Text", value="text2", order=0),
+            Field(name="Text", value="text2"),
         ]
 
         # ... this shouldn't raise an exception
@@ -1758,12 +1770,115 @@ class TestGetNoteType:
 
 
 @pytest.mark.vcr()
+class TestGetNoteTypesDictForDeck:
+    def test_get_note_types_dict(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        assert len(note_types_by_id) == 1
+
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
+        assert note_type["name"] == "Cloze (test1)"
+
+
+@pytest.mark.vcr()
+class TestCreateNoteType:
+    def test_create_note_type(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_type = {
+            "id": 3,
+            "name": "New Type",
+            "flds": [{"name": "Front"}, {"name": "Back"}],
+            "tmpls": [{"name": "Card 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}],
+        }
+        new_note_type = client.create_note_type(ID_OF_DECK_OF_USER_TEST1, note_type)
+        deck = client.get_deck_by_id(ID_OF_DECK_OF_USER_TEST1)
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
+        assert len(note_types_by_id) == 2
+        new_note_type = note_types_by_id[cast(int, note_type["id"])]
+        assert new_note_type["id"] == note_type["id"]
+        assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
+
+
+@pytest.mark.vcr()
+class TestAddNoteTypeFields:
+    def test_add_note_type_fields(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        field_names = ["New1", "New2"]
+        for name in field_names:
+            field = note_type["flds"][0].copy()
+            field["name"] = name
+            field["ord"] = None
+            note_type["flds"].append(field)
+        note_type = client.update_note_type(
+            ID_OF_DECK_OF_USER_TEST1, note_type, ["flds"]
+        )
+        assert all(
+            field_name in [field["name"] for field in note_type["flds"]]
+            for field_name in field_names
+        )
+
+
+@pytest.mark.vcr()
+class TestUpdateNoteTypeTemplatesAndStyles:
+    def test_update_note_type_templates_and_styles(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        css = ".home {background: red}"
+        templates = [
+            {
+                "ord": 0,
+                "afmt": "<div>back</div>",
+                "name": "Test",
+                "qfmt": "<div>front</div>",
+                "bafmt": "{{cloze:Text}}",
+                "bqfmt": "{{cloze:Text}}",
+                "bsize": 12,
+            }
+        ]
+
+        client = authorized_client_for_user_test1
+        note_types_by_id = client.get_note_types_dict_for_deck(
+            ah_did=ID_OF_DECK_OF_USER_TEST1
+        )
+        note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
+        note_type["tmpls"] = templates
+        note_type["css"] = css
+
+        data = client.update_note_type(
+            ID_OF_DECK_OF_USER_TEST1, note_type, ["tmpls", "css"]
+        )
+
+        assert data["css"] == css
+        assert data["tmpls"] == templates
+
+
+@pytest.mark.vcr()
 class TestGetFeatureFlags:
     def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
         client.get_feature_flags()
         # This test just makes sure that the method does not throw an exception
         # Feature flags can change so we don't want to assert anything
+
+
+@pytest.mark.vcr()
+class TestGetUserDetails:
+    def test_get_user_details(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.get_user_details()
+        # This test just makes sure that the method does not throw an exception
 
 
 @pytest.mark.vcr()

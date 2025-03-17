@@ -168,6 +168,7 @@ class UIConfig(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class PrivateConfig(DataClassJSONMixin):
+    username: Optional[str] = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
     deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(
         default_factory=dict
@@ -271,6 +272,10 @@ class _Config:
     def save_user_email(self, user_email: str):
         # aqt.mw.pm.set_ankihub_username(user_email)
         aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = user_email
+
+    def save_username(self, username: str):
+        self._private_config.username = username
+        self._update_private_config()
 
     def save_latest_deck_update(
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
@@ -402,6 +407,12 @@ class _Config:
     def user(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_username()
         return aqt.mw.pm.profile.get("thirdPartyAnkiHubUsername")
+
+    def username(self) -> Optional[str]:
+        return self._private_config.username
+
+    def username_or_email(self) -> Optional[str]:
+        return self.username() or self.user()
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
@@ -806,7 +817,7 @@ class DatadogLogHandler(logging.Handler):
                 "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
                 "hostname": socket.gethostname(),
                 "service": "ankihub_addon",
-                "username": config.user(),
+                "username": config.username_or_email(),
                 **json.loads(self.format(record)),
             }
             for record in records
@@ -880,21 +891,6 @@ url_mh_integrations_preview = (
 url_login = lambda: f"{config.app_url}/accounts/login"  # noqa: E731
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
-ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
-ANKIHUB_HTML_END_COMMENT = (
-    "<!--\n"
-    "ANKIHUB_END\n"
-    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
-    "Do not edit or remove this comment if you want to protect the content below.\n"
-    "-->"
-)
-ANKIHUB_CSS_END_COMMENT = (
-    "/*\n"
-    "ANKIHUB_END\n"
-    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
-    "Do not edit or remove this comment if you want to protect the content below.\n"
-    "*/"
-)
 ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "gui/icons"
 

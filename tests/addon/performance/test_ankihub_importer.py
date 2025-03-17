@@ -54,6 +54,7 @@ def import_anking_notes(
             protected_tags=[],
             suspend_new_cards_of_new_notes=False,
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+            raise_if_full_sync_required=False,
         )
 
     return import_anking_notes_inner

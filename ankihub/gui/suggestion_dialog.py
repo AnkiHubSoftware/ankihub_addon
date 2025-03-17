@@ -42,7 +42,7 @@ from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
     ChangeSuggestionResult,
-    get_anki_nid_to_possible_ah_dids_dict,
+    get_anki_nid_to_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -52,7 +52,6 @@ from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
-    choose_ankihub_deck,
     show_dialog,
     show_error_dialog,
     show_tooltip,
@@ -324,31 +323,24 @@ def _determine_ah_did_for_nids_to_be_suggested(
     """Return an AnkiHub deck id that the notes will be suggested to. If the
     choice of deck is ambiguous, the user is asked to choose a deck from a list
     of viable decks.
-    Returns None if the user cancelled the deck selection dialog or if there is
-    no deck that all notes could belong to."""
-    anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
-    dids_that_all_notes_could_belong_to = set.intersection(
-        *anki_nid_to_possible_ah_dids.values()
-    )
+    Returns None if the user cancelled the deck selection dialog or if notes don't belong to AnkiHub deck.
+    """
+    anki_nid_to_ah_did = get_anki_nid_to_ah_dids_dict(anki_nids)
+    ah_dids = set(anki_nid_to_ah_did.values())
 
-    if len(dids_that_all_notes_could_belong_to) == 0:
+    if len(ah_dids) == 0:
         LOGGER.info(
-            "User tried to submit suggestions for notes that could not belong to a single AnkiHub deck."
+            "User tried to submit suggestions for notes which don't belong to any AnkiHub deck."
+        )
+        return None
+    if len(ah_dids) != 1:
+        LOGGER.info(
+            "User tried to submit suggestions for notes that belong to multiple AnkiHub decks."
         )
         show_info("Please choose notes for one AnkiHub deck only.", parent=parent)
         return None
-    elif len(dids_that_all_notes_could_belong_to) == 1:
-        ah_did = dids_that_all_notes_could_belong_to.pop()
-    else:
-        ah_did = choose_ankihub_deck(
-            prompt="Which AnkiHub deck would you like to submit your suggestion(s) to?",
-            ah_dids=list(dids_that_all_notes_could_belong_to),
-            parent=parent,
-        )
-        if not ah_did:
-            LOGGER.info("User cancelled suggestion.")
-            return None
 
+    ah_did = list(ah_dids)[0]
     return ah_did
 
 
