@@ -332,6 +332,7 @@ def _upload_if_full_sync_triggered_by_ankihub(
 ) -> None:
     if aqt.mw.col.db is None:
         LOGGER.warning("Collection is closed, skipping custom full sync.")
+        config.set_schema_to_do_full_upload_for_once(None)
         _old(mw, out, on_done)
         return
 
