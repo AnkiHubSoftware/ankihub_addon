@@ -1,5 +1,6 @@
 """AddonAnkiHubClient is a wrapper around AnkiHubClient that is adapted to the AnkiHub add-on.
 It should be used instead of AnkiHubClient in the AnkiHub add-on."""
+
 import json
 from copy import deepcopy
 from json import JSONDecodeError
@@ -80,6 +81,8 @@ class AddonAnkiHubClient(AnkiHubClient):
             log_data = f.read()
 
         s3_url_suffix = self._presigned_url_suffix_from_key(key=key, action="upload")
-        s3_response = self._send_request("PUT", API.S3, s3_url_suffix, data=log_data)
+        s3_response = self._send_request(
+            "PUT", API.S3, s3_url_suffix, data=log_data, is_long_running=True
+        )
         if s3_response.status_code != 200:
             raise AnkiHubHTTPError(s3_response)
