@@ -23,7 +23,9 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
     TypedDict,
+    Union,
     cast,
 )
 from zipfile import ZipFile
@@ -114,10 +116,10 @@ IMAGE_FILE_EXTENSIONS = [
 THREAD_POOL_MAX_WORKERS = min(32, (os.cpu_count() or 1) + 1)
 
 
-CONNECTION_TIMEOUT = 3
+CONNECTION_TIMEOUT = 5
 STANDARD_READ_TIMEOUT = 10
 LONG_READ_TIMEOUT = 30
-S3_TIMEOUT = (10, 120)
+S3_TIMEOUT = 10 * 60  # 10 minutes
 
 STANDARD_MAX_RETRIES = 1
 LONG_RUNNING_MAX_RETRIES = 2
@@ -257,6 +259,7 @@ class AnkiHubClient:
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
         """
+        timeout: Union[int, Tuple[int, int]]
         if api == API.ANKIHUB:
             read_timeout = (
                 LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
