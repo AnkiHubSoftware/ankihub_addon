@@ -326,6 +326,11 @@ def _upload_if_full_sync_triggered_by_ankihub(
     on_done: Callable[[], None],
     _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
 ) -> None:
+    if aqt.mw.col.db is None:
+        LOGGER.warning("Collection is closed, skipping custom full sync.")
+        _old(mw, out, on_done)
+        return
+
     if config.schema_to_do_full_upload_for_once() == collection_schema():
         LOGGER.info(
             "Full sync triggered by AnkiHub. Uploading changes.",
