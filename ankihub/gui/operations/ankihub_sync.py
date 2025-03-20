@@ -88,25 +88,29 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
 
         return subscribed_decks
 
-    def on_subscriptions_fetched(subscribed_decks: List[Deck]) -> None:
-        sync_state.schema_before_new_decks_installation = collection_schema()
-
-        check_and_install_new_deck_subscriptions(
-            subscribed_decks=subscribed_decks,
-            on_done=partial(
-                _on_new_deck_subscriptions_done,
-                subscribed_decks=subscribed_decks,
-                on_done=on_done,
-            ),
-        )
-
     AddonQueryOp(
         op=lambda _: get_subscriptions_and_clean_up(),
-        success=on_subscriptions_fetched,
+        success=partial(_on_subscriptions_fetched, on_done=on_done),
         parent=aqt.mw,
     ).failure(
         lambda e: on_done(future_with_exception(e))
     ).with_progress().run_in_background()
+
+
+@pass_exceptions_to_on_done
+def _on_subscriptions_fetched(
+    subscribed_decks: List[Deck], on_done: Callable[[Future], None]
+) -> None:
+    sync_state.schema_before_new_decks_installation = collection_schema()
+
+    check_and_install_new_deck_subscriptions(
+        subscribed_decks=subscribed_decks,
+        on_done=partial(
+            _on_new_deck_subscriptions_done,
+            subscribed_decks=subscribed_decks,
+            on_done=on_done,
+        ),
+    )
 
 
 @pass_exceptions_to_on_done
@@ -326,6 +330,12 @@ def _upload_if_full_sync_triggered_by_ankihub(
     on_done: Callable[[], None],
     _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
 ) -> None:
+    if aqt.mw.col.db is None:
+        LOGGER.warning("Collection is closed, skipping custom full sync.")
+        config.set_schema_to_do_full_upload_for_once(None)
+        _old(mw, out, on_done)
+        return
+
     if config.schema_to_do_full_upload_for_once() == collection_schema():
         LOGGER.info(
             "Full sync triggered by AnkiHub. Uploading changes.",

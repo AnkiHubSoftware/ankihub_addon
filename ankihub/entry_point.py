@@ -10,7 +10,7 @@ from anki.hooks import wrap
 from aqt.gui_hooks import profile_did_open, profile_will_close
 from aqt.main import AnkiQt
 
-from . import LOGGER
+from . import LOGGER, anki_logger
 from .db import ankihub_db
 from .feature_flags import update_feature_flags_in_background
 from .gui import (
@@ -71,6 +71,8 @@ def run():
     _setup_on_profile_did_open()
     profile_will_close.append(_on_profile_will_close)
 
+    anki_logger.setup()
+
 
 def _setup_on_profile_did_open() -> None:
     """Makes sure that _on_profile_did_open gets called after the profile is loaded and before
@@ -129,6 +131,7 @@ def _on_profile_did_open():
 
 def _on_profile_will_close():
     media_sync.stop_background_threads()
+    LOGGER.info("Profile will close, stopping background threads.")
 
 
 def _profile_setup() -> bool:
