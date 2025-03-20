@@ -23,7 +23,9 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
     TypedDict,
+    Union,
     cast,
 )
 from zipfile import ZipFile
@@ -257,6 +259,7 @@ class AnkiHubClient:
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
         """
+        timeout: Union[int, Tuple[int, int]]
         if api == API.ANKIHUB:
             read_timeout = (
                 LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
