@@ -9,7 +9,6 @@ from aqt.qt import (
     QDialog,
     QHBoxLayout,
     QPushButton,
-    Qt,
     QUrl,
     QVBoxLayout,
     QWebEngineUrlRequestInterceptor,
@@ -46,7 +45,6 @@ class AnkiHubWebViewDialog(QDialog):
         return True
 
     def _setup_ui(self) -> None:
-        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
 
