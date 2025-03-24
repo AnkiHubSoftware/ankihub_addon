@@ -383,13 +383,11 @@ def _added_and_removed_tags(
 def _fields_that_changed(
     prev_fields: List[Field], cur_fields: List[Field]
 ) -> List[Field]:
-    result = []
-    for prev_field in prev_fields:
-        cur_field = next(
-            (field for field in cur_fields if field.name == prev_field.name), None
-        )
-        if cur_field and cur_field.value != prev_field.value:
-            result.append(cur_field)
+    result = [
+        cur_field
+        for cur_field, prev_field in zip(cur_fields, prev_fields)
+        if cur_field.value != prev_field.value
+    ]
     return result
 
 
