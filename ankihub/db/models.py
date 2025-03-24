@@ -61,7 +61,7 @@ class AnkiHubNote(Model):
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
     guid = TextField(null=True)
-    fields = TextField(null=True)
+    fields = JSONField(null=True)
     tags = TextField(null=True)
     last_update_type = TextField(null=True)
 

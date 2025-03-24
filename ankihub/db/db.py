@@ -33,7 +33,7 @@ from typing import (
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
-from anki.utils import ids2str, join_fields, split_fields
+from anki.utils import ids2str
 from peewee import DQ, SqliteDatabase
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -85,7 +85,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             bind_peewee_models()
             create_tables()
-            get_peewee_database().pragma("user_version", 11)
+            get_peewee_database().pragma("user_version", 13)
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -117,7 +117,7 @@ class _AnkiHubDB:
             2. Call update_mod_values_based_on_anki_db to update the mod values of the upserted notes.
         """
         # Check if all note types used by notes exist in the AnkiHub DB before inserting
-        mids_of_notes = set([note_data.mid for note_data in notes_data])
+        mids_of_notes = set(note_data.mid for note_data in notes_data)
         mids_in_db = set(self.note_types_for_ankihub_deck(ankihub_did))
         missing_mids = [mid for mid in mids_of_notes if mid not in mids_in_db]
         if missing_mids:
@@ -140,26 +140,19 @@ class _AnkiHubDB:
         note_dicts = []
         for note_data in notes_data:
             # Prepare fields and tags for insertion
-            field_values = []
-            for field_name in self.note_type_field_names(
-                anki_note_type_id=NotetypeId(note_data.mid)
-            ):
-                if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
-                    continue
-                field = next(
-                    (f for f in note_data.fields if f.name == field_name), None
-                )
-                field_values.append(field.value if field else "")
-            fields = join_fields(field_values)
+            fields_dict = {
+                field.name: field.value
+                for field in note_data.fields
+                if field.value and field.name != ANKIHUB_NOTE_TYPE_FIELD_NAME
+            }
             tags = " ".join([tag for tag in note_data.tags if tag is not None])
-
             note_dicts.append(
                 {
                     "ankihub_note_id": note_data.ah_nid,
                     "ankihub_deck_id": ankihub_did,
                     "anki_note_id": note_data.anki_nid,
                     "anki_note_type_id": note_data.mid,
-                    "fields": fields,
+                    "fields": fields_dict,
                     "tags": tags,
                     "guid": note_data.guid,
                     "last_update_type": (
@@ -334,6 +327,7 @@ class _AnkiHubDB:
     def _build_note_info(
         self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]
     ) -> NoteInfo:
+        fields_dict: Dict = note.fields if note.fields else {}  # type: ignore
         return NoteInfo(
             ah_nid=cast(uuid.UUID, note.ankihub_note_id),
             anki_nid=cast(int, note.anki_note_id),
@@ -341,12 +335,13 @@ class _AnkiHubDB:
             tags=aqt.mw.col.tags.split(cast(str, note.tags)),
             fields=[
                 Field(
-                    name=field_names_by_mid[cast(NotetypeId, note.anki_note_type_id)][
-                        i
-                    ],
-                    value=value,
+                    name=field_name,
+                    value=fields_dict.get(field_name, ""),  # type: ignore
                 )
-                for i, value in enumerate(split_fields(cast(str, note.fields)))
+                for field_name in field_names_by_mid[
+                    cast(NotetypeId, note.anki_note_type_id)
+                ]
+                if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
             ],
             guid=cast(str, note.guid),
             last_update_type=(
