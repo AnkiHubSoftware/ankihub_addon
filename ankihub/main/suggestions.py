@@ -338,7 +338,7 @@ def _new_note_suggestion(
 def _change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> Optional[ChangeNoteSuggestion]:
-    note_from_anki_db = to_note_data(note)
+    note_from_anki_db = to_note_data(note, include_empty_fields=True)
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None

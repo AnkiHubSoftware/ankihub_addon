@@ -19,7 +19,9 @@ from .note_conversion import (
 )
 
 
-def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
+def to_note_data(
+    note: Note, set_new_id: bool = False, include_empty_fields: bool = False
+) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
@@ -31,7 +33,7 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
         ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
     tags = _prepare_tags(note)
-    fields = _prepare_fields(note)
+    fields = _prepare_fields(note, include_empty=include_empty_fields)
 
     return NoteInfo(
         ah_nid=ah_nid,
@@ -43,7 +45,7 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     )
 
 
-def _prepare_fields(note: Note) -> List[Field]:
+def _prepare_fields(note: Note, include_empty: bool = False) -> List[Field]:
     note_type = ankihub_db.note_type_dict(note_type_id=NotetypeId(note.mid))
     if note_type is None:
         # When creating a deck the note type is not yet in the AnkiHub DB
@@ -55,10 +57,11 @@ def _prepare_fields(note: Note) -> List[Field]:
     result = []
     for field in note_type["flds"]:
         field_name = field["name"]
+        value = note_fields_dict.get(field_name)
         if (
             field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
             and field_name not in fields_protected_by_tags
-            and (value := note_fields_dict.get(field_name))
+            and (include_empty or value)
         ):
             result.append(
                 Field(
