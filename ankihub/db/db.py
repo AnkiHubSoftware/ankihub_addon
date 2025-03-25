@@ -506,13 +506,17 @@ class _AnkiHubDB:
         """Returns the names of all media files which are referenced on notes in the given deck."""
         notes = AnkiHubNote.select(AnkiHubNote.fields).filter(
             NOTE_NOT_DELETED_CONDITION,
-            (DQ(fields__ilike="%<img%") | DQ(fields__ilike="%[sound:%")),
+            (
+                AnkiHubNote.fields.cast("text").ilike("%<img%")
+                | AnkiHubNote.fields.cast("text").ilike("%[sound:%")
+            ),
             ankihub_deck_id=ah_did,
         )
         return {
             media_name
             for note in notes
-            for media_name in local_media_names_from_html(note.fields)
+            for field_value in (note.fields.values() if note.fields else [])
+            for media_name in local_media_names_from_html(field_value)
         }
 
     def media_names_exist_for_ankihub_deck(
