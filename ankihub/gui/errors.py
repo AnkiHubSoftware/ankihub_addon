@@ -32,6 +32,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
+from ..db.exceptions import MissingValueError
 from ..gui.exceptions import DeckDownloadAndInstallError, FullSyncCancelled
 from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import (
@@ -313,6 +314,19 @@ def _try_handle_exception(
         # This can e.g. happen when a background task is running
         # and the user switches to a different Anki profile.
         LOGGER.warning("Collection is None was handled")
+        return True
+
+    if isinstance(exc_value, MissingValueError):
+        LOGGER.warning(
+            "NoteHasNoFieldsError was handled",
+            ankihub_did=exc_value.ah_did,
+        )
+        config.set_download_full_deck_on_next_sync(exc_value.ah_did, True)
+        show_error_dialog(
+            "There is an issue with the AnkiHub deck.<br>"
+            "Please sync with AnkiHub to resolve it.",
+            title="AnkiHub",
+        )
         return True
 
     if isinstance(

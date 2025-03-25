@@ -41,7 +41,7 @@ from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
-from .exceptions import IntegrityError
+from .exceptions import IntegrityError, MissingValueError
 from .models import (
     AnkiHubNote,
     AnkiHubNoteType,
@@ -327,7 +327,9 @@ class _AnkiHubDB:
     def _build_note_info(
         self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]
     ) -> NoteInfo:
-        fields_dict: Dict = note.fields if note.fields else {}  # type: ignore
+        if note.fields is None:
+            raise MissingValueError(ah_did=note.ankihub_deck_id)
+
         return NoteInfo(
             ah_nid=cast(uuid.UUID, note.ankihub_note_id),
             anki_nid=cast(int, note.anki_note_id),
@@ -336,7 +338,7 @@ class _AnkiHubDB:
             fields=[
                 Field(
                     name=field_name,
-                    value=fields_dict.get(field_name, ""),  # type: ignore
+                    value=note.fields.get(field_name, ""),  # type: ignore
                 )
                 for field_name in field_names_by_mid[
                     cast(NotetypeId, note.anki_note_type_id)
