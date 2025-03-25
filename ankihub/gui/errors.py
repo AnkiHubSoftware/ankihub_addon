@@ -317,11 +317,11 @@ def _try_handle_exception(
         return True
 
     if isinstance(exc_value, MissingValueError):
+        config.set_download_full_deck_on_next_sync(exc_value.ah_did, True)
         LOGGER.warning(
-            "NoteHasNoFieldsError was handled",
+            "MissingValueError was handled",
             ankihub_did=exc_value.ah_did,
         )
-        config.set_download_full_deck_on_next_sync(exc_value.ah_did, True)
         show_error_dialog(
             "There is an issue with the AnkiHub deck.<br>"
             "Please sync with AnkiHub to resolve it.",
