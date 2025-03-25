@@ -1,9 +1,10 @@
 from typing import List
 
-from peewee import Database, Model
+from anki.utils import split_fields
+from peewee import Database, IntegerField, Model, TextField, UUIDField
 
 from .. import LOGGER
-from .db import ankihub_db
+from .db import ankihub_db, flat
 from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, get_peewee_database
 
 
@@ -160,7 +161,7 @@ def migrate_ankihub_db():
     if schema_version < 11:
         # Migrate tables to ensure that all users have the same schemas which are created by peewee.
         # This for example ensures that column types and index names are the same for all users.
-        with get_peewee_database().atomic():
+        with peewee_db.atomic():
             models_to_migrate: List[Model] = [
                 AnkiHubNote,  # type: ignore
                 AnkiHubNoteType,  # type: ignore
@@ -183,6 +184,53 @@ def migrate_ankihub_db():
             _recreate_peewee_table(AnkiHubNoteType, on_conflict="IGNORE")  # type: ignore
 
             peewee_db.pragma("user_version", 12)
+
+        LOGGER.info(
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
+        )
+
+    if schema_version < 13:
+        # Change how note field values are stored in the database
+        # from joined strings to JSON dictionaries from field names to field values.
+        # If there is a mismatch between the number of field names and field values,
+        # fields is set to None.
+        peewee_db.bind([AnkiHubNoteV12, AnkiHubNoteType])
+
+        note_type_ids = set(
+            AnkiHubNoteType.select(
+                AnkiHubNoteType.anki_note_type_id,
+            )
+            .distinct()
+            .objects(flat)
+        )
+        mid_to_field_names = {
+            note_type_id: _note_type_field_names(note_type_id=note_type_id)
+            for note_type_id in note_type_ids
+        }
+
+        notes = []
+        for note in AnkiHubNoteV12.select():
+            note_type_id = note.anki_note_type_id
+            field_names = mid_to_field_names.get(note_type_id, [])
+            field_names = field_names[:-1]  # remove ankihub_id field
+            field_values = split_fields(note.fields) if note.fields else []
+            if len(field_names) != len(field_values):
+                value = None
+            else:
+                value = {
+                    field_name: field_value
+                    for field_name, field_value in zip(field_names, field_values)
+                }
+            note.fields = value
+            notes.append(note)
+
+        if notes:
+            AnkiHubNote.bind(peewee_db)
+            with peewee_db.atomic():
+                AnkiHubNote.bulk_update(notes, fields=["fields"], batch_size=1000)
+
+        peewee_db.pragma("user_version", 13)
 
         LOGGER.info(
             "AnkiHub DB migrated to schema version",
@@ -271,3 +319,42 @@ def _setup_deck_media_table(peewee_db: Database) -> None:
             "CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);"
         )
         LOGGER.info("Created deck_media table")
+
+
+def _note_type_field_names(note_type_id: int) -> List[str]:
+    """Returns the names of the fields of the note type."""
+    result = [
+        field["name"]
+        for field in sorted(
+            (field for field in _note_type_dict(note_type_id)["flds"]),
+            key=lambda f: f["ord"],
+        )
+    ]
+    return result
+
+
+def _note_type_dict(note_type_id: int) -> dict:
+    return (
+        AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict)
+        .filter(
+            anki_note_type_id=note_type_id,
+        )
+        .scalar()
+    )
+
+
+class AnkiHubNoteV12(Model):
+    """AnkiHubNote model at schema version 12."""
+
+    ankihub_note_id = UUIDField(primary_key=True)
+    ankihub_deck_id = UUIDField(index=True, null=True)
+    anki_note_id = IntegerField(unique=True, null=True)
+    anki_note_type_id = IntegerField(index=True, null=True)
+    mod = IntegerField(null=True)
+    guid = TextField(null=True)
+    fields = TextField(null=True)
+    tags = TextField(null=True)
+    last_update_type = TextField(null=True)
+
+    class Meta:
+        table_name = "notes"

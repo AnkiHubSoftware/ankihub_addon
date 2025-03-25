@@ -27,30 +27,42 @@ class UUIDField(Field):
 
     field_type = "TEXT"
 
-    def db_value(self, value: uuid.UUID) -> str:
+    def db_value(self, value: Optional[uuid.UUID]) -> str:
+        if value is None:
+            return None
         return str(value)
 
-    def python_value(self, value: str) -> uuid.UUID:
+    def python_value(self, value: Optional[str]) -> uuid.UUID:
+        if value is None:
+            return None
         return uuid.UUID(value)
 
 
 class DateTimeField(Field):
     field_type = "TEXT"
 
-    def db_value(self, value: datetime) -> str:
+    def db_value(self, value: Optional[datetime]) -> str:
+        if value is None:
+            return None
         return value.isoformat()
 
-    def python_value(self, value: str) -> datetime:
+    def python_value(self, value: Optional[str]) -> datetime:
+        if value is None:
+            return None
         return datetime.fromisoformat(value)
 
 
 class JSONField(Field):
     field_type = "TEXT"
 
-    def db_value(self, value: dict) -> str:
+    def db_value(self, value: Optional[dict]) -> str:
+        if value is None:
+            return None
         return json.dumps(value)
 
-    def python_value(self, value: str) -> dict:
+    def python_value(self, value: Optional[str]) -> dict:
+        if value is None:
+            return None
         return json.loads(value)
 
 
@@ -61,7 +73,7 @@ class AnkiHubNote(Model):
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
     guid = TextField(null=True)
-    fields = TextField(null=True)
+    fields = JSONField(null=True)
     tags = TextField(null=True)
     last_update_type = TextField(null=True)
 

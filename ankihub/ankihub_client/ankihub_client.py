@@ -725,6 +725,7 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         since: datetime,
+        download_full_deck: bool = False,
         updates_download_progress_cb: Optional[Callable[[int], None]] = None,
         deck_download_progress_cb: Optional[Callable[[int], None]] = None,
         should_cancel: Optional[Callable[[], bool]] = None,
@@ -737,6 +738,7 @@ class AnkiHubClient:
             since: The time from which to fetch updates.
             updates_download_progress_cb: An optional callback function to report the progress of the updates download.
                 The function should take one argument: the number of notes downloaded.
+            download_full_deck: If True, the full deck will be downloaded instead of just the updates.
             deck_download_progress_cb: An optional callback function to report the progress of the deck download.
                 The function should take one argument: the percentage of the deck download progress.
             should_cancel: An optional callback function that should return True if the operation should be cancelled.
@@ -751,6 +753,7 @@ class AnkiHubClient:
         for chunk in self._get_deck_updates_inner(
             ah_did,
             since,
+            download_full_deck,
             updates_download_progress_cb,
             deck_download_progress_cb,
         ):
@@ -790,6 +793,7 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         since: datetime,
+        download_full_deck: bool,
         updates_download_progress_cb: Optional[Callable[[int], None]] = None,
         deck_download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdatesChunk]:
@@ -799,10 +803,12 @@ class AnkiHubClient:
         class Params(TypedDict, total=False):
             since: str
             size: int
+            full_deck: bool
 
         params: Params = {
             "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
             "size": DECK_UPDATE_PAGE_SIZE,
+            "full_deck": download_full_deck,
         }
         url_suffix = f"/decks/{ah_did}/updates"
         notes_count = 0
@@ -837,6 +843,7 @@ class AnkiHubClient:
                 yield from self._get_deck_updates_inner(
                     ah_did=ah_did,
                     since=chunk.latest_update,
+                    download_full_deck=False,
                     updates_download_progress_cb=updates_download_progress_cb,
                     deck_download_progress_cb=deck_download_progress_cb,
                 )

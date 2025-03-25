@@ -71,9 +71,10 @@ from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
     UserDeckExtensionRelation,
+    UserDeckRelation,
 )
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError
+from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.feature_flags import (
     _feature_flags_update_callbacks,
@@ -156,7 +157,13 @@ from ankihub.main.utils import (
     note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, DatadogLogHandler, config, log_file_path
+from ankihub.settings import (
+    ANKIWEB_ID,
+    BehaviorOnRemoteNoteDeleted,
+    DatadogLogHandler,
+    config,
+    log_file_path,
+)
 
 
 @pytest.fixture
@@ -1291,6 +1298,33 @@ class TestAnkiHubDBIntegrityError:
             )
 
 
+class TestAnkiHubDBMissingValueError:
+    def test_getting_note_data_raises_error_when_fields_is_none(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        ah_did = next_deterministic_uuid()
+
+        # Add a note to the DB and set fields to None
+        anki_nid = 1
+        ankihub_db.upsert_note_type(ah_did, ankihub_basic_note_type)
+        note = NoteInfoFactory.create(
+            anki_nid=anki_nid, mid=ankihub_basic_note_type["id"]
+        )
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did,
+            notes_data=[note],
+        )
+        ankihub_db.db.execute_sql("UPDATE notes SET fields = NULL")
+
+        with pytest.raises(MissingValueError) as exc_info:
+            ankihub_db.note_data(anki_nid)
+
+        assert exc_info.value.ah_did == ah_did
+
+
 class TestAnkiHubDBMediaNamesForAnkiHubDeck:
     @pytest.fixture(autouse=True)
     def setup_method_fixture(
@@ -1619,6 +1653,25 @@ class TestErrorHandling:
         )
         assert handled
         show_tooltip_mock.assert_called_once()
+
+    def test_handle_missing_value_error(self, next_deterministic_uuid):
+        ah_did = next_deterministic_uuid()
+        config.add_deck(
+            ankihub_did=ah_did,
+            # The values here are not important for this test.
+            name="test_deck",
+            anki_did=1,
+            user_relation=UserDeckRelation.SUBSCRIBER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        )
+
+        handled = _try_handle_exception(
+            exc_value=MissingValueError(ah_did=ah_did), tb=None
+        )
+
+        # The exception should be handled, and the deck should be marked for full download.
+        assert handled
+        assert config.deck_config(ah_did).download_full_deck_on_next_sync
 
 
 def test_show_error_dialog(
