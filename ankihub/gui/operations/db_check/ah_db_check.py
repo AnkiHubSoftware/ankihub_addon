@@ -14,52 +14,35 @@ from ...utils import ask_user
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None) -> None:
     LOGGER.info("Checking AnkiHub database...")
 
-    if not _try_reinstall_decks_with_something_missing(on_success=on_success):
+    ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
+    for ah_did in ah_dids_with_missing_values:
+        config.set_download_full_deck_on_next_sync(ah_did, True)
+
+    if not _try_reinstall_decks_with_missing_deck_configs(on_success=on_success):
         on_success()
 
 
-def _try_reinstall_decks_with_something_missing(
+def _try_reinstall_decks_with_missing_deck_configs(
     on_success: Optional[Callable[[], None]] = None,
 ) -> bool:
     """Checks which decks have missing values in the AnkiHubDB or are missing from the config and asks the user
     if they want to fix the missing values by reinstalling the decks.
     If the decks are not found on AnkiHub anymore, they are uninstalled instead.
     Returns True if the user has chosen to run the fix, False otherwise."""
-    ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
     ah_dids_missing_from_config = _decks_missing_from_config()
-    ah_dids_with_something_missing = list(
-        set(ah_dids_with_missing_values) | set(ah_dids_missing_from_config)
-    )
 
-    if not ah_dids_with_something_missing:
+    if not ah_dids_missing_from_config:
         LOGGER.info("No decks with something missing found.")
         return False
 
     LOGGER.info(
-        "Decks with something missing found.",
-        ah_dids_with_missing_values=ah_dids_with_missing_values,
+        "Found decks missing from config.",
         ah_dids_missing_from_config=ah_dids_missing_from_config,
     )
 
-    if ah_dids_missing_from_config:
-        messsage_begin = "AnkiHub has detected that some decks have missing values in the database.<br><br>"
-    else:
-        deck_names = sorted(
-            [
-                deck_config.name
-                for deck_id in ah_dids_with_missing_values
-                if (deck_config := config.deck_config(deck_id)) is not None
-            ],
-            key=str.lower,
-        )
-        messsage_begin = (
-            "AnkiHub has detected that the following deck(s) have missing values in the database:<br>"
-            f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
-        )
-
     if ask_user(
         text=(
-            messsage_begin
+            "AnkiHub has detected that some decks have missing values in the database.<br><br>"
             + "The add-on needs to download and import these decks again. This may take a while.<br><br>"
             "A full sync with AnkiWeb might be necessary after the reset, so it's recommended "
             "to sync changes from other devices before doing this.<br><br>"
@@ -84,7 +67,7 @@ def _try_reinstall_decks_with_something_missing(
             on_success()
 
         download_and_install_decks(
-            ah_dids_with_something_missing, on_done=on_download_and_install_done
+            ah_dids_missing_from_config, on_done=on_download_and_install_done
         )
         return True
 

@@ -124,6 +124,7 @@ class DeckConfig(DataClassJSONMixin):
         ),
         default=None,
     )
+    download_full_deck_on_next_sync: bool = False
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
     )
@@ -287,6 +288,14 @@ class _Config:
         self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]
     ):
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
+        self._update_private_config()
+
+    def set_download_full_deck_on_next_sync(
+        self, ankihub_did: uuid.UUID, download_full_deck: bool
+    ):
+        self.deck_config(
+            ankihub_did
+        ).download_full_deck_on_next_sync = download_full_deck
         self._update_private_config()
 
     def save_last_sent_summary_date(self, last_summary_sent_date: Optional[date]):

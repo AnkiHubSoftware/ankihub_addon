@@ -124,6 +124,7 @@ class _AnkiHubDeckUpdater:
         deck_updates = self._client.get_deck_updates(
             ankihub_did,
             since=deck_config.latest_update,
+            download_full_deck=deck_config.download_full_deck_on_next_sync,
             updates_download_progress_cb=lambda notes_count: _update_deck_updates_download_progress_cb(
                 notes_count, ankihub_did=ankihub_did
             ),
@@ -160,6 +161,8 @@ class _AnkiHubDeckUpdater:
         if deck_updates.latest_update:
             # latest_update is None if there were no notes in the updates
             config.save_latest_deck_update(ankihub_did, deck_updates.latest_update)
+
+        config.set_download_full_deck_on_next_sync(ankihub_did, False)
 
         return True
 
