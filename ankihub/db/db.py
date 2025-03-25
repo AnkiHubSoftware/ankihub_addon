@@ -328,7 +328,7 @@ class _AnkiHubDB:
         self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]
     ) -> NoteInfo:
         if note.fields is None:
-            raise MissingValueError(ah_did=note.ankihub_deck_id)
+            raise MissingValueError(ah_did=cast(uuid.UUID, note.ankihub_deck_id))
 
         return NoteInfo(
             ah_nid=cast(uuid.UUID, note.ankihub_note_id),
