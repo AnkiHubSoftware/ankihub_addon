@@ -1303,19 +1303,26 @@ class TestAnkiHubDBMissingValueError:
         self,
         ankihub_db: _AnkiHubDB,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_basic_note_type: NotetypeDict,
     ):
         ah_did = next_deterministic_uuid()
-        anki_note_id = 1
-        note = NoteInfoFactory.create(anki_note_id=anki_note_id, fields=None)
+
+        # Add a note to the DB and set fields to None
+        anki_nid = 1
+        ankihub_db.upsert_note_type(ah_did, ankihub_basic_note_type)
+        note = NoteInfoFactory.create(
+            anki_nid=anki_nid, mid=ankihub_basic_note_type["id"]
+        )
         ankihub_db.upsert_notes_data(
             ankihub_did=ah_did,
             notes_data=[note],
         )
+        ankihub_db.db.execute_sql("UPDATE notes SET fields = NULL")
 
-        with pytest.raises(MissingValueError) as exception:
-            ankihub_db.note_data(anki_note_id)
+        with pytest.raises(MissingValueError) as exc_info:
+            ankihub_db.note_data(anki_nid)
 
-        assert exception.ah_did == ah_did
+        assert exc_info.value.ah_did == ah_did
 
 
 class TestAnkiHubDBMediaNamesForAnkiHubDeck:
