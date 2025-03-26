@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 from functools import cached_property
@@ -39,6 +40,10 @@ class _AnkiHubMediaSync:
         """Download missing media for all subscribed decks from AnkiHub in the background.
         Does nothing if a download is already in progress.
         """
+        if os.getenv("DISABLE_MEDIA_DOWNLOAD", None) == "1":
+            LOGGER.info("Media download disabled, skipping...")
+            return
+
         if self._download_in_progress:
             LOGGER.info("Media download already in progress, skipping...")
             return
