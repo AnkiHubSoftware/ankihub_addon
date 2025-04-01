@@ -4414,28 +4414,76 @@ class TestBuildSubdecksAndMoveCardsToThem:
             for card in note2.cards():
                 assert mw.col.decks.name(card.did) == "Testdeck::B::C"
 
-    def test_empty_decks_get_deleted(
+    def test_empty_normal_decks_get_deleted(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
+        """Test that empty normal decks get deleted when build_subdecks_and_move_cards_to_them is called."""
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
-
+            # Install sample AH deck and get its deck ID
             _, ah_did = install_sample_ah_deck()
 
-            # create empty decks
-            mw.col.decks.add_normal_deck_with_name("Testdeck::empty::A")
-            # assert that the empty decks were created to be sure
-            assert mw.col.decks.id("Testdeck::empty", create=False)
-            assert mw.col.decks.id("Testdeck::empty::A", create=False)
+            # Create empty deck hierarchies
+            parent_deck_name = "Testdeck::empty"
+            empty_deck_name = f"{parent_deck_name}::A"
 
-            # call the function that moves all cards in the deck to their subdecks
+            # Create the decks
+            mw.col.decks.add_normal_deck_with_name(empty_deck_name)
+
+            # Verify the empty decks were created
+            assert mw.col.decks.id_for_name(parent_deck_name)
+            assert mw.col.decks.id_for_name(empty_deck_name)
+
+            # Call the function that reorganizes decks
             build_subdecks_and_move_cards_to_them(ah_did)
 
-            # assert that the empty decks were deleted
-            assert mw.col.decks.id("Testdeck::empty", create=False) is None
-            assert mw.col.decks.id("Testdeck::empty::A", create=False) is None
+            # Assert empty normal decks were deleted
+            assert mw.col.decks.id_for_name(parent_deck_name) is None
+            assert mw.col.decks.id_for_name(empty_deck_name) is None
+
+    def test_filtered_decks_get_reparented_when_parent_deleted(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        """Test that filtered decks get reparented when their parent deck is deleted."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+            # Install sample AH deck and get its deck ID
+            _, ah_did = install_sample_ah_deck()
+
+            # Create empty parent deck
+            parent_deck_name = "Testdeck::empty"
+            mw.col.decks.add_normal_deck_with_name(parent_deck_name)
+
+            # Create filtered deck as child
+            filtered_deck_name = f"{parent_deck_name}::A"
+            mw.col.decks.new_filtered(filtered_deck_name)
+
+            # Verify decks were created
+            parent_did = mw.col.decks.id_for_name(parent_deck_name)
+            filtered_did = mw.col.decks.id_for_name(filtered_deck_name)
+            assert parent_did
+            assert filtered_did
+            assert mw.col.decks.is_filtered(filtered_did)
+
+            # Call the function that reorganizes decks
+            build_subdecks_and_move_cards_to_them(ah_did)
+
+            # Parent deck should be deleted
+            assert mw.col.decks.id_for_name(parent_deck_name) is None
+
+            # Filtered deck should be reparented to "Testdeck"
+            new_filtered_did = mw.col.decks.id_for_name("Testdeck::A")
+            assert new_filtered_did
+
+            # Verify it's still a filtered deck
+            assert mw.col.decks.is_filtered(new_filtered_did)
+
+            # Verify it's the same deck (same ID)
+            assert filtered_did == new_filtered_did
 
     def test_notes_not_moved_out_filtered_decks(
         self,
@@ -4544,35 +4592,103 @@ def test_create_copy_browser_action_does_not_copy_ah_nid(
         assert note.fields == ["front", "back", ""]
 
 
-def test_flatten_deck(
-    anki_session_with_addon_data: AnkiSession,
-    install_sample_ah_deck: InstallSampleAHDeck,
-):
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+class TestFlattenDeck:
+    def test_cards_get_moved_to_root_deck_and_subdecks_are_deleted(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
 
-        _, ah_did = install_sample_ah_deck()
+            _, ah_did = install_sample_ah_deck()
 
-        subdeck_name = "Testdeck::A::B"
-        mw.col.decks.add_normal_deck_with_name(subdeck_name)
-        subdeck_id = mw.col.decks.id_for_name(subdeck_name)
+            # add subdeck
+            subdeck_name = "Testdeck::A::B"
+            mw.col.decks.add_normal_deck_with_name(subdeck_name)
+            subdeck_id = mw.col.decks.id_for_name(subdeck_name)
 
-        # move cards of a note to the default deck
-        nids = mw.col.find_notes("deck:Testdeck")
-        note = mw.col.get_note(nids[0])
-        mw.col.set_deck(note.card_ids(), subdeck_id)
+            # move cards of a note to the subdeck
+            nids = mw.col.find_notes("deck:Testdeck")
+            note = mw.col.get_note(nids[0])
+            mw.col.set_deck(note.card_ids(), subdeck_id)
 
-        # call the function that flattens the deck and removes all subdecks
-        flatten_deck(ah_did)
+            # call the function that flattens the deck and removes all subdecks
+            flatten_deck(ah_did)
 
-        # assert that the cards of the note were moved back to the root deck
-        # because the note has no subdeck tag
-        assert note.cards()
-        for card in note.cards():
-            assert mw.col.decks.name(card.did) == "Testdeck"
+            # assert that the cards of the note were moved back to the root deck
+            assert note.cards()
+            for card in note.cards():
+                assert mw.col.decks.name(card.did) == "Testdeck"
 
-        # assert that the subdecks were deleted
-        assert mw.col.decks.by_name(subdeck_name) is None
+            # assert that the subdecks were deleted
+            assert mw.col.decks.by_name(subdeck_name) is None
+
+    def test_with_filtered_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        """Test flatten_deck behavior with filtered decks, verifying:
+        1. Filtered decks get reparented to the root deck
+        2. Empty non-filtered decks are deleted
+        3. Cards in filtered decks stay in those decks
+        4. Original deck IDs (odid) of cards are updated to point to the root deck"""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+            _, ah_did = install_sample_ah_deck()
+
+            # Get root deck ID for later reference
+            root_deck_id = mw.col.decks.id_for_name("Testdeck")
+
+            # Set up: Create parent deck and filtered deck
+            parent_deck_name = "Testdeck::A"
+            filtered_deck_name = f"{parent_deck_name}::Filtered"
+
+            # Create the parent deck
+            mw.col.decks.add_normal_deck_with_name(parent_deck_name)
+            parent_deck_id = mw.col.decks.id_for_name(parent_deck_name)
+
+            # Create a filtered deck under the parent deck
+            filtered_deck_id = mw.col.decks.new_filtered(filtered_deck_name)
+
+            # Verify setup was successful
+            assert mw.col.decks.id_for_name(parent_deck_name)
+            assert mw.col.decks.id_for_name(filtered_deck_name)
+            assert mw.col.decks.is_filtered(filtered_deck_id)
+
+            # Move cards to the filtered deck
+            nids = mw.col.find_notes("deck:Testdeck")
+            note = mw.col.get_note(nids[0])
+            card_ids = note.card_ids()
+            for card_id in card_ids:
+                card = mw.col.get_card(card_id)
+                card.did = filtered_deck_id
+                card.odid = parent_deck_id  # Original deck ID points to parent
+                card.flush()
+
+            # Act: Call flatten_deck
+            flatten_deck(ah_did)
+
+            # Assert: Parent deck was deleted
+            assert mw.col.decks.by_name(parent_deck_name) is None
+
+            # Assert: Filtered deck still exists with correct new name
+            expected_new_name = "Testdeck::Filtered"
+            reparented_deck = mw.col.decks.get(filtered_deck_id)
+            assert reparented_deck is not None
+            assert reparented_deck["name"] == expected_new_name
+            assert mw.col.decks.is_filtered(filtered_deck_id)
+
+            # Assert: Cards are still in the filtered deck
+            for card_id in card_ids:
+                card = mw.col.get_card(card_id)
+                assert card.did == filtered_deck_id
+
+                # Assert: The odid should now point to the root deck
+                assert (
+                    card.odid == root_deck_id
+                ), "Card's original deck ID should now point to root deck"
 
 
 def test_reset_local_changes_to_notes(

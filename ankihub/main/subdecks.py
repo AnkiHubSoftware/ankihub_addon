@@ -40,10 +40,10 @@ def build_subdecks_and_move_cards_to_them(
     ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
     """Move cards belonging to the ankihub deck into their subdeck based on the subdeck tags of the notes.
-    If notes is None, all of the cards belonging to the deck will be moved.
-    If notes is not None, only the cards belonging to the provided notes will be moved.
+    If nids is None, all of the cards belonging to the deck will be moved.
+    If nids is not None, only the cards belonging to the provided notes will be moved.
     Creates subdecks if they don't exist.
-    Subdecks that are empty after the move will be deleted.
+    Non-filtered subdecks that are empty after the move will be deleted.
     This function expects the home deck (the one of which the anki id is stored in the deck config) to exist.
     """
 
@@ -71,19 +71,34 @@ def build_subdecks_and_move_cards_to_them(
     }
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # remove empty subdecks
-    for name_and_did in aqt.mw.col.decks.children(root_deck_id):
-        _, did = name_and_did
-        # The card count includes cards in subdecks and in filtered decks.
-        # This is good, as we don't want to delete a deck which is an original deck of cards which are
-        # currently in filtered decks.
+    # Remove empty subdecks, keeping filtered decks
+    for name, deck_id in aqt.mw.col.decks.children(root_deck_id):
         try:
-            if aqt.mw.col.decks.card_count(did, include_subdecks=True) == 0:
-                aqt.mw.col.decks.remove([did])
-                LOGGER.info("Removed empty subdeck with id", did=did)
+            is_empty = aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
         except NotFoundError:
-            # this can happen if a parent deck was deleted earlier in the loop
-            pass
+            # This can happen if a parent deck was deleted earlier in the loop
+            LOGGER.debug(f"Deck not found during removal process: {name}")
+            continue
+
+        if is_empty and not aqt.mw.col.decks.is_filtered(deck_id):
+            # Find any filtered decks that need to be preserved by reparenting
+            filtered_child_deck_ids = [
+                child_id
+                for _, child_id in aqt.mw.col.decks.children(deck_id)
+                if aqt.mw.col.decks.is_filtered(child_id)
+            ]
+
+            # Get the parent deck ID to reparent filtered decks to
+            parent_name = aqt.mw.col.decks.immediate_parent(name)
+            parent_deck_id = aqt.mw.col.decks.id_for_name(parent_name)
+
+            # Reparent any filtered child decks to the parent before removing this deck
+            if filtered_child_deck_ids:
+                aqt.mw.col.decks.reparent(filtered_child_deck_ids, parent_deck_id)
+
+            # Remove the empty deck
+            aqt.mw.col.decks.remove([deck_id])
+            LOGGER.info("Removed empty subdeck", did=deck_id, name=name)
 
     LOGGER.info("Built subdecks and moved cards to them.")
 
@@ -153,25 +168,45 @@ def _subdeck_tag(tags: List[str]) -> Optional[str]:
 
 
 def flatten_deck(ankihub_did: uuid.UUID) -> None:
-    """Remove all subdecks of the deck with the given ankihub_did and move all cards
-    that were in the subdecks back to the root deck."""
+    """Flatten the deck hierarchy for the given ankihub_did.
 
-    # move cards that are in subdecks back to the root deck
+    This function:
+    1. Moves all cards from subdecks to the root deck
+    2. Reparents filtered subdecks to be direct children of the root deck
+    3. Removes all non-filtered (regular) subdecks
+
+    When cards are in filtered decks, they remain in those decks, but their
+    original deck reference (odid) is updated to point to the root deck.
+    """
+    # Get the root deck ID and name
     root_deck_id = config.deck_config(ankihub_did).anki_id
     root_deck_name = aqt.mw.col.decks.name(root_deck_id)
+
+    # Find all notes in subdecks and move them to the root deck
     nids = aqt.mw.col.find_notes(f'"deck:{root_deck_name}::*"')
     nid_to_did = {nid: root_deck_id for nid in nids}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # remove subdecks
-    for name_and_did in aqt.mw.col.decks.children(root_deck_id):
-        _, did = name_and_did
-        try:
-            aqt.mw.col.decks.remove([did])
-            LOGGER.info("Removed subdeck.", did=did)
-        except NotFoundError:
-            # this can happen if a parent deck was deleted earlier in the loop
-            pass
+    # Get all child decks and separate them into filtered and regular decks
+    child_decks = aqt.mw.col.decks.children(root_deck_id)
+    filtered_deck_ids = [
+        did for _, did in child_decks if aqt.mw.col.decks.is_filtered(did)
+    ]
+    regular_deck_ids = [
+        did for _, did in child_decks if not aqt.mw.col.decks.is_filtered(did)
+    ]
+
+    # Reparent all filtered subdecks to the root deck - we don't want to delete them
+    if filtered_deck_ids:
+        aqt.mw.col.decks.reparent(filtered_deck_ids, root_deck_id)
+        LOGGER.info(
+            f"Reparented {len(filtered_deck_ids)} filtered deck(s) to root deck"
+        )
+
+    # Remove all regular subdecks
+    if regular_deck_ids:
+        aqt.mw.col.decks.remove(regular_deck_ids)
+        LOGGER.info(f"Removed {len(regular_deck_ids)} subdeck(s)")
 
 
 def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> None:
