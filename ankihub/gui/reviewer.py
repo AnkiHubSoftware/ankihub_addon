@@ -429,7 +429,7 @@ def _inject_ankihub_features_and_setup_sidebar(
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(reviewer)
-        reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
+        reviewer.ah_sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
     if _check_access_and_notify_buttons_once not in reviewer_did_show_question._hooks:
