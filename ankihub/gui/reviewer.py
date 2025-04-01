@@ -144,6 +144,8 @@ class ReviewerSidebar:
         page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
         aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
         self.content_webview.setPage(page)
+        # This ensures pycmd() is defined early
+        page.setHtml("")
 
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.content_webview)
