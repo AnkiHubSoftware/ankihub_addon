@@ -209,7 +209,7 @@ class _Config:
             ):
                 self.anking_deck_id = staging_anking_deck_id
             else:
-                self.anking_deck_id = uuid.UUID("86652268-45a8-4832-bde1-8d9c48e9acc4")
+                self.anking_deck_id = uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         else:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
