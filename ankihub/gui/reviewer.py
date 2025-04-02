@@ -4,7 +4,7 @@ import json
 import uuid
 from enum import Enum
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 import aqt
 import aqt.webview
@@ -21,7 +21,7 @@ from aqt.gui_hooks import (
 from aqt.reviewer import Reviewer
 from aqt.theme import theme_manager
 from aqt.utils import openLink
-from aqt.webview import AnkiWebPage, WebContent
+from aqt.webview import WebContent
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -85,9 +85,6 @@ class ReviewerSidebar:
         self.page_type: Optional[SidebarPageType] = None
         self.original_mw_min_width = aqt.mw.minimumWidth()
         self.on_auth_failure_hook: Callable = None
-        self.content_pages: Dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
-        self.content_urls: Dict[SidebarPageType, Optional[str]] = {}
-        self.empty_state_pages: dict[SidebarPageType, aqt.webview.QWebEnginePage] = {}
         self.last_accessed_url: Optional[str] = None
         self.needs_to_accept_terms = False
 
@@ -140,37 +137,15 @@ class ReviewerSidebar:
         self.update_header_button_timer.start(200)
 
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
-        for page_type in SidebarPageType:
-            self.content_pages[page_type] = CustomWebPage(
-                self.profile, self.content_webview._onBridgeCmd
-            )
-            self.content_pages[page_type].profile().setUrlRequestInterceptor(
-                self.interceptor
-            )
-            self.content_urls[page_type] = None
 
-        for page in self.content_pages.values():
-            # Prevent white flicker on dark mode
-            page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
-
-            aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
-
-        # Prepare empty state page for each resource type to prevent flickering
-        for page_type in SidebarPageType:
-            page = AnkiWebPage(self.content_webview._onBridgeCmd)
-
-            # Prevent white flicker on dark mode
-            page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
-
-            html = get_empty_state_html(
-                theme=_ankihub_theme(),
-                resource_type=page_type.value,
-            )
-            page.setHtml(html)
-
-            self.empty_state_pages[page_type] = page
-
-        self.content_webview.setPage(list(self.empty_state_pages.values())[0])
+        page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+        page.profile().setUrlRequestInterceptor(self.interceptor)
+        # Prevent white flicker on dark mode
+        page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+        aqt.qconnect(page.loadFinished, self._on_content_page_loaded)
+        self.content_webview.setPage(page)
+        # This ensures pycmd() is defined early
+        page.setHtml("")
 
         container_layout.addWidget(self.header_webview)
         container_layout.addWidget(self.content_webview)
@@ -241,7 +216,7 @@ class ReviewerSidebar:
     def _update_header_webview(self):
         html = get_header_webview_html(
             self.resources,
-            self.content_urls[self.page_type],
+            self.content_webview.url().toString(),
             f"{PAGE_TYPE_TO_DISPLAY_NAME[self.page_type]}",
             _ankihub_theme(),
         )
@@ -295,31 +270,25 @@ class ReviewerSidebar:
             return
 
         self.last_accessed_url = url
-
         if self.needs_to_accept_terms:
             self.refresh_page_content()
 
         self._update_content_webview_theme()
-
         if url:
-            content_page = self.content_pages[self.page_type]
-
-            if url != self.content_urls[self.page_type]:
-                content_page.setUrl(aqt.QUrl(url))
-                self.content_urls[self.page_type] = url
-
-            if self.content_webview.page() != content_page:
-                self.content_webview.setPage(content_page)
+            self.content_webview.setUrl(aqt.QUrl(url))
         else:
-            self.content_webview.setPage(self.empty_state_pages[self.page_type])
+            html = get_empty_state_html(
+                theme=_ankihub_theme(),
+                resource_type=self.get_page_type().value,
+            )
+            self.content_webview.setHtml(html)
 
     def refresh_page_content(self):
         self.content_webview.reload()
 
     def access_last_accessed_url(self):
         if self.last_accessed_url and self.page_type:
-            content_page = self.content_pages[self.page_type]
-            content_page.setUrl(aqt.QUrl(self.last_accessed_url))
+            self.content_webview.setUrl(aqt.QUrl(self.last_accessed_url))
 
     def _update_content_webview_theme(self):
         self.content_webview.eval(
@@ -462,7 +431,7 @@ def _inject_ankihub_features_and_setup_sidebar(
     global reviewer_sidebar
     if not reviewer_sidebar:
         reviewer_sidebar = ReviewerSidebar(reviewer)
-        reviewer.sidebar = reviewer_sidebar  # type: ignore[attr-defined]
+        reviewer.ah_sidebar = reviewer_sidebar  # type: ignore[attr-defined]
         reviewer_sidebar.set_on_auth_failure_hook(_handle_auth_failure)
 
     if _check_access_and_notify_buttons_once not in reviewer_did_show_question._hooks:
