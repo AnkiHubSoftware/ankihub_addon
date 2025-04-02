@@ -204,7 +204,12 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
-            self.anking_deck_id = uuid.UUID("86652268-45a8-4832-bde1-8d9c48e9acc4")
+            if staging_anking_deck_id := self.public_config.get(
+                "staging_anking_deck_id"
+            ):
+                self.anking_deck_id = staging_anking_deck_id
+            else:
+                self.anking_deck_id = uuid.UUID("86652268-45a8-4832-bde1-8d9c48e9acc4")
         else:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
