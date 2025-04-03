@@ -134,6 +134,8 @@ class AnkiHubWebViewDialog(QDialog):
 
     def _load_page(self) -> None:
         self.web.load_url(QUrl(self._get_embed_url()))
+        # Allow drag and drop event
+        self.web.allow_drops = True
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
     def _on_web_load_finished(self, ok: bool) -> None:
