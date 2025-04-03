@@ -83,9 +83,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
     elif message.startswith(OPEN_BROWSER_PYCMD):
         kwargs = parse_js_message_kwargs(message)
+        search_string = kwargs.get("searchString", "")
         ah_nids = kwargs.get("noteIds", [])
-
-        browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
 
         if ah_nids:
             ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
@@ -93,7 +92,9 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
                 anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid
             ]
             search_string = f"nid:{','.join(map(str, anki_nids))}"
-            browser.search_for(search_string)
+
+        browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
+        browser.search_for(search_string)
 
         return (True, None)
     elif message.startswith(SUSPEND_NOTES_PYCMD):
