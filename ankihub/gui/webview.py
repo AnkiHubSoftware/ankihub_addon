@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from typing import Any, Callable
 
-from anki.utils import is_mac
 from aqt import QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
@@ -14,6 +13,7 @@ from aqt.qt import (
     QWebEngineUrlRequestInterceptor,
     qconnect,
 )
+from aqt.theme import theme_manager
 from aqt.utils import openLink
 from aqt.webview import AnkiWebPage, AnkiWebView
 
@@ -56,10 +56,7 @@ class AnkiHubWebViewDialog(QDialog):
         # when a pycmd is called from the web view.
         self.web.set_bridge_command(func=self.web.defaultOnBridgeCmd, context=self)
 
-        # Set the background color of the web view back to white when Anki's theme changes it to dark
-        theme_did_change.append(
-            lambda: self.web.page().setBackgroundColor(QColor("white"))
-        )
+        theme_did_change.append(self._update_page_theme)
 
         self.view_in_web_browser_button = QPushButton("View in web browser")
         self.view_in_web_browser_button.setAutoDefault(False)
@@ -87,33 +84,6 @@ class AnkiHubWebViewDialog(QDialog):
 
         self.setLayout(self.layout_)
 
-        # Set the background color of the dialog and buttons to fit the light theme of the web app.
-        # We will always show the light theme version of the embed, so the dialog needs to match.
-        self.setStyleSheet(
-            self.styleSheet()
-            + """
-            QDialog {
-                background-color: white;
-            }
-            QPushButton {
-                color: black;
-                border-color: #cccccc;
-            }
-            """
-            + (
-                # On mac, the background color is already white, so we don't need to set it.
-                # Setting the background color to white on mac causes the dialog to loose its
-                # native look (rounded borders).
-                """
-                QPushButton {
-                    background-color: #fcfcfc;
-                }
-                """
-                if not is_mac
-                else ""
-            )
-        )
-
     @abstractmethod
     def _get_embed_url(self) -> str:
         """Return the URL to load in the web view."""
@@ -133,8 +103,15 @@ class AnkiHubWebViewDialog(QDialog):
         ...  # pragma: no cover
 
     def _load_page(self) -> None:
+        self._update_page_theme()
         self.web.load_url(QUrl(self._get_embed_url()))
         qconnect(self.web.loadFinished, self._on_web_load_finished)
+
+    def _update_page_theme(self) -> None:
+        if theme_manager.get_night_mode():
+            self.web.eval("localStorage.setItem('theme', 'dark')")
+        else:
+            self.web.eval("localStorage.setItem('theme', 'light')")
 
     def _on_web_load_finished(self, ok: bool) -> None:
         self._handle_auth_failure_if_needed()
