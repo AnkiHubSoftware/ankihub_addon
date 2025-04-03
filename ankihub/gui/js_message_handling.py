@@ -94,7 +94,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             search_string = f"nid:{','.join(map(str, anki_nids))}"
 
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
-        browser.search_for(search_string)
+        if search_string:
+            browser.search_for(search_string)
 
         return (True, None)
     elif message.startswith(SUSPEND_NOTES_PYCMD):
