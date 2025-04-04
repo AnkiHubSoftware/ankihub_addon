@@ -100,9 +100,3 @@ def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
     conf = _create_deck_preset_if_not_exists()
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
-
-
-def set_recommended_preferences() -> None:
-    preferences = aqt.mw.col.get_preferences()
-    preferences.scheduling.learn_ahead_secs = 0
-    aqt.mw.col.set_preferences(preferences)
