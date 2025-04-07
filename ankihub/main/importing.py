@@ -29,7 +29,7 @@ from ..settings import (
     is_anking_note_types_addon_installed,
     is_projektanki_note_types_addon_installed,
 )
-from .deck_options import set_ankihub_config_for_deck, set_recommended_preferences
+from .deck_options import set_ankihub_config_for_deck
 from .exceptions import ChangesRequireFullSyncError
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -165,7 +165,6 @@ class AnkiHubImporter:
             )
             if recommended_deck_settings:
                 set_ankihub_config_for_deck(self._local_did)
-                set_recommended_preferences()
 
         if subdecks or subdecks_for_new_notes_only:
             if subdecks_for_new_notes_only:
