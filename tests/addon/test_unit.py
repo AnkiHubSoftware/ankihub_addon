@@ -1592,7 +1592,12 @@ class TestErrorHandling:
         ],
     )
     def test_handle_ankihub_403(
-        self, mocker: MockerFixture, response_content: str, expected_handled: bool
+        self,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        anki_session_with_addon_data: AnkiSession,
+        response_content: str,
+        expected_handled: bool,
     ):
         show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
         terms_and_conditions_dialog = mocker.patch(
@@ -1604,20 +1609,20 @@ class TestErrorHandling:
         response_mock.text = response_content
         response_mock.json = lambda: json.loads(response_content)  # type: ignore
 
-        handled = _try_handle_exception(
-            exc_value=AnkiHubHTTPError(response=response_mock),
-            tb=None,
-        )
-        assert handled == expected_handled
-        if (
-            response_content
-            and json.loads(response_content).get("detail")
-            == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL
-        ):
-            terms_and_conditions_dialog.display.assert_called_once()
-
-        else:
-            assert show_error_dialog_mock.called == expected_handled
+        with anki_session_with_addon_data.profile_loaded():
+            handled = _try_handle_exception(
+                exc_value=AnkiHubHTTPError(response=response_mock),
+                tb=None,
+            )
+            assert handled == expected_handled
+            if (
+                response_content
+                and json.loads(response_content).get("detail")
+                == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL
+            ):
+                qtbot.wait_until(lambda: terms_and_conditions_dialog.display.called)
+            else:
+                assert show_error_dialog_mock.called == expected_handled
 
     def test_handle_ankihub_406(self, mocker: MockerFixture):
         ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
