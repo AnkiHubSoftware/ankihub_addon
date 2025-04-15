@@ -786,18 +786,12 @@ def run_with_delay_when_progress_dialog_is_open(func: Callable, *args, **kwargs)
         LOGGER.info("Calling with_delay_when_progress_dialog_is_open.func")
         func(*args, **kwargs)
 
-        # the documentation of aqt.mw.progress.timer says that the timer has to be deleted to
-        # prevent memory leaks
-        timer.deleteLater()
-
-    # aqt.mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    # aqt.mw.progress.single_shot is for creating "Custom timers which avoid firing while a progress dialog is active".
     # It's better to use a large delay value because there is a 0.5 second time window in which
     # the func can be called even if the progress dialog is not closed yet.
     # See https://github.com/ankitects/anki/blob/d9f1e2264804481a2549b23dbc8a530857ad57fc/qt/aqt/progress.py#L261-L277
-    timer = aqt.mw.progress.timer(
+    aqt.mw.progress.single_shot(
         ms=2000,
         func=wrapper,
-        repeat=False,
-        requiresCollection=True,
-        parent=aqt.mw,
+        requires_collection=True,
     )
