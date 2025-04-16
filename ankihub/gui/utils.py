@@ -779,3 +779,19 @@ def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]
 
 def logged_into_ankiweb() -> bool:
     return bool(aqt.mw.pm.sync_auth())
+
+
+def run_with_delay_when_progress_dialog_is_open(func: Callable, *args, **kwargs) -> Any:
+    def wrapper():
+        LOGGER.info("Calling with_delay_when_progress_dialog_is_open.func")
+        func(*args, **kwargs)
+
+    # aqt.mw.progress.single_shot is for creating "Custom timers which avoid firing while a progress dialog is active".
+    # It's better to use a large delay value because there is a 0.5 second time window in which
+    # the func can be called even if the progress dialog is not closed yet.
+    # See https://github.com/ankitects/anki/blob/d9f1e2264804481a2549b23dbc8a530857ad57fc/qt/aqt/progress.py#L261-L277
+    aqt.mw.progress.single_shot(
+        ms=2000,
+        func=wrapper,
+        requires_collection=True,
+    )

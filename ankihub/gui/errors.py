@@ -50,6 +50,7 @@ from .operations import AddonQueryOp
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
+    run_with_delay_when_progress_dialog_is_open,
     show_error_dialog,
     show_tooltip,
 )
@@ -364,7 +365,9 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
             return False
 
         if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
-            TermsAndConditionsDialog.display(parent=aqt.mw)
+            run_with_delay_when_progress_dialog_is_open(
+                TermsAndConditionsDialog.display, parent=aqt.mw
+            )
             return True
 
     elif response.status_code == 406:
