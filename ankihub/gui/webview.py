@@ -11,6 +11,7 @@ from aqt.qt import (
     QUrl,
     QVBoxLayout,
     QWebEngineUrlRequestInterceptor,
+    QWidget,
     qconnect,
 )
 from aqt.theme import theme_manager
@@ -210,8 +211,13 @@ class CustomWebPage(AnkiWebPage):
     AnkiWebPage which grants the `Notifications` feature permission.
     """
 
-    def __init__(self, profile: QWebEngineProfile, onBridgeCmd: Callable[[str], Any]):
-        QWebEnginePage.__init__(self, profile, None)
+    def __init__(
+        self,
+        parent: QWidget,
+        profile: QWebEngineProfile,
+        onBridgeCmd: Callable[[str], Any],
+    ):
+        QWebEnginePage.__init__(self, profile, parent)
         self._onBridgeCmd = onBridgeCmd
         self._setupBridge()
         self.open_links_externally = False
