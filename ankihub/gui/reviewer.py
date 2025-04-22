@@ -138,7 +138,9 @@ class ReviewerSidebar:
 
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
 
-        page = CustomWebPage(self.profile, self.content_webview._onBridgeCmd)
+        page = CustomWebPage(
+            self.content_webview, self.profile, self.content_webview._onBridgeCmd
+        )
         page.profile().setUrlRequestInterceptor(self.interceptor)
         # Prevent white flicker on dark mode
         page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
