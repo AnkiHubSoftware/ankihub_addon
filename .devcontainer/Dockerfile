@@ -23,6 +23,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     libxi6 \
     libxkbcommon-x11-0 \
     libxkbcommon0 \
+    libxcb-cursor-dev \
     libxkbfile1	\
     libxrandr2 \
     libxrender1 \
