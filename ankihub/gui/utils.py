@@ -528,6 +528,10 @@ def chevron_up_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "chevron-up.svg").absolute()))
 
 
+def sparkles_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "sparkles.svg").absolute()))
+
+
 def chevron_down_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "chevron-down.svg").absolute()))
 
