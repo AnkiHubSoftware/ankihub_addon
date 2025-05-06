@@ -28,8 +28,18 @@ from aqt.gui_hooks import (
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
+    dialog_manager_did_open_dialog,
 )
-from aqt.qt import QAction, QMenu, qconnect
+from aqt.qt import (
+    QAction,
+    QGridLayout,
+    QMenu,
+    QSize,
+    Qt,
+    QToolButton,
+    QWidget,
+    qconnect,
+)
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
@@ -52,7 +62,13 @@ from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
+from ..utils import (
+    ask_user,
+    choose_ankihub_deck,
+    choose_list,
+    choose_subset,
+    sparkles_icon,
+)
 from .custom_columns import (
     AnkiHubIdColumn,
     EditedAfterSyncColumn,
@@ -98,6 +114,7 @@ def setup() -> None:
     _setup_search()
     _setup_context_menu()
     _setup_ankihub_sidebar_tree()
+    _setup_smart_search_button()
     _setup_ankihub_menu()
     _make_copy_note_action_not_copy_ankihub_id()
 
@@ -915,6 +932,30 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     ui_config = config.ui_config()
     ui_config.updated_today_tree_expanded = expanded
     config.set_ui_config(ui_config)
+
+
+def _setup_smart_search_button() -> None:
+    dialog_manager_did_open_dialog.append(_on_dialog_manager_did_open_dialog)
+
+
+def _on_dialog_manager_did_open_dialog(
+    dialog_manager: aqt.DialogManager, dialog_name: str, dialog_instance: QWidget
+) -> None:
+    if dialog_name != "Browser":
+        return
+
+    smart_sarch_button = QToolButton()
+    smart_sarch_button.setIcon(sparkles_icon())
+    smart_sarch_button.setIconSize(QSize(16, 16))
+    smart_sarch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+    smart_sarch_button.setAutoRaise(True)
+
+    grid: QGridLayout = browser.sidebarDockWidget.widget().layout()
+    grid.addWidget(smart_sarch_button, 0, 3)
+
+    # Make sidebar span 3 columns so that it includes the smart search button column
+    grid.removeWidget(browser.sidebar)
+    grid.addWidget(browser.sidebar, 1, 0, 1, 3)
 
 
 # copy note action
