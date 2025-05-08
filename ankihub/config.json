@@ -7,6 +7,7 @@
     "use_staging": false,
     "staging_anking_deck_id": null,
     "ankihub_ai_chatbot": true,
+    "ankihub_smart_search": true,
     "boards_and_beyond_step_1": true,
     "boards_and_beyond_step_2": true,
     "first_aid_forward_step_1": true,
