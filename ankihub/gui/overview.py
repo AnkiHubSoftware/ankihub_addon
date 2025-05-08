@@ -121,6 +121,15 @@ learning experience with Premium. 🌟"
     )
 
 
+def show_flashcard_selector(ah_did: UUID) -> None:
+    def on_checked_for_access(has_access: bool) -> None:
+        if has_access:
+            FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
+            LOGGER.info("Opened flashcard selector dialog.")
+
+    _show_flashcard_selector_upsell_if_user_has_no_access(on_checked_for_access)
+
+
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
@@ -128,12 +137,7 @@ def _handle_flashcard_selector_py_commands(
         kwargs = parse_js_message_kwargs(message)
         ah_did = UUID(kwargs.get("deck_id"))
 
-        def on_checked_for_access(has_access: bool) -> None:
-            if has_access:
-                FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
-                LOGGER.info("Opened flashcard selector dialog.")
-
-        _show_flashcard_selector_upsell_if_user_has_no_access(on_checked_for_access)
+        show_flashcard_selector(ah_did=ah_did)
 
         return (True, None)
     elif message.startswith(FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD):
