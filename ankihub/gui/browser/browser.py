@@ -32,19 +32,28 @@ from aqt.gui_hooks import (
 )
 from aqt.qt import (
     QAction,
+    QDialog,
     QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
     QMenu,
+    QPushButton,
     QSize,
     Qt,
     QToolButton,
+    QVBoxLayout,
     QWidget,
     qconnect,
 )
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import SuggestionType
 from ...db import ankihub_db
+from ...gui.overview import show_flashcard_selector
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -949,6 +958,8 @@ def _on_dialog_manager_did_open_dialog(
     smart_sarch_button.setIconSize(QSize(16, 16))
     smart_sarch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
     smart_sarch_button.setAutoRaise(True)
+    smart_sarch_button.setToolTip("Ankihub Smart Search")
+    qconnect(smart_sarch_button.clicked, show_subscribed_decks_dialog)
 
     grid: QGridLayout = browser.sidebarDockWidget.widget().layout()
     grid.addWidget(smart_sarch_button, 0, 3)
@@ -956,6 +967,79 @@ def _on_dialog_manager_did_open_dialog(
     # Make sidebar span 3 columns so that it includes the smart search button column
     grid.removeWidget(browser.sidebar)
     grid.addWidget(browser.sidebar, 1, 0, 1, 3)
+
+
+def show_subscribed_decks_dialog(parent=None):
+    if not isinstance(parent, (QWidget, type(None))):
+        parent = None
+
+    # List of decks
+    client = AnkiHubClient()
+    decks = client.get_decks_with_user_relation()
+    list_widget = QListWidget()
+    decks_dict = {deck.name: deck for deck in decks}
+    for deck in decks:
+        list_widget.addItem(deck.name)
+
+    # Dialog
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Your Subscribed AnkiHub Decks")
+    layout = QVBoxLayout(dialog)
+
+    # Search Bar
+    search_layout = QHBoxLayout()
+    search_label = QLabel("Search:")
+    search_bar = QLineEdit()
+    search_bar.setPlaceholderText("Search decks...")
+
+    # Buttons
+    button_layout = QHBoxLayout()
+    cancel_button = QPushButton("Cancel")
+    open_button = QPushButton("Open")
+    open_button.setEnabled(False)
+
+    # Actions
+    def filter_decks():
+        search_text = search_bar.text().lower()
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            item.setHidden(search_text not in item.text().lower())
+
+    def update_open_button_state():
+        open_button.setEnabled(list_widget.currentItem() is not None)
+
+    # Handle interactions
+    search_bar.textChanged.connect(filter_decks)
+    list_widget.currentItemChanged.connect(update_open_button_state)
+    cancel_button.clicked.connect(dialog.reject)
+    open_button.clicked.connect(
+        lambda: (
+            show_flashcard_selector(
+                ah_did=decks_dict.get(list_widget.currentItem().text()).ah_did
+            ),
+            dialog.close(),
+        )
+    )
+
+    # Customize layouts
+    layout.setContentsMargins(28, 28, 28, 28)
+    layout.addLayout(search_layout)
+    layout.addWidget(list_widget)
+    layout.addLayout(button_layout)
+
+    search_layout.setContentsMargins(0, 0, 0, 16)
+    search_layout.addWidget(search_label)
+    search_layout.addWidget(search_bar)
+
+    button_layout.addWidget(cancel_button)
+    button_layout.addWidget(open_button)
+
+    dialog.setLayout(layout)
+    dialog.setMinimumWidth(400)
+    dialog.setMinimumHeight(300)
+
+    # Show dialog
+    dialog.exec()
 
 
 # copy note action
