@@ -67,7 +67,6 @@ class SmartSearchDecksSelectorDialog(QDialog):
         self.layout.addWidget(self.list_widget)
         self.layout.addLayout(self.button_layout)
 
-        # Connect signals to slots
         qconnect(self.search_bar.textChanged, self._filter_decks)
         qconnect(self.list_widget.currentItemChanged, self._update_open_button_state)
         qconnect(self.cancel_button.clicked, self.reject)

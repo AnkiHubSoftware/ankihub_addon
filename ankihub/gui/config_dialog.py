@@ -58,6 +58,7 @@ def _general_tab(conf_window) -> None:
 
     if config.get_feature_flags().get("mh_integration"):
         tab.text("Sidebar", bold=True)
+        tab.checkbox("ankihub_smart_search", "AnkiHub Smart Search")
         tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
 
         add_nested_checkboxes(

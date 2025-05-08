@@ -945,6 +945,12 @@ def _on_dialog_manager_did_open_dialog(
     if dialog_name != "Browser":
         return
 
+    add_smart_search_button_to_sidebar()
+
+
+def add_smart_search_button_to_sidebar():
+    if not config.public_config.get("ankihub_smart_search"):
+        return
     smart_sarch_button = QToolButton()
     smart_sarch_button.setIcon(sparkles_icon())
     smart_sarch_button.setIconSize(QSize(16, 16))
