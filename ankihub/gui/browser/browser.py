@@ -40,6 +40,7 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
+from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
@@ -951,8 +952,9 @@ def _on_dialog_manager_did_open_dialog(
 def add_smart_search_button_to_sidebar():
     if not config.public_config.get("ankihub_smart_search"):
         return
+
     smart_sarch_button = QToolButton()
-    smart_sarch_button.setIcon(sparkles_icon())
+    smart_sarch_button.setIcon(sparkles_icon(theme_manager.night_mode))
     smart_sarch_button.setIconSize(QSize(16, 16))
     smart_sarch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
     smart_sarch_button.setAutoRaise(True)
