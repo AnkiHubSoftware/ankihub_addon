@@ -27,8 +27,8 @@ class SmartSearchDecksSelectorDialog(QDialog):
     def _setup_data(self):
         # Get subscribed decks
         self.client = AnkiHubClient()
-        self.decks = self.client.get_decks_with_user_relation()
-        self.decks_dict = {deck.name: deck for deck in self.decks}
+        self.decks_list = self.client.get_deck_subscriptions()
+        self.decks_dict = {deck.name: deck for deck in self.decks_list}
 
     def _setup_ui(self):
         # Set window properties
@@ -51,7 +51,7 @@ class SmartSearchDecksSelectorDialog(QDialog):
 
         # List widget
         self.list_widget = QListWidget()
-        for deck in self.decks:
+        for deck in self.decks_list:
             self.list_widget.addItem(deck.name)
 
         # Buttons
