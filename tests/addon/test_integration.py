@@ -82,6 +82,9 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
+from ankihub.gui.smart_search_decks_selector_dialog import (
+    SmartSearchDecksSelectorDialog,
+)
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
 
 from ..factories import (
@@ -7548,3 +7551,144 @@ def test_update_note_type_templates_and_styles(
         assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get(
             "css"
         )
+
+
+class TestSmartSearchDecksSelectorDialog:
+    def _mock_dependencies(self, mocker: MockerFixture) -> None:
+        # Mock the config to return that the user is logged in
+        mocker.patch.object(config, "is_logged_in", return_value=True)
+
+        # Mock the ask_user function to always return True
+        mocker.patch("ankihub.gui.operations.subdecks.ask_user", return_value=True)
+
+    def test_open_dialog_fetches_data(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
+            )
+
+            dialog = SmartSearchDecksSelectorDialog()
+            dialog.show_dialog()
+
+            assert dialog.list_widget.count() == 1
+            assert len(dialog.decks_list) == 1
+
+    def test_search_bar_filters_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            deck_names = ["Test Deck 1", "Test Deck 2", "Test Deck 3"]
+            ah_dids = [install_ah_deck(ah_deck_name=name) for name in deck_names]
+            anki_dids = [config.deck_config(ah_did).anki_id for ah_did in ah_dids]
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=name)
+                    for ah_did, anki_did, name in zip(ah_dids, anki_dids, deck_names)
+                ],
+            )
+
+            dialog = SmartSearchDecksSelectorDialog()
+            dialog.show_dialog()
+            assert dialog.list_widget.count() == 3
+
+            # Filter for "Deck 2"
+            dialog.search_bar.setText("Deck 2")
+            qtbot.wait(200)
+
+            assert dialog.list_widget.item(0).isHidden()
+            assert not dialog.list_widget.item(1).isHidden()
+            assert dialog.list_widget.item(2).isHidden()
+
+    def test_open_button_enabled_when_deck_selected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
+            )
+
+            dialog = SmartSearchDecksSelectorDialog()
+            dialog.show_dialog()
+
+            assert not dialog.open_button.isEnabled()
+
+            dialog.list_widget.setCurrentRow(0)
+            qtbot.wait(200)
+
+            assert dialog.open_button.isEnabled()
+
+    def test_open_button_calls_show_flashcard_selector(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
+            )
+
+            show_flashcard_selector_mock = mocker.patch(
+                "ankihub.gui.smart_search_decks_selector_dialog.show_flashcard_selector"
+            )
+
+            dialog = SmartSearchDecksSelectorDialog()
+            dialog.show_dialog()
+
+            dialog.list_widget.setCurrentRow(0)
+            qtbot.wait(200)
+
+            dialog.open_button.click()
+            qtbot.wait(200)
+
+            show_flashcard_selector_mock.assert_called_once_with(ah_did=ah_did)
