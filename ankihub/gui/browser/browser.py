@@ -954,11 +954,11 @@ def add_smart_search_button_to_sidebar():
     qconnect(smart_sarch_button.clicked, SmartSearchDecksSelectorDialog.show_dialog)
 
     grid = browser.sidebarDockWidget.widget().layout()
-    grid.addWidget(smart_sarch_button, 0, 3)
+    grid.addWidget(smart_sarch_button, 0, 3)  # type: ignore
 
     # Make sidebar span 3 columns so that it includes the smart search button column
     grid.removeWidget(browser.sidebar)
-    grid.addWidget(browser.sidebar, 1, 0, 1, 3)
+    grid.addWidget(browser.sidebar, 1, 0, 1, 3)  # type: ignore
 
 
 # copy note action
