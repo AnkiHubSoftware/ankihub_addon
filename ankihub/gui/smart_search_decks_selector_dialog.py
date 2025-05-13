@@ -42,8 +42,8 @@ class SmartSearchDecksSelectorDialog(QDialog):
         self.setMinimumHeight(300)
 
         # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(28, 28, 28, 28)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(28, 28, 28, 28)
 
         # Search bar
         self.search_layout = QHBoxLayout()
@@ -68,9 +68,9 @@ class SmartSearchDecksSelectorDialog(QDialog):
         self.button_layout.addWidget(self.open_button)
 
         # Add all layouts to main layout
-        self.layout.addLayout(self.search_layout)
-        self.layout.addWidget(self.list_widget)
-        self.layout.addLayout(self.button_layout)
+        self.main_layout.addLayout(self.search_layout)
+        self.main_layout.addWidget(self.list_widget)
+        self.main_layout.addLayout(self.button_layout)
 
         qconnect(self.search_bar.textChanged, self._filter_decks)
         qconnect(self.list_widget.currentItemChanged, self._update_open_button_state)

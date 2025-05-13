@@ -30,16 +30,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
     dialog_manager_did_open_dialog,
 )
-from aqt.qt import (
-    QAction,
-    QGridLayout,
-    QMenu,
-    QSize,
-    Qt,
-    QToolButton,
-    QWidget,
-    qconnect,
-)
+from aqt.qt import QAction, QMenu, QSize, Qt, QToolButton, QWidget, qconnect
 from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
@@ -962,7 +953,7 @@ def add_smart_search_button_to_sidebar():
 
     qconnect(smart_sarch_button.clicked, SmartSearchDecksSelectorDialog.show_dialog)
 
-    grid: QGridLayout = browser.sidebarDockWidget.widget().layout()
+    grid = browser.sidebarDockWidget.widget().layout()
     grid.addWidget(smart_sarch_button, 0, 3)
 
     # Make sidebar span 3 columns so that it includes the smart search button column
