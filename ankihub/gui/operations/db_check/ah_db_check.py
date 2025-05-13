@@ -16,7 +16,8 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None) -> None:
 
     ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
     for ah_did in ah_dids_with_missing_values:
-        config.set_download_full_deck_on_next_sync(ah_did, True)
+        if ah_did in config.deck_ids():
+            config.set_download_full_deck_on_next_sync(ah_did, True)
 
     if not _try_reinstall_decks_with_missing_deck_configs(on_success=on_success):
         on_success()
