@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import uuid
 import zipfile
 from copy import deepcopy
@@ -14,6 +15,7 @@ from typing import Callable, Generator, List, Optional, cast
 from unittest.mock import Mock
 
 import pytest
+import requests
 import requests_mock
 from pytest import FixtureRequest
 from pytest_mock import MockerFixture
@@ -151,10 +153,29 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             raise_on_error=False,
         )
 
+        _wait_for_server(
+            api_url=LOCAL_API_URL,
+            timeout=30.0,
+            interval=0.5,
+        )
+
     client = AnkiHubClient(
         api_url=LOCAL_API_URL, local_media_dir_path_cb=lambda: TEST_MEDIA_PATH
     )
     yield client
+
+
+def _wait_for_server(api_url: str, timeout: float = 30.0, interval: float = 0.5):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = requests.get(api_url, timeout=1.0)
+            if resp.status_code < 500:
+                return
+        except requests.exceptions.RequestException:
+            pass
+        time.sleep(interval)
+    pytest.skip(f"Could not connect to {api_url} after {timeout:.0f}s")
 
 
 def is_playback_mode(vcr: VCR, request: FixtureRequest) -> bool:
