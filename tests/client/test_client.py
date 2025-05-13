@@ -175,7 +175,7 @@ def _wait_for_server(api_url: str, timeout: float = 30.0, interval: float = 0.5)
         except requests.exceptions.RequestException:
             pass
         time.sleep(interval)
-    pytest.skip(f"Could not connect to {api_url} after {timeout:.0f}s")
+    pytest.fail(f"Could not connect to {api_url} after {timeout:.0f}s")
 
 
 def is_playback_mode(vcr: VCR, request: FixtureRequest) -> bool:
