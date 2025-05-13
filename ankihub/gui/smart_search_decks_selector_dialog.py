@@ -1,3 +1,5 @@
+from typing import Optional
+
 from aqt import (
     QDialog,
     QHBoxLayout,
@@ -10,11 +12,14 @@ from aqt import (
     qconnect,
 )
 
+from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.overview import show_flashcard_selector
 
 
 class SmartSearchDecksSelectorDialog(QDialog):
+    _window: Optional["SmartSearchDecksSelectorDialog"] = None
+
     def __init__(self, parent=None):
         if not isinstance(parent, (QWidget, type(None))):
             parent = None
@@ -90,8 +95,13 @@ class SmartSearchDecksSelectorDialog(QDialog):
                 self.close()
 
     @classmethod
-    def show_dialog(cls, parent=None):
-        if not isinstance(parent, (QWidget, type(None))):
-            parent = None
-        dialog = cls(parent)
-        return dialog.exec()
+    def show_dialog(cls):
+        LOGGER.info("SmartSearchDecksSelectorDialog opened")
+
+        if cls._window is None:
+            cls._window = cls()
+        else:
+            cls._window.activateWindow()
+            cls._window.raise_()
+            cls._window.show()
+        return cls._window

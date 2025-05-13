@@ -960,11 +960,7 @@ def add_smart_search_button_to_sidebar():
     smart_sarch_button.setAutoRaise(True)
     smart_sarch_button.setToolTip("Ankihub Smart Search")
 
-    # Create a proper slot function that ignores the checked parameter
-    def on_smart_search_clicked():
-        SmartSearchDecksSelectorDialog.show_dialog(browser)
-
-    qconnect(smart_sarch_button.clicked, on_smart_search_clicked)
+    qconnect(smart_sarch_button.clicked, SmartSearchDecksSelectorDialog.show_dialog)
 
     grid: QGridLayout = browser.sidebarDockWidget.widget().layout()
     grid.addWidget(smart_sarch_button, 0, 3)
