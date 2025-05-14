@@ -46,7 +46,7 @@ function renderFlashCardSelectorButtonOnCongrats() {
                 position: relative;
                 background-color: ${smartSearchBgColor};
                 color: white;
-                display: flex;
+                display: none;
                 align-items: center;
                 justify-content: center;
                 gap: 4px;
@@ -182,8 +182,35 @@ function renderFlashCardSelectorButtonOnDecks() {
 }
 
 
+
+
+function waitForElm(selector) {
+    return new Promise(resolve => {
+        if (document.querySelector(selector)) {
+            return resolve(document.querySelector(selector));
+        }
+
+        const observer = new MutationObserver(mutations => {
+            if (document.querySelector(selector)) {
+                observer.disconnect();
+                resolve(document.querySelector(selector));
+            }
+        });
+
+        // If you get "parameter 1 is not of type 'Node'" error, see https://stackoverflow.com/a/77855838/492336
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    });
+}
+
+
 if (window.location.href.includes("congrats")) {
     renderFlashCardSelectorButtonOnCongrats();
+    waitForElm(".congrats").then(() => {
+        document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}").style.display = "flex";
+    })
 } else {
     renderFlashCardSelectorButtonOnDecks();
 }
