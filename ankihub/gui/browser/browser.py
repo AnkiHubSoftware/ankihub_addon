@@ -48,14 +48,15 @@ from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError
+from ..flashcard_selector_dialog import show_flashcard_selector
 from ..operations.ankihub_sync import update_decks_and_media
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ..smart_search_decks_selector_dialog import SmartSearchDecksSelectorDialog
 from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
 from ..utils import (
+    SearchableSelectionDialog,
     ask_user,
     choose_ankihub_deck,
     choose_list,
@@ -951,7 +952,31 @@ def add_smart_search_button_to_sidebar():
     smart_sarch_button.setAutoRaise(True)
     smart_sarch_button.setToolTip("Ankihub Smart Search")
 
-    qconnect(smart_sarch_button.clicked, SmartSearchDecksSelectorDialog.show_dialog)
+    def on_deck_selected(dialog: SearchableSelectionDialog) -> None:
+        if not dialog.name:
+            return
+        ah_did = config.get_ah_did_by_name(dialog.name)
+        show_flashcard_selector(ah_did=ah_did, parent=browser)
+
+    def names_of_decks_with_note_embeddings() -> List[str]:
+        names = [
+            deck_config.name
+            for ah_did in config.deck_ids()
+            if (deck_config := config.deck_config(ah_did)).has_note_embeddings
+        ]
+        return list(sorted(names))
+
+    def on_smart_search_button_clicked() -> None:
+        SearchableSelectionDialog(
+            browser,
+            names=names_of_decks_with_note_embeddings,
+            accept="Open",
+            title="Select the deck to search",
+            parent=browser,
+            callback=on_deck_selected,
+        )
+
+    qconnect(smart_sarch_button.clicked, on_smart_search_button_clicked)
 
     grid = browser.sidebarDockWidget.widget().layout()
     grid.addWidget(smart_sarch_button, 0, 3)  # type: ignore

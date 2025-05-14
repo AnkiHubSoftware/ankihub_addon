@@ -103,10 +103,10 @@ learning experience with Premium. 🌟"
     )
 
 
-def show_flashcard_selector(ah_did: UUID) -> None:
+def show_flashcard_selector(ah_did: UUID, parent=aqt.mw) -> None:
     def on_checked_for_access(has_access: bool) -> None:
         if has_access:
-            FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
+            FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=parent)
             LOGGER.info("Opened flashcard selector dialog.")
 
     _show_flashcard_selector_upsell_if_user_has_no_access(on_checked_for_access)
