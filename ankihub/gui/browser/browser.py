@@ -956,9 +956,9 @@ def add_smart_search_button_to_sidebar():
     grid = browser.sidebarDockWidget.widget().layout()
     grid.addWidget(smart_sarch_button, 0, 3)  # type: ignore
 
-    # Make sidebar span 3 columns so that it includes the smart search button column
+    # Make sidebar span 4 columns so that it includes the smart search button column
     grid.removeWidget(browser.sidebar)
-    grid.addWidget(browser.sidebar, 1, 0, 1, 3)  # type: ignore
+    grid.addWidget(browser.sidebar, 1, 0, 1, 4)  # type: ignore
 
 
 # copy note action
