@@ -54,7 +54,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message == TERMS_AGREEMENT_NOT_ACCEPTED:
-        from ..gui.overview import FlashCardSelectorDialog
+        from ..gui.flashcard_selector_dialog import FlashCardSelectorDialog
         from .reviewer import reviewer_sidebar
 
         TermsAndConditionsDialog.display(parent=aqt.mw)

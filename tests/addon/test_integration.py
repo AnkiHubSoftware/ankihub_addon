@@ -82,6 +82,7 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
+from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.smart_search_decks_selector_dialog import (
     SmartSearchDecksSelectorDialog,
 )
@@ -188,7 +189,6 @@ from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDia
 from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
-    FlashCardSelectorDialog,
 )
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
@@ -7473,7 +7473,7 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
         )
         aqt.mw.reviewer.show()
         flashcard_selector_dialog_mock = mocker.patch(
-            "ankihub.gui.overview.FlashCardSelectorDialog.dialog"
+            "ankihub.gui.flashcard_selector_dialog.FlashCardSelectorDialog.dialog"
         )
 
         aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
