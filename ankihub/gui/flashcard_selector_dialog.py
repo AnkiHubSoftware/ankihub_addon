@@ -3,7 +3,7 @@ from typing import Any, Callable, Optional
 from uuid import UUID
 
 import aqt
-from aqt import QDialogButtonBox
+from aqt import QDialogButtonBox, sip
 from aqt.utils import openLink
 
 from .. import LOGGER
@@ -38,7 +38,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
             cls.dialog.close()
             cls.dialog = None
 
-        if not cls.dialog:
+        if not cls.dialog or sip.isdeleted(cls.dialog):
             cls.dialog = cls(ah_did=ah_did, parent=parent)
 
         if not cls.dialog.display():
@@ -70,7 +70,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
 
 def _show_flashcard_selector_upsell_if_user_has_no_access(
-    on_done: Callable[[bool], None]
+    on_done: Callable[[bool], None],
 ) -> None:
     user_details = AnkiHubClient().get_user_details()
     has_access = user_details["has_flashcard_selector_access"]

@@ -22,7 +22,7 @@ from ..gui.flashcard_selector_dialog import (
 from ..settings import config
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
-from .utils import get_ah_did_of_deck_or_ancestor_deck
+from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter
 
 ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
     Path(__file__).parent / "web/add_flashcard_selector_button.js"
@@ -81,6 +81,7 @@ def _maybe_add_flashcard_selector_button() -> None:
     overview_web.eval(js)
 
 
+@robust_filter
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
