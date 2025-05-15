@@ -528,6 +528,12 @@ def chevron_up_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "chevron-up.svg").absolute()))
 
 
+def sparkles_icon(night_mode: bool) -> QIcon:
+    if night_mode:
+        return QIcon(str((ICONS_PATH / "sparkles-light.svg").absolute()))
+    return QIcon(str((ICONS_PATH / "sparkles-dark.svg").absolute()))
+
+
 def chevron_down_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "chevron-down.svg").absolute()))
 

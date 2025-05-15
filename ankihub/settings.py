@@ -494,6 +494,10 @@ class _Config:
     def schema_to_do_full_upload_for_once(self) -> Optional[int]:
         return self._private_config.schema_to_do_full_upload_for_once
 
+    def get_ah_did_by_name(self, name: str) -> Optional[uuid.UUID]:
+        decks = self._private_config.decks
+        return next((key for key in decks.keys() if decks[key].name == name), None)
+
 
 config = _Config()
 
