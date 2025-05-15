@@ -945,12 +945,12 @@ def add_smart_search_button_to_sidebar():
     if not config.public_config.get("ankihub_smart_search"):
         return
 
-    smart_sarch_button = QToolButton()
-    smart_sarch_button.setIcon(sparkles_icon(theme_manager.night_mode))
-    smart_sarch_button.setIconSize(QSize(16, 16))
-    smart_sarch_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-    smart_sarch_button.setAutoRaise(True)
-    smart_sarch_button.setToolTip("Ankihub Smart Search")
+    smart_search_button = QToolButton()
+    smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
+    smart_search_button.setIconSize(QSize(16, 16))
+    smart_search_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+    smart_search_button.setAutoRaise(True)
+    smart_search_button.setToolTip("AnkiHub Smart Search")
 
     def on_deck_selected(dialog: SearchableSelectionDialog) -> None:
         if not dialog.name:
@@ -976,10 +976,10 @@ def add_smart_search_button_to_sidebar():
             callback=on_deck_selected,
         )
 
-    qconnect(smart_sarch_button.clicked, on_smart_search_button_clicked)
+    qconnect(smart_search_button.clicked, on_smart_search_button_clicked)
 
     grid = browser.sidebarDockWidget.widget().layout()
-    grid.addWidget(smart_sarch_button, 0, 3)  # type: ignore
+    grid.addWidget(smart_search_button, 0, 3)  # type: ignore
 
     # Make sidebar span 4 columns so that it includes the smart search button column
     grid.removeWidget(browser.sidebar)
