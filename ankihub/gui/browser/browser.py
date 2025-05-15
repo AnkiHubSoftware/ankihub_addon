@@ -956,7 +956,9 @@ def add_smart_search_button_to_sidebar():
         if not dialog.name:
             return
         ah_did = config.get_ah_did_by_name(dialog.name)
-        show_flashcard_selector(ah_did=ah_did, parent=browser)
+        aqt.mw.taskman.run_on_main(
+            lambda: show_flashcard_selector(ah_did=ah_did, parent=browser)
+        )
 
     def names_of_decks_with_note_embeddings() -> List[str]:
         names = [
