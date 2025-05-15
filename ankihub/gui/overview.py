@@ -27,7 +27,7 @@ from ..settings import (
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
-from .utils import get_ah_did_of_deck_or_ancestor_deck, show_dialog
+from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter, show_dialog
 from .webview import AnkiHubWebViewDialog
 
 ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
@@ -88,7 +88,7 @@ def _maybe_add_flashcard_selector_button() -> None:
 
 
 def _show_flashcard_selector_upsell_if_user_has_no_access(
-    on_done: Callable[[bool], None]
+    on_done: Callable[[bool], None],
 ) -> None:
     user_details = AnkiHubClient().get_user_details()
     has_access = user_details["has_flashcard_selector_access"]
@@ -121,6 +121,7 @@ learning experience with Premium. 🌟"
     )
 
 
+@robust_filter
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:

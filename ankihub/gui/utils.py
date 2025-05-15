@@ -1,8 +1,8 @@
 import inspect
 import uuid
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import aqt
 from anki.decks import DeckId
@@ -795,3 +795,46 @@ def run_with_delay_when_progress_dialog_is_open(func: Callable, *args, **kwargs)
         func=wrapper,
         requires_collection=True,
     )
+
+
+def _raise_on_main(exc: Exception) -> None:
+    def _raiser(e: Exception) -> None:
+        raise e
+
+    aqt.mw.taskman.run_on_main(partial(_raiser, exc))
+
+
+def robust_hook(hook: Callable[..., None]) -> Callable[..., None]:
+    """Decorator that wraps a hook function to catch exceptions and schedule them to be raised on the main thread.
+    This prevents Anki from removing the hook, which is the default behavior when an exception is raised
+    in a hook/filter.
+    """
+
+    @wraps(hook)
+    def wrapper(*args: Any, **kwargs: Any) -> None:
+        try:
+            hook(*args, **kwargs)
+        except Exception as e:
+            _raise_on_main(e)
+
+    return wrapper
+
+
+T = TypeVar("T")
+
+
+def robust_filter(filter: Callable[..., T]) -> Callable[..., T]:
+    """Decorator that wraps a filter function to catch exceptions and schedule them to be raised on the main thread.
+    This prevents Anki from removing the filter, which is the default behavior when an exception is raised
+    in a hook/filter.
+    """
+
+    @wraps(filter)
+    def wrapper(first: T, *args: Any, **kwargs: Any) -> T:
+        try:
+            return filter(first, *args, **kwargs)
+        except Exception as e:
+            _raise_on_main(e)
+            return first
+
+    return wrapper
