@@ -28,8 +28,10 @@ from aqt.gui_hooks import (
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
+    dialog_manager_did_open_dialog,
 )
-from aqt.qt import QAction, QMenu, qconnect
+from aqt.qt import QAction, QMenu, QSize, Qt, QToolButton, QWidget, qconnect
+from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
@@ -46,13 +48,21 @@ from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError
+from ..flashcard_selector_dialog import show_flashcard_selector
 from ..operations.ankihub_sync import update_decks_and_media
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
+from ..utils import (
+    SearchableSelectionDialog,
+    ask_user,
+    choose_ankihub_deck,
+    choose_list,
+    choose_subset,
+    sparkles_icon,
+)
 from .custom_columns import (
     AnkiHubIdColumn,
     EditedAfterSyncColumn,
@@ -98,6 +108,7 @@ def setup() -> None:
     _setup_search()
     _setup_context_menu()
     _setup_ankihub_sidebar_tree()
+    _setup_smart_search_button()
     _setup_ankihub_menu()
     _make_copy_note_action_not_copy_ankihub_id()
 
@@ -915,6 +926,66 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     ui_config = config.ui_config()
     ui_config.updated_today_tree_expanded = expanded
     config.set_ui_config(ui_config)
+
+
+def _setup_smart_search_button() -> None:
+    dialog_manager_did_open_dialog.append(_on_dialog_manager_did_open_dialog)
+
+
+def _on_dialog_manager_did_open_dialog(
+    dialog_manager: aqt.DialogManager, dialog_name: str, dialog_instance: QWidget
+) -> None:
+    if dialog_name != "Browser":
+        return
+
+    add_smart_search_button_to_sidebar()
+
+
+def add_smart_search_button_to_sidebar():
+    if not config.public_config.get("ankihub_smart_search"):
+        return
+
+    smart_search_button = QToolButton()
+    smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
+    smart_search_button.setIconSize(QSize(16, 16))
+    smart_search_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+    smart_search_button.setAutoRaise(True)
+    smart_search_button.setToolTip("AnkiHub Smart Search")
+
+    def on_deck_selected(dialog: SearchableSelectionDialog) -> None:
+        if not dialog.name:
+            return
+        ah_did = config.get_ah_did_by_name(dialog.name)
+        aqt.mw.taskman.run_on_main(
+            lambda: show_flashcard_selector(ah_did=ah_did, parent=browser)
+        )
+
+    def names_of_decks_with_note_embeddings() -> List[str]:
+        names = [
+            deck_config.name
+            for ah_did in config.deck_ids()
+            if (deck_config := config.deck_config(ah_did)).has_note_embeddings
+        ]
+        return list(sorted(names))
+
+    def on_smart_search_button_clicked() -> None:
+        SearchableSelectionDialog(
+            browser,
+            names=names_of_decks_with_note_embeddings,
+            accept="Open",
+            title="Select the deck to search",
+            parent=browser,
+            callback=on_deck_selected,
+        )
+
+    qconnect(smart_search_button.clicked, on_smart_search_button_clicked)
+
+    grid = browser.sidebarDockWidget.widget().layout()
+    grid.addWidget(smart_search_button, 0, 3)  # type: ignore
+
+    # Make sidebar span 4 columns so that it includes the smart search button column
+    grid.removeWidget(browser.sidebar)
+    grid.addWidget(browser.sidebar, 1, 0, 1, 4)  # type: ignore
 
 
 # copy note action
