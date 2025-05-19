@@ -804,10 +804,10 @@ def run_with_delay_when_progress_dialog_is_open(func: Callable, *args, **kwargs)
 
 
 def _raise_on_main(exc: Exception) -> None:
-    def _raiser(e: Exception) -> None:
+    def _raise_exception(e: Exception) -> None:
         raise e
 
-    aqt.mw.taskman.run_on_main(partial(_raiser, exc))
+    aqt.mw.taskman.run_on_main(partial(_raise_exception, exc))
 
 
 T = TypeVar("T")

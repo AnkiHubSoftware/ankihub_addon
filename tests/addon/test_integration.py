@@ -27,7 +27,6 @@ from unittest.mock import Mock
 from zipfile import ZipFile
 
 import aqt
-import aqt.reviewer
 import pytest
 import requests_mock
 from anki.cards import Card, CardId
@@ -116,6 +115,8 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from aqt.gui_hooks import overview_will_render_bottom
+
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.ankihub_client import (
@@ -188,6 +189,7 @@ from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
 )
 from ankihub.gui.suggestion_dialog import SuggestionDialog
+from ankihub.gui.utils import robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
@@ -7548,3 +7550,43 @@ def test_update_note_type_templates_and_styles(
         assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get(
             "css"
         )
+
+
+@pytest.mark.qt_no_exception_capture
+@pytest.mark.parametrize(
+    "use_decorator, expected_present",
+    [
+        (True, True),
+        (False, False),
+    ],
+)
+def test_robust_filter(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    use_decorator: bool,
+    expected_present: bool,
+):
+    if use_decorator:
+
+        @robust_filter
+        def raise_exception(*args, **kwargs):
+            raise Exception("Test exception")
+
+    else:
+
+        def raise_exception(*args, **kwargs):
+            raise Exception("Test exception")
+
+    raise_exception_spy = Mock(side_effect=raise_exception)
+
+    overview_will_render_bottom.append(raise_exception_spy)
+
+    with anki_session_with_addon_data.profile_loaded():
+        # Trigger the hook by opening the overview
+        aqt.mw.deckBrowser.set_current_deck(DeckId(1))
+        qtbot.wait_until(lambda: raise_exception_spy.called)
+
+        # The hook should only be present if the robust_filter decorator was used
+        assert (
+            raise_exception_spy in overview_will_render_bottom._hooks
+        ) is expected_present
