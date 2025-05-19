@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import aqt
@@ -15,6 +15,7 @@ from ..settings import (
     url_plans_page,
 )
 from .menu import AnkiHubLogin
+from .operations import AddonQueryOp
 from .utils import show_dialog
 
 
@@ -69,14 +70,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         )
 
 
-def _show_flashcard_selector_upsell_if_user_has_no_access(
-    on_done: Callable[[bool], None],
-) -> None:
-    user_details = AnkiHubClient().get_user_details()
-    has_access = user_details["has_flashcard_selector_access"]
-    if has_access:
-        on_done(True)
-        return
+def _show_upsell(user_details: dict) -> None:
     show_trial_ended_message = user_details["show_trial_ended_message"]
     text = "Let AI do the heavy lifting! Find flashcards perfectly matched to your study materials and elevate your \
 learning experience with Premium. 🌟"
@@ -88,7 +82,6 @@ learning experience with Premium. 🌟"
     def on_button_clicked(button_index: int) -> None:
         if button_index == 1:
             openLink(url_plans_page())
-        on_done(False)
 
     show_dialog(
         text,
@@ -104,9 +97,19 @@ learning experience with Premium. 🌟"
 
 
 def show_flashcard_selector(ah_did: UUID, parent=aqt.mw) -> None:
-    def on_checked_for_access(has_access: bool) -> None:
-        if has_access:
+    def fetch_user_details(_) -> dict:
+        user_details = AnkiHubClient().get_user_details()
+        return user_details
+
+    def on_fetched_user_details(user_details: dict) -> None:
+        if user_details.get("has_flashcard_selector_access"):
             FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=parent)
             LOGGER.info("Opened flashcard selector dialog.")
+        else:
+            _show_upsell(user_details)
 
-    _show_flashcard_selector_upsell_if_user_has_no_access(on_checked_for_access)
+    AddonQueryOp(
+        op=fetch_user_details,
+        success=on_fetched_user_details,
+        parent=aqt.mw,
+    ).without_collection().run_in_background()
