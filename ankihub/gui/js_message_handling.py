@@ -20,6 +20,7 @@ from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
+from .utils import robust_filter
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -44,6 +45,7 @@ def setup():
     webview_did_receive_js_message.append(_on_js_message)
 
 
+@robust_filter
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == VIEW_NOTE_PYCMD:

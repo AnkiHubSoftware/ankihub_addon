@@ -33,7 +33,7 @@ from ..settings import config, url_login
 from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .operations import AddonQueryOp
-from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
+from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter, using_qt5
 from .web.templates import (
     get_empty_state_html,
     get_header_webview_html,
@@ -647,6 +647,7 @@ def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]
     return {tag for tag in tags if search_pattern in tag.lower()}
 
 
+@robust_filter
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles messages sent from JavaScript code."""
     if message == INVALID_AUTH_TOKEN_PYCMD:
