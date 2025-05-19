@@ -810,22 +810,6 @@ def _raise_on_main(exc: Exception) -> None:
     aqt.mw.taskman.run_on_main(partial(_raiser, exc))
 
 
-def robust_hook(hook: Callable[..., None]) -> Callable[..., None]:
-    """Decorator that wraps a hook function to catch exceptions and schedule them to be raised on the main thread.
-    This prevents Anki from removing the hook, which is the default behavior when an exception is raised
-    in a hook/filter.
-    """
-
-    @wraps(hook)
-    def wrapper(*args: Any, **kwargs: Any) -> None:
-        try:
-            hook(*args, **kwargs)
-        except Exception as e:
-            _raise_on_main(e)
-
-    return wrapper
-
-
 T = TypeVar("T")
 
 
