@@ -526,8 +526,11 @@ class _Config:
         if new_current == backup_entry.get("current"):
             return False
 
-        if "current" in backup_entry:
+        # Rotate current->previous if the current parameters are different from the new current,
+        # preventing revert loops.
+        if "current" in backup_entry and backup_entry["previous"] != new_current:
             backup_entry["previous"] = backup_entry["current"]
+
         backup_entry["current"] = new_current
         self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
         return True
