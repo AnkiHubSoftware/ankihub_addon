@@ -24,14 +24,13 @@ def setup() -> None:
     def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
         deck = deck_options_dialog._deck
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])["id"]
-        fsrs_parameters_changed = (
-            config.get_fsrs_parameters_from_backup(conf_id)
-            != _get_live_fsrs_parameters(conf_id)[1]
-        )
+        fsrs_parameters_from_deck_config = _get_live_fsrs_parameters(conf_id)[1]
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
                 "THEME": anki_theme(),
-                "FSRS_PARAMETERS_CHANGED": fsrs_parameters_changed,
+                "RESET_BUTTON_ENABLED_INITIALLY": _can_revert_from_fsrs_parameters(
+                    conf_id, fsrs_parameters_from_deck_config
+                ),
                 "ANKI_DECK_ID": deck_options_dialog._deck["id"],
             }
         )
@@ -46,15 +45,24 @@ def setup() -> None:
 
 def _get_live_fsrs_parameters(conf_id: int) -> Tuple[int, List[float]]:
     """
-    Return (version, parameters) for the *highest* fsrsParamsX array present
-    in this deck-config. A version is counted only if its list is non-empty.
-    If FSRS is disabled entirely, returns (None, []).
+    Return (version, parameters) for the fsrs parameters that are currently used by the
+    specified deck-preset.
+    If FSRS is enabled, returns (version, parameters).
+    If FSRS is not enabled, returns (None, []).
     """
     deck_config = aqt.mw.col.decks.get_config(conf_id)
     fsrs_version = get_fsrs_version()
     field_name = f"fsrsParams{fsrs_version}"
     parameters = deck_config.get(field_name, [])
     return fsrs_version, parameters
+
+
+def _can_revert_from_fsrs_parameters(
+    conf_id: int, fsrs_parameters: List[float]
+) -> bool:
+    fsrs_parameters_from_backup = config.get_fsrs_parameters_from_backup(conf_id)
+    fsrs_parameters_changed = fsrs_parameters_from_backup != fsrs_parameters
+    return bool(fsrs_parameters_from_backup) and fsrs_parameters_changed
 
 
 def _backup_fsrs_parameters(conf_id: int) -> bool:
@@ -103,9 +111,7 @@ def _on_webview_did_receive_js_message(
         fsrs_parameters_from_editor = kwargs["fsrs_parameters"]
 
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
-        if fsrs_parameters_from_editor != config.get_fsrs_parameters_from_backup(
-            conf_id
-        ):
+        if _can_revert_from_fsrs_parameters(conf_id, fsrs_parameters_from_editor):
             deck_options_dialog: DeckOptionsDialog = context
             deck_options_dialog.web.eval("revertFsrsParametersBtn.disabled = false;")
 

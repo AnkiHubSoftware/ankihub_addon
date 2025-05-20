@@ -109,7 +109,7 @@
        initialise Revert button disabled state from template flag
        -------------------------------------------------------------------- */
     revertBtn.disabled =
-        "{{ FSRS_PARAMETERS_CHANGED }}" === "False";
+        "{{ RESET_BUTTON_ENABLED_INITIALLY }}" === "False";
 
     /* -----------------------------------------------------------------------
        theme-aware styling for disabled Revert button
