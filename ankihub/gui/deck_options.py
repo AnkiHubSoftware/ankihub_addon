@@ -101,7 +101,7 @@ def _on_webview_did_receive_js_message(
         )
 
         tooltip(
-            "Reverted FSRS parameters to previous snapshot.",
+            "Reverted FSRS parameters.",
             parent=active_window_or_mw(),
         )
         return (True, None)
