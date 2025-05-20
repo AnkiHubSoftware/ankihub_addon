@@ -15,7 +15,7 @@ from .js_message_handling import parse_js_message_kwargs
 from .utils import active_window_or_mw, anki_theme, robust_filter
 
 ADD_FSRS_REVERT_BUTTON_JS_PATH = (
-    Path(__file__).parent / "web" / "add_fsrs_revert_button.js"
+    Path(__file__).parent / "web" / "deck_options_revert_fsrs.js"
 )
 REVERT_FSRS_PARAMATERS_PYCMD = "ankihub_revert_fsrs_parameters"
 FSRS_PARAMETERS_CHANGED_PYCMD = "ankihub_fsrs_parameters_changed"
