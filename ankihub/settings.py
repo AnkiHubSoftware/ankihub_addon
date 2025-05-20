@@ -501,6 +501,14 @@ class _Config:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
 
+    def get_fsrs_parameters_from_backup(self, conf_id: int) -> Dict[str, Any]:
+        return (
+            self._get_fsrs_parameteters_backup_dict()
+            .get(str(conf_id), {})
+            .get("previous", {})
+            .get("parameters", [])
+        )
+
     def backup_fsrs_parameters(
         self, conf_id: int, version: int, parameters: List[float]
     ) -> bool:
@@ -524,15 +532,12 @@ class _Config:
         self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
         return True
 
-    def clear_fsrs_parameters_backup_entry(self, conf_id: int) -> None:
+    def clear_fsrs_parameters_backup(self, conf_id: int) -> None:
         """Clear the backup for the given preset."""
         fsrs_parameters_backup_dict: Dict = self._get_fsrs_parameteters_backup_dict()
         if str(conf_id) in fsrs_parameters_backup_dict:
             fsrs_parameters_backup_dict.pop(str(conf_id))
             self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
-
-    def get_fsrs_parameteters_backup_entry(self, conf_id: int) -> Dict[str, Any]:
-        return self._get_fsrs_parameteters_backup_dict().get(str(conf_id), {})
 
     def _get_fsrs_parameteters_backup_dict(self) -> Dict[str, Any]:
         return aqt.mw.col.get_config(FSRS_PARAMETERS_BACKUP_KEY, {})

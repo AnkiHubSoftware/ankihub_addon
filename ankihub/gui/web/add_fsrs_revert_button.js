@@ -75,15 +75,23 @@
         debounceTimerId = setTimeout(() => {
             debounceTimerId = null;
 
-            const currentValue = paramsTextarea.value;
-            if (currentValue === lastSnapshot) return;   // nothing new
+            const currentValue = paramsTextarea.value.trim();
+            if (currentValue === lastSnapshot) return;
+            lastSnapshot = currentValue;
 
-            lastSnapshot = currentValue;                 // update snapshot
+            // convert "1, 2,3" → [1, 2, 3]
+            const numericList = currentValue
+                .split(/[,\s]+/)
+                .filter(token => token.length)
+                .map(Number);
+
             const payload = JSON.stringify({
                 anki_deck_id: activeDeckId,
-                raw_params: currentValue
+                fsrs_parameters: numericList,           // e.g. "[1,2,3]"
             });
             pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
+
+            revertBtn.disabled = false;               // a fresh backup now exists
         }, DEBOUNCE_DELAY_MS);
     });
 
@@ -99,7 +107,7 @@
        initialise Revert button disabled state from template flag
        -------------------------------------------------------------------- */
     revertBtn.disabled =
-        "{{ FSRS_PARAMETERS_BACKUP_ENTRY_EXISTS }}" === "False";
+        "{{ FSRS_PARAMETERS_CHANGED }}" === "False";
 
     /* -----------------------------------------------------------------------
        theme-aware styling for disabled Revert button

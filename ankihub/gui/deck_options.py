@@ -1,8 +1,9 @@
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
 import aqt
+from aqt import qconnect
 from aqt.deckoptions import DeckOptionsDialog
 from aqt.gui_hooks import deck_options_did_load, webview_did_receive_js_message
 from aqt.utils import tooltip
@@ -22,24 +23,27 @@ FSRS_PARAMETERS_CHANGED_PYCMD = "ankihub_fsrs_parameters_changed"
 def setup() -> None:
     def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
         deck = deck_options_dialog._deck
-        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])
+        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])["id"]
+        fsrs_parameters_changed = (
+            config.get_fsrs_parameters_from_backup(conf_id)
+            != _get_live_fsrs_parameters(conf_id)[1]
+        )
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
                 "THEME": anki_theme(),
-                "FSRS_PARAMETERS_BACKUP_ENTRY_EXISTS": bool(
-                    config.get_fsrs_parameteters_backup_entry(conf_id=conf_id)
-                ),
+                "FSRS_PARAMETERS_CHANGED": fsrs_parameters_changed,
                 "ANKI_DECK_ID": deck_options_dialog._deck["id"],
             }
         )
         deck_options_dialog.web.eval(js)
+
+        qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
     deck_options_did_load.append(_on_deck_options_did_load)
 
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 
     _add_backup_menu_entry()
-    _add_revert_menu_entry()
     _add_print_fsrs_parameters_menu_entry()
 
 
@@ -52,14 +56,14 @@ def _on_webview_did_receive_js_message(
         kwargs = parse_js_message_kwargs(message)
         anki_did = kwargs["anki_deck_id"]
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
-        _revert_to_previous_fsrs_parameters(conf_id)
 
-        _, current_parameters = _get_live_fsrs_parameters(
-            aqt.mw.col.decks.get_config(conf_id)
-        )
+        previous_parameters = config.get_fsrs_parameters_from_backup(conf_id)
+        if not previous_parameters:
+            return (True, None)
+
         deck_options_dialog: DeckOptionsDialog = context
         deck_options_dialog.web.eval(
-            f"updateFsrsParametersTextarea({current_parameters})"
+            f"updateFsrsParametersTextarea({previous_parameters})"
         )
 
         tooltip(
@@ -70,8 +74,12 @@ def _on_webview_did_receive_js_message(
     elif message.startswith(FSRS_PARAMETERS_CHANGED_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         anki_did = kwargs["anki_deck_id"]
+        fsrs_parameters_from_editor = kwargs["fsrs_parameters"]
+
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
-        if _backup_fsrs_parameters(conf_id):
+        if fsrs_parameters_from_editor != config.get_fsrs_parameters_from_backup(
+            conf_id
+        ):
             deck_options_dialog: DeckOptionsDialog = context
             deck_options_dialog.web.eval("revertFsrsParametersBtn.disabled = false;")
 
@@ -80,12 +88,13 @@ def _on_webview_did_receive_js_message(
     return handled
 
 
-def _get_live_fsrs_parameters(deck_config: Dict[str, Any]) -> Tuple[int, List[float]]:
+def _get_live_fsrs_parameters(conf_id: int) -> Tuple[int, List[float]]:
     """
     Return (version, parameters) for the *highest* fsrsParamsX array present
     in this deck-config. A version is counted only if its list is non-empty.
     If FSRS is disabled entirely, returns (None, []).
     """
+    deck_config = aqt.mw.col.decks.get_config(conf_id)
     highest_present_version = max(
         [
             int(re.search(r"fsrsParams(\d+)", field).group(1))
@@ -99,45 +108,11 @@ def _get_live_fsrs_parameters(deck_config: Dict[str, Any]) -> Tuple[int, List[fl
     return highest_present_version, parameters
 
 
-def _revert_to_previous_fsrs_parameters(conf_id: int) -> None:
-    """
-    Revert the specified deck-preset to the parameters stored in the “previous”
-    snapshot and clear any higher-version arrays so they don't get used.
-    """
-    backup_entry = config.get_fsrs_parameteters_backup_entry(conf_id)
-    if "previous" not in backup_entry:
-        return
-
-    deck_config = aqt.mw.col.decks.get_config(conf_id)
-
-    # Retrieve the previous snapshot we want to restore
-    previous_version: int = backup_entry["previous"]["version"]
-    previous_parameters: List[float] = backup_entry["previous"]["parameters"]
-
-    live_version, _ = _get_live_fsrs_parameters(deck_config)
-    if live_version:
-        # Clear all arrays belonging to a higher FSRS version
-        for version in range(previous_version + 1, live_version + 1):
-            field_name: str = f"fsrsParams{version}"
-            deck_config[field_name] = []
-
-    # Write the snapshot back into its native field
-    target_field = f"fsrsParams{previous_version}"
-    deck_config[target_field] = previous_parameters[:]
-
-    # Persist changes to the deck config
-    aqt.mw.col.decks.update_config(deck_config)
-
-    # Clear the backup entry so it doesn't get used again
-    config.clear_fsrs_parameters_backup_entry(conf_id)
-
-
 def _backup_fsrs_parameters(conf_id: int) -> bool:
     """
     Backup the current FSRS parameters of the specified deck-preset.
     """
-    deck_config = aqt.mw.col.decks.get_config(conf_id)
-    version, parameters = _get_live_fsrs_parameters(deck_config)
+    version, parameters = _get_live_fsrs_parameters(conf_id)
 
     # If no FSRS parameters are present, return False
     if not version:
@@ -163,29 +138,13 @@ def _add_backup_menu_entry() -> None:
     aqt.mw.form.menuTools.addAction(action)
 
 
-def _revert_current_deck_fsrs_parameters() -> None:
-    """
-    Revert the FSRS parameters of the currently selected deck to the previous
-    snapshot.
-    """
-    conf_id: int = aqt.mw.col.decks.current()["conf"]
-    _revert_to_previous_fsrs_parameters(conf_id)
-
-
-def _add_revert_menu_entry() -> None:
-    action = aqt.QAction("Revert FSRS Parameters to Previous", aqt.mw)
-    action.triggered.connect(_revert_current_deck_fsrs_parameters)  # type: ignore[arg-type]
-    aqt.mw.form.menuTools.addAction(action)
-
-
 def _print_fsrs_parameters() -> None:
     conf_id: int = aqt.mw.col.decks.current()["conf"]
-    deck_config = aqt.mw.col.decks.get_config(conf_id)
-    version, parameters = _get_live_fsrs_parameters(deck_config)
+    version, parameters = _get_live_fsrs_parameters(conf_id)
     print(f"FSRS Parameters (version {version}): {parameters}")
 
     # Print the backup entry for debugging purposes
-    backup_entry = config.get_fsrs_parameteters_backup_entry(conf_id)
+    backup_entry = config.get_fsrs_parameters_from_backup(conf_id)
     print(f"Backup Entry: {backup_entry}")
 
 
