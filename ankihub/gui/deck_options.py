@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import aqt
 from aqt import qconnect
@@ -20,10 +21,27 @@ REVERT_FSRS_PARAMATERS_PYCMD = "ankihub_revert_fsrs_parameters"
 FSRS_PARAMETERS_CHANGED_PYCMD = "ankihub_fsrs_parameters_changed"
 
 
+@dataclass
+class CurrentDeckOptionsDialog:
+    """Class to store the current deck options dialog."""
+
+    dialog: Optional[DeckOptionsDialog] = None
+
+
+_deck_options_dialog = CurrentDeckOptionsDialog()
+
+
 def setup() -> None:
     def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
+        _deck_options_dialog.dialog = deck_options_dialog
+
         deck = deck_options_dialog._deck
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])["id"]
+
+        # Setup backup of FSRS parameters on deck options dialog close
+        qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
+
+        # Execute JS to add the revert button
         fsrs_parameters_from_deck_config = _get_live_fsrs_parameters(conf_id)[1]
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
@@ -35,8 +53,6 @@ def setup() -> None:
             }
         )
         deck_options_dialog.web.eval(js)
-
-        qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
     deck_options_did_load.append(_on_deck_options_did_load)
 
@@ -61,8 +77,10 @@ def _can_revert_from_fsrs_parameters(
     conf_id: int, fsrs_parameters: List[float]
 ) -> bool:
     fsrs_parameters_from_backup = config.get_fsrs_parameters_from_backup(conf_id)
-    fsrs_parameters_changed = fsrs_parameters_from_backup != fsrs_parameters
-    return bool(fsrs_parameters_from_backup) and fsrs_parameters_changed
+    return (
+        bool(fsrs_parameters_from_backup)
+        and fsrs_parameters_from_backup != fsrs_parameters
+    )
 
 
 def _backup_fsrs_parameters(conf_id: int) -> bool:
@@ -95,8 +113,7 @@ def _on_webview_did_receive_js_message(
         if not previous_parameters:
             return (True, None)
 
-        deck_options_dialog: DeckOptionsDialog = context
-        deck_options_dialog.web.eval(
+        _deck_options_dialog.dialog.web.eval(
             f"updateFsrsParametersTextarea({previous_parameters})"
         )
 
@@ -112,8 +129,9 @@ def _on_webview_did_receive_js_message(
 
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
         if _can_revert_from_fsrs_parameters(conf_id, fsrs_parameters_from_editor):
-            deck_options_dialog: DeckOptionsDialog = context
-            deck_options_dialog.web.eval("revertFsrsParametersBtn.disabled = false;")
+            _deck_options_dialog.dialog.web.eval(
+                "revertFsrsParametersBtn.disabled = false;"
+            )
 
         return (True, None)
 

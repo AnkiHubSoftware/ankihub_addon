@@ -93,7 +93,6 @@
             });
             pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
 
-            revertBtn.disabled = false;               // a fresh backup now exists
         }, DEBOUNCE_DELAY_MS);
     });
 
