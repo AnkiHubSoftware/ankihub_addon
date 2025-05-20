@@ -1,8 +1,10 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import anki
 import aqt
 from anki.decks import DeckConfigDict, DeckId
+
+from ..settings import ANKI_INT_VERSION
 
 try:
     from anki import deck_config_pb2
@@ -100,3 +102,14 @@ def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
     conf = _create_deck_preset_if_not_exists()
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
+
+
+def get_fsrs_version() -> Optional[int]:
+    if ANKI_INT_VERSION >= 250500:
+        return 6
+    elif ANKI_INT_VERSION >= 241100:
+        return 5
+    elif ANKI_INT_VERSION >= 231200:
+        return 4
+    else:
+        return None

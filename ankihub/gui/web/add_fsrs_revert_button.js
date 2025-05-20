@@ -45,10 +45,12 @@
        helper called by Python side to overwrite textarea contents
        -------------------------------------------------------------------- */
     function updateFsrsParametersTextarea(params) {
-        const text =
-            Array.isArray(params) ? params.join(", ") : (params || "");
+        const text = Array.isArray(params) ? params.join(", ") : (params || "");
         paramsTextarea.value = text;
-        paramsTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // Notify the UI of the change
+        paramsTextarea.focus();
+        paramsTextarea.blur();
     }
     window.updateFsrsParametersTextarea = updateFsrsParametersTextarea;
 
