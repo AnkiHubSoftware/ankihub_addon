@@ -1,10 +1,9 @@
+import re
 from typing import Any, Dict, Optional, Tuple
 
 import anki
 import aqt
 from anki.decks import DeckConfigDict, DeckId
-
-from ..settings import ANKI_INT_VERSION
 
 try:
     from anki import deck_config_pb2
@@ -105,11 +104,14 @@ def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
 
 
 def get_fsrs_version() -> Optional[int]:
-    if ANKI_INT_VERSION >= 250500:
-        return 6
-    elif ANKI_INT_VERSION >= 241100:
-        return 5
-    elif ANKI_INT_VERSION >= 231200:
-        return 4
-    else:
-        return None
+    """
+    Get the version of the FSRS scheduler used in the current Anki version.
+    """
+    return max(
+        (
+            int(m.group(1))
+            for field_name in deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
+            if (m := re.search(r"fsrs_params_(\d)+", field_name))
+        ),
+        default=None,
+    )
