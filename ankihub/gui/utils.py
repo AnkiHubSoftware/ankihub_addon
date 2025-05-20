@@ -740,6 +740,11 @@ def using_qt5() -> bool:
         return False  # pragma: no cover
 
 
+def anki_theme() -> str:
+    """Returns the theme that AnkiHub should use based on the current Anki theme."""
+    return "dark" if theme_manager.night_mode else "light"
+
+
 def active_window_or_mw() -> QWidget:
     """The purpose of this function is to get a suitable parent widget for a dialog.
     By default it returns the active window.

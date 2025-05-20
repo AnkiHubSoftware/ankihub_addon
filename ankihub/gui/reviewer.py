@@ -33,7 +33,12 @@ from ..settings import config, url_login
 from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .operations import AddonQueryOp
-from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter, using_qt5
+from .utils import (
+    anki_theme,
+    get_ah_did_of_deck_or_ancestor_deck,
+    robust_filter,
+    using_qt5,
+)
 from .web.templates import (
     get_empty_state_html,
     get_header_webview_html,
@@ -220,7 +225,7 @@ class ReviewerSidebar:
             self.resources,
             self.content_webview.url().toString(),
             f"{PAGE_TYPE_TO_DISPLAY_NAME[self.page_type]}",
-            _ankihub_theme(),
+            anki_theme(),
         )
 
         # The height of the header depends on whether there is an active tab or not.
@@ -280,7 +285,7 @@ class ReviewerSidebar:
             self.content_webview.setUrl(aqt.QUrl(url))
         else:
             html = get_empty_state_html(
-                theme=_ankihub_theme(),
+                theme=anki_theme(),
                 resource_type=self.get_page_type().value,
             )
             self.content_webview.setHtml(html)
@@ -293,9 +298,7 @@ class ReviewerSidebar:
             self.content_webview.setUrl(aqt.QUrl(self.last_accessed_url))
 
     def _update_content_webview_theme(self):
-        self.content_webview.eval(
-            f"localStorage.setItem('theme', '{_ankihub_theme()}');"
-        )
+        self.content_webview.eval(f"localStorage.setItem('theme', '{anki_theme()}');")
 
     def _on_content_page_loaded(self, ok: bool) -> None:
         if url_login() in self.content_webview.url().toString():
@@ -427,7 +430,7 @@ def _inject_ankihub_features_and_setup_sidebar(
 
     reviewer: Reviewer = context
 
-    reviewer_button_js = get_reviewer_buttons_js(theme=_ankihub_theme())
+    reviewer_button_js = get_reviewer_buttons_js(theme=anki_theme())
     web_content.body += f"<script>{reviewer_button_js}</script>"
 
     global reviewer_sidebar
@@ -490,11 +493,6 @@ def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
         )
         for ah_did in ah_dids
     )
-
-
-def _ankihub_theme() -> str:
-    """Returns the theme that AnkiHub should use based on the current Anki theme."""
-    return "dark" if theme_manager.night_mode else "light"
 
 
 def _notify_ankihub_ai_of_card_change(card: Card) -> None:
