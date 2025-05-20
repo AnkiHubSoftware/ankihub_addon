@@ -20,7 +20,6 @@
     const primaryBtns = section.querySelectorAll("button.btn.btn-primary");
     if (!primaryBtns.length) return;
 
-    const optimiseBtn = primaryBtns[0];
     const evaluateBtn = primaryBtns[1];
 
     /* -----------------------------------------------------------------------
@@ -94,14 +93,6 @@
             pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
 
         }, DEBOUNCE_DELAY_MS);
-    });
-
-    /* -----------------------------------------------------------------------
-       3.  legacy optimise-button hook (optional but harmless)
-       -------------------------------------------------------------------- */
-    optimiseBtn.addEventListener("click", () => {
-        const payload = JSON.stringify({ anki_deck_id: activeDeckId });
-        pycmd(`ankihub_on_optimize_fsrs_parameters ${payload}`);
     });
 
     /* -----------------------------------------------------------------------
