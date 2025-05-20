@@ -532,13 +532,6 @@ class _Config:
         self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
         return True
 
-    def clear_fsrs_parameters_backup(self, conf_id: int) -> None:
-        """Clear the backup for the given preset."""
-        fsrs_parameters_backup_dict: Dict = self._get_fsrs_parameteters_backup_dict()
-        if str(conf_id) in fsrs_parameters_backup_dict:
-            fsrs_parameters_backup_dict.pop(str(conf_id))
-            self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
-
     def _get_fsrs_parameteters_backup_dict(self) -> Dict[str, Any]:
         return aqt.mw.col.get_config(FSRS_PARAMETERS_BACKUP_KEY, {})
 
