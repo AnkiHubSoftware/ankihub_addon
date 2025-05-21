@@ -946,6 +946,14 @@ def add_smart_search_button_to_sidebar():
     if not config.public_config.get("ankihub_smart_search"):
         return
 
+    def names_of_decks_with_note_embeddings() -> List[str]:
+        names = [
+            deck_config.name
+            for ah_did in config.deck_ids()
+            if (deck_config := config.deck_config(ah_did)).has_note_embeddings
+        ]
+        return list(sorted(names))
+
     # We wrap the smart search button in a toolbar so that it doesn't show a frame on MacOS
     smart_search_button_toolbar = QToolBar()
     smart_search_button_toolbar.setIconSize(QSize(16, 16))
@@ -955,7 +963,7 @@ def add_smart_search_button_to_sidebar():
         "QToolBar { border: none; padding: 0px; }"
     )
     if is_mac:
-        smart_search_button_toolbar.setContentsMargins(0, 0, 5, 0)
+        smart_search_button_toolbar.setContentsMargins(0, 0, 8, 0)
 
     smart_search_button = QToolButton()
     smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
@@ -963,6 +971,12 @@ def add_smart_search_button_to_sidebar():
     smart_search_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
     smart_search_button.setAutoRaise(True)
     smart_search_button.setToolTip("AnkiHub Smart Search")
+
+    if not names_of_decks_with_note_embeddings():
+        smart_search_button.setEnabled(False)
+        smart_search_button.setToolTip(
+            "No installed AnkiHub decks support Smart Search"
+        )
 
     smart_search_button_toolbar.addWidget(smart_search_button)
 
@@ -973,14 +987,6 @@ def add_smart_search_button_to_sidebar():
         aqt.mw.taskman.run_on_main(
             lambda: show_flashcard_selector(ah_did=ah_did, parent=browser)
         )
-
-    def names_of_decks_with_note_embeddings() -> List[str]:
-        names = [
-            deck_config.name
-            for ah_did in config.deck_ids()
-            if (deck_config := config.deck_config(ah_did)).has_note_embeddings
-        ]
-        return list(sorted(names))
 
     def on_smart_search_button_clicked() -> None:
         SearchableSelectionDialog(
