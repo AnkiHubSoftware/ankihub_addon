@@ -42,7 +42,7 @@ def setup() -> None:
         qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
         # Execute JS to add the revert button
-        fsrs_parameters_from_deck_config = _get_fsrs_parameters(conf_id)
+        _, fsrs_parameters_from_deck_config = _get_fsrs_parameters(conf_id)
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
                 "THEME": anki_theme(),
@@ -59,7 +59,7 @@ def setup() -> None:
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 
 
-def _get_fsrs_parameters(conf_id: DeckConfigId) -> List[float]:
+def _get_fsrs_parameters(conf_id: DeckConfigId) -> Tuple[Optional[int], List[float]]:
     """Fetch the FSRS parameters for a deck config.
     Tries version = FSRS_VERSION down to the lowest FSRS version, returns the first found list or [].
     """
@@ -68,9 +68,9 @@ def _get_fsrs_parameters(conf_id: DeckConfigId) -> List[float]:
     for version in range(FSRS_VERSION, min_fsrs_version - 1, -1):
         params = deck_config.get(f"fsrsParams{version}", None)
         if params is not None:
-            return params
+            return version, params
 
-    return []
+    return None, []
 
 
 def _can_revert_from_fsrs_parameters(
@@ -93,10 +93,12 @@ def _can_revert_from_fsrs_parameters(
 
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
     """Backup the current FSRS parameters of the specified deck-preset."""
-    parameters = _get_fsrs_parameters(conf_id)
+    version, parameters = _get_fsrs_parameters(conf_id)
+    if not version:
+        return False
 
     return config.backup_fsrs_parameters(
-        conf_id, version=FSRS_VERSION, parameters=parameters
+        conf_id, version=version, parameters=parameters
     )
 
 
