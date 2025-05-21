@@ -98,14 +98,20 @@ def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
     if not deck:
         return
 
-    ankihub_did = config.get_ankihub_did_by_anki_did(deck_id)
+    conf = _create_deck_preset_if_not_exists()
 
-    if ankihub_did and ankihub_did == config.anking_deck_id:
-        conf = _create_deck_preset_if_not_exists(config_name="AnKing")
-        if ANKI_INT_VERSION > ANKI_VERSION_24_06_00:
-            aqt.mw.col.set_config("fsrs", True)
-    else:
-        conf = _create_deck_preset_if_not_exists()
+    deck["conf"] = conf["id"]
+    aqt.mw.col.decks.update(deck)
+    
+
+def set_ankihub_config_for_anking_deck(deck_id: DeckId) -> None:
+    deck = aqt.mw.col.decks.get(deck_id, default=False)
+    if not deck:
+        return
+
+    conf = _create_deck_preset_if_not_exists(config_name="AnKing")
+    if ANKI_INT_VERSION > ANKI_VERSION_24_06_00:
+        aqt.mw.col.set_config("fsrs", True)
 
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)

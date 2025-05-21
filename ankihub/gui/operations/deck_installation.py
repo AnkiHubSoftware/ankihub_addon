@@ -12,6 +12,8 @@ from anki.models import NotetypeDict, NotetypeId
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import QDialogButtonBox
 
+from ankihub.main.deck_options import set_ankihub_config_for_anking_deck
+
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
@@ -268,6 +270,10 @@ def _install_deck(
         latest_udpate=latest_update,
         behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
     )
+    
+
+    if ankihub_did == config.anking_deck_id and recommended_deck_settings:
+        set_ankihub_config_for_anking_deck(import_result.anki_did)
 
     aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
