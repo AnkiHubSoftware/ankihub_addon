@@ -104,7 +104,6 @@ function setupTextAreaListener(textarea, revertBtn) {
             fsrs_parameters: numericList,
         });
         pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
-        revertBtn.disabled = false;
     }
 
     // Listen for programmatic updates
@@ -121,7 +120,6 @@ function setupTextAreaListener(textarea, revertBtn) {
 }
 
 
-// Initialize the FSRS-Revert UI
 function initializeFsrsRevertUI() {
     const headers = Array.from(document.querySelectorAll(".setting-title"));
     const fsrsHeader = headers.find(el =>
