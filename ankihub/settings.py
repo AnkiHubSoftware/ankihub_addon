@@ -21,7 +21,7 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from shutil import copyfile, move, rmtree
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import aqt
 import requests
@@ -47,6 +47,7 @@ from .ankihub_client import (
     DeckExtension,
 )
 from .ankihub_client.models import Deck, UserDeckRelation
+from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -501,13 +502,14 @@ class _Config:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
 
-    def get_fsrs_parameters_from_backup(self, conf_id: int) -> Dict[str, Any]:
-        return (
+    def get_fsrs_parameters_from_backup(self, conf_id: int) -> Tuple[int, List[float]]:
+        backup_entry = (
             self._get_fsrs_parameteters_backup_dict()
             .get(str(conf_id), {})
+            .get(str(conf_id), {})
             .get("previous", {})
-            .get("parameters", [])
         )
+        return (backup_entry.get("version", None), backup_entry.get("parameters", []))
 
     def backup_fsrs_parameters(
         self, conf_id: int, version: int, parameters: List[float]
@@ -965,6 +967,7 @@ USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
 ANKI_VERSION = buildinfo.version
 ANKI_INT_VERSION = point_version()
+FSRS_VERSION = get_fsrs_version()
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 

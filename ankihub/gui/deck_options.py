@@ -3,14 +3,14 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 import aqt
+from anki.decks import DeckConfigId
 from aqt import qconnect
 from aqt.deckoptions import DeckOptionsDialog
 from aqt.gui_hooks import deck_options_did_load, webview_did_receive_js_message
 from aqt.utils import tooltip
 from jinja2 import Template
 
-from ..main.deck_options import get_fsrs_version
-from ..settings import config
+from ..settings import FSRS_VERSION, config
 from .js_message_handling import parse_js_message_kwargs
 from .utils import active_window_or_mw, anki_theme, robust_filter
 
@@ -42,7 +42,7 @@ def setup() -> None:
         qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
         # Execute JS to add the revert button
-        fsrs_parameters_from_deck_config = _get_live_fsrs_parameters(conf_id)[1]
+        fsrs_parameters_from_deck_config = _get_fsrs_parameters(conf_id)
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
                 "THEME": anki_theme(),
@@ -59,43 +59,41 @@ def setup() -> None:
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 
 
-def _get_live_fsrs_parameters(conf_id: int) -> Tuple[int, List[float]]:
-    """
-    Return (version, parameters) for the fsrs parameters that are currently used by the
-    specified deck-preset.
-    If FSRS is enabled, returns (version, parameters).
-    If FSRS is not enabled, returns (None, []).
-    """
+def _get_fsrs_parameters(conf_id: DeckConfigId) -> List[float]:
     deck_config = aqt.mw.col.decks.get_config(conf_id)
-    fsrs_version = get_fsrs_version()
-    field_name = f"fsrsParams{fsrs_version}"
+    field_name = f"fsrsParams{FSRS_VERSION}"
     parameters = deck_config.get(field_name, [])
-    return fsrs_version, parameters
+    return parameters
 
 
 def _can_revert_from_fsrs_parameters(
-    conf_id: int, fsrs_parameters: List[float]
+    conf_id: DeckConfigId, fsrs_parameters: List[float]
 ) -> bool:
-    fsrs_parameters_from_backup = config.get_fsrs_parameters_from_backup(conf_id)
+    """Check if we can revert from the passed FSRS parameters to the backup parameters for the provided deck config."""
+    (
+        fsrs_version_from_backup,
+        fsrs_parameters_from_backup,
+    ) = config.get_fsrs_parameters_from_backup(conf_id)
     return (
         bool(fsrs_parameters_from_backup)
         and fsrs_parameters_from_backup != fsrs_parameters
+        # We can only revert if the version of the parameters in the backup is
+        # less than or equal to the current version of FSRS.
+        # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
+        # around is fine.
+        and fsrs_version_from_backup <= FSRS_VERSION
     )
 
 
-def _backup_fsrs_parameters(conf_id: int) -> bool:
-    """
-    Backup the current FSRS parameters of the specified deck-preset.
-    """
-    version, parameters = _get_live_fsrs_parameters(conf_id)
+def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
+    """Backup the current FSRS parameters of the specified deck-preset."""
+    parameters = _get_fsrs_parameters(conf_id)
 
-    # If no FSRS parameters are present, return False
-    if not version:
+    if not parameters:
         return False
 
-    # Store the current parameters in the backup entry
     return config.backup_fsrs_parameters(
-        conf_id, version=version, parameters=parameters
+        conf_id, version=FSRS_VERSION, parameters=parameters
     )
 
 
@@ -109,12 +107,15 @@ def _on_webview_did_receive_js_message(
         anki_did = kwargs["anki_deck_id"]
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
 
-        previous_parameters = config.get_fsrs_parameters_from_backup(conf_id)
-        if not previous_parameters:
+        (
+            fsrs_version_from_backup,
+            fsrs_parameters_from_backup,
+        ) = config.get_fsrs_parameters_from_backup(conf_id)
+        if not fsrs_parameters_from_backup or fsrs_version_from_backup > FSRS_VERSION:
             return (True, None)
 
         _deck_options_dialog.dialog.web.eval(
-            f"updateFsrsParametersTextarea({previous_parameters})"
+            f"updateFsrsParametersTextarea({fsrs_parameters_from_backup})"
         )
 
         tooltip(
