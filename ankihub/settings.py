@@ -528,7 +528,7 @@ class _Config:
 
         # Rotate current->previous if the current parameters are different from the new current,
         # preventing revert loops.
-        if "current" in backup_entry and backup_entry["previous"] != new_current:
+        if "current" in backup_entry and backup_entry.get("previous") != new_current:
             backup_entry["previous"] = backup_entry["current"]
 
         backup_entry["current"] = new_current
