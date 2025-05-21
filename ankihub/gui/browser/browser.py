@@ -8,6 +8,7 @@ import aqt
 from anki.collection import SearchNode
 from anki.hooks import wrap
 from anki.notes import NoteId
+from anki.utils import is_mac
 from aqt.addcards import AddCards
 from aqt.browser import (
     Browser,
@@ -953,6 +954,8 @@ def add_smart_search_button_to_sidebar():
     smart_search_button_toolbar.setStyleSheet(
         "QToolBar { border: none; padding: 0px; }"
     )
+    if is_mac:
+        smart_search_button_toolbar.setContentsMargins(0, 0, 5, 0)
 
     smart_search_button = QToolButton()
     smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
