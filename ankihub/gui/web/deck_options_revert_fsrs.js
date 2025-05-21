@@ -69,33 +69,54 @@ function setupRevertButton(evaluateBtn) {
 
 
 function setupTextAreaListener(textarea, revertBtn) {
+    // Patch the textarea value setter to fire a custom event
+    const proto = Object.getPrototypeOf(textarea);
+    if (!textarea._fsrsRevertPatched) {
+        const desc = Object.getOwnPropertyDescriptor(proto, "value");
+        Object.defineProperty(textarea, "value", {
+            get: desc.get,
+            set(v) {
+                desc.set.call(this, v);
+                // Fire a custom event so we don't interfere with Anki's own logic
+                this.dispatchEvent(new CustomEvent("fsrsParamsUpdated", { bubbles: true }));
+            },
+        });
+        textarea._fsrsRevertPatched = true;
+    }
+
     const DEBOUNCE_MS = 400;
     let debounceId = null;
     let lastValue = textarea.value;
 
+    function processChange() {
+        const current = textarea.value.trim();
+        if (current === lastValue) return;
+        lastValue = current;
+
+        // parse numeric tokens only
+        const numericList = current
+            .split(/[,\s]+/)
+            .filter(tok => /^-?\d+(\.\d+)?$/.test(tok))
+            .map(Number);
+
+        const payload = JSON.stringify({
+            anki_deck_id: config.deckId,
+            fsrs_parameters: numericList,
+        });
+        pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
+        revertBtn.disabled = false;
+    }
+
+    // Listen for programmatic updates
+    textarea.addEventListener("fsrsParamsUpdated", () => {
+        if (debounceId) clearTimeout(debounceId);
+        debounceId = setTimeout(processChange, DEBOUNCE_MS);
+    });
+
+    // Listen for manual edits
     textarea.addEventListener("input", () => {
-        if (debounceId) {
-            clearTimeout(debounceId);
-        }
-        debounceId = setTimeout(() => {
-            debounceId = null;
-            const current = textarea.value.trim();
-            if (current === lastValue) return;
-            lastValue = current;
-
-            // parse only valid numeric tokens
-            const numericList = current
-                .split(/[,\s]+/)
-                .filter(tok => /^-?\d+(\.\d+)?$/.test(tok))
-                .map(Number);
-
-            const payload = JSON.stringify({
-                anki_deck_id: config.deckId,
-                fsrs_parameters: numericList
-            });
-            pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
-            revertBtn.disabled = false;
-        }, DEBOUNCE_MS);
+        if (debounceId) clearTimeout(debounceId);
+        debounceId = setTimeout(processChange, DEBOUNCE_MS);
     });
 }
 
