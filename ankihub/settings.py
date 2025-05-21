@@ -47,6 +47,7 @@ from .ankihub_client import (
     DeckExtension,
 )
 from .ankihub_client.models import Deck, UserDeckRelation
+from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -920,6 +921,8 @@ USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
 ANKI_VERSION = buildinfo.version
 ANKI_INT_VERSION = point_version()
+FSRS_VERSION = get_fsrs_version()
+
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 
