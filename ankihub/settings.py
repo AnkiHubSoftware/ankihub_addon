@@ -506,7 +506,6 @@ class _Config:
         backup_entry = (
             self._get_fsrs_parameteters_backup_dict()
             .get(str(conf_id), {})
-            .get(str(conf_id), {})
             .get("previous", {})
         )
         return (backup_entry.get("version", None), backup_entry.get("parameters", []))
