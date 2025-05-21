@@ -30,7 +30,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
     dialog_manager_did_open_dialog,
 )
-from aqt.qt import QAction, QMenu, QSize, Qt, QToolButton, QWidget, qconnect
+from aqt.qt import QAction, QMenu, QSize, Qt, QToolBar, QToolButton, QWidget, qconnect
 from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
@@ -945,12 +945,23 @@ def add_smart_search_button_to_sidebar():
     if not config.public_config.get("ankihub_smart_search"):
         return
 
+    # We wrap the smart search button in a toolbar so that it doesn't show a frame on MacOS
+    smart_search_button_toolbar = QToolBar()
+    smart_search_button_toolbar.setIconSize(QSize(16, 16))
+    smart_search_button_toolbar.setMovable(False)
+    smart_search_button_toolbar.setFloatable(False)
+    smart_search_button_toolbar.setStyleSheet(
+        "QToolBar { border: none; padding: 0px; }"
+    )
+
     smart_search_button = QToolButton()
     smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
     smart_search_button.setIconSize(QSize(16, 16))
     smart_search_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
     smart_search_button.setAutoRaise(True)
     smart_search_button.setToolTip("AnkiHub Smart Search")
+
+    smart_search_button_toolbar.addWidget(smart_search_button)
 
     def on_deck_selected(dialog: SearchableSelectionDialog) -> None:
         if not dialog.name:
@@ -981,7 +992,7 @@ def add_smart_search_button_to_sidebar():
     qconnect(smart_search_button.clicked, on_smart_search_button_clicked)
 
     grid = browser.sidebarDockWidget.widget().layout()
-    grid.addWidget(smart_search_button, 0, 3)  # type: ignore
+    grid.addWidget(smart_search_button_toolbar, 0, 3)  # type: ignore
 
     # Make sidebar span 4 columns so that it includes the smart search button column
     grid.removeWidget(browser.sidebar)
