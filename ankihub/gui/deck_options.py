@@ -75,8 +75,7 @@ def _can_revert_from_fsrs_parameters(
         fsrs_parameters_from_backup,
     ) = config.get_fsrs_parameters_from_backup(conf_id)
     return (
-        bool(fsrs_parameters_from_backup)
-        and fsrs_parameters_from_backup != fsrs_parameters
+        fsrs_parameters_from_backup != fsrs_parameters
         # We can only revert if the version of the parameters in the backup is
         # less than or equal to the current version of FSRS.
         # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
@@ -88,9 +87,6 @@ def _can_revert_from_fsrs_parameters(
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
     """Backup the current FSRS parameters of the specified deck-preset."""
     parameters = _get_fsrs_parameters(conf_id)
-
-    if not parameters:
-        return False
 
     return config.backup_fsrs_parameters(
         conf_id, version=FSRS_VERSION, parameters=parameters
@@ -111,7 +107,7 @@ def _on_webview_did_receive_js_message(
             fsrs_version_from_backup,
             fsrs_parameters_from_backup,
         ) = config.get_fsrs_parameters_from_backup(conf_id)
-        if not fsrs_parameters_from_backup or fsrs_version_from_backup > FSRS_VERSION:
+        if not fsrs_version_from_backup or fsrs_version_from_backup > FSRS_VERSION:
             return (True, None)
 
         _deck_options_dialog.dialog.web.eval(
