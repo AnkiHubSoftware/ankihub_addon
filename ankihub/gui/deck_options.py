@@ -60,10 +60,17 @@ def setup() -> None:
 
 
 def _get_fsrs_parameters(conf_id: DeckConfigId) -> List[float]:
+    """Fetch the FSRS parameters for a deck config.
+    Tries version = FSRS_VERSION down to the lowest FSRS version, returns the first found list or [].
+    """
+    min_fsrs_version = 4  # The first version of FSRS that was used in Anki.
     deck_config = aqt.mw.col.decks.get_config(conf_id)
-    field_name = f"fsrsParams{FSRS_VERSION}"
-    parameters = deck_config.get(field_name, [])
-    return parameters
+    for version in range(FSRS_VERSION, min_fsrs_version - 1, -1):
+        params = deck_config.get(f"fsrsParams{version}", None)
+        if params is not None:
+            return params
+
+    return []
 
 
 def _can_revert_from_fsrs_parameters(
