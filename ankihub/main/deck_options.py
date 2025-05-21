@@ -104,13 +104,17 @@ def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
 
 
 def get_fsrs_version() -> Optional[int]:
-    """
-    Get the version of the FSRS scheduler used in the current Anki version.
-    """
+    """Get the version of the FSRS scheduler available in the current Anki version."""
+    deck_config_field_names = set(
+        deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
+    )
+    if "fsrs_weights" in deck_config_field_names:
+        return 4  # pragma: no cover
+
     return max(
         (
             int(m.group(1))
-            for field_name in deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
+            for field_name in deck_config_field_names
             if (m := re.search(r"fsrs_params_(\d)+", field_name))
         ),
         default=None,
