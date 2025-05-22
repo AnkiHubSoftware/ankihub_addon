@@ -93,6 +93,8 @@ def show_fsrs_optimization_reminder() -> None:
         default_button_idx=1,
         callback=on_button_clicked,
         open_dialog=False,
+        add_title_to_body_on_mac=False,
+        parent=aqt.mw,
     )
 
     dialog.dont_show_this_again_cb = QCheckBox("Don't show this again")
