@@ -1,6 +1,6 @@
 set -e
 
-python3 scripts/build.py
+python scripts/build.py
 
 mkdir -p dist
 rm -rf dist/release
