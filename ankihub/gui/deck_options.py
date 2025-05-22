@@ -21,8 +21,8 @@ FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS = 30
 
 
 def maybe_show_fsrs_optimization_reminder() -> None:
-    # if not config.get_feature_flags().get("fsrs_reminder", False):
-    #     return
+    if not config.get_feature_flags().get("fsrs_reminder", False):
+        return
 
     deck_config = config.deck_config(config.anking_deck_id)
     if not deck_config:
@@ -36,8 +36,8 @@ def maybe_show_fsrs_optimization_reminder() -> None:
         and deck_configs_for_update.fsrs
         # This is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
-        # and deck_configs_for_update.days_since_last_fsrs_optimize
-        # >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+        and deck_configs_for_update.days_since_last_fsrs_optimize
+        >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
     ):
         show_fsrs_optimization_reminder()
 
