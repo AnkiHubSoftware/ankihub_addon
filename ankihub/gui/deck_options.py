@@ -9,15 +9,16 @@ from aqt.qt import QCheckBox
 from aqt.utils import tooltip
 
 from ..main.deck_options import get_fsrs_parameters
-from ..settings import config
+from ..settings import FSRS_VERSION, config
 from .utils import show_dialog
 
 
 def optimize_fsrs_parameters(conf_id: DeckConfigId):
     deck_config = aqt.mw.col.decks.get_config(conf_id)
 
+    _, fsrs_parameters = get_fsrs_parameters(conf_id)
+
     def compute_fsrs_params() -> scheduler_pb2.ComputeFsrsParamsResponse:
-        _, fsrs_parameters = get_fsrs_parameters(conf_id)
 
         deck_config_name_escaped = (
             deck_config["name"].replace("\\", "\\\\").replace('"', '\\"')
@@ -41,17 +42,24 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId):
 
     def on_done(future: Future) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
-        # TODO: Check return value when no changes needed
         params = list(response.params)
 
-        deck_config = aqt.mw.col.decks.get_config(conf_id)
-
-        # TODO: Use correct params field
-        deck_config["fsrsParams6"] = params
-
-        aqt.mw.col.decks.update_config(deck_config)
-
         print("FSRS params:", [round(param, 4) for param in params])
+
+        already_optimal = not params or [
+            round(param, 4) == round(old_param, 4)
+            for param, old_param in zip(params, fsrs_parameters)
+        ]
+
+        if already_optimal:
+            aqt.mw.taskman.run_on_main(
+                lambda: tooltip("FSRS parameters are already optimal!", parent=aqt.mw)
+            )
+            return
+
+        deck_config = aqt.mw.col.decks.get_config(conf_id)
+        deck_config[f"fsrsParams{FSRS_VERSION}"] = params
+        aqt.mw.col.decks.update_config(deck_config)
 
         mw.taskman.run_on_main(
             lambda: tooltip("FSRS parameters optimized successfully!", parent=aqt.mw)
