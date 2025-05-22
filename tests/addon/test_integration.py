@@ -3780,7 +3780,7 @@ class TestCustomSearchNodes:
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(cid, review_time_ms=1 * 1000)
+            record_review(cid, time_of_review_ms=1 * 1000)
 
             # Update the mod time in the ankihub database to simulate a note update.
             AnkiHubNote.update(mod=2).where(AnkiHubNote.anki_note_id == nid).execute()
@@ -3791,7 +3791,7 @@ class TestCustomSearchNodes:
             ) == [nid]
 
             # Add another review entry for the card to the database.
-            record_review(cid, review_time_ms=3 * 1000)
+            record_review(cid, time_of_review_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
             assert (

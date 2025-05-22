@@ -710,36 +710,36 @@ def record_review_for_anki_nid(
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
     record_review(
         cid=cid,
-        id=int(date_time.timestamp() * 1000),
+        time_of_review_ms=int(date_time.timestamp() * 1000),
         rating=rating,
         ivl=ivl,
         lastIvl=lastIvl,
         factor=factor,
-        review_time_ms=1000,
+        review_duration_ms=1000,
         revlog_type=revlog_type,
     )
 
 
 def record_review(
     cid: CardId,
-    id: Optional[int] = None,
+    time_of_review_ms: Optional[int] = None,
     rating: int = 3,
     ivl: int = 1,
     lastIvl: int = 1,
     factor: int = 2500,
-    review_time_ms: int = 1000,
+    review_duration_ms: int = 1000,
     revlog_type: int = REVLOG_LRN,
 ) -> None:
     aqt.mw.col.db.execute(
         "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        id,
+        time_of_review_ms,
         cid,
         aqt.mw.col.usn(),
         rating,
         ivl,
         lastIvl,
         factor,
-        review_time_ms,
+        review_duration_ms,
         revlog_type,
     )
 
