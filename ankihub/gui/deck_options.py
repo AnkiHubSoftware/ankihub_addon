@@ -1,11 +1,10 @@
 from concurrent.futures import Future
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 import aqt
 from anki import scheduler_pb2
 from anki.decks import DeckConfigDict, DeckConfigId
-from aqt import mw
 from aqt.qt import QCheckBox
 from aqt.utils import tooltip
 
@@ -108,7 +107,9 @@ def show_fsrs_optimization_reminder() -> None:
     dialog.show()
 
 
-def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
+def optimize_fsrs_parameters(
+    conf_id: DeckConfigId, on_done: Optional[Callable[[], None]] = None
+) -> None:
     deck_config = aqt.mw.col.decks.get_config(conf_id)
 
     _, fsrs_parameters = get_fsrs_parameters(conf_id)
@@ -145,7 +146,7 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
             **extra_kwargs,
         )
 
-    def on_done(future: Future) -> None:
+    def on_compute_fsrs_params_done(future: Future) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
         params = list(response.params)
 
@@ -158,19 +159,23 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
             aqt.mw.taskman.run_on_main(
                 lambda: tooltip("FSRS parameters are already optimal!", parent=aqt.mw)
             )
-            return
+        else:
+            deck_config = aqt.mw.col.decks.get_config(conf_id)
+            deck_config[f"fsrsParams{FSRS_VERSION}"] = params
+            aqt.mw.col.decks.update_config(deck_config)
 
-        deck_config = aqt.mw.col.decks.get_config(conf_id)
-        deck_config[f"fsrsParams{FSRS_VERSION}"] = params
-        aqt.mw.col.decks.update_config(deck_config)
+            aqt.mw.taskman.run_on_main(
+                lambda: tooltip(
+                    "FSRS parameters optimized successfully!", parent=aqt.mw
+                )
+            )
 
-        mw.taskman.run_on_main(
-            lambda: tooltip("FSRS parameters optimized successfully!", parent=aqt.mw)
-        )
+        if on_done:
+            on_done()
 
     aqt.mw.taskman.with_progress(
         task=compute_fsrs_params,
-        on_done=on_done,
+        on_done=on_compute_fsrs_params_done,
         label="Optimizing FSRS parameters",
         parent=aqt.mw,
     )
