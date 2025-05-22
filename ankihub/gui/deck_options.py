@@ -33,10 +33,13 @@ def maybe_show_fsrs_optimization_reminder() -> None:
         config.public_config["remind_to_optimize_fsrs_parameters"]
         and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
         and deck_configs_for_update.fsrs
-        # This is a global value, not just for the current deck, but that's okay, because
+        # days_since_last_fsrs_optimize is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
-        and deck_configs_for_update.days_since_last_fsrs_optimize
-        >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+        and (
+            deck_configs_for_update.days_since_last_fsrs_optimize is None
+            or deck_configs_for_update.days_since_last_fsrs_optimize
+            >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+        )
     ):
         show_fsrs_optimization_reminder()
 
@@ -148,12 +151,14 @@ def optimize_fsrs_parameters(
 
     def on_compute_fsrs_params_done(future: Future) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
-        params = list(response.params)
+        new_parameters = list(response.params)
 
-        already_optimal = not params or all(
-            round(param, 4) == round(old_param, 4)
-            for param, old_param in zip(params, fsrs_parameters)
+        old_parameters = list(fsrs_parameters)
+        parameters_are_the_same = len(new_parameters) == len(old_parameters) and all(
+            round(new_param, 4) == round(old_param, 4)
+            for new_param, old_param in zip(new_parameters, old_parameters)
         )
+        already_optimal = not new_parameters or parameters_are_the_same
 
         if already_optimal:
             aqt.mw.taskman.run_on_main(
@@ -161,7 +166,7 @@ def optimize_fsrs_parameters(
             )
         else:
             deck_config = aqt.mw.col.decks.get_config(conf_id)
-            deck_config[f"fsrsParams{FSRS_VERSION}"] = params
+            deck_config[f"fsrsParams{FSRS_VERSION}"] = new_parameters
             aqt.mw.col.decks.update_config(deck_config)
 
             aqt.mw.taskman.run_on_main(
