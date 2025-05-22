@@ -160,6 +160,7 @@ from ankihub.gui.config_dialog import (
 from ankihub.gui.deck_options import (
     FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
     MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    _show_fsrs_optimization_reminder,
     maybe_show_fsrs_optimization_reminder,
     optimize_fsrs_parameters,
 )
@@ -7745,3 +7746,36 @@ def test_maybe_show_fsrs_optimization_reminder(
         else:
             qtbot.wait(300)
             optimize_fsrs_parameters_mock.assert_not_called()
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    # Start with the config flag enabled
+    config.public_config["remind_to_optimize_fsrs_parameters"] = True
+    save_public_config_mock = mocker.patch(
+        "ankihub.gui.deck_options.config.save_public_config"
+    )
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+        _show_fsrs_optimization_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected the reminder dialog to appear"
+
+        # Check "Don't show this again" and click Skip
+        dialog.dont_show_this_again_cb.setChecked(True)
+        skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
+        skip_button.click()
+
+    # The config flag should now be False and saved
+    assert config.public_config["remind_to_optimize_fsrs_parameters"] is False
+    save_public_config_mock.assert_called_once()

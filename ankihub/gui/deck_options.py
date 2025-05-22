@@ -38,10 +38,10 @@ def maybe_show_fsrs_optimization_reminder() -> None:
         and deck_configs_for_update.days_since_last_fsrs_optimize
         >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
     ):
-        show_fsrs_optimization_reminder()
+        _show_fsrs_optimization_reminder()
 
 
-def show_fsrs_optimization_reminder() -> None:
+def _show_fsrs_optimization_reminder() -> None:
     deck_config = config.deck_config(config.anking_deck_id)
     if not deck_config:
         return
