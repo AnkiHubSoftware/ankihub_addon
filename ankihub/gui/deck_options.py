@@ -9,6 +9,7 @@ from aqt import mw
 from aqt.qt import QCheckBox
 from aqt.utils import tooltip
 
+from .. import LOGGER
 from ..main.deck_options import get_fsrs_parameters
 from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .utils import show_dialog
@@ -45,14 +46,22 @@ def show_fsrs_optimization_reminder() -> None:
         return
 
     def on_button_clicked(button_idx: Optional[int]):
-        assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
+        optimize = button_idx == 1
 
-        if dialog.dont_show_this_again_cb.isChecked():
+        assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
+        dont_show_again = dialog.dont_show_this_again_cb.isChecked()
+
+        LOGGER.info(
+            "fsrs_optimization_reminder_dialog_choice",
+            user_choice="optimize" if optimize else "skip",
+            dont_show_again=dont_show_again,
+        )
+
+        if dont_show_again:
             config.public_config["remind_to_optimize_fsrs_parameters"] = False
             config.save_public_config()
 
-        if button_idx == 0 or button_idx is None:
-            # Skip button or close button
+        if not optimize:
             return
 
         if aqt.mw.col.decks.get(anki_did) is None:
