@@ -262,8 +262,12 @@ class _Config:
         self.log_private_config(log_level=logging.DEBUG)
 
     def load_public_config(self) -> None:
-        """For loading the public config from its file (after it has been changed)."""
+        """For loading the public config from its file."""
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
+    def save_public_config(self) -> None:
+        """For saving the public config to its file."""
+        aqt.mw.addonManager.writeConfig(ADDON_PATH.name, self.public_config)
 
     def save_token(self, token: str):
         token_changed = self.token() != token

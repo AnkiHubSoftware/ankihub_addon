@@ -48,8 +48,8 @@ def show_fsrs_optimization_reminder() -> None:
         assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
 
         if dialog.dont_show_this_again_cb.isChecked():
-            # TODO
-            pass
+            config.public_config["remind_to_optimize_fsrs_parameters"] = False
+            config.save_public_config()
 
         if button_idx == 0 or button_idx is None:
             # Skip button or close button
