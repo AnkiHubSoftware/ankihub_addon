@@ -117,13 +117,22 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
         )
         default_search = f'preset:"{deck_config_name_escaped}" -is:suspended'
 
-        ignore_revlog_before_date_str = deck_config.get(
-            "ignoreRevlogsBeforeDate", "1970-01-01"
+        ignore_revlog_before_date_str = (
+            deck_config.get("ignoreRevlogsBeforeDate") or "1970-01-01"
         )
         ignore_revlog_before_date = datetime.fromisoformat(
             ignore_revlog_before_date_str
         ).replace(tzinfo=timezone.utc)
         ignore_revlog_before_ms = int(ignore_revlog_before_date.timestamp() * 1000)
+
+        extra_kwargs = {}
+        if ANKI_INT_VERSION >= 250200:
+            # The num_of_relearning_steps parameter became available in Anki 25.02
+            extra_kwargs[
+                "num_of_relearning_steps"
+            ] = _get_amount_relearning_steps_in_day(
+                deck_config,
+            )
 
         return aqt.mw.col.backend.compute_fsrs_params(
             search=deck_config.get(
@@ -131,9 +140,7 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
             ),
             current_params=fsrs_parameters,
             ignore_revlogs_before_ms=ignore_revlog_before_ms,
-            num_of_relearning_steps=_get_amount_relearning_steps_in_day(
-                deck_config,
-            ),
+            **extra_kwargs,
         )
 
     def on_done(future: Future) -> None:
