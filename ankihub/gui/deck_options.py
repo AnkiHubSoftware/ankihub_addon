@@ -14,6 +14,9 @@ from ..main.deck_options import get_fsrs_parameters
 from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .utils import show_dialog
 
+MIN_ANKI_VERSION_FOR_FSRS_OPTIMIZATION = 240600
+FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS = 30
+
 
 def maybe_show_fsrs_optimization_reminder() -> None:
     if not config.get_feature_flags().get("fsrs_reminder", False):
@@ -27,11 +30,12 @@ def maybe_show_fsrs_optimization_reminder() -> None:
     deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
     if (
         config.public_config["remind_to_optimize_fsrs_parameters"]
-        and ANKI_INT_VERSION >= 240600
+        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_OPTIMIZATION
         and deck_configs_for_update.fsrs
         # This is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
-        and deck_configs_for_update.days_since_last_fsrs_optimize >= 30
+        and deck_configs_for_update.days_since_last_fsrs_optimize
+        >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
     ):
         show_fsrs_optimization_reminder()
 
@@ -45,7 +49,7 @@ def show_fsrs_optimization_reminder() -> None:
     if aqt.mw.col.decks.get(anki_did) is None:
         return
 
-    def on_button_clicked(button_idx: Optional[int]):
+    def on_button_clicked(button_idx: Optional[int]) -> None:
         optimize = button_idx == 1
 
         assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
@@ -106,13 +110,14 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
     _, fsrs_parameters = get_fsrs_parameters(conf_id)
 
     def compute_fsrs_params() -> scheduler_pb2.ComputeFsrsParamsResponse:
-
         deck_config_name_escaped = (
             deck_config["name"].replace("\\", "\\\\").replace('"', '\\"')
         )
         default_search = f'preset:"{deck_config_name_escaped}" -is:suspended'
 
-        ignore_revlog_before_date_str = deck_config.get("ignoreRevlogsBeforeDate")
+        ignore_revlog_before_date_str = deck_config.get(
+            "ignoreRevlogsBeforeDate", "1970-01-01"
+        )
         ignore_revlog_before_date = datetime.fromisoformat(
             ignore_revlog_before_date_str
         ).replace(tzinfo=timezone.utc)
@@ -131,10 +136,10 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
         params = list(response.params)
 
-        already_optimal = not params or [
+        already_optimal = not params or all(
             round(param, 4) == round(old_param, 4)
             for param, old_param in zip(params, fsrs_parameters)
-        ]
+        )
 
         if already_optimal:
             aqt.mw.taskman.run_on_main(
