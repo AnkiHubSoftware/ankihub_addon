@@ -14,78 +14,6 @@ from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .utils import show_dialog
 
 
-def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
-    deck_config = aqt.mw.col.decks.get_config(conf_id)
-
-    _, fsrs_parameters = get_fsrs_parameters(conf_id)
-
-    def compute_fsrs_params() -> scheduler_pb2.ComputeFsrsParamsResponse:
-
-        deck_config_name_escaped = (
-            deck_config["name"].replace("\\", "\\\\").replace('"', '\\"')
-        )
-        default_search = f'preset:"{deck_config_name_escaped}" -is:suspended'
-
-        ignore_revlog_before_date_str = deck_config.get("ignoreRevlogsBeforeDate")
-        ignore_revlog_before_date = datetime.fromisoformat(
-            ignore_revlog_before_date_str
-        ).replace(tzinfo=timezone.utc)
-        ignore_revlog_before_ms = int(ignore_revlog_before_date.timestamp() * 1000)
-
-        return aqt.mw.col.backend.compute_fsrs_params(
-            search=deck_config.get("weightSearch", default_search),
-            current_params=fsrs_parameters,
-            ignore_revlogs_before_ms=ignore_revlog_before_ms,
-            num_of_relearning_steps=_get_amount_relearning_steps_in_day(
-                deck_config,
-            ),
-        )
-
-    def on_done(future: Future) -> None:
-        response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
-        params = list(response.params)
-
-        already_optimal = not params or [
-            round(param, 4) == round(old_param, 4)
-            for param, old_param in zip(params, fsrs_parameters)
-        ]
-
-        if already_optimal:
-            aqt.mw.taskman.run_on_main(
-                lambda: tooltip("FSRS parameters are already optimal!", parent=aqt.mw)
-            )
-            return
-
-        deck_config = aqt.mw.col.decks.get_config(conf_id)
-        deck_config[f"fsrsParams{FSRS_VERSION}"] = params
-        aqt.mw.col.decks.update_config(deck_config)
-
-        mw.taskman.run_on_main(
-            lambda: tooltip("FSRS parameters optimized successfully!", parent=aqt.mw)
-        )
-
-    aqt.mw.taskman.with_progress(
-        task=compute_fsrs_params,
-        on_done=on_done,
-        label="Optimizing FSRS parameters",
-        parent=aqt.mw,
-    )
-
-
-def _get_amount_relearning_steps_in_day(deck_config: DeckConfigDict) -> int:
-    # Ported from TS code
-    # https://github.com/ankitects/anki/blob/main/ts/routes/deck-options/FsrsOptions.svelte
-    num_of_relearning_steps_in_day = 0
-    accumulated_time = 0
-    for step in deck_config["lapse"]["delays"]:
-        accumulated_time += step
-        if accumulated_time >= 24 * 60:  # minutes in a day
-            break
-        num_of_relearning_steps_in_day += 1
-
-    return num_of_relearning_steps_in_day
-
-
 def maybe_show_fsrs_optimization_reminder() -> None:
     if not config.get_feature_flags().get("fsrs_reminder", False):
         return
@@ -161,3 +89,75 @@ def show_fsrs_optimization_reminder() -> None:
     dialog.adjustSize()
 
     dialog.show()
+
+
+def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
+    deck_config = aqt.mw.col.decks.get_config(conf_id)
+
+    _, fsrs_parameters = get_fsrs_parameters(conf_id)
+
+    def compute_fsrs_params() -> scheduler_pb2.ComputeFsrsParamsResponse:
+
+        deck_config_name_escaped = (
+            deck_config["name"].replace("\\", "\\\\").replace('"', '\\"')
+        )
+        default_search = f'preset:"{deck_config_name_escaped}" -is:suspended'
+
+        ignore_revlog_before_date_str = deck_config.get("ignoreRevlogsBeforeDate")
+        ignore_revlog_before_date = datetime.fromisoformat(
+            ignore_revlog_before_date_str
+        ).replace(tzinfo=timezone.utc)
+        ignore_revlog_before_ms = int(ignore_revlog_before_date.timestamp() * 1000)
+
+        return aqt.mw.col.backend.compute_fsrs_params(
+            search=deck_config.get("weightSearch", default_search),
+            current_params=fsrs_parameters,
+            ignore_revlogs_before_ms=ignore_revlog_before_ms,
+            num_of_relearning_steps=_get_amount_relearning_steps_in_day(
+                deck_config,
+            ),
+        )
+
+    def on_done(future: Future) -> None:
+        response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
+        params = list(response.params)
+
+        already_optimal = not params or [
+            round(param, 4) == round(old_param, 4)
+            for param, old_param in zip(params, fsrs_parameters)
+        ]
+
+        if already_optimal:
+            aqt.mw.taskman.run_on_main(
+                lambda: tooltip("FSRS parameters are already optimal!", parent=aqt.mw)
+            )
+            return
+
+        deck_config = aqt.mw.col.decks.get_config(conf_id)
+        deck_config[f"fsrsParams{FSRS_VERSION}"] = params
+        aqt.mw.col.decks.update_config(deck_config)
+
+        mw.taskman.run_on_main(
+            lambda: tooltip("FSRS parameters optimized successfully!", parent=aqt.mw)
+        )
+
+    aqt.mw.taskman.with_progress(
+        task=compute_fsrs_params,
+        on_done=on_done,
+        label="Optimizing FSRS parameters",
+        parent=aqt.mw,
+    )
+
+
+def _get_amount_relearning_steps_in_day(deck_config: DeckConfigDict) -> int:
+    # Ported from TS code
+    # https://github.com/ankitects/anki/blob/main/ts/routes/deck-options/FsrsOptions.svelte
+    num_of_relearning_steps_in_day = 0
+    accumulated_time = 0
+    for step in deck_config["lapse"]["delays"]:
+        accumulated_time += step
+        if accumulated_time >= 24 * 60:  # minutes in a day
+            break
+        num_of_relearning_steps_in_day += 1
+
+    return num_of_relearning_steps_in_day
