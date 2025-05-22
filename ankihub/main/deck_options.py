@@ -9,7 +9,7 @@ try:
 except ImportError:
     from anki import deckconfig_pb2 as deck_config_pb2  # type: ignore
 
-from ..settings import ANKI_INT_VERSION, ANKI_VERSION_24_06_00, config
+from ..settings import config
 
 ANKIHUB_PRESET_NAME = "AnkiHub"
 DECK_CONFIG: Dict[str, Any] = {
@@ -70,16 +70,16 @@ def deep_set(data: Dict, path: str, value: Any) -> None:
 
 
 def _create_deck_preset_if_not_exists(
-    config_name=ANKIHUB_PRESET_NAME,
+    preset_name=ANKIHUB_PRESET_NAME,
 ) -> DeckConfigDict:
     conf = next(
-        (conf for conf in aqt.mw.col.decks.all_config() if conf["name"] == config_name),
+        (conf for conf in aqt.mw.col.decks.all_config() if conf["name"] == preset_name),
         None,
     )
     if conf:
         aqt.mw.col.decks.restore_to_default(conf)
     else:
-        conf = aqt.mw.col.decks.add_config(config_name)
+        conf = aqt.mw.col.decks.add_config(preset_name)
     fsrs_enabled = aqt.mw.col.get_config("fsrs")
     for option, value in DECK_CONFIG.items():
         if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (
@@ -93,25 +93,17 @@ def _create_deck_preset_if_not_exists(
     return conf
 
 
-def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
+def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -> None:
     deck = aqt.mw.col.decks.get(deck_id, default=False)
     if not deck:
         return
 
-    conf = _create_deck_preset_if_not_exists()
-
-    deck["conf"] = conf["id"]
-    aqt.mw.col.decks.update(deck)
-    
-
-def set_ankihub_config_for_anking_deck(deck_id: DeckId) -> None:
-    deck = aqt.mw.col.decks.get(deck_id, default=False)
-    if not deck:
-        return
-
-    conf = _create_deck_preset_if_not_exists(config_name="AnKing")
-    if ANKI_INT_VERSION > ANKI_VERSION_24_06_00:
-        aqt.mw.col.set_config("fsrs", True)
+    if is_anking_deck and config.get_feature_flags().get(
+        "fsrs_in_recommended_deck_settings"
+    ):
+        conf = _create_deck_preset_if_not_exists(preset_name="AnKing")
+    else:
+        conf = _create_deck_preset_if_not_exists()
 
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
