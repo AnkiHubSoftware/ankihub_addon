@@ -65,25 +65,6 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.models import (
-    DeckMediaUpdateChunk,
-    DeckUpdates,
-    NotesAction,
-    NotesActionChoices,
-    UserDeckExtensionRelation,
-)
-from ankihub.gui import editor
-from ankihub.gui.browser.browser import (
-    ModifiedAfterSyncSearchNode,
-    NewNoteSearchNode,
-    SuggestionTypeSearchNode,
-    UpdatedInTheLastXDaysSearchNode,
-    _on_protect_fields_action,
-    _on_reset_optional_tags_action,
-)
-from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
-from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
-
 from ..factories import (
     DeckExtensionFactory,
     DeckFactory,
@@ -105,9 +86,11 @@ from ..fixtures import (
     add_field_to_local_note_type,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
+    make_review_histories,
     note_type_with_field_names,
     record_review,
     record_review_for_anki_nid,
+    record_review_histories,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -140,16 +123,31 @@ from ankihub.ankihub_client.ankihub_client import (
     _to_ankihub_note_type,
     _transform_notes_data,
 )
+from ankihub.ankihub_client.models import (
+    DeckMediaUpdateChunk,
+    DeckUpdates,
+    NotesAction,
+    NotesActionChoices,
+    UserDeckExtensionRelation,
+)
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import utils
+from ankihub.gui import editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
 )
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
+from ankihub.gui.browser.browser import (
+    ModifiedAfterSyncSearchNode,
+    NewNoteSearchNode,
+    SuggestionTypeSearchNode,
+    UpdatedInTheLastXDaysSearchNode,
+    _on_protect_fields_action,
+    _on_reset_optional_tags_action,
+)
 from ankihub.gui.browser.custom_search_nodes import (
     AnkiHubNoteSearchNode,
     UpdatedSinceLastReviewSearchNode,
@@ -159,11 +157,16 @@ from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
     setup_config_dialog_manager,
 )
+from ankihub.gui.deck_options import (
+    MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    optimize_fsrs_parameters,
+)
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
     GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
@@ -191,6 +194,7 @@ from ankihub.gui.overview import (
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.gui.utils import robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
+from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
@@ -238,7 +242,9 @@ from ankihub.main.utils import (
     note_type_contains_field,
 )
 from ankihub.settings import (
+    ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    FSRS_VERSION,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -7590,3 +7596,47 @@ def test_robust_filter(
         assert (
             raise_exception_spy in overview_will_render_bottom._hooks
         ) is expected_present
+
+
+@pytest.mark.skipif(
+    ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    reason=f"Feature available only in Anki {MIN_ANKI_VERSION_FOR_FSRS_FEATURES} or higher",
+)
+def test_optimize_fsrs_parameters(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    qtbot: QtBot,
+    next_deterministic_id: Callable[[], int],
+):
+    with anki_session_with_addon_data.profile_loaded():
+        anki_did = DeckId(next_deterministic_id())
+        ah_did = install_ah_deck(anki_did=anki_did)
+
+        aqt.mw.col.set_config("fsrs", True)
+
+        # Create and import note
+        note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+
+        # Generate synthetic histories and record them
+        review_history = make_review_histories(num_cards=1, max_days=400)[0]
+        record_review_histories(
+            NoteId(note_info.anki_nid), review_history, max_days=400
+        )
+
+        # Set bad FSRS parameters
+        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        fsrs_params_key = f"fsrsParams{FSRS_VERSION}"
+        bad_fsrs_params = [0.1] * 17
+        deck_config[fsrs_params_key] = bad_fsrs_params
+        aqt.mw.col.decks.update_config(deck_config)
+
+        # Run optimization
+        with qtbot.wait_callback() as cb:
+            optimize_fsrs_parameters(deck_config["id"], on_done=cb)
+
+        # Assert that FSRS parameters were changed
+        new_conf = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        new_params = new_conf[fsrs_params_key]
+        assert new_params != bad_fsrs_params
+        assert new_params
