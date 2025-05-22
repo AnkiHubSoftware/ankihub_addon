@@ -13,7 +13,7 @@ from ..settings import FSRS_VERSION, config
 from .utils import show_dialog
 
 
-def optimize_fsrs_parameters(conf_id: DeckConfigId):
+def optimize_fsrs_parameters(conf_id: DeckConfigId) -> None:
     deck_config = aqt.mw.col.decks.get_config(conf_id)
 
     _, fsrs_parameters = get_fsrs_parameters(conf_id)
@@ -43,8 +43,6 @@ def optimize_fsrs_parameters(conf_id: DeckConfigId):
     def on_done(future: Future) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
         params = list(response.params)
-
-        print("FSRS params:", [round(param, 4) for param in params])
 
         already_optimal = not params or [
             round(param, 4) == round(old_param, 4)
@@ -112,8 +110,6 @@ def show_fsrs_optimization_reminder() -> None:
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
         optimize_fsrs_parameters(conf_id)
 
-        # open_deck_options_dialog_and_scroll_to_fsrs(anki_did)
-
     dialog = show_dialog(
         text="""
             <h3>🛠️ Keep Your FSRS Scheduler Optimized</h3>
@@ -125,7 +121,7 @@ def show_fsrs_optimization_reminder() -> None:
             with AnkiWeb before proceeding.
             </p>
             <p><strong>Would you like us to optimize the AnKing FSRS parameters for you?</strong></p>
-        """,
+            """,
         title="AnKing Recommendation",
         buttons=["Skip", "Optimize"],
         default_button_idx=1,
@@ -142,94 +138,3 @@ def show_fsrs_optimization_reminder() -> None:
     dialog.adjustSize()
 
     dialog.show()
-
-
-a = {
-    "id": 1730584908073,
-    "mod": 1747844944,
-    "name": "JKU",
-    "usn": -1,
-    "maxTaken": 60,
-    "autoplay": True,
-    "timer": 0,
-    "replayq": True,
-    "new": {
-        "bury": True,
-        "delays": [10.0],
-        "initialFactor": 2400,
-        "ints": [1, 4, 0],
-        "order": 1,
-        "perDay": 30,
-        "retirementActions": {
-            "delete": False,
-            "move": False,
-            "suspend": True,
-            "tag": True,
-        },
-        "retiringInterval": 0,
-        "separate": True,
-    },
-    "rev": {
-        "bury": True,
-        "ease4": 1.3,
-        "ivlFct": 1.0,
-        "maxIvl": 36500,
-        "perDay": 999,
-        "hardFactor": 1.2,
-        "minSpace": 1,
-        "fuzz": 0.05,
-    },
-    "lapse": {
-        "delays": [10.0],
-        "leechAction": 0,
-        "leechFails": 8,
-        "minInt": 1,
-        "mult": 0.5,
-    },
-    "dyn": False,
-    "newMix": 1,
-    "newPerDayMinimum": 0,
-    "interdayLearningMix": 2,
-    "reviewOrder": 11,
-    "newSortOrder": 1,
-    "newGatherPriority": 4,
-    "buryInterdayLearning": True,
-    "fsrsWeights": [],
-    "fsrsParams5": [],
-    "fsrsParams6": [
-        0.48438278,
-        2.6989408,
-        8.904372,
-        24.615675,
-        7.137523,
-        0.56907123,
-        2.1679354,
-        0.001,
-        1.4669979,
-        0.16145188,
-        0.9536771,
-        1.8758221,
-        0.12884021,
-        0.39521834,
-        2.2978072,
-        0.051171675,
-        3.0004,
-        0.73922735,
-        0.34591433,
-        0.13614067,
-        0.1,
-    ],
-    "desiredRetention": 0.9,
-    "ignoreRevlogsBeforeDate": "1970-01-01",
-    "easyDaysPercentages": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-    "stopTimerOnAnswer": False,
-    "secondsToShowQuestion": 0.0,
-    "secondsToShowAnswer": 0.0,
-    "questionAction": 0,
-    "answerAction": 0,
-    "waitForAudio": False,
-    "sm2Retention": 0.9,
-    "weightSearch": "deck:JKU",
-    "exam_settings": {"enabled": False, "exam_date": 1650812661, "exam_name": ""},
-    "fsrsParams4": [],
-}
