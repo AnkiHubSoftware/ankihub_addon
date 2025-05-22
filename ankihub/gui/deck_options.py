@@ -14,7 +14,9 @@ from ..main.deck_options import get_fsrs_parameters
 from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .utils import show_dialog
 
-MIN_ANKI_VERSION_FOR_FSRS_OPTIMIZATION = 240600
+# Minimum Anki version for which the AnkiHub add-on provides FSRS features
+MIN_ANKI_VERSION_FOR_FSRS_FEATURES = 241100
+
 FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS = 30
 
 
@@ -30,7 +32,7 @@ def maybe_show_fsrs_optimization_reminder() -> None:
     deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
     if (
         config.public_config["remind_to_optimize_fsrs_parameters"]
-        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_OPTIMIZATION
+        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
         and deck_configs_for_update.fsrs
         # This is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
