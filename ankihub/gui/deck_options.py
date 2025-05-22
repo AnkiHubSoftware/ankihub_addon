@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import aqt
 from anki import scheduler_pb2
 from anki.decks import DeckConfigDict, DeckConfigId
-from aqt.qt import QCheckBox
+from aqt.qt import QCheckBox, QDialogButtonBox
 from aqt.utils import tooltip
 
 from .. import LOGGER
@@ -35,11 +35,8 @@ def maybe_show_fsrs_optimization_reminder() -> None:
         and deck_configs_for_update.fsrs
         # days_since_last_fsrs_optimize is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
-        and (
-            deck_configs_for_update.days_since_last_fsrs_optimize is None
-            or deck_configs_for_update.days_since_last_fsrs_optimize
-            >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
-        )
+        and deck_configs_for_update.days_since_last_fsrs_optimize
+        >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
     ):
         show_fsrs_optimization_reminder()
 
@@ -91,7 +88,10 @@ def show_fsrs_optimization_reminder() -> None:
             <p><strong>Would you like us to optimize the AnKing FSRS parameters for you?</strong></p>
             """,
         title="AnKing Recommendation",
-        buttons=["Skip", "Optimize"],
+        buttons=[
+            ("Skip", QDialogButtonBox.ButtonRole.RejectRole),
+            ("Optimize", QDialogButtonBox.ButtonRole.AcceptRole),
+        ],
         default_button_idx=1,
         callback=on_button_clicked,
         open_dialog=False,

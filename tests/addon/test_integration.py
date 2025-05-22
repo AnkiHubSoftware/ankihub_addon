@@ -158,7 +158,9 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_options import (
+    FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
     MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    maybe_show_fsrs_optimization_reminder,
     optimize_fsrs_parameters,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
@@ -192,7 +194,7 @@ from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
 )
 from ankihub.gui.suggestion_dialog import SuggestionDialog
-from ankihub.gui.utils import robust_filter
+from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -271,6 +273,15 @@ SAMPLE_NOTE_TYPES: Dict[NotetypeId, NotetypeDict] = json.loads(
 # to determine the path to the add-on files which also determines if an existing add-on is updated
 # or if a new add-on is installed
 ANKIHUB_ANKIADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
+
+
+skip_test_fsrs_unsupported = pytest.mark.skipif(
+    ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    reason=(
+        f"FSRS requires Anki ≥{MIN_ANKI_VERSION_FOR_FSRS_FEATURES}; "
+        f"you have {ANKI_INT_VERSION}"
+    ),
+)
 
 
 class InstallSampleAHDeck(Protocol):
@@ -7598,10 +7609,7 @@ def test_robust_filter(
         ) is expected_present
 
 
-@pytest.mark.skipif(
-    ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
-    reason=f"Feature available only in Anki {MIN_ANKI_VERSION_FOR_FSRS_FEATURES} or higher",
-)
+@skip_test_fsrs_unsupported
 @pytest.mark.parametrize(
     "with_review_history, expected_changed",
     [
@@ -7653,3 +7661,87 @@ def test_optimize_fsrs_parameters(
             assert new_params
         else:
             assert new_params == bad_fsrs_params
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+@pytest.mark.parametrize(
+    (
+        "feature_flag_active, "
+        "deck_installed, "
+        "days_since_last_fsrs_optimize, "
+        "expected_dialog_shown, "
+        "expected_optimization_called"
+    ),
+    [
+        # feature flag on, deck installed, below threshold → no dialog
+        (True, True, 0, False, False),
+        # feature flag on, deck installed, above threshold → dialog + optimize
+        (True, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, True, True),
+        # feature flag off, deck installed, above threshold → no dialog
+        (False, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+        # feature flag on, deck not installed, above threshold → no dialog
+        (True, False, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+    ],
+)
+def test_maybe_show_fsrs_optimization_reminder(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+    feature_flag_active: bool,
+    deck_installed: bool,
+    days_since_last_fsrs_optimize: int,
+    expected_dialog_shown: bool,
+    expected_optimization_called: bool,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=feature_flag_active)
+
+    with anki_session_with_addon_data.profile_loaded():
+        if deck_installed:
+            # Install the deck
+            install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Mock days_since_last_fsrs_optimize and fsrs
+        aqt.mw.col.set_config("fsrs", True)
+        deck_configs_for_update = Mock(
+            days_since_last_fsrs_optimize=days_since_last_fsrs_optimize,
+            fsrs=True,
+        )
+        mocker.patch.object(
+            aqt.mw.col.decks,
+            "get_deck_configs_for_update",
+            return_value=deck_configs_for_update,
+        )
+
+        # Mock the optimize_fsrs_parameters function
+        optimize_fsrs_parameters_mock = mocker.patch(
+            "ankihub.gui.deck_options.optimize_fsrs_parameters"
+        )
+
+        # Track the reminder dialog
+        latest_instance_tracker.track(_Dialog)
+
+        # Call function
+        maybe_show_fsrs_optimization_reminder()
+
+        # Asssert whether the dialog was shown
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        if expected_dialog_shown:
+            assert dialog is not None, "expected a reminder dialog to appear"
+            # Click the "Optimize" button
+            optimize_button = next(
+                b for b in dialog.button_box.buttons() if b.text() == "Optimize"
+            )
+            optimize_button.click()
+        else:
+            assert dialog is None, "did not expect a dialog"
+
+        # Assert whether the optimization was called
+        if expected_optimization_called:
+            qtbot.wait_until(lambda: optimize_fsrs_parameters_mock.called)
+        else:
+            qtbot.wait(300)
+            optimize_fsrs_parameters_mock.assert_not_called()
