@@ -1,5 +1,6 @@
 from concurrent.futures import Future
 from datetime import datetime, timezone
+from typing import Optional
 
 import aqt
 from anki import scheduler_pb2
@@ -9,7 +10,7 @@ from aqt.qt import QCheckBox
 from aqt.utils import tooltip
 
 from ..main.deck_options import get_fsrs_parameters
-from ..settings import FSRS_VERSION, config
+from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .utils import show_dialog
 
 
@@ -85,6 +86,27 @@ def _get_amount_relearning_steps_in_day(deck_config: DeckConfigDict) -> int:
     return num_of_relearning_steps_in_day
 
 
+def maybe_show_fsrs_optimization_reminder() -> None:
+    if not config.get_feature_flags().get("fsrs_reminder", False):
+        return
+
+    deck_config = config.deck_config(config.anking_deck_id)
+    if not deck_config:
+        return
+
+    anki_did = deck_config.anki_id
+    deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
+    if (
+        config.public_config["remind_to_optimize_fsrs_parameters"]
+        and ANKI_INT_VERSION >= 240600
+        and deck_configs_for_update.fsrs
+        # This is a global value, not just for the current deck, but that's okay, because
+        # if the user optimized the parameters for some deck, they probably don't need the reminder
+        and deck_configs_for_update.days_since_last_fsrs_optimize >= 30
+    ):
+        show_fsrs_optimization_reminder()
+
+
 def show_fsrs_optimization_reminder() -> None:
     deck_config = config.deck_config(config.anking_deck_id)
     if not deck_config:
@@ -94,14 +116,15 @@ def show_fsrs_optimization_reminder() -> None:
     if aqt.mw.col.decks.get(anki_did) is None:
         return
 
-    def on_button_clicked(button_index: int):
+    def on_button_clicked(button_idx: Optional[int]):
         assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
 
         if dialog.dont_show_this_again_cb.isChecked():
             # TODO
             pass
 
-        if button_index == 0:
+        if button_idx == 0 or button_idx is None:
+            # Skip button or close button
             return
 
         if aqt.mw.col.decks.get(anki_did) is None:
