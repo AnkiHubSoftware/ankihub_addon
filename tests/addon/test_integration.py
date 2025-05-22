@@ -7602,12 +7602,21 @@ def test_robust_filter(
     ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     reason=f"Feature available only in Anki {MIN_ANKI_VERSION_FOR_FSRS_FEATURES} or higher",
 )
+@pytest.mark.parametrize(
+    "with_review_history, expected_changed",
+    [
+        (True, True),
+        (False, False),
+    ],
+)
 def test_optimize_fsrs_parameters(
     anki_session_with_addon_data: AnkiSession,
     install_ah_deck: InstallAHDeck,
     import_ah_note: ImportAHNote,
     qtbot: QtBot,
     next_deterministic_id: Callable[[], int],
+    with_review_history: bool,
+    expected_changed: bool,
 ):
     with anki_session_with_addon_data.profile_loaded():
         anki_did = DeckId(next_deterministic_id())
@@ -7618,11 +7627,12 @@ def test_optimize_fsrs_parameters(
         # Create and import note
         note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
 
-        # Generate synthetic histories and record them
-        review_history = make_review_histories(num_cards=1, max_days=400)[0]
-        record_review_histories(
-            NoteId(note_info.anki_nid), review_history, max_days=400
-        )
+        if with_review_history:
+            # Generate synthetic histories and record them
+            review_history = make_review_histories(num_cards=1, max_days=400)[0]
+            record_review_histories(
+                NoteId(note_info.anki_nid), review_history, max_days=400
+            )
 
         # Set bad FSRS parameters
         deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
@@ -7635,8 +7645,11 @@ def test_optimize_fsrs_parameters(
         with qtbot.wait_callback() as cb:
             optimize_fsrs_parameters(deck_config["id"], on_done=cb)
 
-        # Assert that FSRS parameters were changed
+        # Check if FSRS parameters were changed
         new_conf = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
         new_params = new_conf[fsrs_params_key]
-        assert new_params != bad_fsrs_params
-        assert new_params
+        if expected_changed:
+            assert new_params != bad_fsrs_params
+            assert new_params
+        else:
+            assert new_params == bad_fsrs_params
