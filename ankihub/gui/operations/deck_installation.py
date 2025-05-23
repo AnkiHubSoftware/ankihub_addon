@@ -17,10 +17,17 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import Deck, UserDeckRelation
+from ...main.deck_options import _create_deck_preset_if_not_exists
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
-from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
+from ...settings import (
+    ANKI_INT_VERSION,
+    ANKI_VERSION_24_06_00,
+    BehaviorOnRemoteNoteDeleted,
+    DeckConfig,
+    config,
+)
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
@@ -167,6 +174,18 @@ def _download_and_install_decks_inner(
     Attempts to install all decks even if some fail."""
     result = []
     exceptions = []
+    if config.get_feature_flags().get("fsrs_in_recommended_deck_settings"):
+        is_anking_deck_in_the_list = any(
+            deck.ah_did == config.anking_deck_id for deck in decks
+        )
+        if (
+            is_anking_deck_in_the_list
+            and recommended_deck_settings
+            and ANKI_INT_VERSION >= ANKI_VERSION_24_06_00
+        ):
+            aqt.mw.col.set_config("fsrs", True)
+            _create_deck_preset_if_not_exists()
+
     for deck in decks:
         try:
             result.append(
@@ -206,6 +225,7 @@ def _download_and_install_single_deck(
     aqt.mw.taskman.run_on_main(
         lambda: aqt.mw.progress.update(label="Installing deck...", max=0, value=0)
     )
+
     result = _install_deck(
         notes_data=notes_data,
         deck_name=deck.name,
@@ -214,6 +234,7 @@ def _download_and_install_single_deck(
         behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         latest_update=deck.csv_last_upload,
         recommended_deck_settings=recommended_deck_settings,
+        is_anking_deck=deck.ah_did == config.anking_deck_id,
     )
 
     return result
@@ -227,6 +248,7 @@ def _install_deck(
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     latest_update: datetime,
     recommended_deck_settings: bool,
+    is_anking_deck: bool = False,
 ) -> AnkiHubImportResult:
     """Imports the notes_data into the Anki collection.
     Saves the deck subscription to the config file.
@@ -258,6 +280,7 @@ def _install_deck(
         ),
         recommended_deck_settings=recommended_deck_settings,
         raise_if_full_sync_required=False,
+        is_anking_deck=is_anking_deck,
     )
 
     config.add_deck(
