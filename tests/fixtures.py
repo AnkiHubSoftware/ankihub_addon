@@ -1,14 +1,15 @@
 import copy
 import os
+import random
 import uuid
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Protocol, Type
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Type
 from unittest.mock import MagicMock, Mock
 
 import aqt
 import pytest
 from anki.cards import CardId
-from anki.consts import REVLOG_LRN
+from anki.consts import REVLOG_LRN, REVLOG_REV
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
@@ -697,31 +698,88 @@ def record_review_for_anki_nid(
     anki_nid: NoteId,
     date_time: Optional[datetime] = None,
     revlog_type: int = REVLOG_LRN,
+    rating: int = 3,
+    ivl: int = 1,
+    lastIvl: int = 1,
+    factor: int = 2500,
 ) -> None:
     """Adds a review for the note with the given anki_nid at the given date_time."""
     if date_time is None:
         date_time = datetime.now()
 
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
-    record_review(cid, int(date_time.timestamp() * 1000), revlog_type=revlog_type)
+    record_review(
+        cid=cid,
+        time_of_review_ms=int(date_time.timestamp() * 1000),
+        rating=rating,
+        ivl=ivl,
+        lastIvl=lastIvl,
+        factor=factor,
+        review_duration_ms=1000,
+        revlog_type=revlog_type,
+    )
 
 
 def record_review(
-    cid: CardId, review_time_ms: int, revlog_type: int = REVLOG_LRN
+    cid: CardId,
+    time_of_review_ms: Optional[int] = None,
+    rating: int = 3,
+    ivl: int = 1,
+    lastIvl: int = 1,
+    factor: int = 2500,
+    review_duration_ms: int = 1000,
+    revlog_type: int = REVLOG_LRN,
 ) -> None:
     aqt.mw.col.db.execute(
-        "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        # the revlog table stores the timestamp in milliseconds
-        review_time_ms,
+        "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        time_of_review_ms,
         cid,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
+        aqt.mw.col.usn(),
+        rating,
+        ivl,
+        lastIvl,
+        factor,
+        review_duration_ms,
         revlog_type,
     )
+
+
+def make_review_histories(num_cards: int, max_days: int) -> List[List[Tuple[int, int]]]:
+    """Generate per‐card histories with random ratings and intervals."""
+
+    random.seed(42)
+    histories = []
+    for _ in range(num_cards):
+        reviews = []
+        last_day = 0
+        for _ in range(random.randint(5, 15)):
+            day = last_day + random.randint(22, max_days // 4)
+            rating = random.randint(1, 4)
+            reviews.append((day, rating))
+            last_day = day
+        histories.append(reviews)
+    return histories
+
+
+def record_review_histories(
+    anki_nid: NoteId, history: List[Tuple[int, int]], max_days: int
+) -> None:
+    # First, add an initial learning step:
+    start_day = datetime.now() - timedelta(days=max_days)
+    record_review_for_anki_nid(
+        anki_nid=anki_nid,
+        date_time=start_day,
+        revlog_type=REVLOG_LRN,
+        rating=3,
+    )
+    # Then all the subsequent “real” reviews:
+    for day, rating in history:
+        record_review_for_anki_nid(
+            anki_nid=anki_nid,
+            date_time=start_day + timedelta(days=day),
+            revlog_type=REVLOG_REV,
+            rating=rating,
+        )
 
 
 def assert_datetime_equal_ignore_milliseconds(dt1: datetime, dt2: datetime) -> None:
