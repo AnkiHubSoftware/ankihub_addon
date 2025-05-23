@@ -7749,6 +7749,23 @@ def test_maybe_show_fsrs_optimization_reminder(
 
 
 @skip_test_fsrs_unsupported
+def test_deck_configs_for_update_exposes_fsrs_fields(anki_session_with_addon_data):
+    """Integration canary: ensure Anki's deck‐config still has the FSRS-related fields we expect."""
+    with anki_session_with_addon_data.profile_loaded():
+        deck_config = aqt.mw.col.decks.get_deck_configs_for_update(DeckId(1))
+
+        assert hasattr(
+            deck_config, "days_since_last_fsrs_optimize"
+        ), "API change: days_since_last_fsrs_optimize no longer on DeckConfigForUpdate"
+        assert hasattr(
+            deck_config, "fsrs"
+        ), "API change: fsrs flag no longer on DeckConfigForUpdate"
+
+        assert isinstance(deck_config.days_since_last_fsrs_optimize, int)
+        assert isinstance(deck_config.fsrs, bool)
+
+
+@skip_test_fsrs_unsupported
 @pytest.mark.qt_no_exception_capture
 def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
     anki_session_with_addon_data: AnkiSession,
