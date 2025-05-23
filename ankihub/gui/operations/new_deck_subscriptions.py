@@ -36,8 +36,8 @@ def check_and_install_new_deck_subscriptions(
     recommended_deck_settings_cb.setChecked(True)
     if ANKI_INT_VERSION > ANKI_VERSION_24_06_00:
         recommended_deck_settings_cb.setToolTip(
-            "Modifies deck settings like limits and order, and sets learn ahead to 0."
-            "FSRS will also  be enabled as a global change for smarter, personalized, scheduling.<br>"
+            "Modifies deck settings like limits, order, and learning steps; sets learn ahead to 0; "
+            "and enables FSRS globally for smarter, personalized scheduling.<br>"
             "You can adjust these anytime in deck options."
         )
     else:
