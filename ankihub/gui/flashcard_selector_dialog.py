@@ -35,7 +35,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         """Display the flashcard selector dialog for the given deck.
         Reuses the dialog if it is already open for the same deck.
         Otherwise, closes the existing dialog and opens a new one."""
-        if cls.dialog and cls.dialog.ah_did != ah_did:
+        if cls.dialog and cls.dialog.ah_did != ah_did and not sip.isdeleted(cls.dialog):
             cls.dialog.close()
             cls.dialog = None
 
