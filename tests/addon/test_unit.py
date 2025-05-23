@@ -28,6 +28,8 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
 
+from ankihub.main.deck_options import set_ankihub_config_for_deck
+
 from ..factories import (
     DeckExtensionFactory,
     DeckFactory,
@@ -3269,3 +3271,68 @@ class TestAddNoteTypeFields:
             # Assert client method was called with the same note type as the one in the db
             note_type_passed_to_client = update_note_type_mock.call_args[0][1]
             assert note_type_passed_to_client == ah_db_note_type
+
+
+def test_set_ankihub_config_for_deck_no_deck():
+    with patch("ankihub.main.deck_options.aqt.mw") as mock_mw:
+        mock_col = MagicMock()
+        mock_mw.col = mock_col
+        mock_decks = MagicMock()
+        mock_col.decks = mock_decks
+        mock_decks.get.return_value = None
+
+        set_ankihub_config_for_deck(deck_id=123)
+
+        mock_decks.update.assert_not_called()
+
+
+def test_set_ankihub_config_for_deck_anking_deck():
+    with patch("ankihub.main.deck_options.aqt.mw") as mock_mw, patch(
+        "ankihub.main.deck_options.config"
+    ) as mock_config, patch(
+        "ankihub.main.deck_options._create_deck_preset_if_not_exists"
+    ) as mock_create_deck_preset:
+
+        mock_col = MagicMock()
+        mock_mw.col = mock_col
+        mock_decks = MagicMock()
+        mock_col.decks = mock_decks
+
+        mock_deck = {"id": 123, "conf": None}
+        mock_decks.get.return_value = mock_deck
+        mock_config.get_feature_flags.return_value = {
+            "fsrs_in_recommended_deck_settings": True
+        }
+        mock_create_deck_preset.return_value = {"id": 456}
+
+        set_ankihub_config_for_deck(deck_id=123, is_anking_deck=True)
+
+        mock_create_deck_preset.assert_called_once_with(preset_name="AnKing")
+        assert mock_deck["conf"] == 456
+        mock_decks.update.assert_called_once_with(mock_deck)
+
+
+def test_set_ankihub_config_for_deck_non_anking_deck():
+    with patch("ankihub.main.deck_options.aqt.mw") as mock_mw, patch(
+        "ankihub.main.deck_options.config"
+    ) as mock_config, patch(
+        "ankihub.main.deck_options._create_deck_preset_if_not_exists"
+    ) as mock_create_deck_preset:
+
+        mock_col = MagicMock()
+        mock_mw.col = mock_col
+        mock_decks = MagicMock()
+        mock_col.decks = mock_decks
+
+        mock_deck = {"id": 123, "conf": None}
+        mock_decks.get.return_value = mock_deck
+        mock_config.get_feature_flags.return_value = {
+            "fsrs_in_recommended_deck_settings": False
+        }
+        mock_create_deck_preset.return_value = {"id": 789}
+
+        set_ankihub_config_for_deck(deck_id=123, is_anking_deck=False)
+
+        mock_create_deck_preset.assert_called_once_with()
+        assert mock_deck["conf"] == 789
+        mock_decks.update.assert_called_once_with(mock_deck)
