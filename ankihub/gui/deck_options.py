@@ -48,23 +48,10 @@ _deck_options_dialog = CurrentDeckOptionsDialog()
 
 
 def setup() -> None:
-    def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
-        if not (conf_id := _conf_id_for_ah_deck(config.anking_deck_id)):
-            return
-
-        _deck_options_dialog.dialog = deck_options_dialog
-
-        # Setup backup of FSRS parameters on deck options dialog close
-        qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
-
-        # Execute JS to add the revert button
-        js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
-            {"THEME": anki_theme()}
-        )
-        deck_options_dialog.web.eval(js)
+    if ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
+        return
 
     deck_options_did_load.append(_on_deck_options_did_load)
-
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 
     # Syncs can update deck options, so we need to backup FSRS parameters after syncs
@@ -74,6 +61,22 @@ def setup() -> None:
 
     # Backup FSRS parameters on startup
     _backup_fsrs_parameters_for_ah_deck(config.anking_deck_id)
+
+
+def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
+    if not (conf_id := _conf_id_for_ah_deck(config.anking_deck_id)):
+        return
+
+    _deck_options_dialog.dialog = deck_options_dialog
+
+    # Setup backup of FSRS parameters on deck options dialog close
+    qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
+
+    # Execute JS to add the revert button
+    js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
+        {"THEME": anki_theme()}
+    )
+    deck_options_dialog.web.eval(js)
 
 
 def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
