@@ -3,13 +3,18 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
+from uuid import UUID
 
 import aqt
 from anki import scheduler_pb2
 from anki.decks import DeckConfigDict, DeckConfigId
 from aqt import qconnect
 from aqt.deckoptions import DeckOptionsDialog
-from aqt.gui_hooks import deck_options_did_load, webview_did_receive_js_message
+from aqt.gui_hooks import (
+    deck_options_did_load,
+    sync_did_finish,
+    webview_did_receive_js_message,
+)
 from aqt.qt import QCheckBox, QDialogButtonBox
 from aqt.utils import tooltip
 from jinja2 import Template
@@ -44,17 +49,10 @@ _deck_options_dialog = CurrentDeckOptionsDialog()
 
 def setup() -> None:
     def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
-        _deck_options_dialog.dialog = deck_options_dialog
-
-        deck = deck_options_dialog._deck
-        anki_did = deck["id"]
-        if (
-            not (anking_config := config.deck_config(config.anking_deck_id))
-            or anki_did != anking_config.anki_id
-        ):
+        if not (conf_id := _conf_id_for_ah_deck(config.anking_deck_id)):
             return
 
-        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+        _deck_options_dialog.dialog = deck_options_dialog
 
         # Setup backup of FSRS parameters on deck options dialog close
         qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
@@ -68,6 +66,30 @@ def setup() -> None:
     deck_options_did_load.append(_on_deck_options_did_load)
 
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
+
+    # Syncs can update deck options, so we need to backup FSRS parameters after syncs
+    sync_did_finish.append(
+        lambda: _backup_fsrs_parameters_for_ah_deck(config.anking_deck_id)
+    )
+
+    # Backup FSRS parameters on startup
+    _backup_fsrs_parameters_for_ah_deck(config.anking_deck_id)
+
+
+def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
+    if not (deck_config := config.deck_config(ah_did)):
+        return None
+
+    anki_did = deck_config.anki_id
+    if not aqt.mw.col.decks.get(anki_did):
+        return None
+
+    return aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+
+
+def _backup_fsrs_parameters_for_ah_deck(ah_did: UUID) -> None:
+    conf_id = _conf_id_for_ah_deck(ah_did)
+    _backup_fsrs_parameters(conf_id)
 
 
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
