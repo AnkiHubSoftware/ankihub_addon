@@ -48,6 +48,10 @@ _deck_options_dialog = CurrentDeckOptionsDialog()
 
 
 def setup() -> None:
+    """Set up the FSRS-parameter revert feature in the deck options dialog.
+
+    Injects JS into the dialog, registers message handlers, and sets up a backup
+    mechanism for FSRS parameters so the revert button can restore previous values."""
     if ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
         return
 
