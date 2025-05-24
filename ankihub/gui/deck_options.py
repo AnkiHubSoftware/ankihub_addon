@@ -53,13 +53,9 @@ def setup() -> None:
         qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
         # Execute JS to add the revert button
-        _, fsrs_parameters_from_deck_config = get_fsrs_parameters(conf_id)
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
             {
                 "THEME": anki_theme(),
-                "RESET_BUTTON_ENABLED_INITIALLY": _can_revert_from_fsrs_parameters(
-                    conf_id, fsrs_parameters_from_deck_config
-                ),
                 "ANKI_DECK_ID": deck_options_dialog._deck["id"],
             }
         )

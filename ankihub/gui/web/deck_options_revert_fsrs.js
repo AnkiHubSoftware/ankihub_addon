@@ -1,7 +1,6 @@
 const config = {
     theme: "{{ THEME }}",
     deckId: Number("{{ ANKI_DECK_ID }}"),
-    revertEnabledInit: "{{ RESET_BUTTON_ENABLED_INITIALLY }}" !== "False"
 };
 
 // Cached reference to the FSRS section element
@@ -37,7 +36,7 @@ function setupRevertButton(evaluateBtn) {
           </button>`
     );
     const revertBtn = document.getElementById(revertBtnId);
-    revertBtn.disabled = !config.revertEnabledInit;
+    revertBtn.disabled = true;
 
     revertBtn.addEventListener("click", () => {
         const payload = JSON.stringify({ anki_deck_id: config.deckId });
@@ -68,36 +67,37 @@ function setupRevertButton(evaluateBtn) {
 }
 
 
-function setupTextAreaListener(textarea, revertBtn) {
+function setupTextAreaListener(textarea) {
     // Patch the textarea value setter to fire a custom event
-    const proto = Object.getPrototypeOf(textarea);
     if (!textarea._fsrsRevertPatched) {
+        const proto = Object.getPrototypeOf(textarea);
         const desc = Object.getOwnPropertyDescriptor(proto, "value");
-        Object.defineProperty(textarea, "value", {
-            get: desc.get,
-            set(v) {
-                desc.set.call(this, v);
-                // Fire a custom event so we don't interfere with Anki's own logic
-                this.dispatchEvent(new CustomEvent("fsrsParamsUpdated", { bubbles: true }));
-            },
-        });
-        textarea._fsrsRevertPatched = true;
+        if (desc && typeof desc.set === "function") {
+            const newDesc = {
+                ...desc,
+                set(v) {
+                    desc.set.call(this, v);
+                    this.dispatchEvent(new CustomEvent("fsrsParamsUpdated", { bubbles: true }));
+                }
+            };
+            Object.defineProperty(textarea, "value", newDesc);
+            textarea._fsrsRevertPatched = true;
+        }
     }
 
     const DEBOUNCE_MS = 400;
     let debounceId = null;
     let lastValue = textarea.value;
 
-    function processChange() {
+    function processChange(force = false) {
         const current = textarea.value.trim();
-        if (current === lastValue) return;
+        if (!force && current === lastValue) return;
         lastValue = current;
 
-        // parse numeric tokens only
         const numericList = current
             .split(/[,\s]+/)
-            .filter(tok => /^-?\d+(\.\d+)?$/.test(tok))
-            .map(Number);
+            .map(Number)
+            .filter(n => !isNaN(n));
 
         const payload = JSON.stringify({
             anki_deck_id: config.deckId,
@@ -106,17 +106,15 @@ function setupTextAreaListener(textarea, revertBtn) {
         pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
     }
 
-    // Listen for programmatic updates
-    textarea.addEventListener("fsrsParamsUpdated", () => {
+    const onChange = () => {
         if (debounceId) clearTimeout(debounceId);
         debounceId = setTimeout(processChange, DEBOUNCE_MS);
-    });
+    };
 
-    // Listen for manual edits
-    textarea.addEventListener("input", () => {
-        if (debounceId) clearTimeout(debounceId);
-        debounceId = setTimeout(processChange, DEBOUNCE_MS);
-    });
+    textarea.addEventListener("fsrsParamsUpdated", onChange);
+    textarea.addEventListener("input", onChange);
+
+    processChange(true); // Initial sync
 }
 
 
@@ -142,10 +140,7 @@ function initializeFsrsRevertUI() {
 
     const evaluateBtn = buttons[1];
     setupRevertButton(evaluateBtn);
-
-    // Pass the newly inserted button to the listener setup
-    const revertBtn = document.getElementById("revertFsrsParametersBtn");
-    setupTextAreaListener(textarea, revertBtn);
+    setupTextAreaListener(textarea);
 }
 
 
