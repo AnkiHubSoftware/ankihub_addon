@@ -126,6 +126,16 @@ def _on_webview_did_receive_js_message(
             f"updateFsrsParametersTextarea({fsrs_parameters_from_backup})"
         )
 
+        current_version, current_params = get_fsrs_parameters(conf_id)
+        LOGGER.info(
+            "fsrs_deck_preset_reverted",
+            preset_name=aqt.mw.col.decks.get_config(conf_id)["name"],
+            current_version=current_version,
+            current_parameter_count=len(current_params),
+            backup_version=fsrs_version_from_backup,
+            backup_parameter_count=len(fsrs_parameters_from_backup),
+        )
+
         tooltip(
             "Reverted FSRS parameters.",
             parent=active_window_or_mw(),
