@@ -47,7 +47,14 @@ def setup() -> None:
         _deck_options_dialog.dialog = deck_options_dialog
 
         deck = deck_options_dialog._deck
-        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])["id"]
+        anki_did = deck["id"]
+        if (
+            not (anking_config := config.deck_config(config.anking_deck_id))
+            or anki_did != anking_config.anki_id
+        ):
+            return
+
+        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
 
         # Setup backup of FSRS parameters on deck options dialog close
         qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
