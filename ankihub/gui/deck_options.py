@@ -33,7 +33,7 @@ FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS = 30
 ADD_FSRS_REVERT_BUTTON_JS_PATH = (
     Path(__file__).parent / "web" / "deck_options_revert_fsrs.js"
 )
-REVERT_FSRS_PARAMATERS_PYCMD = "ankihub_revert_fsrs_parameters"
+REVERT_FSRS_PARAMETERS_PYCMD = "ankihub_revert_fsrs_parameters"
 FSRS_PARAMETERS_CHANGED_PYCMD = "ankihub_fsrs_parameters_changed"
 
 
@@ -116,7 +116,7 @@ def _on_webview_did_receive_js_message(
         anki_did = _deck_options_dialog.dialog._deck["id"]
         return aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
 
-    if message == REVERT_FSRS_PARAMATERS_PYCMD:
+    if message == REVERT_FSRS_PARAMETERS_PYCMD:
         conf_id = current_conf_id()
         (
             fsrs_version_from_backup,
