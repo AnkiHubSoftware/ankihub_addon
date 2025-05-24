@@ -1,9 +1,9 @@
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import anki
 import aqt
-from anki.decks import DeckConfigDict, DeckId
+from anki.decks import DeckConfigDict, DeckConfigId, DeckId
 
 try:
     from anki import deck_config_pb2
@@ -108,9 +108,6 @@ def get_fsrs_version() -> Optional[int]:
     deck_config_field_names = set(
         deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
     )
-    if "fsrs_weights" in deck_config_field_names:
-        return 4  # pragma: no cover
-
     return max(
         (
             int(m.group(1))
@@ -119,3 +116,19 @@ def get_fsrs_version() -> Optional[int]:
         ),
         default=None,
     )
+
+
+def get_fsrs_parameters(conf_id: DeckConfigId) -> Tuple[Optional[int], List[float]]:
+    """Fetch the FSRS parameters for a deck config.
+    Tries version = FSRS_VERSION down to the lowest FSRS version, returns the first found list or [].
+    """
+    from ..settings import FSRS_VERSION
+
+    min_fsrs_version = 4  # The first version of FSRS that was used in Anki.
+    deck_config = aqt.mw.col.decks.get_config(conf_id)
+    for version in range(FSRS_VERSION, min_fsrs_version - 1, -1):
+        params = deck_config.get(f"fsrsParams{version}", None)
+        if params:
+            return version, params
+
+    return None, []

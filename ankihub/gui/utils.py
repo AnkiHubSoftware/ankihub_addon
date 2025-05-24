@@ -447,15 +447,17 @@ def show_dialog(
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
     open_dialog: bool = True,
+    add_title_to_body_on_mac: bool = True,
 ) -> _Dialog:
     """Show a dialog with the given text and buttons.
     The callback is called with the index of the clicked button."""
     if not parent:
         parent = active_window_or_mw()
 
-    # Some callers pass " " as title to avoid the default title "AnkiHub",
-    # in this case we don't want to add the title to the text
-    if is_mac and title.strip():
+    # MacOS has dialogs without a title bar when using .open(). They have title bars when using .show().
+    # The .strip() is used because some callers pass " " as title to avoid the default title "AnkiHub",
+    # in this case we don't want to add the title to the text.
+    if is_mac and title.strip() and add_title_to_body_on_mac:
         if text_format == Qt.TextFormat.PlainText:
             text = f"{title}\n\n{text}"
         else:
