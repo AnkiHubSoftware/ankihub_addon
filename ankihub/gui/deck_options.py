@@ -63,24 +63,6 @@ def setup() -> None:
     webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 
 
-def _can_revert_from_fsrs_parameters(
-    conf_id: DeckConfigId, fsrs_parameters: List[float]
-) -> bool:
-    """Check if we can revert from the passed FSRS parameters to the backup parameters for the provided deck config."""
-    (
-        fsrs_version_from_backup,
-        fsrs_parameters_from_backup,
-    ) = config.get_fsrs_parameters_from_backup(conf_id)
-    return (
-        fsrs_parameters_from_backup != fsrs_parameters
-        # We can only revert if the version of the parameters in the backup is
-        # less than or equal to the current version of FSRS.
-        # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
-        # around is fine.
-        and fsrs_version_from_backup <= FSRS_VERSION
-    )
-
-
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
     """Backup the current FSRS parameters of the specified deck-preset."""
     version, parameters = get_fsrs_parameters(conf_id)
@@ -96,11 +78,14 @@ def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
 def _on_webview_did_receive_js_message(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> Tuple[bool, Any]:
+    def current_conf_id() -> DeckConfigId:
+        # Newer Anki versions no longer gives us the DeckOptionsDialog instance in context for some reason,
+        # so we grab it from our global _deck_options_dialog instead.
+        anki_did = _deck_options_dialog.dialog._deck["id"]
+        return aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
 
     if message == REVERT_FSRS_PARAMATERS_PYCMD:
-        anki_did = _deck_options_dialog.dialog._deck["id"]
-        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
-
+        conf_id = current_conf_id()
         (
             fsrs_version_from_backup,
             fsrs_parameters_from_backup,
@@ -121,8 +106,7 @@ def _on_webview_did_receive_js_message(
         kwargs = parse_js_message_kwargs(message)
         fsrs_parameters_from_editor = kwargs["fsrs_parameters"]
 
-        anki_did = _deck_options_dialog.dialog._deck["id"]
-        conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+        conf_id = current_conf_id()
         if _can_revert_from_fsrs_parameters(conf_id, fsrs_parameters_from_editor):
             _deck_options_dialog.dialog.web.eval(
                 "revertFsrsParametersBtn.disabled = false;"
@@ -131,6 +115,24 @@ def _on_webview_did_receive_js_message(
         return (True, None)
 
     return handled
+
+
+def _can_revert_from_fsrs_parameters(
+    conf_id: DeckConfigId, fsrs_parameters: List[float]
+) -> bool:
+    """Check if we can revert from the passed FSRS parameters to the backup parameters for the provided deck config."""
+    (
+        fsrs_version_from_backup,
+        fsrs_parameters_from_backup,
+    ) = config.get_fsrs_parameters_from_backup(conf_id)
+    return (
+        fsrs_parameters_from_backup != fsrs_parameters
+        # We can only revert if the version of the parameters in the backup is
+        # less than or equal to the current version of FSRS.
+        # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
+        # around is fine.
+        and fsrs_version_from_backup <= FSRS_VERSION
+    )
 
 
 def maybe_show_fsrs_optimization_reminder() -> None:
