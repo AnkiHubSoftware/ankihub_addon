@@ -1,7 +1,4 @@
-const config = {
-    theme: "{{ THEME }}",
-    deckId: Number("{{ ANKI_DECK_ID }}"),
-};
+const theme = "{{ THEME }}"
 
 // Cached reference to the FSRS section element
 let fsrsSection = null;
@@ -39,16 +36,15 @@ function setupRevertButton(evaluateBtn) {
     revertBtn.disabled = true;
 
     revertBtn.addEventListener("click", () => {
-        const payload = JSON.stringify({ anki_deck_id: config.deckId });
-        pycmd(`ankihub_revert_fsrs_parameters ${payload}`);
+        pycmd("ankihub_revert_fsrs_parameters");
         revertBtn.disabled = true;
     });
 
     // Theme-aware styling for disabled state
     const lightBg = "#e6e6e6", lightText = "#6c717e";
     const darkBg = "#505050", darkText = "#CCCCCC";
-    const bg = config.theme === "dark" ? darkBg : lightBg;
-    const text = config.theme === "dark" ? darkText : lightText;
+    const bg = theme === "dark" ? darkBg : lightBg;
+    const text = theme === "dark" ? darkText : lightText;
 
     const style = document.createElement("style");
     style.textContent = `
@@ -99,10 +95,7 @@ function setupTextAreaListener(textarea) {
             .map(Number)
             .filter(n => !isNaN(n));
 
-        const payload = JSON.stringify({
-            anki_deck_id: config.deckId,
-            fsrs_parameters: numericList,
-        });
+        const payload = JSON.stringify({ fsrs_parameters: numericList });
         pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
     }
 

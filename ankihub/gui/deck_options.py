@@ -54,10 +54,7 @@ def setup() -> None:
 
         # Execute JS to add the revert button
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
-            {
-                "THEME": anki_theme(),
-                "ANKI_DECK_ID": deck_options_dialog._deck["id"],
-            }
+            {"THEME": anki_theme()}
         )
         deck_options_dialog.web.eval(js)
 
@@ -100,9 +97,8 @@ def _on_webview_did_receive_js_message(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> Tuple[bool, Any]:
 
-    if message.startswith(REVERT_FSRS_PARAMATERS_PYCMD):
-        kwargs = parse_js_message_kwargs(message)
-        anki_did = kwargs["anki_deck_id"]
+    if message == REVERT_FSRS_PARAMATERS_PYCMD:
+        anki_did = _deck_options_dialog.dialog._deck["id"]
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
 
         (
@@ -123,9 +119,9 @@ def _on_webview_did_receive_js_message(
         return (True, None)
     elif message.startswith(FSRS_PARAMETERS_CHANGED_PYCMD):
         kwargs = parse_js_message_kwargs(message)
-        anki_did = kwargs["anki_deck_id"]
         fsrs_parameters_from_editor = kwargs["fsrs_parameters"]
 
+        anki_did = _deck_options_dialog.dialog._deck["id"]
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
         if _can_revert_from_fsrs_parameters(conf_id, fsrs_parameters_from_editor):
             _deck_options_dialog.dialog.web.eval(
