@@ -52,10 +52,7 @@ def setup() -> None:
 
     Injects JS into the dialog, registers message handlers, and sets up a backup
     mechanism for FSRS parameters so the revert button can restore previous values."""
-    if not (
-        config.get_feature_flags().get("fsrs_revert_button", False)
-        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
-    ):
+    if not ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
         return
 
     deck_options_did_load.append(_on_deck_options_did_load)
@@ -71,7 +68,10 @@ def setup() -> None:
 
 
 def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
-    if not (conf_id := _conf_id_for_ah_deck(config.anking_deck_id)):
+    if not (
+        config.get_feature_flags().get("fsrs_revert_button", False)
+        and (conf_id := _conf_id_for_ah_deck(config.anking_deck_id))
+    ):
         return
 
     _deck_options_dialog.dialog = deck_options_dialog
@@ -99,8 +99,19 @@ def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
 
 
 def _backup_fsrs_parameters_for_ah_deck(ah_did: UUID) -> None:
-    if conf_id := _conf_id_for_ah_deck(ah_did):
-        _backup_fsrs_parameters(conf_id)
+    """This function is called during startup and after syncs, so we use
+    broad exception handling to avoid showing error dialogs to users at these times.
+    FSRS parameter backup is a convenience feature and not critical for addon functionality.
+    """
+    try:
+        if conf_id := _conf_id_for_ah_deck(ah_did):
+            _backup_fsrs_parameters(conf_id)
+    except Exception as e:  # pragma: no cover
+        LOGGER.exception(
+            "Failed to backup FSRS parameters for AnkiHub deck",
+            ah_deck_id=ah_did,
+            error=str(e),
+        )
 
 
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
