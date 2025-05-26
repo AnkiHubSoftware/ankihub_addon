@@ -245,7 +245,6 @@ from ankihub.main.utils import (
     note_type_contains_field,
 )
 from ankihub.settings import (
-    ANKI_VERSION_24_06_00,
     ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     FSRS_VERSION,
@@ -1203,7 +1202,7 @@ class TestDownloadAndInstallDecks:
             )
             mocker.patch(
                 "ankihub.gui.operations.deck_installation.ANKI_INT_VERSION",
-                ANKI_VERSION_24_06_00,
+                MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
             )
 
             # Mock the `_create_deck_preset_if_not_exists` function

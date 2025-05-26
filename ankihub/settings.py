@@ -419,18 +419,6 @@ class _Config:
             None,
         )
 
-    def get_ankihub_did_by_anki_did(self, anki_did: DeckId) -> Optional[uuid.UUID]:
-        """Get the ankihub did of a deck by its anki did."""
-        decks = self._private_config.decks
-        return next(
-            (
-                ankihub_did
-                for ankihub_did, config in decks.items()
-                if config.anki_id == anki_did
-            ),
-            None,
-        )
-
     def token(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_token()
         return aqt.mw.pm.profile.get("thirdPartyAnkiHubToken")
@@ -961,7 +949,6 @@ def get_end_cutoff_date_for_sending_review_summaries() -> date:
 
 
 ANKI_VERSION_23_10_00 = 231000
-ANKI_VERSION_24_06_00 = 240600
 
 ANKING_NOTE_TYPES_ADDON_ANKIWEB_ID = 952691989
 ANKING_NOTE_TYPES_ADDON_MODULE_NAME = "anking_note_types"

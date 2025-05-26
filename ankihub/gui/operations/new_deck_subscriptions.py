@@ -8,7 +8,8 @@ from aqt.qt import QCheckBox, QDialogButtonBox, QStyle
 
 from ... import LOGGER
 from ...ankihub_client import Deck
-from ...settings import ANKI_INT_VERSION, ANKI_VERSION_24_06_00, config
+from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+from ...settings import ANKI_INT_VERSION, config
 from ..messages import messages
 from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
@@ -34,7 +35,7 @@ def check_and_install_new_deck_subscriptions(
 
     recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
     recommended_deck_settings_cb.setChecked(True)
-    if ANKI_INT_VERSION > ANKI_VERSION_24_06_00:
+    if ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
         recommended_deck_settings_cb.setToolTip(
             "Modifies deck settings like limits, order, and learning steps; sets learn ahead to 0; "
             "and enables FSRS globally for smarter, personalized scheduling.<br>"

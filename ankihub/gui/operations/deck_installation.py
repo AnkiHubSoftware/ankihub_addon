@@ -17,13 +17,13 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import Deck, UserDeckRelation
+from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
 from ...main.deck_options import _create_deck_preset_if_not_exists
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
 from ...settings import (
     ANKI_INT_VERSION,
-    ANKI_VERSION_24_06_00,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
     config,
@@ -181,7 +181,7 @@ def _download_and_install_decks_inner(
         if (
             is_anking_deck_in_the_list
             and recommended_deck_settings
-            and ANKI_INT_VERSION >= ANKI_VERSION_24_06_00
+            and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
         ):
             aqt.mw.col.set_config("fsrs", True)
             _create_deck_preset_if_not_exists()
