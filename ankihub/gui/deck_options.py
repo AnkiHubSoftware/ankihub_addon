@@ -99,8 +99,8 @@ def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
 
 
 def _backup_fsrs_parameters_for_ah_deck(ah_did: UUID) -> None:
-    conf_id = _conf_id_for_ah_deck(ah_did)
-    _backup_fsrs_parameters(conf_id)
+    if conf_id := _conf_id_for_ah_deck(ah_did):
+        _backup_fsrs_parameters(conf_id)
 
 
 def _backup_fsrs_parameters(conf_id: DeckConfigId) -> bool:
