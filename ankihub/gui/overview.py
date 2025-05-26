@@ -58,7 +58,8 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
     ah_did = get_ah_did_of_deck_or_ancestor_deck(aqt.mw.col.decks.current()["id"])
     if (
-        not config.deck_config(ah_did)
+        not config.public_config.get("ankihub_smart_search")
+        or not config.deck_config(ah_did)
         or not config.deck_config(ah_did).has_note_embeddings
     ):
         return
