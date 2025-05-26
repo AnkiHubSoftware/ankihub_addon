@@ -52,7 +52,10 @@ def setup() -> None:
 
     Injects JS into the dialog, registers message handlers, and sets up a backup
     mechanism for FSRS parameters so the revert button can restore previous values."""
-    if ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
+    if not (
+        config.get_feature_flags().get("fsrs_revert_button", False)
+        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+    ):
         return
 
     deck_options_did_load.append(_on_deck_options_did_load)

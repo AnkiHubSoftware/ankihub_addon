@@ -7824,8 +7824,10 @@ class TestFSRSDeckOptions:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
         """Test that FSRS parameters are automatically backed up when deck options dialog is closed."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
@@ -7890,8 +7892,10 @@ class TestFSRSDeckOptions:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
         """Test that the revert button restores previous FSRS parameters from backup."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
@@ -7939,8 +7943,10 @@ class TestFSRSDeckOptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
         """Test the _can_revert_from_fsrs_parameters utility function."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
