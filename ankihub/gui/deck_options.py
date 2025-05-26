@@ -173,12 +173,13 @@ def _can_revert_from_fsrs_parameters(
         fsrs_parameters_from_backup,
     ) = config.get_fsrs_parameters_from_backup(conf_id)
     return (
-        fsrs_parameters_from_backup != fsrs_parameters
+        fsrs_version_from_backup is not None
         # We can only revert if the version of the parameters in the backup is
         # less than or equal to the current version of FSRS.
         # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
         # around is fine.
         and fsrs_version_from_backup <= FSRS_VERSION
+        and fsrs_parameters_from_backup != fsrs_parameters
     )
 
 
