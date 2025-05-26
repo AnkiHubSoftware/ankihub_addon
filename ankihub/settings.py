@@ -47,6 +47,7 @@ from .ankihub_client import (
     DeckExtension,
 )
 from .ankihub_client.models import Deck, UserDeckRelation
+from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -261,8 +262,12 @@ class _Config:
         self.log_private_config(log_level=logging.DEBUG)
 
     def load_public_config(self) -> None:
-        """For loading the public config from its file (after it has been changed)."""
+        """For loading the public config from its file."""
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
+    def save_public_config(self) -> None:
+        """For saving the public config to its file."""
+        aqt.mw.addonManager.writeConfig(ADDON_PATH.name, self.public_config)
 
     def save_token(self, token: str):
         token_changed = self.token() != token
@@ -932,6 +937,8 @@ USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
 ANKI_VERSION = buildinfo.version
 ANKI_INT_VERSION = point_version()
+FSRS_VERSION = get_fsrs_version()
+
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 

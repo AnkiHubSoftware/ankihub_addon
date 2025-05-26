@@ -65,25 +65,6 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.models import (
-    DeckMediaUpdateChunk,
-    DeckUpdates,
-    NotesAction,
-    NotesActionChoices,
-    UserDeckExtensionRelation,
-)
-from ankihub.gui import editor
-from ankihub.gui.browser.browser import (
-    ModifiedAfterSyncSearchNode,
-    NewNoteSearchNode,
-    SuggestionTypeSearchNode,
-    UpdatedInTheLastXDaysSearchNode,
-    _on_protect_fields_action,
-    _on_reset_optional_tags_action,
-)
-from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
-from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
-
 from ..factories import (
     DeckExtensionFactory,
     DeckFactory,
@@ -105,9 +86,11 @@ from ..fixtures import (
     add_field_to_local_note_type,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
+    make_review_histories,
     note_type_with_field_names,
     record_review,
     record_review_for_anki_nid,
+    record_review_histories,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -140,16 +123,31 @@ from ankihub.ankihub_client.ankihub_client import (
     _to_ankihub_note_type,
     _transform_notes_data,
 )
+from ankihub.ankihub_client.models import (
+    DeckMediaUpdateChunk,
+    DeckUpdates,
+    NotesAction,
+    NotesActionChoices,
+    UserDeckExtensionRelation,
+)
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import utils
+from ankihub.gui import editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
 )
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
+from ankihub.gui.browser.browser import (
+    ModifiedAfterSyncSearchNode,
+    NewNoteSearchNode,
+    SuggestionTypeSearchNode,
+    UpdatedInTheLastXDaysSearchNode,
+    _on_protect_fields_action,
+    _on_reset_optional_tags_action,
+)
 from ankihub.gui.browser.custom_search_nodes import (
     AnkiHubNoteSearchNode,
     UpdatedSinceLastReviewSearchNode,
@@ -159,11 +157,19 @@ from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
     setup_config_dialog_manager,
 )
+from ankihub.gui.deck_options import (
+    FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
+    MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    _show_fsrs_optimization_reminder,
+    maybe_show_fsrs_optimization_reminder,
+    optimize_fsrs_parameters,
+)
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
     GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
@@ -189,8 +195,9 @@ from ankihub.gui.overview import (
     FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
 )
 from ankihub.gui.suggestion_dialog import SuggestionDialog
-from ankihub.gui.utils import robust_filter
+from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
+from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
@@ -239,7 +246,9 @@ from ankihub.main.utils import (
 )
 from ankihub.settings import (
     ANKI_VERSION_24_06_00,
+    ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    FSRS_VERSION,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -266,6 +275,15 @@ SAMPLE_NOTE_TYPES: Dict[NotetypeId, NotetypeDict] = json.loads(
 # to determine the path to the add-on files which also determines if an existing add-on is updated
 # or if a new add-on is installed
 ANKIHUB_ANKIADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
+
+
+skip_test_fsrs_unsupported = pytest.mark.skipif(
+    ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    reason=(
+        f"FSRS requires Anki ≥{MIN_ANKI_VERSION_FOR_FSRS_FEATURES}; "
+        f"you have {ANKI_INT_VERSION}"
+    ),
+)
 
 
 class InstallSampleAHDeck(Protocol):
@@ -3826,7 +3844,7 @@ class TestCustomSearchNodes:
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(cid, review_time_ms=1 * 1000)
+            record_review(cid, time_of_review_ms=1 * 1000)
 
             # Update the mod time in the ankihub database to simulate a note update.
             AnkiHubNote.update(mod=2).where(AnkiHubNote.anki_note_id == nid).execute()
@@ -3837,7 +3855,7 @@ class TestCustomSearchNodes:
             ) == [nid]
 
             # Add another review entry for the card to the database.
-            record_review(cid, review_time_ms=3 * 1000)
+            record_review(cid, time_of_review_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
             assert (
@@ -7642,3 +7660,191 @@ def test_robust_filter(
         assert (
             raise_exception_spy in overview_will_render_bottom._hooks
         ) is expected_present
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.parametrize(
+    "with_review_history, expected_changed",
+    [
+        (True, True),
+        (False, False),
+    ],
+)
+def test_optimize_fsrs_parameters(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    qtbot: QtBot,
+    next_deterministic_id: Callable[[], int],
+    with_review_history: bool,
+    expected_changed: bool,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        anki_did = DeckId(next_deterministic_id())
+        ah_did = install_ah_deck(anki_did=anki_did)
+
+        aqt.mw.col.set_config("fsrs", True)
+
+        # Create and import note
+        note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+
+        if with_review_history:
+            # Generate synthetic histories and record them
+            review_history = make_review_histories(num_cards=1, max_days=400)[0]
+            record_review_histories(
+                NoteId(note_info.anki_nid), review_history, max_days=400
+            )
+
+        # Set bad FSRS parameters
+        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        fsrs_params_key = f"fsrsParams{FSRS_VERSION}"
+        bad_fsrs_params = [0.1] * 17
+        deck_config[fsrs_params_key] = bad_fsrs_params
+        aqt.mw.col.decks.update_config(deck_config)
+
+        # Run optimization
+        with qtbot.wait_callback() as cb:
+            optimize_fsrs_parameters(deck_config["id"], on_done=cb)
+
+        # Check if FSRS parameters were changed
+        new_conf = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        new_params = new_conf[fsrs_params_key]
+        if expected_changed:
+            assert new_params != bad_fsrs_params
+            assert new_params
+        else:
+            assert new_params == bad_fsrs_params
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+@pytest.mark.parametrize(
+    (
+        "feature_flag_active, "
+        "deck_installed, "
+        "days_since_last_fsrs_optimize, "
+        "expected_dialog_shown, "
+        "expected_optimization_called"
+    ),
+    [
+        # feature flag on, deck installed, below threshold → no dialog
+        (True, True, 0, False, False),
+        # feature flag on, deck installed, above threshold → dialog + optimize
+        (True, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, True, True),
+        # feature flag off, deck installed, above threshold → no dialog
+        (False, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+        # feature flag on, deck not installed, above threshold → no dialog
+        (True, False, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+    ],
+)
+def test_maybe_show_fsrs_optimization_reminder(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+    feature_flag_active: bool,
+    deck_installed: bool,
+    days_since_last_fsrs_optimize: int,
+    expected_dialog_shown: bool,
+    expected_optimization_called: bool,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=feature_flag_active)
+
+    with anki_session_with_addon_data.profile_loaded():
+        if deck_installed:
+            # Install the deck
+            install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Mock days_since_last_fsrs_optimize and fsrs
+        aqt.mw.col.set_config("fsrs", True)
+        deck_configs_for_update = Mock(
+            days_since_last_fsrs_optimize=days_since_last_fsrs_optimize,
+            fsrs=True,
+        )
+        mocker.patch.object(
+            aqt.mw.col.decks,
+            "get_deck_configs_for_update",
+            return_value=deck_configs_for_update,
+        )
+
+        # Mock the optimize_fsrs_parameters function
+        optimize_fsrs_parameters_mock = mocker.patch(
+            "ankihub.gui.deck_options.optimize_fsrs_parameters"
+        )
+
+        # Track the reminder dialog
+        latest_instance_tracker.track(_Dialog)
+
+        # Call function
+        maybe_show_fsrs_optimization_reminder()
+
+        # Asssert whether the dialog was shown
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        if expected_dialog_shown:
+            assert dialog is not None, "expected a reminder dialog to appear"
+            # Click the "Optimize" button
+            optimize_button = next(
+                b for b in dialog.button_box.buttons() if b.text() == "Optimize"
+            )
+            optimize_button.click()
+        else:
+            assert dialog is None, "did not expect a dialog"
+
+        # Assert whether the optimization was called
+        if expected_optimization_called:
+            qtbot.wait_until(lambda: optimize_fsrs_parameters_mock.called)
+        else:
+            qtbot.wait(300)
+            optimize_fsrs_parameters_mock.assert_not_called()
+
+
+@skip_test_fsrs_unsupported
+def test_deck_configs_for_update_exposes_fsrs_fields(anki_session_with_addon_data):
+    """Integration canary: ensure Anki's deck‐config still has the FSRS-related fields we expect."""
+    with anki_session_with_addon_data.profile_loaded():
+        deck_config = aqt.mw.col.decks.get_deck_configs_for_update(DeckId(1))
+
+        assert hasattr(
+            deck_config, "days_since_last_fsrs_optimize"
+        ), "API change: days_since_last_fsrs_optimize no longer on DeckConfigForUpdate"
+        assert hasattr(
+            deck_config, "fsrs"
+        ), "API change: fsrs flag no longer on DeckConfigForUpdate"
+
+        assert isinstance(deck_config.days_since_last_fsrs_optimize, int)
+        assert isinstance(deck_config.fsrs, bool)
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    # Start with the config flag enabled
+    config.public_config["remind_to_optimize_fsrs_parameters"] = True
+    save_public_config_mock = mocker.patch(
+        "ankihub.gui.deck_options.config.save_public_config"
+    )
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+        _show_fsrs_optimization_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected the reminder dialog to appear"
+
+        # Check "Don't show this again" and click Skip
+        dialog.dont_show_this_again_cb.setChecked(True)
+        skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
+        skip_button.click()
+
+    # The config flag should now be False and saved
+    assert config.public_config["remind_to_optimize_fsrs_parameters"] is False
+    save_public_config_mock.assert_called_once()

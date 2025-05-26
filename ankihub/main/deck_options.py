@@ -1,8 +1,9 @@
-from typing import Any, Dict, Tuple
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 import anki
 import aqt
-from anki.decks import DeckConfigDict, DeckId
+from anki.decks import DeckConfigDict, DeckConfigId, DeckId
 
 try:
     from anki import deck_config_pb2
@@ -107,3 +108,34 @@ def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -
 
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
+
+
+def get_fsrs_version() -> Optional[int]:
+    """Get the version of the FSRS scheduler available in the current Anki version."""
+    deck_config_field_names = set(
+        deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
+    )
+    return max(
+        (
+            int(m.group(1))
+            for field_name in deck_config_field_names
+            if (m := re.search(r"fsrs_params_(\d)+", field_name))
+        ),
+        default=None,
+    )
+
+
+def get_fsrs_parameters(conf_id: DeckConfigId) -> Tuple[Optional[int], List[float]]:
+    """Fetch the FSRS parameters for a deck config.
+    Tries version = FSRS_VERSION down to the lowest FSRS version, returns the first found list or [].
+    """
+    from ..settings import FSRS_VERSION
+
+    min_fsrs_version = 4  # The first version of FSRS that was used in Anki.
+    deck_config = aqt.mw.col.decks.get_config(conf_id)
+    for version in range(FSRS_VERSION, min_fsrs_version - 1, -1):
+        params = deck_config.get(f"fsrsParams{version}", None)
+        if params:
+            return version, params
+
+    return None, []
