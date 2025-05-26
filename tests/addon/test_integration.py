@@ -7818,6 +7818,58 @@ class TestFSRSDeckOptions:
     - Revert functionality requires a "previous" backup entry to exist
     """
 
+    @pytest.mark.parametrize(
+        "feature_flag_active,fsrs_enabled,use_anking_deck",
+        [
+            # If all conditions are met, the revert button should be visible
+            (True, True, True),
+            # If any condition is False, the revert button should not be visible
+            (True, True, False),
+            (False, True, True),
+            (True, False, True),
+        ],
+    )
+    @pytest.mark.sequential
+    def test_revert_button_visibility(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
+        fsrs_enabled: bool,
+        use_anking_deck: bool,
+    ):
+        """Test that the revert button is only present when the feature flag and FSRS are enabled,
+        and the deck is an AnkiHub deck."""
+        entry_point.run()
+
+        set_feature_flag_state("fsrs_revert_button", is_active=feature_flag_active)
+
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", fsrs_enabled)
+
+            ah_did = (
+                config.anking_deck_id if use_anking_deck else next_deterministic_uuid()
+            )
+            install_ah_deck(ah_did=ah_did)
+            deck_config = config.deck_config(ah_did)
+            anki_did = DeckId(deck_config.anki_id)
+
+            # Open deck options dialog
+            dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
+
+            # Button should exist only when all conditions are met
+            button_should_exist = (
+                feature_flag_active and fsrs_enabled and use_anking_deck
+            )
+
+            assert (
+                self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000)
+                == button_should_exist
+            )
+
     @pytest.mark.sequential
     def test_fsrs_parameters_backup_on_dialog_close(
         self,
