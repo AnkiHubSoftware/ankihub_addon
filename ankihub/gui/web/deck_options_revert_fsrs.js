@@ -92,6 +92,7 @@ function setupTextAreaListener(textarea) {
 
         const numericList = current
             .split(/[,\s]+/)
+            .filter(str => str.length)
             .map(Number)
             .filter(n => !isNaN(n));
 

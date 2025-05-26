@@ -7815,7 +7815,7 @@ class TestFSRSDeckOptions:
     - First backup call: Creates "current" entry
     - Second backup call: Moves "current" to "previous", creates new "current"
     - get_fsrs_parameters_from_backup() returns the "previous" entry
-    - Revert functionality requires a "previous" backup entry to exist
+    - When there is no previous entry, reverting will clear the parameters
     """
 
     @pytest.mark.parametrize(
