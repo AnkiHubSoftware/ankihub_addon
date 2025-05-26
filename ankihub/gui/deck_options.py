@@ -76,11 +76,12 @@ def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
     # Setup backup of FSRS parameters on deck options dialog close
     qconnect(deck_options_dialog.finished, lambda: _backup_fsrs_parameters(conf_id))
 
-    # Execute JS to add the revert button
-    js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
-        {"THEME": anki_theme()}
-    )
-    deck_options_dialog.web.eval(js)
+    # Execute JS to add the revert button if FSRS is enabled
+    if aqt.mw.col.get_config("fsrs"):
+        js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
+            {"THEME": anki_theme()}
+        )
+        deck_options_dialog.web.eval(js)
 
 
 def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
