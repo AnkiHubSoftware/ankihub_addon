@@ -1313,7 +1313,7 @@ class AnkiHubClient:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            "/feature-flags",
+            "/feature-flags/",
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
