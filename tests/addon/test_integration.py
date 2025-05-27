@@ -7836,6 +7836,31 @@ def test_maybe_show_enable_fsrs_reminder(
 
 @skip_test_fsrs_unsupported
 @pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_fsrs_enabled(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        aqt.mw.col.set_config("fsrs", True)
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_no_anking_deck_installed(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
