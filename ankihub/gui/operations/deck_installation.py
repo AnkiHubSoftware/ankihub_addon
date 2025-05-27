@@ -234,7 +234,6 @@ def _download_and_install_single_deck(
         behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         latest_update=deck.csv_last_upload,
         recommended_deck_settings=recommended_deck_settings,
-        is_anking_deck=deck.ah_did == config.anking_deck_id,
     )
 
     return result
