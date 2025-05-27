@@ -16,10 +16,15 @@ function updateFsrsParametersTextarea(params) {
         return;
     }
 
-    textarea.value = Array.isArray(params) ? params.join(", ") : (params || "");
-    // focus+blur to notify Anki of the change
-    textarea.focus();
-    textarea.blur();
+    const newValue = Array.isArray(params) ? params.join(", ") : (params || "");
+    textarea.value = newValue;
+
+    // Trigger events to notify Anki of the change
+    ['input', 'change', 'blur'].forEach(eventType => {
+        const event = new Event(eventType, { bubbles: true });
+        Object.defineProperty(event, 'target', { value: textarea });
+        textarea.dispatchEvent(event);
+    });
 }
 window.updateFsrsParametersTextarea = updateFsrsParametersTextarea;
 
