@@ -8124,7 +8124,7 @@ def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
         assert dialog is not None, "expected a reminder dialog to appear"
 
         # Check "Don't show this again" and click Skip
-        dialog.dont_show_this_again_cb.setChecked(True)
+        dialog.checkbox.setChecked(True)
         skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
         skip_button.click()
 
