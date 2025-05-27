@@ -179,7 +179,6 @@ def _after_profile_setup() -> None:
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
 
-    # FSRS checks
     if aqt.mw.can_auto_sync():
         sync_did_finish.append(_once_after_startup_ankiweb_sync)
     else:

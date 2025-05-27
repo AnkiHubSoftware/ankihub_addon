@@ -39,8 +39,7 @@ def _show_enable_fsrs_reminder() -> None:
     def on_button_clicked(button_idx: Optional[int]) -> None:
         enable = button_idx == 1
 
-        assert isinstance(dialog.dont_show_this_again_cb, aqt.QCheckBox)
-        dont_show_again = dialog.dont_show_this_again_cb.isChecked()
+        dont_show_again = dialog.checkbox.isChecked()
 
         LOGGER.info(
             "enable_fsrs_reminder_dialog_choice",
@@ -67,6 +66,7 @@ def _show_enable_fsrs_reminder() -> None:
             — helping you study less and remember more.</p>
 
             <p><strong>Want us to enable FSRS for you for all decks?</strong></p>
+            <br>
             """,
         title="AnKing Recommendation",
         buttons=[
@@ -78,14 +78,7 @@ def _show_enable_fsrs_reminder() -> None:
         open_dialog=False,
         add_title_to_body_on_mac=False,
         parent=aqt.mw,
+        checkbox=aqt.QCheckBox("Don't show this again"),
     )
-
-    dialog.dont_show_this_again_cb = aqt.QCheckBox("Don't show this again")
-    layout = dialog.content_layout
-    layout.insertWidget(
-        layout.count() - 1,
-        dialog.dont_show_this_again_cb,
-    )
-    dialog.adjustSize()
 
     dialog.show()
