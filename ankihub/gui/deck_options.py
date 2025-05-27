@@ -70,8 +70,7 @@ def _show_fsrs_optimization_reminder() -> None:
     def on_button_clicked(button_idx: Optional[int]) -> None:
         optimize = button_idx == 1
 
-        assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
-        dont_show_again = dialog.dont_show_this_again_cb.isChecked()
+        dont_show_again = dialog.checkbox.isChecked()
 
         LOGGER.info(
             "fsrs_optimization_reminder_dialog_choice",
@@ -110,20 +109,12 @@ def _show_fsrs_optimization_reminder() -> None:
             ("Optimize", QDialogButtonBox.ButtonRole.AcceptRole),
         ],
         default_button_idx=1,
+        checkbox=QCheckBox("Don't show this again"),
         callback=on_button_clicked,
         open_dialog=False,
         add_title_to_body_on_mac=False,
         parent=aqt.mw,
     )
-
-    dialog.dont_show_this_again_cb = QCheckBox("Don't show this again")
-    layout = dialog.content_layout
-    layout.insertWidget(
-        layout.count() - 2,
-        dialog.dont_show_this_again_cb,
-    )
-    dialog.adjustSize()
-
     dialog.show()
 
 
