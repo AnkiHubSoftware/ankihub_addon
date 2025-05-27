@@ -1205,9 +1205,9 @@ class TestDownloadAndInstallDecks:
                 MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
             )
 
-            # Mock the `_create_deck_preset_if_not_exists` function
+            # Mock the `create_or_reset_deck_preset` function
             mock_create_deck_preset = mocker.patch(
-                "ankihub.gui.operations.deck_installation._create_deck_preset_if_not_exists"
+                "ankihub.gui.operations.deck_installation.create_or_reset_deck_preset"
             )
 
             deck = DeckFactory.create(ah_did=config.anking_deck_id)
@@ -1228,7 +1228,7 @@ class TestDownloadAndInstallDecks:
             # Assert that the FSRS configuration was updated
             assert aqt.mw.col.get_config("fsrs") is True
 
-            # Assert that `_create_deck_preset_if_not_exists` was called
+            # Assert that `create_or_reset_deck_preset` was called
             mock_create_deck_preset.assert_called_once()
 
 

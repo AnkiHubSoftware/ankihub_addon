@@ -68,7 +68,7 @@ def deep_set(data: Dict, path: str, value: Any) -> None:
     d[last_key] = value
 
 
-def _create_deck_preset_if_not_exists(
+def create_or_reset_deck_preset(
     preset_name=ANKIHUB_PRESET_NAME,
 ) -> DeckConfigDict:
     conf = next(
@@ -102,9 +102,9 @@ def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -
     if is_anking_deck and config.get_feature_flags().get(
         "fsrs_in_recommended_deck_settings"
     ):
-        conf = _create_deck_preset_if_not_exists(preset_name="AnKing")
+        conf = create_or_reset_deck_preset(preset_name="AnKing")
     else:
-        conf = _create_deck_preset_if_not_exists()
+        conf = create_or_reset_deck_preset()
 
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
