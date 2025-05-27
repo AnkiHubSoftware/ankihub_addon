@@ -1180,6 +1180,57 @@ class TestDownloadAndInstallDecks:
             assert isinstance(exception, DeckDownloadAndInstallError)
             assert exception.original_exception.args[0] == exception_message
 
+    def test_fsrs_feature_flag_and_recommended_deck_settings(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", False)
+
+            # Mock the feature flag and version conditions
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"fsrs_in_recommended_deck_settings": True},
+            )
+            mocker.patch.object(
+                config, "anking_deck_id", return_value="mock_anking_deck_id"
+            )
+            mocker.patch(
+                "ankihub.gui.operations.deck_installation.ANKI_INT_VERSION",
+                MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+            )
+
+            # Mock the `create_or_reset_deck_preset` function
+            mock_create_deck_preset = mocker.patch(
+                "ankihub.gui.operations.deck_installation.create_or_reset_deck_preset"
+            )
+
+            deck = DeckFactory.create(ah_did=config.anking_deck_id)
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            # Call the function
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(
+                    [deck.ah_did],
+                    on_done=callback,
+                    recommended_deck_settings=True,
+                    behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                )
+
+            # Assert that the FSRS configuration was updated
+            assert aqt.mw.col.get_config("fsrs") is True
+
+            # Assert that `create_or_reset_deck_preset` was called
+            mock_create_deck_preset.assert_called_once()
+
 
 class TestCheckAndInstallNewDeckSubscriptions:
     def test_one_new_subscription(

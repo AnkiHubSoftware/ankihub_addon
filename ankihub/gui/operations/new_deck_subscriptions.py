@@ -8,7 +8,8 @@ from aqt.qt import QCheckBox, QDialogButtonBox, QStyle
 
 from ... import LOGGER
 from ...ankihub_client import Deck
-from ...settings import config
+from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+from ...settings import ANKI_INT_VERSION, config
 from ..messages import messages
 from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
@@ -34,11 +35,26 @@ def check_and_install_new_deck_subscriptions(
 
     recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
     recommended_deck_settings_cb.setChecked(True)
-    recommended_deck_settings_cb.setToolTip(
-        "This will modify deck settings such as daily limits, display order, "
-        "and set the learn ahead limit to 0.<br>"
-        "Change these settings at any time in your deck options area."
+
+    is_anking_deck_in_the_list = any(
+        deck.ah_did == config.anking_deck_id for deck in decks
     )
+    if (
+        config.get_feature_flags().get("fsrs_in_recommended_deck_settings")
+        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+        and is_anking_deck_in_the_list
+    ):
+        recommended_deck_settings_cb.setToolTip(
+            "Modifies deck settings like limits, order, and learning steps; sets learn ahead to 0; "
+            "and enables FSRS globally for smarter, personalized scheduling.<br>"
+            "You can adjust these anytime in deck options."
+        )
+    else:
+        recommended_deck_settings_cb.setToolTip(
+            "This will modify deck settings such as daily limits, display order, "
+            "and set the learn ahead limit to 0.<br>"
+            "Change these settings at any time in your deck options area."
+        )
     recommended_deck_settings_cb.setIcon(
         recommended_deck_settings_cb.style().standardIcon(
             QStyle.StandardPixmap.SP_MessageBoxInformation
@@ -83,9 +99,15 @@ def _on_button_clicked(
     decks: List[Deck],
     on_done: Callable[[Future], None],
 ) -> None:
+    is_recommended_deck_settings_checked = recommended_deck_settings_cb.isChecked()
     if button_index != 1:
         # Skip
         LOGGER.info("User skipped deck installation.")
+        LOGGER.info(
+            "deck_installation_confirmation_dialog_choice",
+            user_choice="skip",
+            use_recommended_settings=is_recommended_deck_settings_checked,
+        )
         on_done(future_with_result(None))
         return
 
@@ -95,8 +117,14 @@ def _on_button_clicked(
         download_and_install_decks(
             ah_dids,
             on_done=on_done,
-            recommended_deck_settings=recommended_deck_settings_cb.isChecked(),
+            recommended_deck_settings=is_recommended_deck_settings_checked,
         )
+
+    LOGGER.info(
+        "deck_installation_confirmation_dialog_choice",
+        user_choice="install",
+        use_recommended_settings=is_recommended_deck_settings_checked,
+    )
 
     # Sync with AnkiWeb first to avoid data loss on the next AnkiWeb sync if deck installation triggers a full sync
     sync_with_ankiweb(on_collection_sync_finished)
