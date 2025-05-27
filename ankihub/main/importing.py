@@ -26,6 +26,7 @@ from ..settings import (
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
+    config,
     is_anking_note_types_addon_installed,
     is_projektanki_note_types_addon_installed,
 )
@@ -109,7 +110,6 @@ class AnkiHubImporter:
         recommended_deck_settings: bool = True,
         raise_if_full_sync_required: bool = True,
         clear_ah_note_types_before_import: bool = False,
-        is_anking_deck: bool = False,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or for updating it.
@@ -165,7 +165,10 @@ class AnkiHubImporter:
                 dids, self._local_did
             )
             if recommended_deck_settings:
-                set_ankihub_config_for_deck(self._local_did, is_anking_deck)
+                set_ankihub_config_for_deck(
+                    self._local_did,
+                    is_anking_deck=self._ankihub_did == config.anking_deck_id,
+                )
 
         if subdecks or subdecks_for_new_notes_only:
             if subdecks_for_new_notes_only:

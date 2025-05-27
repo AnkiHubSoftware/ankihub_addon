@@ -248,7 +248,6 @@ def _install_deck(
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     latest_update: datetime,
     recommended_deck_settings: bool,
-    is_anking_deck: bool = False,
 ) -> AnkiHubImportResult:
     """Imports the notes_data into the Anki collection.
     Saves the deck subscription to the config file.
@@ -280,7 +279,6 @@ def _install_deck(
         ),
         recommended_deck_settings=recommended_deck_settings,
         raise_if_full_sync_required=False,
-        is_anking_deck=is_anking_deck,
     )
 
     config.add_deck(

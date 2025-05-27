@@ -35,7 +35,15 @@ def check_and_install_new_deck_subscriptions(
 
     recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
     recommended_deck_settings_cb.setChecked(True)
-    if ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
+
+    is_anking_deck_in_the_list = any(
+        deck.ah_did == config.anking_deck_id for deck in decks
+    )
+    if (
+        config.get_feature_flags().get("fsrs_in_recommended_deck_settings")
+        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+        and is_anking_deck_in_the_list
+    ):
         recommended_deck_settings_cb.setToolTip(
             "Modifies deck settings like limits, order, and learning steps; sets learn ahead to 0; "
             "and enables FSRS globally for smarter, personalized scheduling.<br>"
@@ -112,12 +120,11 @@ def _on_button_clicked(
             recommended_deck_settings=is_recommended_deck_settings_checked,
         )
 
-    if is_recommended_deck_settings_checked:
-        LOGGER.info(
-            "deck_installation_confirmation_dialog_choice",
-            user_choice="install",
-            use_recommended_settings=is_recommended_deck_settings_checked,
-        )
+    LOGGER.info(
+        "deck_installation_confirmation_dialog_choice",
+        user_choice="install",
+        use_recommended_settings=is_recommended_deck_settings_checked,
+    )
 
     # Sync with AnkiWeb first to avoid data loss on the next AnkiWeb sync if deck installation triggers a full sync
     sync_with_ankiweb(on_collection_sync_finished)
