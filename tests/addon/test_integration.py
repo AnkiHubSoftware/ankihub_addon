@@ -7983,10 +7983,9 @@ def test_maybe_show_enable_fsrs_reminder_interval_reached(
     with anki_session_with_addon_data.profile_loaded():
         install_ah_deck(ah_did=config.anking_deck_id)
 
-        mocker.patch.object(
-            config._private_config,
-            "last_enable_fsrs_remind_date",
-            date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL),
+        # Set last reminder as 30 days ago => interval reached
+        config.set_last_enable_fsrs_reminder_date(
+            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL))
         )
 
         latest_instance_tracker.track(_Dialog)
@@ -8020,9 +8019,8 @@ def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
     with anki_session_with_addon_data.profile_loaded():
         install_ah_deck(ah_did=config.anking_deck_id)
 
-        mocker.patch.object(
-            config._private_config, "last_enable_fsrs_remind_date", date.today()
-        )
+        # Set last reminder as today => interval not reached
+        config.set_last_enable_fsrs_reminder_date(date.today())
 
         latest_instance_tracker.track(_Dialog)
 
