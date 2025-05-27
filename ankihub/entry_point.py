@@ -7,7 +7,7 @@ from pathlib import Path
 import aqt
 from anki.errors import CardTypeError
 from anki.hooks import wrap
-from aqt.gui_hooks import profile_did_open, profile_will_close
+from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
@@ -52,7 +52,7 @@ ATTEMPTED_GENERAL_SETUP = False
 WEB_MEDIA_PATH = Path(__file__).parent / "gui/web/media"
 
 
-def run():
+def run() -> None:
     """Call this function in __init__.py when Anki starts."""
 
     config.setup_public_config_and_other_settings()
@@ -116,7 +116,7 @@ def _setup_on_profile_did_open() -> None:
     )
 
 
-def _on_profile_did_open():
+def _on_profile_did_open() -> None:
     if not _profile_setup():
         return
 
@@ -130,7 +130,7 @@ def _on_profile_did_open():
     media_sync.allow_background_threads()
 
 
-def _on_profile_will_close():
+def _on_profile_will_close() -> None:
     media_sync.stop_background_threads()
     LOGGER.info("Profile will close, stopping background threads.")
 
@@ -161,7 +161,7 @@ def _profile_setup() -> bool:
     return True
 
 
-def _after_profile_setup():
+def _after_profile_setup() -> None:
     _log_enabled_addons()
 
     # This deletes broken notetypes with no fields or templates created by a previous version of the add-on.
@@ -178,10 +178,24 @@ def _after_profile_setup():
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
 
+    if aqt.mw.can_auto_sync():
+        sync_did_finish.append(_once_after_startup_ankiweb_sync)
+    else:
+        _on_startup_after_ankiweb_sync()
+
+
+def _once_after_startup_ankiweb_sync() -> None:
+    sync_did_finish.remove(_once_after_startup_ankiweb_sync)
+
+    _on_startup_after_ankiweb_sync()
+
+
+def _on_startup_after_ankiweb_sync() -> None:
+    """Run tasks after startup AnkiWeb sync completes (or immediately if there is no auto sync)."""
     maybe_show_fsrs_optimization_reminder()
 
 
-def _general_setup():
+def _general_setup() -> None:
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
@@ -248,7 +262,7 @@ def _general_setup():
     )
 
 
-def _copy_web_media_to_media_folder():
+def _copy_web_media_to_media_folder() -> None:
     """Copy media files from the web folder to the media folder. Existing files with the same name
     will be overwritten.
     The media file names should start with '_' so that Anki doesn't remove them when checking for unused media.
@@ -259,7 +273,7 @@ def _copy_web_media_to_media_folder():
         file_path.write_bytes(file.read_bytes())
 
 
-def _log_enabled_addons():
+def _log_enabled_addons() -> None:
     enabled_addons = [
         {"dir_name": x.dir_name, "human_version": x.human_version}
         for x in aqt.mw.addonManager.all_addon_meta()
@@ -268,14 +282,14 @@ def _log_enabled_addons():
     LOGGER.info("Enabled addons", enabled_addons=enabled_addons)
 
 
-def _trigger_addon_update_check():
+def _trigger_addon_update_check() -> None:
     # This sets the last_addon_update_check time to 25 hours before now and Anki usually checks
     # for add-on updates every 24 hours, so this will trigger an add-on update check on Anki startup.
     # See https://github.com/ankitects/anki/blob/21812556a6a29c7da34561e58824219783a867e7/qt/aqt/main.py#L896-L916
     aqt.mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
 
 
-def _adjust_ankihub_note_type_templates():
+def _adjust_ankihub_note_type_templates() -> None:
     mids = ankihub_db.ankihub_note_type_ids()
 
     # Filter out note types that don't exist in the Anki database to avoid errors.
