@@ -64,7 +64,7 @@ def _show_fsrs_optimization_reminder() -> None:
         return
 
     anki_did = deck_config.anki_id
-    if aqt.mw.col.decks.get(anki_did) is None:
+    if aqt.mw.col.decks.get(anki_did, default=False) is None:
         return
 
     def on_button_clicked(button_idx: Optional[int]) -> None:
@@ -86,7 +86,7 @@ def _show_fsrs_optimization_reminder() -> None:
         if not optimize:
             return
 
-        if aqt.mw.col.decks.get(anki_did) is None:
+        if aqt.mw.col.decks.get(anki_did, default=False) is None:
             return
 
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]

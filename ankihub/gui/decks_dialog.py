@@ -904,7 +904,8 @@ class DeckManagementDialog(QDialog):
     def _on_new_cards_destination_btn_clicked(self):
         ah_did = self._selected_ah_did()
         current_destination_deck = aqt.mw.col.decks.get(
-            config.deck_config(ah_did).anki_id
+            config.deck_config(ah_did).anki_id,
+            default=False,
         )
         if current_destination_deck is None:
             current = None
