@@ -30,8 +30,10 @@ def maybe_show_fsrs_optimization_reminder() -> None:
     anki_did = deck_config.anki_id
     deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
     if (
-        config.public_config["remind_to_optimize_fsrs_parameters"]
-        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+        ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+        and config.public_config["remind_to_optimize_fsrs_parameters"]
+        and config.get_days_since_last_fsrs_optimize_reminder()
+        >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
         and deck_configs_for_update.fsrs
         # days_since_last_fsrs_optimize is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder

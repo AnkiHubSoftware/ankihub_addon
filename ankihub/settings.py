@@ -503,6 +503,9 @@ class _Config:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
 
+    def get_days_since_last_fsrs_optimize_reminder(self) -> int:
+        aqt.mw.col.get_config("days_since_last_fsrs_optimize", 0)
+
 
 config = _Config()
 
