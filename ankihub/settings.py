@@ -193,7 +193,6 @@ class _Config:
         # self.public_config is editable by the user using a built-in Anki feature.
         self.public_config: Optional[Dict[str, Any]] = None
         self._private_config: Optional[PrivateConfig] = None
-        self._collection_config: Optional[Dict[str, Any]] = None
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: List[Callable[[], None]] = []
         self.app_url: Optional[str] = None
