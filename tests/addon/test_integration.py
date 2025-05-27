@@ -7664,6 +7664,9 @@ def test_optimize_fsrs_parameters(
             assert new_params == bad_fsrs_params
 
 
+FSRS_INTERVAL_DAYS = FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+
+
 @skip_test_fsrs_unsupported
 @pytest.mark.qt_no_exception_capture
 @pytest.mark.parametrize(
@@ -7671,18 +7674,19 @@ def test_optimize_fsrs_parameters(
         "feature_flag_active, "
         "deck_installed, "
         "days_since_last_fsrs_optimize, "
+        "days_since_last_reminder, "
         "expected_dialog_shown, "
         "expected_optimization_called"
     ),
     [
-        # feature flag on, deck installed, below threshold → no dialog
-        (True, True, 0, False, False),
-        # feature flag on, deck installed, above threshold → dialog + optimize
-        (True, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, True, True),
-        # feature flag off, deck installed, above threshold → no dialog
-        (False, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
-        # feature flag on, deck not installed, above threshold → no dialog
-        (True, False, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+        # All conditions met, dialog should be shown and optimization called
+        (True, True, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, True, True),
+        (True, True, FSRS_INTERVAL_DAYS, None, True, True),
+        # When any of the conditions is not met, dialog should not be shown, and optimization not called
+        (False, True, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, False, False),
+        (True, False, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, False, False),
+        (True, True, 0, FSRS_INTERVAL_DAYS, False, False),
+        (True, True, FSRS_INTERVAL_DAYS, 0, False, False),
     ],
 )
 def test_maybe_show_fsrs_optimization_reminder(
@@ -7695,6 +7699,7 @@ def test_maybe_show_fsrs_optimization_reminder(
     feature_flag_active: bool,
     deck_installed: bool,
     days_since_last_fsrs_optimize: int,
+    days_since_last_reminder: int,
     expected_dialog_shown: bool,
     expected_optimization_called: bool,
 ):
@@ -7717,6 +7722,12 @@ def test_maybe_show_fsrs_optimization_reminder(
             return_value=deck_configs_for_update,
         )
 
+        config.set_last_fsrs_optimization_reminder_date(
+            (date.today() - timedelta(days=days_since_last_reminder))
+            if days_since_last_reminder is not None
+            else None
+        )
+
         # Mock the optimize_fsrs_parameters function
         optimize_fsrs_parameters_mock = mocker.patch(
             "ankihub.gui.deck_options.optimize_fsrs_parameters"
@@ -7732,6 +7743,7 @@ def test_maybe_show_fsrs_optimization_reminder(
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         if expected_dialog_shown:
             assert dialog is not None, "expected a reminder dialog to appear"
+
             # Click the "Optimize" button
             optimize_button = next(
                 b for b in dialog.button_box.buttons() if b.text() == "Optimize"
@@ -7739,6 +7751,11 @@ def test_maybe_show_fsrs_optimization_reminder(
             optimize_button.click()
         else:
             assert dialog is None, "did not expect a dialog"
+
+        # Assert the days since last FSRS optimization reminder is updated correctly if the dialog was shown
+        assert config.get_days_since_last_fsrs_optimize_reminder() == (
+            0 if expected_dialog_shown else days_since_last_reminder
+        )
 
         # Assert whether the optimization was called
         if expected_optimization_called:

@@ -84,6 +84,11 @@ SHARED_LOG_PROCESSORS: List[Processor] = [
 ]
 
 
+FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY = (
+    "ankihub_fsrs_last_optimization_reminder_date"
+)
+
+
 def _serialize_datetime(x: datetime) -> str:
     return x.strftime(ANKIHUB_DATETIME_FORMAT_STR) if x else ""
 
@@ -503,8 +508,35 @@ class _Config:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
 
-    def get_days_since_last_fsrs_optimize_reminder(self) -> int:
-        aqt.mw.col.get_config("days_since_last_fsrs_optimize", 0)
+    def get_days_since_last_fsrs_optimize_reminder(self) -> Optional[int]:
+        """Get the number of days since the last FSRS optimization reminder."""
+        last_optimization_reminder_date_str = aqt.mw.col.get_config(
+            FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY
+        )
+
+        if not last_optimization_reminder_date_str:
+            return None
+
+        try:
+            last_optimization_reminder_date = datetime.fromisoformat(
+                last_optimization_reminder_date_str
+            )
+            days_since_last_reminder = (
+                datetime.now() - last_optimization_reminder_date
+            ).days
+            return days_since_last_reminder
+        except (ValueError, TypeError):  # pragma: no cover
+            return None
+
+    def set_last_fsrs_optimization_reminder_date(self, date_: Optional[date]) -> None:
+        """Set the date of the last FSRS optimization reminder."""
+        if date_ is None:
+            aqt.mw.col.set_config(FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY, None)
+        else:
+            aqt.mw.col.set_config(
+                FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY,
+                date_.isoformat(),
+            )
 
 
 config = _Config()
