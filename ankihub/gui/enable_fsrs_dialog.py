@@ -86,7 +86,7 @@ def _show_enable_fsrs_reminder() -> None:
     dialog.dont_show_this_again_cb = aqt.QCheckBox("Don't show this again")
     layout = dialog.content_layout
     layout.insertWidget(
-        layout.count() - 2.5,
+        layout.count() - 1,
         dialog.dont_show_this_again_cb,
     )
     dialog.adjustSize()
