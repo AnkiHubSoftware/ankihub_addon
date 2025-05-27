@@ -184,6 +184,8 @@ class PrivateConfig(DataClassJSONMixin):
     schema_to_do_full_upload_for_once: Optional[int] = None
     last_sent_summary_date: Optional[date] = None
     feature_flags: dict = field(default_factory=dict)
+    last_enable_fsrs_remind_date: Optional[date] = None
+    show_enable_fsrs_remind_again: Optional[bool] = True
 
 
 class _Config:
@@ -336,6 +338,14 @@ class _Config:
 
     def set_feature_flags(self, feature_flags: Optional[dict]):
         self._private_config.feature_flags = feature_flags
+        self._update_private_config()
+
+    def set_last_enable_fsrs_remind_date(self, last_remind_date: date):
+        self._private_config.last_enable_fsrs_remind_date = last_remind_date
+        self._update_private_config()
+
+    def set_show_enable_fsrs_remind_again(self, show_remind: bool):
+        self._private_config.show_enable_fsrs_remind_again = show_remind
         self._update_private_config()
 
     def get_feature_flags(self) -> Optional[dict]:
