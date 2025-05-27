@@ -26,6 +26,7 @@ from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
 from .gui.deck_options import maybe_show_fsrs_optimization_reminder
+from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
@@ -178,7 +179,9 @@ def _after_profile_setup():
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
 
+    # FSRS checks
     maybe_show_fsrs_optimization_reminder()
+    maybe_show_enable_fsrs_reminder()
 
 
 def _general_setup():
