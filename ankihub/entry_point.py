@@ -15,6 +15,7 @@ from .db import ankihub_db
 from .feature_flags import update_feature_flags_in_background
 from .gui import (
     browser,
+    deck_options,
     deckbrowser,
     editor,
     js_message_handling,
@@ -235,6 +236,9 @@ def _general_setup() -> None:
 
     overview.setup()
     LOGGER.info("Set up deck overview")
+
+    deck_options.setup()
+    LOGGER.info("Set up deck options.")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")

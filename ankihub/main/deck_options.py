@@ -1,3 +1,4 @@
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -139,3 +140,15 @@ def get_fsrs_parameters(conf_id: DeckConfigId) -> Tuple[Optional[int], List[floa
             return version, params
 
     return None, []
+
+
+def fsrs_parameters_equal(parameters1: List[float], parameters2: List[float]) -> bool:
+    """Check if two lists of FSRS parameters are close enough to be considered equal."""
+    if len(parameters1) != len(parameters2):
+        return False
+
+    return all(
+        # True if numbers differ by <= 6 units in the 5th decimal place
+        math.isclose(param1, param2, abs_tol=6e-5, rel_tol=0.0)
+        for param1, param2 in zip(parameters1, parameters2)
+    )
