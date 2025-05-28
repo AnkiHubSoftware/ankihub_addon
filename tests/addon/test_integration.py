@@ -68,6 +68,11 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.gui.enable_fsrs_dialog import (
+    ENABLE_FSRS_REMINDER_INTERVAL_DAYS,
+    maybe_show_enable_fsrs_reminder,
+)
+
 from ..factories import (
     DeckExtensionFactory,
     DeckFactory,
@@ -8157,3 +8162,246 @@ class TestFSRSDeckOptions:
     def _click_revert_button(self, dialog: DeckOptionsDialog) -> None:
         """Click the revert button in the dialog."""
         dialog.web.eval("document.getElementById('revert-fsrs-parameters-btn').click()")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected a reminder dialog to appear"
+
+        enable_button = next(
+            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
+        )
+        enable_button.click()
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_fsrs_enabled(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        aqt.mw.col.set_config("fsrs", True)
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_no_anking_deck_installed(
+    anki_session_with_addon_data: AnkiSession,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None, "expected a reminder dialog to appear"
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_no_feature_flag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=False)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None, "expected a reminder dialog to appear"
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_anki_version_too_low(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    mocker.patch(
+        "ankihub.gui.enable_fsrs_dialog.ANKI_INT_VERSION",
+        MIN_ANKI_VERSION_FOR_FSRS_FEATURES - 1,
+    )
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to low Anki version"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        mocker.patch.object(config._private_config, "show_enable_fsrs_reminder", False)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to show_enable_fsrs_reminder=False"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_interval_reached(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Set last reminder as 30 days ago => interval reached
+        config.set_last_enable_fsrs_reminder_date(
+            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL_DAYS))
+        )
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is not None
+        ), "expected a reminder dialog to appear after interval reached"
+
+        enable_button = next(
+            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
+        )
+        enable_button.click()
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Set last reminder as today => interval not reached
+        config.set_last_enable_fsrs_reminder_date(date.today())
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to recent reminder"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    latest_instance_tracker: LatestInstanceTracker,
+    set_feature_flag_state: SetFeatureFlagState,
+):
+
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected a reminder dialog to appear"
+
+        # Check "Don't show this again" and click Skip
+        dialog.checkbox.setChecked(True)
+        skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
+        skip_button.click()
+
+        assert not aqt.mw.col.get_config("fsrs")
+        assert not config._private_config.show_enable_fsrs_reminder

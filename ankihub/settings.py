@@ -62,6 +62,9 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
+
+ENABLE_FSRS_LAST_REMINDER_DATE_KEY = "ankihub_enable_fsrs_last_reminder_date"
+
 # Only used for configuring the logger, a structlog logger is used for logging.
 STD_LOGGER = logging.getLogger("ankihub")
 
@@ -190,6 +193,7 @@ class PrivateConfig(DataClassJSONMixin):
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
     last_sent_summary_date: Optional[date] = None
+    show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
 
 
@@ -343,6 +347,10 @@ class _Config:
 
     def set_feature_flags(self, feature_flags: Optional[dict]):
         self._private_config.feature_flags = feature_flags
+        self._update_private_config()
+
+    def set_show_enable_fsrs_reminder(self, show_remind: bool):
+        self._private_config.show_enable_fsrs_reminder = show_remind
         self._update_private_config()
 
     def get_feature_flags(self) -> Optional[dict]:
@@ -549,6 +557,32 @@ class _Config:
         self, fsrs_parameters_backup_dict: Dict[str, Any]
     ) -> None:
         aqt.mw.col.set_config(FSRS_PARAMETERS_BACKUP_KEY, fsrs_parameters_backup_dict)
+
+    def get_days_since_last_enable_fsrs_reminder(self) -> Optional[int]:
+        """Get the number of days since the last Enable FSRS reminder."""
+        last_reminder_date_str = aqt.mw.col.get_config(
+            ENABLE_FSRS_LAST_REMINDER_DATE_KEY
+        )
+
+        if not last_reminder_date_str:
+            return None
+
+        try:
+            last_reminder_date = datetime.fromisoformat(last_reminder_date_str)
+            days_since_last_reminder = (datetime.now() - last_reminder_date).days
+            return days_since_last_reminder
+        except (ValueError, TypeError):  # pragma: no cover
+            return None
+
+    def set_last_enable_fsrs_reminder_date(self, date_: Optional[date]) -> None:
+        """Set the date of the last Enable FSRS reminder."""
+        if date_ is None:
+            aqt.mw.col.set_config(ENABLE_FSRS_LAST_REMINDER_DATE_KEY, None)
+        else:
+            aqt.mw.col.set_config(
+                ENABLE_FSRS_LAST_REMINDER_DATE_KEY,
+                date_.isoformat(),
+            )
 
     def get_days_since_last_fsrs_optimize_reminder(self) -> Optional[int]:
         """Get the number of days since the last FSRS optimization reminder."""
