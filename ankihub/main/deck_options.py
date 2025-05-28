@@ -148,7 +148,7 @@ def fsrs_parameters_equal(parameters1: List[float], parameters2: List[float]) ->
         return False
 
     return all(
-        # True if numbers differ by < 1 unit in the 5th decimal place
-        math.isclose(param1, param2, abs_tol=1e-5, rel_tol=0.0)
+        # True if numbers differ by <= 6 units in the 5th decimal place
+        math.isclose(param1, param2, abs_tol=6e-5, rel_tol=0.0)
         for param1, param2 in zip(parameters1, parameters2)
     )
