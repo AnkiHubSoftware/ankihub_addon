@@ -66,7 +66,7 @@ from requests import Response  # type: ignore
 from requests_mock import Mocker
 
 from ankihub.gui.enable_fsrs_dialog import (
-    ENABLE_FSRS_REMINDER_INTERVAL,
+    ENABLE_FSRS_REMINDER_INTERVAL_DAYS,
     maybe_show_enable_fsrs_reminder,
 )
 
@@ -8038,7 +8038,7 @@ def test_maybe_show_enable_fsrs_reminder_interval_reached(
 
         # Set last reminder as 30 days ago => interval reached
         config.set_last_enable_fsrs_reminder_date(
-            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL))
+            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL_DAYS))
         )
 
         latest_instance_tracker.track(_Dialog)

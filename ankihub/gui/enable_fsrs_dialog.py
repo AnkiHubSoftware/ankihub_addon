@@ -8,7 +8,7 @@ from ..settings import ANKI_INT_VERSION, config
 from .deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
 from .utils import show_dialog
 
-ENABLE_FSRS_REMINDER_INTERVAL = 30
+ENABLE_FSRS_REMINDER_INTERVAL_DAYS = 30
 
 
 def maybe_show_enable_fsrs_reminder():
@@ -30,7 +30,10 @@ def maybe_show_enable_fsrs_reminder():
 
     last_remind_date = config.get_days_since_last_enable_fsrs_reminder()
     today_date = date.today()
-    if last_remind_date is None or last_remind_date >= ENABLE_FSRS_REMINDER_INTERVAL:
+    if (
+        last_remind_date is None
+        or last_remind_date >= ENABLE_FSRS_REMINDER_INTERVAL_DAYS
+    ):
         config.set_last_enable_fsrs_reminder_date(today_date)
         _show_enable_fsrs_reminder()
 
