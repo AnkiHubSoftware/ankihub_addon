@@ -168,10 +168,12 @@ def _on_webview_did_receive_js_message(
         fsrs_parameters_from_editor = kwargs["fsrs_parameters"]
 
         conf_id = current_conf_id()
-        if _can_revert_from_fsrs_parameters(conf_id, fsrs_parameters_from_editor):
-            _deck_options_dialog.dialog.web.eval(
-                "revertFsrsParametersBtn.disabled = false;"
-            )
+        can_revert = _can_revert_from_fsrs_parameters(
+            conf_id, fsrs_parameters_from_editor
+        )
+        _deck_options_dialog.dialog.web.eval(
+            f"document.getElementById('revert-fsrs-parameters-btn').disabled = {'true' if not can_revert else 'false'};"
+        )
 
         return (True, None)
 

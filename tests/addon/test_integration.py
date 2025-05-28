@@ -8163,7 +8163,7 @@ class TestFSRSDeckOptions:
         """Check if the revert button element exists in the DOM."""
         with qtbot.wait_callback(timeout=timeout) as callback:
             dialog.web.evalWithCallback(
-                "document.getElementById('revertFsrsParametersBtn') !== null",
+                "document.getElementById('revert-fsrs-parameters-btn') !== null",
                 callback,
             )
 
@@ -8176,7 +8176,7 @@ class TestFSRSDeckOptions:
 
         with qtbot.wait_callback(timeout=500) as callback:
             dialog.web.evalWithCallback(
-                "!document.getElementById('revertFsrsParametersBtn').disabled",
+                "!document.getElementById('revert-fsrs-parameters-btn').disabled",
                 callback,
             )
 
@@ -8184,4 +8184,4 @@ class TestFSRSDeckOptions:
 
     def _click_revert_button(self, dialog: DeckOptionsDialog) -> None:
         """Click the revert button in the dialog."""
-        dialog.web.eval("document.getElementById('revertFsrsParametersBtn').click()")
+        dialog.web.eval("document.getElementById('revert-fsrs-parameters-btn').click()")

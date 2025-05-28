@@ -30,7 +30,7 @@ window.updateFsrsParametersTextarea = updateFsrsParametersTextarea;
 
 
 function setupRevertButton(evaluateBtn) {
-    const revertBtnId = "revertFsrsParametersBtn";
+    const revertBtnId = "revert-fsrs-parameters-btn";
     evaluateBtn.insertAdjacentHTML(
         "afterend",
         ` <button id="${revertBtnId}" class="${evaluateBtn.className}">
@@ -53,14 +53,14 @@ function setupRevertButton(evaluateBtn) {
 
     const style = document.createElement("style");
     style.textContent = `
-        #revertFsrsParametersBtn:disabled {
+        #revert-fsrs-parameters-btn:disabled {
             background-color: ${bg} !important;
             border-color:     ${bg} !important;
             color:            ${text} !important;
             box-shadow:       none !important;
             outline:          none !important;
         }
-        #revertFsrsParametersBtn:disabled:focus {
+        #revert-fsrs-parameters-btn:disabled:focus {
             box-shadow: none !important;
         }
     `;
