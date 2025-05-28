@@ -106,7 +106,8 @@ class AnkiHubRevertFSRS {
         textarea.addEventListener("fsrsParamsUpdated", onChange);
         textarea.addEventListener("input", onChange);
 
-        this.processTextAreaChange(textarea, true); // Initial sync
+        // Trigger initial processing to update the revert button enabled state if necessary
+        this.processTextAreaChange(textarea, true);
     }
 
     processTextAreaChange(textarea, force = false) {
