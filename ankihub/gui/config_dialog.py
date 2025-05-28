@@ -56,11 +56,11 @@ def _general_tab(conf_window) -> None:
     tab.hseparator()
     tab.space(8)
 
-    if config.get_feature_flags().get("mh_integration"):
-        tab.text("Feature Preferences", bold=True)
-        tab.checkbox("ankihub_smart_search", "AnkiHub Smart Search")
-        tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
+    tab.text("Feature Preferences", bold=True)
+    tab.checkbox("ankihub_smart_search", "AnkiHub Smart Search")
+    tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
 
+    if config.get_feature_flags().get("mh_integration"):
         add_nested_checkboxes(
             tab, key_prefix="boards_and_beyond", description="Boards and Beyond"
         )
@@ -68,13 +68,13 @@ def _general_tab(conf_window) -> None:
             tab, key_prefix="first_aid_forward", description="First Aid Forward"
         )
 
-        tab.checkbox(
-            "remind_to_optimize_fsrs_parameters",
-            "Show monthly FSRS optimization reminder",
-        )
+    tab.checkbox(
+        "remind_to_optimize_fsrs_parameters",
+        "Show monthly FSRS optimization reminder",
+    )
 
-        tab.hseparator()
-        tab.space(8)
+    tab.hseparator()
+    tab.space(8)
 
     tab.text("Debug", bold=True)
     tab.checkbox("report_errors", "Report errors")
