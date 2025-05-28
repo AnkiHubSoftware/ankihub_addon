@@ -49,6 +49,8 @@ def _show_enable_fsrs_reminder() -> None:
 
         if dont_show_again:
             config.set_show_enable_fsrs_reminder(False)
+            if enable:
+                aqt.mw.col.set_config("fsrs", True)
             return
 
         if not enable:
