@@ -21,7 +21,7 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from shutil import copyfile, move, rmtree
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import aqt
 import requests
@@ -82,6 +82,8 @@ SHARED_LOG_PROCESSORS: List[Processor] = [
     structlog.processors.format_exc_info,
     structlog.processors.UnicodeDecoder(),
 ]
+
+FSRS_PARAMETERS_BACKUP_KEY = "ankihub_fsrs_parameters_backup"
 
 
 FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY = (
@@ -507,6 +509,46 @@ class _Config:
     def get_ah_did_by_name(self, name: str) -> Optional[uuid.UUID]:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
+
+    def get_fsrs_parameters_from_backup(self, conf_id: int) -> Tuple[int, List[float]]:
+        backup_entry = (
+            self._get_fsrs_parameteters_backup_dict()
+            .get(str(conf_id), {})
+            .get("previous", {})
+        )
+        return (backup_entry.get("version", None), backup_entry.get("parameters", []))
+
+    def backup_fsrs_parameters(
+        self, conf_id: int, version: int, parameters: List[float]
+    ) -> bool:
+        """
+        Rotate current->previous for the given preset and store the provided
+        parameters as the new “current” snapshot.
+        Returns True if the parameters were changed, False if they were not.
+        """
+        fsrs_parameters_backup_dict: Dict = self._get_fsrs_parameteters_backup_dict()
+        backup_entry = fsrs_parameters_backup_dict.setdefault(str(conf_id), {})
+        new_current = {
+            "version": version,
+            "parameters": parameters,
+        }
+        if new_current == backup_entry.get("current"):
+            return False
+
+        if "current" in backup_entry:
+            backup_entry["previous"] = backup_entry["current"]
+
+        backup_entry["current"] = new_current
+        self._update_fsrs_parameters_backup_dict(fsrs_parameters_backup_dict)
+        return True
+
+    def _get_fsrs_parameteters_backup_dict(self) -> Dict[str, Any]:
+        return aqt.mw.col.get_config(FSRS_PARAMETERS_BACKUP_KEY, {})
+
+    def _update_fsrs_parameters_backup_dict(
+        self, fsrs_parameters_backup_dict: Dict[str, Any]
+    ) -> None:
+        aqt.mw.col.set_config(FSRS_PARAMETERS_BACKUP_KEY, fsrs_parameters_backup_dict)
 
     def get_days_since_last_fsrs_optimize_reminder(self) -> Optional[int]:
         """Get the number of days since the last FSRS optimization reminder."""
@@ -961,7 +1003,6 @@ USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 ANKI_VERSION = buildinfo.version
 ANKI_INT_VERSION = point_version()
 FSRS_VERSION = get_fsrs_version()
-
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 
