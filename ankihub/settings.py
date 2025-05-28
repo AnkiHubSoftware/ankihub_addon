@@ -530,7 +530,7 @@ class _Config:
         backup_entry = fsrs_parameters_backup_dict.setdefault(str(conf_id), {})
         new_current = {
             "version": version,
-            "parameters": parameters[:],
+            "parameters": parameters,
         }
         if new_current == backup_entry.get("current"):
             return False
