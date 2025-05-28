@@ -68,6 +68,11 @@ def _general_tab(conf_window) -> None:
             tab, key_prefix="first_aid_forward", description="First Aid Forward"
         )
 
+        tab.checkbox(
+            "remind_to_optimize_fsrs_parameters",
+            "Show monthly FSRS optimization reminder",
+        )
+
         tab.hseparator()
         tab.space(8)
 
