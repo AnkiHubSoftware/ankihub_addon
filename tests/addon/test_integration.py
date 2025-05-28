@@ -201,7 +201,7 @@ from ankihub.gui.overview import (
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
-from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
+from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
@@ -8049,14 +8049,13 @@ class TestFSRSDeckOptions:
             self._click_revert_button(dialog)
             qtbot.wait(500)
 
-            # Verify parameters were reverted to original
-            current_params_str = self._get_fsrs_parameters_from_dialog(dialog, qtbot)
-            reverted_params = [
-                float(x.strip()) for x in current_params_str.split(",") if x.strip()
-            ]
-            assert reverted_params == original_params
-
             assert not self._is_revert_button_enabled(dialog, qtbot=qtbot)
+
+            self._close_deck_options_dialog(dialog)
+            qtbot.wait(500)
+
+            # Verify parameters were reverted to original
+            assert get_fsrs_parameters(conf_id)[1] == original_params
 
     @pytest.mark.sequential
     def test_can_revert_from_fsrs_parameters_function(
@@ -8129,33 +8128,6 @@ class TestFSRSDeckOptions:
             Promise.resolve().then(() => saveBtn.click());
             """
         )
-
-    def _get_fsrs_parameters_from_dialog(
-        self, dialog: DeckOptionsDialog, qtbot: QtBot
-    ) -> str:
-        """Get current FSRS parameters from the dialog textarea."""
-        with qtbot.wait_callback(timeout=2000) as callback:
-            dialog.web.evalWithCallback(
-                """
-                (function() {
-                    const headers = Array.from(document.querySelectorAll(".setting-title"));
-                    const fsrsHeader = headers.find(el =>
-                        el.textContent.includes("FSRS") && el.textContent.trim() !== "FSRS"
-                    );
-                    if (fsrsHeader) {
-                        const section = fsrsHeader.parentElement;
-                        const textarea = section.querySelector("textarea");
-                        if (textarea) {
-                            return textarea.value;
-                        }
-                    }
-                    return "";
-                })()
-                """,
-                callback,
-            )
-
-        return callback.args[0] if callback.args else ""
 
     def _revert_button_exists(
         self, dialog: DeckOptionsDialog, qtbot: QtBot, timeout: int = 500
