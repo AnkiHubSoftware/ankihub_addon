@@ -8010,9 +8010,7 @@ def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
     with anki_session_with_addon_data.profile_loaded():
         install_ah_deck(ah_did=config.anking_deck_id)
 
-        mocker.patch.object(
-            config._private_config, "show_enable_fsrs_remind_again", False
-        )
+        mocker.patch.object(config._private_config, "show_enable_fsrs_reminder", False)
 
         latest_instance_tracker.track(_Dialog)
 
@@ -8021,7 +8019,7 @@ def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         assert (
             dialog is None
-        ), "expected no reminder dialog to appear due to show_enable_fsrs_remind_again=False"
+        ), "expected no reminder dialog to appear due to show_enable_fsrs_reminder=False"
         assert not aqt.mw.col.get_config("fsrs")
 
 
@@ -8113,4 +8111,4 @@ def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
         skip_button.click()
 
         assert not aqt.mw.col.get_config("fsrs")
-        assert not config._private_config.show_enable_fsrs_remind_again
+        assert not config._private_config.show_enable_fsrs_reminder

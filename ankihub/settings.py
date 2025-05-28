@@ -191,8 +191,8 @@ class PrivateConfig(DataClassJSONMixin):
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
     last_sent_summary_date: Optional[date] = None
+    show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
-    show_enable_fsrs_remind_again: Optional[bool] = True
 
 
 class _Config:
@@ -373,8 +373,8 @@ class _Config:
                 date_.isoformat(),
             )
 
-    def set_show_enable_fsrs_remind_again(self, show_remind: bool):
-        self._private_config.show_enable_fsrs_remind_again = show_remind
+    def set_show_enable_fsrs_reminder(self, show_remind: bool):
+        self._private_config.show_enable_fsrs_reminder = show_remind
         self._update_private_config()
 
     def get_feature_flags(self) -> Optional[dict]:

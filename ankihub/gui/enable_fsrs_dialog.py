@@ -25,7 +25,7 @@ def maybe_show_enable_fsrs_reminder():
     if aqt.mw.col.get_config("fsrs"):
         return
 
-    if not config._private_config.show_enable_fsrs_remind_again:
+    if not config._private_config.show_enable_fsrs_reminder:
         return
 
     last_remind_date = config.get_days_since_last_enable_fsrs_reminder()
@@ -48,7 +48,7 @@ def _show_enable_fsrs_reminder() -> None:
         )
 
         if dont_show_again:
-            config.set_show_enable_fsrs_remind_again(False)
+            config.set_show_enable_fsrs_reminder(False)
             return
 
         if not enable:
