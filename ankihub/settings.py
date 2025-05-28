@@ -347,32 +347,6 @@ class _Config:
         self._private_config.feature_flags = feature_flags
         self._update_private_config()
 
-    def get_days_since_last_enable_fsrs_reminder(self) -> Optional[int]:
-        """Get the number of days since the last Enable FSRS reminder."""
-        last_reminder_date_str = aqt.mw.col.get_config(
-            ENABLE_FSRS_LAST_REMINDER_DATE_KEY
-        )
-
-        if not last_reminder_date_str:
-            return None
-
-        try:
-            last_reminder_date = datetime.fromisoformat(last_reminder_date_str)
-            days_since_last_reminder = (datetime.now() - last_reminder_date).days
-            return days_since_last_reminder
-        except (ValueError, TypeError):  # pragma: no cover
-            return None
-
-    def set_last_enable_fsrs_reminder_date(self, date_: Optional[date]) -> None:
-        """Set the date of the last Enable FSRS reminder."""
-        if date_ is None:
-            aqt.mw.col.set_config(ENABLE_FSRS_LAST_REMINDER_DATE_KEY, None)
-        else:
-            aqt.mw.col.set_config(
-                ENABLE_FSRS_LAST_REMINDER_DATE_KEY,
-                date_.isoformat(),
-            )
-
     def set_show_enable_fsrs_reminder(self, show_remind: bool):
         self._private_config.show_enable_fsrs_reminder = show_remind
         self._update_private_config()
@@ -541,6 +515,32 @@ class _Config:
     def get_ah_did_by_name(self, name: str) -> Optional[uuid.UUID]:
         decks = self._private_config.decks
         return next((key for key in decks.keys() if decks[key].name == name), None)
+
+    def get_days_since_last_enable_fsrs_reminder(self) -> Optional[int]:
+        """Get the number of days since the last Enable FSRS reminder."""
+        last_reminder_date_str = aqt.mw.col.get_config(
+            ENABLE_FSRS_LAST_REMINDER_DATE_KEY
+        )
+
+        if not last_reminder_date_str:
+            return None
+
+        try:
+            last_reminder_date = datetime.fromisoformat(last_reminder_date_str)
+            days_since_last_reminder = (datetime.now() - last_reminder_date).days
+            return days_since_last_reminder
+        except (ValueError, TypeError):  # pragma: no cover
+            return None
+
+    def set_last_enable_fsrs_reminder_date(self, date_: Optional[date]) -> None:
+        """Set the date of the last Enable FSRS reminder."""
+        if date_ is None:
+            aqt.mw.col.set_config(ENABLE_FSRS_LAST_REMINDER_DATE_KEY, None)
+        else:
+            aqt.mw.col.set_config(
+                ENABLE_FSRS_LAST_REMINDER_DATE_KEY,
+                date_.isoformat(),
+            )
 
     def get_days_since_last_fsrs_optimize_reminder(self) -> Optional[int]:
         """Get the number of days since the last FSRS optimization reminder."""
