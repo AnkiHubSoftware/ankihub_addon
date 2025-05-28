@@ -7875,10 +7875,8 @@ def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=True)
@@ -7906,10 +7904,8 @@ def test_maybe_show_enable_fsrs_reminder(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_fsrs_enabled(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=True)
@@ -7931,10 +7927,7 @@ def test_maybe_show_enable_fsrs_reminder_fsrs_enabled(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_no_anking_deck_installed(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
-    install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=True)
@@ -7954,10 +7947,8 @@ def test_maybe_show_enable_fsrs_reminder_no_anking_deck_installed(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_no_feature_flag(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=False)
@@ -7979,7 +7970,6 @@ def test_maybe_show_enable_fsrs_reminder_no_feature_flag(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_anki_version_too_low(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
     mocker: MockerFixture,
@@ -8010,7 +8000,6 @@ def test_maybe_show_enable_fsrs_reminder_anki_version_too_low(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
     mocker: MockerFixture,
@@ -8040,10 +8029,8 @@ def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_interval_reached(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=True)
@@ -8076,10 +8063,8 @@ def test_maybe_show_enable_fsrs_reminder_interval_reached(
 @pytest.mark.qt_no_exception_capture
 def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
     anki_session_with_addon_data: AnkiSession,
-    qtbot: QtBot,
     install_ah_deck: InstallAHDeck,
     set_feature_flag_state: SetFeatureFlagState,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
 ):
     set_feature_flag_state("fsrs_reminder", is_active=True)
@@ -8106,7 +8091,6 @@ def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
 def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
     anki_session_with_addon_data: AnkiSession,
     install_ah_deck: InstallAHDeck,
-    mocker: MockerFixture,
     latest_instance_tracker: LatestInstanceTracker,
     set_feature_flag_state: SetFeatureFlagState,
 ):
