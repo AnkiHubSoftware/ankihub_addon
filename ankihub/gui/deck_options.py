@@ -145,7 +145,7 @@ def _on_webview_did_receive_js_message(
             return (True, None)
 
         _deck_options_dialog.dialog.web.eval(
-            f"updateFsrsParametersTextarea({fsrs_parameters_from_backup})"
+            f"ankihubRevertFSRS.updateFsrsParametersTextarea({fsrs_parameters_from_backup})"
         )
 
         current_version, current_params = get_fsrs_parameters(conf_id)
@@ -172,7 +172,7 @@ def _on_webview_did_receive_js_message(
             conf_id, fsrs_parameters_from_editor
         )
         _deck_options_dialog.dialog.web.eval(
-            f"document.getElementById('revert-fsrs-parameters-btn').disabled = {'true' if not can_revert else 'false'};"
+            f"ankihubRevertFSRS.revertButton.disabled = {'true' if not can_revert else 'false'};"
         )
 
         return (True, None)
