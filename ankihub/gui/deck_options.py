@@ -82,7 +82,11 @@ def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
     # Execute JS to add the revert button if FSRS is enabled
     if aqt.mw.col.get_config("fsrs"):
         js = Template(ADD_FSRS_REVERT_BUTTON_JS_PATH.read_text()).render(
-            {"THEME": anki_theme()}
+            {
+                "THEME": anki_theme(),
+                "REVERT_FSRS_PARAMETERS_PYCMD": REVERT_FSRS_PARAMETERS_PYCMD,
+                "FSRS_PARAMETERS_CHANGED_PYCMD": FSRS_PARAMETERS_CHANGED_PYCMD,
+            }
         )
         deck_options_dialog.web.eval(js)
 

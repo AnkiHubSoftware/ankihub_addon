@@ -47,7 +47,7 @@ class AnkiHubRevertFSRS {
         this.revertButton.disabled = true;
 
         this.revertButton.addEventListener("click", () => {
-            pycmd("ankihub_revert_fsrs_parameters");
+            pycmd("{{ REVERT_FSRS_PARAMETERS_PYCMD }}");
             this.revertButton.disabled = true;
         });
 
@@ -122,7 +122,7 @@ class AnkiHubRevertFSRS {
             .filter(n => !isNaN(n));
 
         const payload = JSON.stringify({ fsrs_parameters: numericList });
-        pycmd(`ankihub_fsrs_parameters_changed ${payload}`);
+        pycmd(`{{ FSRS_PARAMETERS_CHANGED_PYCMD }} ${payload}`);
     }
 
     updateFsrsParametersTextarea(params) {
