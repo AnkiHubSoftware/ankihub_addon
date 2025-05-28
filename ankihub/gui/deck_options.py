@@ -209,16 +209,33 @@ def maybe_show_fsrs_optimization_reminder() -> None:
 
     anki_did = deck_config.anki_id
     deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
-    if (
-        config.public_config["remind_to_optimize_fsrs_parameters"]
-        and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+    if not (
+        ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
         and deck_configs_for_update.fsrs
+        and config.public_config.get("remind_to_optimize_fsrs_parameters", False)
+    ):
+        return
+
+    days_since_last_reminder = config.get_days_since_last_fsrs_optimize_reminder()
+    reminder_interval_met = (
+        days_since_last_reminder is None
+        or days_since_last_reminder >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+    )
+    optimize_interval_met = (
         # days_since_last_fsrs_optimize is a global value, not just for the current deck, but that's okay, because
         # if the user optimized the parameters for some deck, they probably don't need the reminder
-        and deck_configs_for_update.days_since_last_fsrs_optimize
+        deck_configs_for_update.days_since_last_fsrs_optimize
         >= FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
-    ):
-        _show_fsrs_optimization_reminder()
+    )
+    if reminder_interval_met and optimize_interval_met:
+        try:
+            _show_fsrs_optimization_reminder()
+            config.set_last_fsrs_optimization_reminder_date(datetime.now())
+        except Exception as e:
+            LOGGER.exception(
+                "Error showing FSRS optimization reminder dialog",
+                exc_info=e,
+            )
 
 
 def _show_fsrs_optimization_reminder() -> None:
@@ -227,14 +244,13 @@ def _show_fsrs_optimization_reminder() -> None:
         return
 
     anki_did = deck_config.anki_id
-    if aqt.mw.col.decks.get(anki_did) is None:
+    if aqt.mw.col.decks.get(anki_did, default=False) is None:
         return
 
     def on_button_clicked(button_idx: Optional[int]) -> None:
         optimize = button_idx == 1
 
-        assert isinstance(dialog.dont_show_this_again_cb, QCheckBox)
-        dont_show_again = dialog.dont_show_this_again_cb.isChecked()
+        dont_show_again = dialog.checkbox.isChecked()
 
         LOGGER.info(
             "fsrs_optimization_reminder_dialog_choice",
@@ -249,7 +265,7 @@ def _show_fsrs_optimization_reminder() -> None:
         if not optimize:
             return
 
-        if aqt.mw.col.decks.get(anki_did) is None:
+        if aqt.mw.col.decks.get(anki_did, default=False) is None:
             return
 
         conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
@@ -273,20 +289,12 @@ def _show_fsrs_optimization_reminder() -> None:
             ("Optimize", QDialogButtonBox.ButtonRole.AcceptRole),
         ],
         default_button_idx=1,
+        checkbox=QCheckBox("Don't show this again"),
         callback=on_button_clicked,
         open_dialog=False,
         add_title_to_body_on_mac=False,
         parent=aqt.mw,
     )
-
-    dialog.dont_show_this_again_cb = QCheckBox("Don't show this again")
-    layout = dialog.content_layout
-    layout.insertWidget(
-        layout.count() - 2,
-        dialog.dont_show_this_again_cb,
-    )
-    dialog.adjustSize()
-
     dialog.show()
 
 

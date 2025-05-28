@@ -69,19 +69,17 @@ def deep_set(data: Dict, path: str, value: Any) -> None:
     d[last_key] = value
 
 
-def _create_deck_preset_if_not_exists() -> DeckConfigDict:
+def create_or_reset_deck_preset(
+    preset_name=ANKIHUB_PRESET_NAME,
+) -> DeckConfigDict:
     conf = next(
-        (
-            conf
-            for conf in aqt.mw.col.decks.all_config()
-            if conf["name"] == ANKIHUB_PRESET_NAME
-        ),
+        (conf for conf in aqt.mw.col.decks.all_config() if conf["name"] == preset_name),
         None,
     )
     if conf:
         aqt.mw.col.decks.restore_to_default(conf)
     else:
-        conf = aqt.mw.col.decks.add_config(ANKIHUB_PRESET_NAME)
+        conf = aqt.mw.col.decks.add_config(preset_name)
     fsrs_enabled = aqt.mw.col.get_config("fsrs")
     for option, value in DECK_CONFIG.items():
         if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (
@@ -95,11 +93,20 @@ def _create_deck_preset_if_not_exists() -> DeckConfigDict:
     return conf
 
 
-def set_ankihub_config_for_deck(deck_id: DeckId) -> None:
+def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -> None:
+    from ..settings import config
+
     deck = aqt.mw.col.decks.get(deck_id, default=False)
     if not deck:
         return
-    conf = _create_deck_preset_if_not_exists()
+
+    if is_anking_deck and config.get_feature_flags().get(
+        "fsrs_in_recommended_deck_settings"
+    ):
+        conf = create_or_reset_deck_preset(preset_name="AnKing")
+    else:
+        conf = create_or_reset_deck_preset()
+
     deck["conf"] = conf["id"]
     aqt.mw.col.decks.update(deck)
 

@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 import aqt
 from anki.decks import DeckId
 from anki.utils import is_mac
-from aqt import sync
+from aqt import QCheckBox, sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
 from aqt.qt import (
@@ -321,6 +321,7 @@ class _Dialog(QDialog):
         scrollable: bool,
         callback: Optional[Callable[[int], None]],
         icon: Optional[QIcon],
+        checkbox: Optional[QCheckBox] = None,
     ) -> None:
         super().__init__(parent)
 
@@ -332,6 +333,7 @@ class _Dialog(QDialog):
         self.scrollable = scrollable
         self.callback = callback
         self.icon = icon
+        self.checkbox = checkbox
         self._is_closing = False
         self._clicked_button_index: Optional[int] = None
 
@@ -383,8 +385,15 @@ class _Dialog(QDialog):
 
         self.button_box = self._setup_button_box()
 
+        button_layout = QHBoxLayout()
+
+        if self.checkbox is not None:
+            button_layout.addWidget(self.checkbox)
+
+        button_layout.addWidget(self.button_box)
+
         self.main_layout.addStretch()
-        self.main_layout.addWidget(self.button_box)
+        self.main_layout.addLayout(button_layout)
 
         self.adjustSize()
 
@@ -448,6 +457,7 @@ def show_dialog(
     icon: Optional[QIcon] = None,
     open_dialog: bool = True,
     add_title_to_body_on_mac: bool = True,
+    checkbox: Optional[QCheckBox] = None,
 ) -> _Dialog:
     """Show a dialog with the given text and buttons.
     The callback is called with the index of the clicked button."""
@@ -474,6 +484,7 @@ def show_dialog(
         scrollable=scrollable,
         callback=callback,
         icon=icon,
+        checkbox=checkbox,
     )
 
     if open_dialog:

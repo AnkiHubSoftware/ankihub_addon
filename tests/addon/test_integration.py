@@ -1184,6 +1184,57 @@ class TestDownloadAndInstallDecks:
             assert isinstance(exception, DeckDownloadAndInstallError)
             assert exception.original_exception.args[0] == exception_message
 
+    def test_fsrs_feature_flag_and_recommended_deck_settings(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", False)
+
+            # Mock the feature flag and version conditions
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"fsrs_in_recommended_deck_settings": True},
+            )
+            mocker.patch.object(
+                config, "anking_deck_id", return_value="mock_anking_deck_id"
+            )
+            mocker.patch(
+                "ankihub.gui.operations.deck_installation.ANKI_INT_VERSION",
+                MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+            )
+
+            # Mock the `create_or_reset_deck_preset` function
+            mock_create_deck_preset = mocker.patch(
+                "ankihub.gui.operations.deck_installation.create_or_reset_deck_preset"
+            )
+
+            deck = DeckFactory.create(ah_did=config.anking_deck_id)
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            # Call the function
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(
+                    [deck.ah_did],
+                    on_done=callback,
+                    recommended_deck_settings=True,
+                    behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                )
+
+            # Assert that the FSRS configuration was updated
+            assert aqt.mw.col.get_config("fsrs") is True
+
+            # Assert that `create_or_reset_deck_preset` was called
+            mock_create_deck_preset.assert_called_once()
+
 
 class TestCheckAndInstallNewDeckSubscriptions:
     def test_one_new_subscription(
@@ -7668,6 +7719,9 @@ def test_optimize_fsrs_parameters(
             assert new_params == bad_fsrs_params
 
 
+FSRS_INTERVAL_DAYS = FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS
+
+
 @skip_test_fsrs_unsupported
 @pytest.mark.qt_no_exception_capture
 @pytest.mark.parametrize(
@@ -7675,18 +7729,19 @@ def test_optimize_fsrs_parameters(
         "feature_flag_active, "
         "deck_installed, "
         "days_since_last_fsrs_optimize, "
+        "days_since_last_reminder, "
         "expected_dialog_shown, "
         "expected_optimization_called"
     ),
     [
-        # feature flag on, deck installed, below threshold → no dialog
-        (True, True, 0, False, False),
-        # feature flag on, deck installed, above threshold → dialog + optimize
-        (True, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, True, True),
-        # feature flag off, deck installed, above threshold → no dialog
-        (False, True, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
-        # feature flag on, deck not installed, above threshold → no dialog
-        (True, False, FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS + 1, False, False),
+        # All conditions met, dialog should be shown and optimization called
+        (True, True, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, True, True),
+        (True, True, FSRS_INTERVAL_DAYS, None, True, True),
+        # When any of the conditions is not met, dialog should not be shown, and optimization not called
+        (False, True, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, False, False),
+        (True, False, FSRS_INTERVAL_DAYS, FSRS_INTERVAL_DAYS, False, False),
+        (True, True, 0, FSRS_INTERVAL_DAYS, False, False),
+        (True, True, FSRS_INTERVAL_DAYS, 0, False, False),
     ],
 )
 def test_maybe_show_fsrs_optimization_reminder(
@@ -7699,6 +7754,7 @@ def test_maybe_show_fsrs_optimization_reminder(
     feature_flag_active: bool,
     deck_installed: bool,
     days_since_last_fsrs_optimize: int,
+    days_since_last_reminder: int,
     expected_dialog_shown: bool,
     expected_optimization_called: bool,
 ):
@@ -7721,6 +7777,12 @@ def test_maybe_show_fsrs_optimization_reminder(
             return_value=deck_configs_for_update,
         )
 
+        config.set_last_fsrs_optimization_reminder_date(
+            (date.today() - timedelta(days=days_since_last_reminder))
+            if days_since_last_reminder is not None
+            else None
+        )
+
         # Mock the optimize_fsrs_parameters function
         optimize_fsrs_parameters_mock = mocker.patch(
             "ankihub.gui.deck_options.optimize_fsrs_parameters"
@@ -7736,6 +7798,7 @@ def test_maybe_show_fsrs_optimization_reminder(
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         if expected_dialog_shown:
             assert dialog is not None, "expected a reminder dialog to appear"
+
             # Click the "Optimize" button
             optimize_button = next(
                 b for b in dialog.button_box.buttons() if b.text() == "Optimize"
@@ -7743,6 +7806,11 @@ def test_maybe_show_fsrs_optimization_reminder(
             optimize_button.click()
         else:
             assert dialog is None, "did not expect a dialog"
+
+        # Assert the days since last FSRS optimization reminder is updated correctly if the dialog was shown
+        assert config.get_days_since_last_fsrs_optimize_reminder() == (
+            0 if expected_dialog_shown else days_since_last_reminder
+        )
 
         # Assert whether the optimization was called
         if expected_optimization_called:
@@ -7793,7 +7861,7 @@ def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
         assert dialog is not None, "expected the reminder dialog to appear"
 
         # Check "Don't show this again" and click Skip
-        dialog.dont_show_this_again_cb.setChecked(True)
+        dialog.checkbox.setChecked(True)
         skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
         skip_button.click()
 
