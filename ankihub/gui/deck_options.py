@@ -20,7 +20,7 @@ from aqt.utils import tooltip
 from jinja2 import Template
 
 from .. import LOGGER
-from ..main.deck_options import get_fsrs_parameters
+from ..main.deck_options import fsrs_parameters_equal, get_fsrs_parameters
 from ..settings import ANKI_INT_VERSION, FSRS_VERSION, config
 from .js_message_handling import parse_js_message_kwargs
 from .utils import active_window_or_mw, anki_theme, robust_filter, show_dialog
@@ -192,14 +192,11 @@ def _can_revert_from_fsrs_parameters(
         # Old Anki versions can't handle FSRS parameters from newer versions, but the other way
         # around is fine.
         (fsrs_version_from_backup is None or fsrs_version_from_backup <= FSRS_VERSION)
-        and _round_fsrs_parameters(fsrs_parameters_from_backup)
-        != _round_fsrs_parameters(fsrs_parameters)
+        and not fsrs_parameters_equal(
+            fsrs_parameters,
+            fsrs_parameters_from_backup,
+        )
     )
-
-
-def _round_fsrs_parameters(parameters: List[float]) -> List[float]:
-    """Rounds each parameter to 4 decimal places."""
-    return [round(param, 4) for param in parameters]
 
 
 def maybe_show_fsrs_optimization_reminder() -> None:
@@ -335,14 +332,11 @@ def optimize_fsrs_parameters(
     def on_compute_fsrs_params_done(future: Future) -> None:
         response: scheduler_pb2.ComputeFsrsParamsResponse = future.result()
         new_parameters = list(response.params)
-
         old_parameters = list(fsrs_parameters)
-        parameters_are_the_same = len(new_parameters) == len(old_parameters) and all(
-            round(new_param, 4) == round(old_param, 4)
-            for new_param, old_param in zip(new_parameters, old_parameters)
-        )
-        already_optimal = not new_parameters or parameters_are_the_same
 
+        already_optimal = not new_parameters or fsrs_parameters_equal(
+            old_parameters, new_parameters
+        )
         if already_optimal:
             aqt.mw.taskman.run_on_main(
                 lambda: tooltip("FSRS parameters are already optimal!", parent=aqt.mw)
