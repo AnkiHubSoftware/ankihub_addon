@@ -943,6 +943,9 @@ def _on_dialog_manager_did_open_dialog(
 
 
 def add_smart_search_button_to_sidebar():
+    if not config.get_feature_flags().get("show_flashcards_selector_button", False):
+        return
+
     if not config.public_config.get("ankihub_smart_search"):
         return
 
