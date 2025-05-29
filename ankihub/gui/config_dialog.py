@@ -72,7 +72,7 @@ def _general_tab(conf_window) -> None:
     if get_deck_for_ah_did(config.anking_deck_id):
         tab.checkbox(
             "remind_to_optimize_fsrs_parameters",
-            "Show monthly FSRS optimization reminder",
+            "Monthly FSRS optimization reminder",
         )
 
     tab.hseparator()
