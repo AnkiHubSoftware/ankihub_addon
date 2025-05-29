@@ -7792,7 +7792,7 @@ def test_maybe_show_fsrs_optimization_reminder(
 
         # Mock the optimize_fsrs_parameters function
         optimize_fsrs_parameters_mock = mocker.patch(
-            "ankihub.gui.deck_options.optimize_fsrs_parameters"
+            "ankihub.gui.optimize_fsrs_dialog._optimize_fsrs_parameters"
         )
 
         # Track the reminder dialog
