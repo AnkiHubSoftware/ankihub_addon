@@ -12,6 +12,7 @@ from typing import cast
 from aqt import qconnect
 from aqt.qt import QCheckBox, Qt
 
+from ..main.utils import get_deck_for_ah_did
 from ..settings import config
 
 _config_dialog_manager = None
@@ -56,11 +57,16 @@ def _general_tab(conf_window) -> None:
     tab.hseparator()
     tab.space(8)
 
-    if config.get_feature_flags().get("mh_integration"):
-        tab.text("Feature Preferences", bold=True)
+    tab.text("Feature Preferences", bold=True)
+
+    feature_flags = config.get_feature_flags()
+    if feature_flags.get("show_flashcards_selector_button"):
         tab.checkbox("ankihub_smart_search", "AnkiHub Smart Search")
+
+    if feature_flags.get("chatbot"):
         tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
 
+    if feature_flags.get("mh_integration"):
         add_nested_checkboxes(
             tab, key_prefix="boards_and_beyond", description="Boards and Beyond"
         )
@@ -68,8 +74,16 @@ def _general_tab(conf_window) -> None:
             tab, key_prefix="first_aid_forward", description="First Aid Forward"
         )
 
-        tab.hseparator()
-        tab.space(8)
+    if feature_flags.get("fsrs_reminder") and get_deck_for_ah_did(
+        config.anking_deck_id
+    ):
+        tab.checkbox(
+            "remind_to_optimize_fsrs_parameters",
+            "Monthly FSRS optimization reminder",
+        )
+
+    tab.hseparator()
+    tab.space(8)
 
     tab.text("Debug", bold=True)
     tab.checkbox("report_errors", "Report errors")

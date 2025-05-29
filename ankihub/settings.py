@@ -1038,6 +1038,9 @@ ANKI_VERSION = buildinfo.version
 ANKI_INT_VERSION = point_version()
 FSRS_VERSION = get_fsrs_version()
 
+# Minimum Anki version for which the AnkiHub add-on provides FSRS features
+MIN_ANKI_VERSION_FOR_FSRS_FEATURES = 241100
+
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 
 

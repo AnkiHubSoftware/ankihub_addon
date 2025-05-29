@@ -4,22 +4,21 @@ from typing import Optional
 import aqt
 
 from .. import LOGGER
-from ..settings import ANKI_INT_VERSION, config
-from .deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+from ..main.utils import get_deck_for_ah_did
+from ..settings import ANKI_INT_VERSION, MIN_ANKI_VERSION_FOR_FSRS_FEATURES, config
 from .utils import show_dialog
 
 ENABLE_FSRS_REMINDER_INTERVAL_DAYS = 30
 
 
-def maybe_show_enable_fsrs_reminder():
+def maybe_show_enable_fsrs_reminder() -> None:
     if ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
         return
 
     if not config.get_feature_flags().get("fsrs_reminder", False):
         return
 
-    anking_deck_id = config.anking_deck_id
-    if not bool(config.deck_config(anking_deck_id)):
+    if not get_deck_for_ah_did(config.anking_deck_id):
         return
 
     if aqt.mw.col.get_config("fsrs"):
@@ -29,12 +28,11 @@ def maybe_show_enable_fsrs_reminder():
         return
 
     days_since_last_reminder = config.get_days_since_last_enable_fsrs_reminder()
-    today_date = date.today()
     if (
         days_since_last_reminder is None
         or days_since_last_reminder >= ENABLE_FSRS_REMINDER_INTERVAL_DAYS
     ):
-        config.set_last_enable_fsrs_reminder_date(today_date)
+        config.set_last_enable_fsrs_reminder_date(date.today())
         _show_enable_fsrs_reminder()
 
 
@@ -52,14 +50,9 @@ def _show_enable_fsrs_reminder() -> None:
 
         if dont_show_again:
             config.set_show_enable_fsrs_reminder(False)
-            if enable:
-                aqt.mw.col.set_config("fsrs", True)
-            return
 
-        if not enable:
-            return
-
-        aqt.mw.col.set_config("fsrs", True)
+        if enable:
+            aqt.mw.col.set_config("fsrs", True)
 
     dialog = show_dialog(
         text="""

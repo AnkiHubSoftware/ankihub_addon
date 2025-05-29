@@ -56,8 +56,8 @@ class AnkiHubRevertFSRS {
 
     addRevertButtonStyles() {
         // Theme-aware styling for disabled state
-        const lightBg = "#e6e6e6", lightText = "#6c717e";
-        const darkBg = "#505050", darkText = "#CCCCCC";
+        const lightBg = "#E6E6E6", lightText = "#6B7280";
+        const darkBg = "#414141", darkText = "#7B7A7A";
         const bg = this.theme === "dark" ? darkBg : lightBg;
         const text = this.theme === "dark" ? darkText : lightText;
 

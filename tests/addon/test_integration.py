@@ -72,6 +72,12 @@ from ankihub.gui.enable_fsrs_dialog import (
     ENABLE_FSRS_REMINDER_INTERVAL_DAYS,
     maybe_show_enable_fsrs_reminder,
 )
+from ankihub.gui.optimize_fsrs_dialog import (
+    FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
+    _optimize_fsrs_parameters,
+    _show_fsrs_optimization_reminder,
+    maybe_show_fsrs_optimization_reminder,
+)
 
 from ..factories import (
     DeckExtensionFactory,
@@ -165,13 +171,8 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_options import (
-    FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
-    MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     _backup_fsrs_parameters,
     _can_revert_from_fsrs_parameters,
-    _show_fsrs_optimization_reminder,
-    maybe_show_fsrs_optimization_reminder,
-    optimize_fsrs_parameters,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
@@ -257,6 +258,7 @@ from ankihub.settings import (
     ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     FSRS_VERSION,
+    MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -7712,7 +7714,7 @@ def test_optimize_fsrs_parameters(
 
         # Run optimization
         with qtbot.wait_callback() as cb:
-            optimize_fsrs_parameters(deck_config["id"], on_done=cb)
+            _optimize_fsrs_parameters(deck_config["id"], on_done=cb)
 
         # Check if FSRS parameters were changed
         new_conf = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
@@ -7790,7 +7792,7 @@ def test_maybe_show_fsrs_optimization_reminder(
 
         # Mock the optimize_fsrs_parameters function
         optimize_fsrs_parameters_mock = mocker.patch(
-            "ankihub.gui.deck_options.optimize_fsrs_parameters"
+            "ankihub.gui.optimize_fsrs_dialog._optimize_fsrs_parameters"
         )
 
         # Track the reminder dialog
