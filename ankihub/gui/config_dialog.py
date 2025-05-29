@@ -12,6 +12,7 @@ from typing import cast
 from aqt import qconnect
 from aqt.qt import QCheckBox, Qt
 
+from ..main.utils import get_deck_for_ah_did
 from ..settings import config
 
 _config_dialog_manager = None
@@ -68,10 +69,11 @@ def _general_tab(conf_window) -> None:
             tab, key_prefix="first_aid_forward", description="First Aid Forward"
         )
 
-    tab.checkbox(
-        "remind_to_optimize_fsrs_parameters",
-        "Show monthly FSRS optimization reminder",
-    )
+    if get_deck_for_ah_did(config.anking_deck_id):
+        tab.checkbox(
+            "remind_to_optimize_fsrs_parameters",
+            "Show monthly FSRS optimization reminder",
+        )
 
     tab.hseparator()
     tab.space(8)
