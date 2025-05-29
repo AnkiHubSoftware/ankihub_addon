@@ -4,14 +4,13 @@ from typing import Optional
 import aqt
 
 from .. import LOGGER
-from ..settings import ANKI_INT_VERSION, config
-from .deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+from ..settings import ANKI_INT_VERSION, MIN_ANKI_VERSION_FOR_FSRS_FEATURES, config
 from .utils import show_dialog
 
 ENABLE_FSRS_REMINDER_INTERVAL_DAYS = 30
 
 
-def maybe_show_enable_fsrs_reminder():
+def maybe_show_enable_fsrs_reminder() -> None:
     if ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES:
         return
 
@@ -52,14 +51,9 @@ def _show_enable_fsrs_reminder() -> None:
 
         if dont_show_again:
             config.set_show_enable_fsrs_reminder(False)
-            if enable:
-                aqt.mw.col.set_config("fsrs", True)
-            return
 
-        if not enable:
-            return
-
-        aqt.mw.col.set_config("fsrs", True)
+        if enable:
+            aqt.mw.col.set_config("fsrs", True)
 
     dialog = show_dialog(
         text="""

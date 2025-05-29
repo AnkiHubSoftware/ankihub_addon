@@ -26,13 +26,13 @@ from .gui import (
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
-from .gui.deck_options import maybe_show_fsrs_optimization_reminder
 from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .gui.operations.ankihub_sync import setup_full_sync_patch
 from .gui.operations.username import fetch_username_in_background
+from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
