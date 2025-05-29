@@ -41,7 +41,11 @@ from ..main.note_type_management import (
     update_note_type_templates_and_styles,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..main.utils import note_type_name_without_ankihub_modifications, truncate_string
+from ..main.utils import (
+    get_deck_for_ah_did,
+    note_type_name_without_ankihub_modifications,
+    truncate_string,
+)
 from ..settings import (
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
@@ -903,14 +907,9 @@ class DeckManagementDialog(QDialog):
 
     def _on_new_cards_destination_btn_clicked(self):
         ah_did = self._selected_ah_did()
-        current_destination_deck = aqt.mw.col.decks.get(
-            config.deck_config(ah_did).anki_id,
-            default=False,
-        )
-        if current_destination_deck is None:
-            current = None
-        else:
-            current = current_destination_deck["name"]
+        current_destination_deck_name = None
+        if current_destination_deck := get_deck_for_ah_did(ah_did):
+            current_destination_deck_name = current_destination_deck["name"]
 
         def update_deck_config(note_type_selector: SearchableSelectionDialog):
             if not note_type_selector.name:
@@ -923,7 +922,7 @@ class DeckManagementDialog(QDialog):
         # this lets the user pick a deck
         SearchableSelectionDialog(
             aqt.mw,
-            current=current,
+            current=current_destination_deck_name,
             accept="Confirm Destination for New Cards",
             title="Select Destination for New Cards",
             parent=self,

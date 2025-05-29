@@ -17,6 +17,7 @@ from jinja2 import Template
 
 from .. import LOGGER
 from ..main.deck_options import fsrs_parameters_equal, get_fsrs_parameters
+from ..main.utils import get_deck_for_ah_did
 from ..settings import (
     ANKI_INT_VERSION,
     FSRS_VERSION,
@@ -88,14 +89,10 @@ def _on_deck_options_did_load(deck_options_dialog: DeckOptionsDialog) -> None:
 
 
 def _conf_id_for_ah_deck(ah_did: UUID) -> Optional[DeckConfigId]:
-    if not (deck_config := config.deck_config(ah_did)):
+    if not (deck := get_deck_for_ah_did(ah_did)):
         return None
 
-    anki_did = deck_config.anki_id
-    if not aqt.mw.col.decks.get(anki_did):
-        return None
-
-    return aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+    return aqt.mw.col.decks.config_dict_for_deck_id(deck["id"])["id"]
 
 
 def _backup_fsrs_parameters_for_ah_deck(ah_did: UUID) -> None:

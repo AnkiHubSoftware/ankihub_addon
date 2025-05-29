@@ -10,6 +10,7 @@ from aqt.utils import tooltip
 
 from .. import LOGGER
 from ..main.deck_options import fsrs_parameters_equal, get_fsrs_parameters
+from ..main.utils import get_deck_for_ah_did
 from ..settings import (
     ANKI_INT_VERSION,
     FSRS_VERSION,
@@ -25,12 +26,12 @@ def maybe_show_fsrs_optimization_reminder() -> None:
     if not config.get_feature_flags().get("fsrs_reminder", False):
         return
 
-    deck_config = config.deck_config(config.anking_deck_id)
-    if not deck_config:
+    if not (anking_deck := get_deck_for_ah_did(config.anking_deck_id)):
         return
 
-    anki_did = deck_config.anki_id
-    deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(anki_did)
+    deck_configs_for_update = aqt.mw.col.decks.get_deck_configs_for_update(
+        anking_deck["id"]
+    )
     if not (
         ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
         and deck_configs_for_update.fsrs
@@ -61,13 +62,10 @@ def maybe_show_fsrs_optimization_reminder() -> None:
 
 
 def _show_fsrs_optimization_reminder() -> None:
-    deck_config = config.deck_config(config.anking_deck_id)
-    if not deck_config:
+    if not (anking_deck := get_deck_for_ah_did(config.anking_deck_id)):
         return
 
-    anki_did = deck_config.anki_id
-    if aqt.mw.col.decks.get(anki_did, default=False) is None:
-        return
+    anki_did = anking_deck["id"]
 
     def on_button_clicked(button_idx: Optional[int]) -> None:
         optimize = button_idx == 1

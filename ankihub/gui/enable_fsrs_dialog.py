@@ -4,6 +4,7 @@ from typing import Optional
 import aqt
 
 from .. import LOGGER
+from ..main.utils import get_deck_for_ah_did
 from ..settings import ANKI_INT_VERSION, MIN_ANKI_VERSION_FOR_FSRS_FEATURES, config
 from .utils import show_dialog
 
@@ -17,8 +18,7 @@ def maybe_show_enable_fsrs_reminder() -> None:
     if not config.get_feature_flags().get("fsrs_reminder", False):
         return
 
-    anking_deck_id = config.anking_deck_id
-    if not bool(config.deck_config(anking_deck_id)):
+    if not get_deck_for_ah_did(config.anking_deck_id):
         return
 
     if aqt.mw.col.get_config("fsrs"):

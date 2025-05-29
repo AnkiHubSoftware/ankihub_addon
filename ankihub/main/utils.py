@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from uuid import UUID
 
 import aqt
 from anki.collection import EmptyCardsReport
-from anki.decks import DeckId
+from anki.decks import DeckDict, DeckId
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
@@ -147,6 +148,15 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
     For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
     """
     return aqt.mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
+
+
+def get_deck_for_ah_did(ah_did: UUID) -> Optional[DeckDict]:
+    """Returns the Anki deck dictionary for the given AnkiHub deck ID, or None if it doesn't exist."""
+    deck_config = config.deck_config(ah_did)
+    if not deck_config:
+        return None
+
+    return aqt.mw.col.decks.get(deck_config.anki_id, default=False)
 
 
 # notes
