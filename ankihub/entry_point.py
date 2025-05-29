@@ -15,6 +15,7 @@ from .db import ankihub_db
 from .feature_flags import update_feature_flags_in_background
 from .gui import (
     browser,
+    deck_options,
     deckbrowser,
     editor,
     js_message_handling,
@@ -26,6 +27,7 @@ from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
 from .gui.deck_options import maybe_show_fsrs_optimization_reminder
+from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
@@ -193,6 +195,7 @@ def _once_after_startup_ankiweb_sync() -> None:
 def _on_startup_after_ankiweb_sync() -> None:
     """Run tasks after startup AnkiWeb sync completes (or immediately if there is no auto sync)."""
     maybe_show_fsrs_optimization_reminder()
+    maybe_show_enable_fsrs_reminder()
 
 
 def _general_setup() -> None:
@@ -233,6 +236,9 @@ def _general_setup() -> None:
 
     overview.setup()
     LOGGER.info("Set up deck overview")
+
+    deck_options.setup()
+    LOGGER.info("Set up deck options.")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")

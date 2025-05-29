@@ -39,7 +39,7 @@ from anki.consts import (
     REVLOG_RESCHED,
     REVLOG_REV,
 )
-from anki.decks import DeckId, FilteredDeckConfig
+from anki.decks import DeckConfigId, DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
@@ -49,10 +49,13 @@ from aqt.addons import InstallOk
 from aqt.browser import Browser, SearchContext
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
+from aqt.deckoptions import DeckOptionsDialog
 from aqt.gui_hooks import (
     browser_did_search,
     browser_will_show,
     browser_will_show_context_menu,
+    deck_options_did_load,
+    overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt, QUrl, QWidget
@@ -64,6 +67,11 @@ from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
+
+from ankihub.gui.enable_fsrs_dialog import (
+    ENABLE_FSRS_REMINDER_INTERVAL_DAYS,
+    maybe_show_enable_fsrs_reminder,
+)
 
 from ..factories import (
     DeckExtensionFactory,
@@ -98,7 +106,6 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from aqt.gui_hooks import overview_will_render_bottom
 
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -160,6 +167,8 @@ from ankihub.gui.config_dialog import (
 from ankihub.gui.deck_options import (
     FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
     MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
+    _backup_fsrs_parameters,
+    _can_revert_from_fsrs_parameters,
     _show_fsrs_optimization_reminder,
     maybe_show_fsrs_optimization_reminder,
     optimize_fsrs_parameters,
@@ -197,7 +206,7 @@ from ankihub.gui.overview import (
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
-from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
+from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
@@ -7864,3 +7873,535 @@ def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
     # The config flag should now be False and saved
     assert config.public_config["remind_to_optimize_fsrs_parameters"] is False
     save_public_config_mock.assert_called_once()
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+class TestFSRSDeckOptions:
+    """
+    Test FSRS parameter backup and revert functionality in deck options.
+
+    These tests require FSRS to be available (minimum Anki version with FSRS support)
+    and use the current FSRS_VERSION from settings.
+
+    Note: The backup system works as follows:
+    - First backup call: Creates "current" entry
+    - Second backup call: Moves "current" to "previous", creates new "current"
+    - get_fsrs_parameters_from_backup() returns the "previous" entry
+    - When there is no previous entry, reverting will clear the parameters
+    """
+
+    @pytest.mark.parametrize(
+        "feature_flag_active,fsrs_enabled,use_anking_deck",
+        [
+            # If all conditions are met, the revert button should be visible
+            (True, True, True),
+            # If any condition is False, the revert button should not be visible
+            (True, True, False),
+            (False, True, True),
+            (True, False, True),
+        ],
+    )
+    @pytest.mark.sequential
+    def test_revert_button_visibility(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
+        fsrs_enabled: bool,
+        use_anking_deck: bool,
+    ):
+        """Test that the revert button is only present when the feature flag and FSRS are enabled,
+        and the deck is an AnkiHub deck."""
+        entry_point.run()
+
+        set_feature_flag_state("fsrs_revert_button", is_active=feature_flag_active)
+
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", fsrs_enabled)
+
+            ah_did = (
+                config.anking_deck_id if use_anking_deck else next_deterministic_uuid()
+            )
+            install_ah_deck(ah_did=ah_did)
+            deck_config = config.deck_config(ah_did)
+            anki_did = DeckId(deck_config.anki_id)
+
+            # Open deck options dialog
+            dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
+
+            # Button should exist only when all conditions are met
+            button_should_exist = (
+                feature_flag_active and fsrs_enabled and use_anking_deck
+            )
+
+            assert (
+                self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000)
+                == button_should_exist
+            )
+
+    @pytest.mark.sequential
+    def test_fsrs_parameters_backup_on_dialog_close(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        """Test that FSRS parameters are automatically backed up when deck options dialog is closed."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", True)
+
+            ah_did = config.anking_deck_id
+            install_ah_deck(ah_did=ah_did)
+
+            deck_config = config.deck_config(ah_did)
+            anki_did = DeckId(deck_config.anki_id)
+            conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+
+            # Set initial FSRS parameters
+            initial_params = [0.1] * 19
+            self._set_fsrs_parameters(conf_id, initial_params)
+
+            # Verify no backup exists initially
+            backup_dict = config._get_fsrs_parameteters_backup_dict()
+            assert str(conf_id) not in backup_dict
+
+            # Open and close the deck options dialog
+            dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
+            self._close_deck_options_dialog(dialog)
+
+            qtbot.wait(500)
+
+            # Verify backup was created
+            backup_dict = config._get_fsrs_parameteters_backup_dict()
+            assert str(conf_id) in backup_dict
+
+            # Check the backup
+            current_entry = backup_dict[str(conf_id)].get("current", {})
+            assert current_entry.get("version") == FSRS_VERSION
+            assert current_entry.get("parameters") == initial_params
+
+            previous_entry = backup_dict[str(conf_id)].get("previous", {})
+            assert previous_entry.get("version") is None
+            assert previous_entry.get("parameters") is None
+
+            # Update FSRS parameters again to create a new backup
+            new_params = [0.2] * 19
+            self._set_fsrs_parameters(conf_id, new_params)
+
+            # Open and close the deck options dialog
+            dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
+            self._close_deck_options_dialog(dialog)
+            qtbot.wait(500)
+
+            # Check that the backup was updated correctly
+            backup_dict = config._get_fsrs_parameteters_backup_dict()
+            current_entry = backup_dict[str(conf_id)].get("current", {})
+            assert current_entry.get("version") == FSRS_VERSION
+            assert current_entry.get("parameters") == new_params
+
+            previous_entry = backup_dict[str(conf_id)].get("previous", {})
+            assert previous_entry.get("version") == FSRS_VERSION
+            assert previous_entry.get("parameters") == initial_params
+
+    @pytest.mark.sequential
+    def test_fsrs_parameters_revert_functionality(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        """Test that the revert button restores previous FSRS parameters from backup."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.col.set_config("fsrs", True)
+
+            ah_did = config.anking_deck_id
+            install_ah_deck(ah_did=ah_did)
+
+            deck_config = config.deck_config(ah_did)
+            anki_did = DeckId(deck_config.anki_id)
+            conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+
+            # Set initial parameters and create backup history
+            original_params = [0.1] * 19
+            self._set_fsrs_parameters(conf_id, original_params)
+            assert _backup_fsrs_parameters(conf_id)
+
+            # Set different parameters to create "previous" backup
+            new_params = [0.2] * 19
+            self._set_fsrs_parameters(conf_id, new_params)
+            assert _backup_fsrs_parameters(conf_id)
+
+            # Open deck options dialog
+            dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
+
+            # Wait for the revert button to be created
+            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=500)
+            assert self._is_revert_button_enabled(dialog, qtbot=qtbot)
+
+            # Click revert button
+            self._click_revert_button(dialog)
+            qtbot.wait(500)
+
+            assert not self._is_revert_button_enabled(dialog, qtbot=qtbot)
+
+            self._close_deck_options_dialog(dialog)
+            qtbot.wait(500)
+
+            # Verify parameters were reverted to original
+            assert get_fsrs_parameters(conf_id)[1] == original_params
+
+    @pytest.mark.sequential
+    def test_can_revert_from_fsrs_parameters_function(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        """Test the _can_revert_from_fsrs_parameters utility function."""
+        set_feature_flag_state("fsrs_revert_button", is_active=True)
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = config.anking_deck_id
+            install_ah_deck(ah_did=ah_did)
+
+            deck_config = config.deck_config(ah_did)
+            anki_did = DeckId(deck_config.anki_id)
+            conf_id = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)["id"]
+
+            # Set up backup history
+            original_params = [0.1] * 19
+            self._set_fsrs_parameters(conf_id, original_params)
+            assert _backup_fsrs_parameters(conf_id)
+
+            new_params = [0.2] * 19
+            self._set_fsrs_parameters(conf_id, new_params)
+            assert _backup_fsrs_parameters(conf_id)
+
+            # Verify backup exists
+            backup_version, backup_params = config.get_fsrs_parameters_from_backup(
+                conf_id
+            )
+            assert backup_version == FSRS_VERSION
+            assert backup_params == original_params
+
+            # Same parameters as backup - should not be able to revert
+            assert not _can_revert_from_fsrs_parameters(conf_id, original_params)
+
+            # Different parameters from backup - should be able to revert
+            assert _can_revert_from_fsrs_parameters(conf_id, new_params)
+
+    def _open_deck_options_dialog(
+        self, anki_did: DeckId, qtbot: QtBot
+    ) -> DeckOptionsDialog:
+        """Open the deck options dialog for the given deck."""
+        deck = aqt.mw.col.decks.get(anki_did)
+
+        with qtbot.wait_callback() as callback:
+            deck_options_did_load.append(callback)
+            dialog = DeckOptionsDialog(aqt.mw, deck)
+
+        deck_options_did_load.remove(callback)
+
+        return dialog
+
+    def _set_fsrs_parameters(self, conf_id: DeckConfigId, params: List[float]) -> None:
+        """Set FSRS parameters for the given deck config."""
+        deck_config = aqt.mw.col.decks.get_config(conf_id)
+        deck_config[f"fsrsParams{FSRS_VERSION}"] = params
+        aqt.mw.col.decks.update_config(deck_config)
+
+    def _close_deck_options_dialog(self, dialog: DeckOptionsDialog) -> None:
+        dialog.web.eval(
+            """
+            const saveBtn = document.querySelector("button .save")?.closest("button");
+            if (!saveBtn) throw new Error("Save button not found");
+
+            // Defer by one microtask so Svelte applies any pending changes first
+            Promise.resolve().then(() => saveBtn.click());
+            """
+        )
+
+    def _revert_button_exists(
+        self, dialog: DeckOptionsDialog, qtbot: QtBot, timeout: int = 500
+    ) -> bool:
+        """Check if the revert button element exists in the DOM."""
+        with qtbot.wait_callback(timeout=timeout) as callback:
+            dialog.web.evalWithCallback(
+                "document.getElementById('revert-fsrs-parameters-btn') !== null",
+                callback,
+            )
+
+        return callback.args[0] if callback.args else False
+
+    def _is_revert_button_enabled(self, dialog: DeckOptionsDialog, qtbot) -> bool:
+        """Check if the revert button is enabled."""
+        if not self._revert_button_exists(dialog, qtbot=qtbot):
+            return False
+
+        with qtbot.wait_callback(timeout=500) as callback:
+            dialog.web.evalWithCallback(
+                "!document.getElementById('revert-fsrs-parameters-btn').disabled",
+                callback,
+            )
+
+        return callback.args[0] if callback.args else False
+
+    def _click_revert_button(self, dialog: DeckOptionsDialog) -> None:
+        """Click the revert button in the dialog."""
+        dialog.web.eval("document.getElementById('revert-fsrs-parameters-btn').click()")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected a reminder dialog to appear"
+
+        enable_button = next(
+            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
+        )
+        enable_button.click()
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_fsrs_enabled(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        aqt.mw.col.set_config("fsrs", True)
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_no_anking_deck_installed(
+    anki_session_with_addon_data: AnkiSession,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None, "expected a reminder dialog to appear"
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_no_feature_flag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=False)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is None, "expected a reminder dialog to appear"
+
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_anki_version_too_low(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    mocker.patch(
+        "ankihub.gui.enable_fsrs_dialog.ANKI_INT_VERSION",
+        MIN_ANKI_VERSION_FOR_FSRS_FEATURES - 1,
+    )
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to low Anki version"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        mocker.patch.object(config._private_config, "show_enable_fsrs_reminder", False)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to show_enable_fsrs_reminder=False"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_interval_reached(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Set last reminder as 30 days ago => interval reached
+        config.set_last_enable_fsrs_reminder_date(
+            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL_DAYS))
+        )
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is not None
+        ), "expected a reminder dialog to appear after interval reached"
+
+        enable_button = next(
+            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
+        )
+        enable_button.click()
+        assert aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    set_feature_flag_state: SetFeatureFlagState,
+    latest_instance_tracker: LatestInstanceTracker,
+):
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        # Set last reminder as today => interval not reached
+        config.set_last_enable_fsrs_reminder_date(date.today())
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert (
+            dialog is None
+        ), "expected no reminder dialog to appear due to recent reminder"
+        assert not aqt.mw.col.get_config("fsrs")
+
+
+@skip_test_fsrs_unsupported
+@pytest.mark.qt_no_exception_capture
+def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    latest_instance_tracker: LatestInstanceTracker,
+    set_feature_flag_state: SetFeatureFlagState,
+):
+
+    set_feature_flag_state("fsrs_reminder", is_active=True)
+
+    with anki_session_with_addon_data.profile_loaded():
+        install_ah_deck(ah_did=config.anking_deck_id)
+
+        latest_instance_tracker.track(_Dialog)
+
+        maybe_show_enable_fsrs_reminder()
+
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
+        assert dialog is not None, "expected a reminder dialog to appear"
+
+        # Check "Don't show this again" and click Skip
+        dialog.checkbox.setChecked(True)
+        skip_button = next(b for b in dialog.button_box.buttons() if b.text() == "Skip")
+        skip_button.click()
+
+        assert not aqt.mw.col.get_config("fsrs")
+        assert not config._private_config.show_enable_fsrs_reminder
