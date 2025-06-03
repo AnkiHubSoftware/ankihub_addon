@@ -749,6 +749,9 @@ class AnkiHubImporter:
         }
 
         dids_without_created = dids_cards_were_imported_into - set([created_did])
+        if not dids_without_created:
+            return None
+
         common_ancestor_did = lowest_level_common_ancestor_did(dids_without_created)
         return common_ancestor_did
 
