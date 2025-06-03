@@ -45,8 +45,8 @@ from .utils import (
     change_note_types_of_notes,
     create_deck_with_id,
     create_note_type_with_id,
-    dids_of_notes,
     exclude_descendant_decks,
+    get_original_dids_for_nids,
     get_unique_ankihub_deck_name,
     is_tag_in_list,
     lowest_level_common_ancestor_did,
@@ -84,6 +84,7 @@ class AnkiHubImporter:
     def __init__(self):
         self._created_nids: List[NoteId] = []
         self._updated_nids: List[NoteId] = []
+        self._nids_without_changes: List[NoteId] = []
         self._deleted_nids: List[NoteId] = []
         self._marked_as_deleted_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
@@ -139,6 +140,8 @@ class AnkiHubImporter:
         # Instance attributes are reset here so that the results returned are only for the current deck.
         self._created_nids = []
         self._updated_nids = []
+        self._nids_without_changes = []
+        self._deleted_nids = []
         self._skipped_nids = []
 
         self._ankihub_did = ankihub_did
@@ -155,9 +158,8 @@ class AnkiHubImporter:
 
         self._import_note_types(note_types=note_types)
 
-        dids = set()
         if notes:
-            dids = self._import_notes(
+            self._import_notes(
                 notes_data=notes,
                 behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
                 suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
@@ -166,7 +168,7 @@ class AnkiHubImporter:
 
         if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(
-                dids, self._local_did
+                created_did=self._local_did
             )
             if recommended_deck_settings:
                 set_ankihub_config_for_deck(
@@ -344,7 +346,7 @@ class AnkiHubImporter:
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
-    ) -> Set[DeckId]:
+    ) -> None:
         """
         Handles the import of notes into the Anki and AnkiHub databases. This
         includes creating and updating notes, and marking notes as deleted in
@@ -385,6 +387,7 @@ class AnkiHubImporter:
             notes_to_delete_count=len(notes_to_delete),
             notes_without_changes_count=len(notes_without_changes),
         )
+        self._nids_without_changes = [NoteId(note.id) for note in notes_without_changes]
 
         cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
@@ -410,14 +413,6 @@ class AnkiHubImporter:
         aqt.mw.col.save()
 
         self._log_note_import_summary()
-
-        notes = (
-            list(notes_to_create_by_ah_nid.values())
-            + notes_to_update
-            + notes_without_changes
-        )
-        dids = dids_of_notes(notes)
-        return dids
 
     def _reset_note_types_of_notes_based_on_notes_data(
         self, notes_data: Sequence[NoteInfo]
@@ -644,16 +639,11 @@ class AnkiHubImporter:
         for ah_nid, note in notes_to_create_by_ah_nid.items():
             note.id = NoteId(notes_data_by_ah_nid[ah_nid].anki_nid)
 
-    def _cleanup_first_time_deck_import(
-        self, dids_cards_were_imported_to: Set[DeckId], created_did: DeckId
-    ) -> DeckId:
+    def _cleanup_first_time_deck_import(self, created_did: DeckId) -> DeckId:
         """If a previous version of the deck already existed in Anki, move the cards to that deck and
         remove the newly created deck.
         """
-        if existing_deck_id := self._get_existing_deck_id(
-            dids_cards_were_imported_into=dids_cards_were_imported_to,
-            created_did=created_did,
-        ):
+        if existing_deck_id := self._get_existing_deck_id(created_did=created_did):
             cids = aqt.mw.col.find_cards(f'deck:"{aqt.mw.col.decks.name(created_did)}"')
             aqt.mw.col.set_deck(cids, existing_deck_id)
             LOGGER.info(
@@ -669,9 +659,7 @@ class AnkiHubImporter:
 
         return created_did
 
-    def _get_existing_deck_id(
-        self, dids_cards_were_imported_into: Set[DeckId], created_did: DeckId
-    ) -> Optional[DeckId]:
+    def _get_existing_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
         """Find the previous version of the deck that was imported into Anki.
 
         This method tries to identify if a previous version of the deck was already present
@@ -686,9 +674,7 @@ class AnkiHubImporter:
         if self._ankihub_did == config.anking_deck_id:
             return self._get_existing_anking_deck_id(created_did)
         else:
-            return self._get_existing_regular_deck_id(
-                dids_cards_were_imported_into, created_did
-            )
+            return self._get_existing_regular_deck_id(created_did)
 
     def _get_existing_anking_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
         """Find an existing AnKing deck based on the deck name and the number of AnKing cards in it."""
@@ -734,21 +720,17 @@ class AnkiHubImporter:
             # Either no decks meet threshold or multiple decks do
             return None
 
-    def _get_existing_regular_deck_id(
-        self, dids_cards_were_imported_into: Set[DeckId], created_did: DeckId
-    ) -> Optional[DeckId]:
+    def _get_existing_regular_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
         """Find an existing regular deck.
         If there is one deck that all the already existing notes belong to, return it.
         """
+        existing_nids = self._updated_nids + self._nids_without_changes
+        if not existing_nids:
+            return None
 
-        # Remove "Custom Study" decks from dids
-        dids_cards_were_imported_into = {
-            did
-            for did in dids_cards_were_imported_into
-            if not aqt.mw.col.decks.is_filtered(did)
-        }
+        dids = get_original_dids_for_nids(existing_nids)
+        dids_without_created = dids - {created_did}
 
-        dids_without_created = dids_cards_were_imported_into - set([created_did])
         if not dids_without_created:
             return None
 

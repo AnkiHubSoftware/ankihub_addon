@@ -151,6 +151,7 @@ from ankihub.main.utils import (
     Resource,
     clear_empty_cards,
     exclude_descendant_decks,
+    get_original_dids_for_nids,
     lowest_level_common_ancestor_deck_name,
     mh_tag_to_resource,
     mids_of_notes,
@@ -429,6 +430,43 @@ class TestExcludeDescendantDecks:
                 ]
             )
             assert set(result) == {DeckId(deck1.id), DeckId(deck2.id)}
+
+
+class TestGetOriginalDidsForNids:
+    def test_notes_in_regular_decks(
+        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
+    ):
+        with anki_session.profile_loaded():
+            # Create notes
+            note1 = add_anki_note()
+            note2 = add_anki_note()
+
+            # Set did values (odid should be 0 for regular decks)
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 100, odid = 0 WHERE nid = {note1.id}"
+            )
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 200, odid = 0 WHERE nid = {note2.id}"
+            )
+
+            result = get_original_dids_for_nids([note1.id, note2.id])
+            assert result == {DeckId(100), DeckId(200)}
+
+    def test_notes_in_filtered_deck(
+        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
+    ):
+        with anki_session.profile_loaded():
+            # Create a note
+            note = add_anki_note()
+
+            # Simulate card being in a filtered deck (odid = original deck, did = filtered deck)
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 999, odid = 123 WHERE nid = {note.id}"
+            )
+
+            # Should return the original deck ID (odid), not the filtered deck ID (did)
+            result = get_original_dids_for_nids([note.id])
+            assert result == {DeckId(123)}
 
 
 class TestGetFieldsProtectedByTags:

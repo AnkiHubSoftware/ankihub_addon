@@ -107,12 +107,23 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
         return result
 
 
-def dids_of_notes(notes: List[Note]) -> Set[DeckId]:
-    result: Set[DeckId] = set()
-    for note in notes:
-        dids_for_note = set(c.did for c in note.cards())
-        result |= dids_for_note
-    return result
+def get_original_dids_for_nids(nids: List[NoteId]) -> Set[DeckId]:
+    """Get the original deck IDs for the given note IDs.
+
+    Returns the original deck ID (odid) if the card is in a filtered deck,
+    otherwise returns the current deck ID (did).
+    """
+    query_results = aqt.mw.col.db.list(
+        f"""
+        SELECT DISTINCT CASE
+            WHEN odid != 0 THEN odid
+            ELSE did
+        END as deck_id
+        FROM cards
+        WHERE nid IN {ids2str(nids)}
+        """
+    )
+    return {DeckId(did) for did in query_results}
 
 
 def get_unique_ankihub_deck_name(deck_name: str) -> str:
