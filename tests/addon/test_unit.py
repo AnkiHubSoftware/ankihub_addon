@@ -150,6 +150,7 @@ from ankihub.main.utils import (
     ANKIHUB_HTML_END_COMMENT,
     Resource,
     clear_empty_cards,
+    exclude_descendant_decks,
     lowest_level_common_ancestor_deck_name,
     mh_tag_to_resource,
     mids_of_notes,
@@ -387,6 +388,47 @@ def test_mids_of_notes(anki_session: AnkiSession):
             note_basic.mid,
             note_cloze.mid,
         }
+
+
+class TestExcludeDescendantDecks:
+    def test_empty_list(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            assert exclude_descendant_decks([]) == []
+
+    def test_parent_child_relationship(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            parent = aqt.mw.col.decks.add_normal_deck_with_name("Parent")
+            child = aqt.mw.col.decks.add_normal_deck_with_name("Parent::Child")
+            grandchild = aqt.mw.col.decks.add_normal_deck_with_name(
+                "Parent::Child::Grandchild"
+            )
+
+            # Only parent should remain when all are in list
+            result = exclude_descendant_decks(
+                [DeckId(parent.id), DeckId(child.id), DeckId(grandchild.id)]
+            )
+            assert result == [DeckId(parent.id)]
+
+            # Child should remain when parent not in list
+            result = exclude_descendant_decks([DeckId(child.id), DeckId(grandchild.id)])
+            assert result == [child.id]
+
+    def test_multiple_hierarchies(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            deck1 = aqt.mw.col.decks.add_normal_deck_with_name("Deck1")
+            child1 = aqt.mw.col.decks.add_normal_deck_with_name("Deck1::Child1")
+            deck2 = aqt.mw.col.decks.add_normal_deck_with_name("Deck2")
+            child2 = aqt.mw.col.decks.add_normal_deck_with_name("Deck2::Child2")
+
+            result = exclude_descendant_decks(
+                [
+                    DeckId(deck1.id),
+                    DeckId(child1.id),
+                    DeckId(deck2.id),
+                    DeckId(child2.id),
+                ]
+            )
+            assert set(result) == {DeckId(deck1.id), DeckId(deck2.id)}
 
 
 class TestGetFieldsProtectedByTags:

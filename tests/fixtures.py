@@ -390,6 +390,8 @@ def add_anki_note() -> AddAnkiNote:
             aqt.mw.col.db.execute(
                 f"UPDATE cards SET nid = {anki_nid} WHERE nid = {note.id};"
             )
+            note = aqt.mw.col.get_note(NoteId(anki_nid))
+
         return note
 
     return add_note_inner
