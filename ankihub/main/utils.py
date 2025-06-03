@@ -131,6 +131,31 @@ def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
     return min(dids, key=lambda did: aqt.mw.col.decks.name(did).count("::"))
 
 
+def exclude_descendant_decks(deck_ids: List[DeckId]) -> List[DeckId]:
+    """Return only deck IDs that are not descendants of other decks in the list.
+
+    These decks may still be children of other decks outside this list, but within
+    the provided list, they have no ancestors.
+
+    Args:
+        deck_ids: List of deck IDs to filter
+
+    Returns:
+        List of deck IDs that are not children/descendants of any other deck in the input list
+    """
+    deck_id_set = set(deck_ids)
+    independent_dids = []
+
+    for did in deck_ids:
+        parent_ids = [deck["id"] for deck in aqt.mw.col.decks.parents(did)]
+        # Check if any parent is in our original list
+        has_parent_in_list = any(pid in deck_id_set for pid in parent_ids)
+        if not has_parent_in_list:
+            independent_dids.append(did)
+
+    return independent_dids
+
+
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
     return [
         mid
