@@ -690,7 +690,7 @@ class AnkiHubImporter:
                 dids_cards_were_imported_into, created_did
             )
 
-    def _get_existing_anking_deck_id(self, created_did) -> Optional[DeckId]:
+    def _get_existing_anking_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
         """Find an existing AnKing deck based on the deck name and the number of AnKing cards in it."""
         # The candidates are all decks with "anking" in the name which aren't descendants of each other,
         # and aren't the deck that was just created.
