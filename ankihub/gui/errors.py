@@ -114,6 +114,7 @@ def upload_logs_in_background(
         )
         .failure(_on_upload_logs_failure)
         .without_collection()
+        .with_progress("Uploading logs...")
     )
     aqt.mw.taskman.run_on_main(op.run_in_background)
 
@@ -139,6 +140,7 @@ def upload_logs_and_data_in_background(
         )
         .failure(_on_upload_logs_failure)
         .without_collection()
+        .with_progress("Uploading logs and data...")
     )
     aqt.mw.taskman.run_on_main(op.run_in_background)
 
@@ -232,12 +234,18 @@ def _setup_excepthook():
     sys.excepthook = excepthook
 
 
+def _show_feedback_dialog(
+    exception: BaseException, sentry_event_id: Optional[str] = None
+) -> None:
+    ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
+
+
 def _show_feedback_dialog_and_maybe_report_exception(exception: BaseException) -> None:
     sentry_event_id: Optional[str] = None
     if _error_reporting_enabled():
         sentry_event_id = report_exception_and_upload_logs(exception=exception)
 
-    ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
+    _show_feedback_dialog(exception=exception, sentry_event_id=sentry_event_id)
 
 
 def _try_handle_exception(
@@ -629,12 +637,15 @@ def _upload_logs(key: str) -> str:
 
 
 def _on_upload_logs_failure(exc: Exception) -> None:
+    sentry_id: Optional[str] = None
     if isinstance(exc, AnkiHubHTTPError):
         # Don't report outdated client errors that happen when uploading logs,
         # because they are handled by the add-on when they happen in other places
         # and we don't want to see them in Sentry.
         if exc.response.status_code == 401 or exc.response.status_code == 406:
             return
-        _report_exception(exc)
+        sentry_id = _report_exception(exc)
     else:
-        _report_exception(exc)
+        sentry_id = _report_exception(exc)
+
+    _show_feedback_dialog(exception=exc, sentry_event_id=sentry_id)
