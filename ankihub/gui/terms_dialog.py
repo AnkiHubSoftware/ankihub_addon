@@ -22,7 +22,8 @@ class TermsAndConditionsDialog(QDialog):
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
         self.interceptor = AuthenticationRequestInterceptor(self.web)
-        page = AnkiWebPage(self.web._onBridgeCmd, parent=self)
+        page = AnkiWebPage(self.web._onBridgeCmd)
+        page.setParent(self)
         page.open_links_externally = False
         self.web.setPage(page)
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
