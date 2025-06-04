@@ -114,6 +114,7 @@ def upload_logs_in_background(
         )
         .failure(_on_upload_logs_failure)
         .without_collection()
+        .with_progress("Uploading logs...")
     )
     aqt.mw.taskman.run_on_main(op.run_in_background)
 
@@ -139,6 +140,7 @@ def upload_logs_and_data_in_background(
         )
         .failure(_on_upload_logs_failure)
         .without_collection()
+        .with_progress("Uploading logs and data...")
     )
     aqt.mw.taskman.run_on_main(op.run_in_background)
 

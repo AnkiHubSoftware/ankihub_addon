@@ -290,7 +290,6 @@ def _upload_logs_action() -> None:
     ):
         return
 
-    aqt.mw.progress.start(label="Uploading logs...", parent=aqt.mw, immediate=True)
     upload_logs_in_background(on_done=_on_logs_uploaded, hide_username=True)
 
 
@@ -301,9 +300,6 @@ def _upload_logs_and_data_action() -> None:
     ):
         return
 
-    aqt.mw.progress.start(
-        label="Uploading logs and data...", parent=aqt.mw, immediate=True
-    )
     upload_logs_and_data_in_background(on_done=_on_logs_uploaded)
 
 
