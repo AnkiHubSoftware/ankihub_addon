@@ -2211,6 +2211,240 @@ class TestAnkiHubImporter:
 
             assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
+    def test_import_anking_deck_with_previous_version(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            # Mock the threshold to 1 for easier testing
+            mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
+
+            # Create an existing AnKing deck
+            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing Overhaul"
+            ).id
+
+            # Create a note that will be part of the AnKing deck
+            ah_did = config.anking_deck_id  # Use the actual AnKing deck ID
+            note_info = NoteInfoFactory.create(
+                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
+            )
+
+            # Add the note to the existing Anki deck
+            note = add_anki_note(
+                anki_nid=NoteId(note_info.anki_nid),
+                anki_did=DeckId(existing_anking_did),
+                note_type=ankihub_basic_note_type,
+            )
+
+            dids_before_import = all_dids()
+
+            # Import the AnKing deck
+            import_result = self._import_notes(
+                ah_did=ah_did,
+                ah_notes=[note_info],
+                note_types={note.mid: aqt.mw.col.models.get(note.mid)},
+                is_first_import_of_deck=True,
+            )
+
+            new_dids = all_dids() - dids_before_import
+
+            # There should be no new decks created
+            assert len(new_dids) == 0
+            assert import_result.anki_did == existing_anking_did
+
+            # Verify the card is still in the existing deck
+            assert note.cards()[0].did == existing_anking_did
+
+    def test_import_anking_deck_with_multiple_candidate_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Mock the threshold to 1 for easier testing
+            mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
+
+            # Create multiple decks with "anking" in the name
+            anking_deck1_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing v11"
+            ).id
+            anking_deck2_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing v12"
+            ).id
+
+            ah_did = config.anking_deck_id
+
+            # Create notes for both decks
+            note_info1 = NoteInfoFactory.create(
+                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
+            )
+            note_info2 = NoteInfoFactory.create(
+                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
+            )
+
+            # Add notes to different AnKing decks
+            note1 = add_anki_note(
+                anki_nid=NoteId(note_info1.anki_nid),
+                anki_did=DeckId(anking_deck1_did),
+                note_type=ankihub_basic_note_type,
+            )
+            note2 = add_anki_note(
+                anki_nid=NoteId(note_info2.anki_nid),
+                anki_did=DeckId(anking_deck2_did),
+                note_type=ankihub_basic_note_type,
+            )
+
+            dids_before_import = all_dids()
+
+            # Import the AnKing deck
+            import_result = self._import_notes(
+                ah_did=ah_did,
+                ah_notes=[note_info1, note_info2],
+                note_types={note1.mid: aqt.mw.col.models.get(note1.mid)},
+                is_first_import_of_deck=True,
+            )
+
+            new_dids = all_dids() - dids_before_import
+
+            # Should create a new deck since multiple candidates exist
+            assert len(new_dids) == 1
+            assert import_result.anki_did in new_dids
+            assert import_result.anki_did not in [anking_deck1_did, anking_deck2_did]
+
+            # Cards should remain in their respective decks
+            assert note1.cards()[0].did == anking_deck1_did
+            assert note2.cards()[0].did == anking_deck2_did
+
+    def test_import_anking_deck_with_nested_anking_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Mock the threshold to 1 for easier testing
+            mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
+
+            # Create nested AnKing decks
+            parent_deck_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing Parent"
+            ).id
+            child_deck_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing Parent::AnKing Child"
+            ).id
+
+            ah_did = config.anking_deck_id
+
+            # Create a note in the child deck
+            note_info = NoteInfoFactory.create(
+                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
+            )
+
+            # Add the note to the child deck
+            note = add_anki_note(
+                anki_nid=NoteId(note_info.anki_nid),
+                anki_did=DeckId(child_deck_did),
+                note_type=ankihub_basic_note_type,
+            )
+
+            dids_before_import = all_dids()
+
+            # Import the AnKing deck
+            import_result = self._import_notes(
+                ah_did=ah_did,
+                ah_notes=[note_info],
+                note_types={note.mid: aqt.mw.col.models.get(note.mid)},
+                is_first_import_of_deck=True,
+            )
+
+            new_dids = all_dids() - dids_before_import
+
+            # Should use the parent deck (not the child) due to exclude_descendant_decks
+            assert len(new_dids) == 0
+            assert import_result.anki_did == parent_deck_did
+
+            # Card should remain in the child deck
+            assert note.cards()[0].did == child_deck_did
+
+    @pytest.mark.parametrize(
+        "num_cards, threshold, should_reuse_deck",
+        [
+            (5, 10, False),  # Below threshold - create new deck
+            (10, 10, True),  # Meets threshold - reuse existing deck
+        ],
+    )
+    def test_import_anking_deck_threshold_behavior(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        ankihub_basic_note_type: NotetypeDict,
+        num_cards: int,
+        threshold: int,
+        should_reuse_deck: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Mock the threshold
+            mocker.patch(
+                "ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", threshold
+            )
+
+            # Create an existing AnKing deck
+            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name(
+                "AnKing Overhaul"
+            ).id
+
+            ah_did = config.anking_deck_id
+
+            # Create the specified number of notes in the existing deck
+            note_infos = []
+            for i in range(num_cards):
+                note_info = NoteInfoFactory.create(
+                    ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
+                )
+                note_infos.append(note_info)
+
+                # Add the note to the existing Anki deck
+                add_anki_note(
+                    anki_nid=NoteId(note_info.anki_nid),
+                    anki_did=DeckId(existing_anking_did),
+                    note_type=ankihub_basic_note_type,
+                )
+
+            dids_before_import = all_dids()
+
+            # Import the AnKing deck
+            import_result = self._import_notes(
+                ah_did=ah_did,
+                ah_notes=note_infos,
+                note_types={ankihub_basic_note_type["id"]: ankihub_basic_note_type},
+                is_first_import_of_deck=True,
+            )
+
+            new_dids = all_dids() - dids_before_import
+
+            if should_reuse_deck:
+                # Should reuse the existing deck
+                assert len(new_dids) == 0
+                assert import_result.anki_did == existing_anking_did
+            else:
+                # Should create a new deck
+                assert len(new_dids) == 1
+                assert import_result.anki_did in new_dids
+                assert import_result.anki_did != existing_anking_did
+
     def test_update_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
