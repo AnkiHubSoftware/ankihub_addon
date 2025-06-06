@@ -1722,6 +1722,7 @@ class TestUploadLogs:
         upload_logs_mock = mocker.patch.object(
             AddonAnkiHubClient, "upload_logs", side_effect=exception
         )
+        mocker.patch("ankihub.gui.errors._show_feedback_dialog")
         report_exception_mock = mocker.patch("ankihub.gui.errors._report_exception")
         upload_logs_in_background(on_done=on_done_mock)
 
