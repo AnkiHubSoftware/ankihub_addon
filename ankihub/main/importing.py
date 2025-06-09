@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Collection, Dict, List, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki import consts as anki_consts
@@ -45,13 +45,17 @@ from .utils import (
     change_note_types_of_notes,
     create_deck_with_id,
     create_note_type_with_id,
-    dids_of_notes,
+    exclude_descendant_decks,
+    get_original_dids_for_nids,
     get_unique_ankihub_deck_name,
     is_tag_in_list,
     lowest_level_common_ancestor_did,
     note_type_with_updated_templates_and_css,
     truncated_list,
 )
+
+# How many cards the previous AnKing deck should at least have to be considered the previous deck
+MIN_ANKING_CARDS_FOR_PREVIOUS_DECK = 1000
 
 
 class NoteOperation(Enum):
@@ -80,6 +84,7 @@ class AnkiHubImporter:
     def __init__(self):
         self._created_nids: List[NoteId] = []
         self._updated_nids: List[NoteId] = []
+        self._nids_without_changes: List[NoteId] = []
         self._deleted_nids: List[NoteId] = []
         self._marked_as_deleted_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
@@ -135,6 +140,8 @@ class AnkiHubImporter:
         # Instance attributes are reset here so that the results returned are only for the current deck.
         self._created_nids = []
         self._updated_nids = []
+        self._nids_without_changes = []
+        self._deleted_nids = []
         self._skipped_nids = []
 
         self._ankihub_did = ankihub_did
@@ -151,9 +158,8 @@ class AnkiHubImporter:
 
         self._import_note_types(note_types=note_types)
 
-        dids = set()
         if notes:
-            dids = self._import_notes(
+            self._import_notes(
                 notes_data=notes,
                 behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
                 suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
@@ -162,7 +168,7 @@ class AnkiHubImporter:
 
         if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(
-                dids, self._local_did
+                created_did=self._local_did
             )
             if recommended_deck_settings:
                 set_ankihub_config_for_deck(
@@ -340,7 +346,7 @@ class AnkiHubImporter:
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
-    ) -> Set[DeckId]:
+    ) -> None:
         """
         Handles the import of notes into the Anki and AnkiHub databases. This
         includes creating and updating notes, and marking notes as deleted in
@@ -381,6 +387,7 @@ class AnkiHubImporter:
             notes_to_delete_count=len(notes_to_delete),
             notes_without_changes_count=len(notes_without_changes),
         )
+        self._nids_without_changes = [NoteId(note.id) for note in notes_without_changes]
 
         cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
@@ -406,14 +413,6 @@ class AnkiHubImporter:
         aqt.mw.col.save()
 
         self._log_note_import_summary()
-
-        notes = (
-            list(notes_to_create_by_ah_nid.values())
-            + notes_to_update
-            + notes_without_changes
-        )
-        dids = dids_of_notes(notes)
-        return dids
 
     def _reset_note_types_of_notes_based_on_notes_data(
         self, notes_data: Sequence[NoteInfo]
@@ -640,41 +639,103 @@ class AnkiHubImporter:
         for ah_nid, note in notes_to_create_by_ah_nid.items():
             note.id = NoteId(notes_data_by_ah_nid[ah_nid].anki_nid)
 
-    def _cleanup_first_time_deck_import(
-        self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
-    ) -> DeckId:
-        """Remove newly created deck if the subset of local notes were in a single deck before subscribing.
-
-        I.e., if the user has a subset of the remote deck and the entire
-        subset exists in a single local deck, that deck will be used as the home deck.
-
-        If the newly created deck is removed, move all the cards to their original deck.
+    def _cleanup_first_time_deck_import(self, created_did: DeckId) -> DeckId:
+        """If a previous version of the deck already existed in Anki, move the cards to that deck and
+        remove the newly created deck.
         """
-        dids = set(dids_cards_were_imported_to)
-
-        # remove "Custom Study" decks from dids
-        dids = {did for did in dids if not aqt.mw.col.decks.is_filtered(did)}
-
-        # If the subset of local notes were in a single deck before the import,
-        # move the new cards there (from the newly created deck) and remove the created deck.
-        # Subdecks are taken into account below.
-        if (dids_wh_created := dids - set([created_did])) and (
-            (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
-        ) is not None:
+        if existing_deck_id := self._get_existing_deck_id(created_did=created_did):
             cids = aqt.mw.col.find_cards(f'deck:"{aqt.mw.col.decks.name(created_did)}"')
-            aqt.mw.col.set_deck(cids, common_ancestor_did)
+            aqt.mw.col.set_deck(cids, existing_deck_id)
             LOGGER.info(
-                "Moved new cards to common ancestor deck.",
-                common_ancestor_did=common_ancestor_did,
+                "Moved new cards to existing deck.",
+                existing_deck_did=existing_deck_id,
             )
 
-            if created_did != common_ancestor_did:
+            if created_did != existing_deck_id:
                 aqt.mw.col.decks.remove([created_did])
                 LOGGER.info("Removed created deck.", created_did=created_did)
 
-            return common_ancestor_did
+            return existing_deck_id
 
         return created_did
+
+    def _get_existing_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
+        """Find the previous version of the deck that was imported into Anki.
+
+        This method tries to identify if a previous version of the deck was already present
+        in the Anki collection before the current import. It uses different strategies depending
+        on whether this is an AnKing deck or a regular deck.
+
+        Returns:
+            The deck ID of the previous version, or None if:
+            - No clear previously existing deck can be identified
+            - Multiple potential previous decks exist
+        """
+        if self._ankihub_did == config.anking_deck_id:
+            return self._get_existing_anking_deck_id(created_did)
+        else:
+            return self._get_existing_regular_deck_id(created_did)
+
+    def _get_existing_anking_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
+        """Find an existing AnKing deck based on the deck name and the number of AnKing cards in it."""
+        # The candidates are all decks with "anking" in the name which aren't descendants of each other,
+        # and aren't the deck that was just created.
+        dids_with_anking_in_name = [
+            DeckId(deck_name_id.id)
+            for deck_name_id in aqt.mw.col.decks.all_names_and_ids(
+                include_filtered=False
+            )
+            if "anking" in deck_name_id.name.lower()
+        ]
+        candidate_dids = exclude_descendant_decks(dids_with_anking_in_name)
+        candidate_dids = [did for did in candidate_dids if did != created_did]
+
+        # Count AnKing cards in each candidate AnKing deck
+        anki_nids = ankihub_db.anki_nids_for_ankihub_deck(self._ankihub_did)
+        anking_card_counts_by_did = {}
+        for did in candidate_dids:
+            # Check how many AnKing deck cards were imported into this deck or child decks
+            descendant_ids = [id_ for _, id_ in aqt.mw.col.decks.children(did)]
+            deck_ids = [did] + descendant_ids
+            card_count = aqt.mw.col.db.scalar(
+                f"""
+                SELECT COUNT(*) FROM cards WHERE (
+                    (did IN {ids2str(deck_ids)} OR odid IN {ids2str(deck_ids)})
+                    AND nid IN {ids2str(anki_nids)}
+                )
+                """
+            )
+            anking_card_counts_by_did[did] = card_count
+
+        # If there is exactly one deck with >= ANKING_DECK_THRESHOLD AnKing cards, use this deck
+        dids_with_many_anking_cards = [
+            did
+            for did, count in anking_card_counts_by_did.items()
+            if count >= MIN_ANKING_CARDS_FOR_PREVIOUS_DECK
+        ]
+
+        if len(dids_with_many_anking_cards) == 1:
+            return dids_with_many_anking_cards[0]
+        else:
+            # Either no decks meet threshold or multiple decks do
+            return None
+
+    def _get_existing_regular_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
+        """Find an existing regular deck.
+        If there is one deck that all the already existing notes belong to, return it.
+        """
+        existing_nids = self._updated_nids + self._nids_without_changes
+        if not existing_nids:
+            return None
+
+        dids = get_original_dids_for_nids(existing_nids)
+        dids_without_created = dids - {created_did}
+
+        if not dids_without_created:
+            return None
+
+        common_ancestor_did = lowest_level_common_ancestor_did(dids_without_created)
+        return common_ancestor_did
 
     def _cards_to_suspend_for_note(
         self,

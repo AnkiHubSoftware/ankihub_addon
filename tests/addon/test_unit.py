@@ -150,6 +150,8 @@ from ankihub.main.utils import (
     ANKIHUB_HTML_END_COMMENT,
     Resource,
     clear_empty_cards,
+    exclude_descendant_decks,
+    get_original_dids_for_nids,
     lowest_level_common_ancestor_deck_name,
     mh_tag_to_resource,
     mids_of_notes,
@@ -387,6 +389,84 @@ def test_mids_of_notes(anki_session: AnkiSession):
             note_basic.mid,
             note_cloze.mid,
         }
+
+
+class TestExcludeDescendantDecks:
+    def test_empty_list(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            assert exclude_descendant_decks([]) == []
+
+    def test_parent_child_relationship(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            parent = aqt.mw.col.decks.add_normal_deck_with_name("Parent")
+            child = aqt.mw.col.decks.add_normal_deck_with_name("Parent::Child")
+            grandchild = aqt.mw.col.decks.add_normal_deck_with_name(
+                "Parent::Child::Grandchild"
+            )
+
+            # Only parent should remain when all are in list
+            result = exclude_descendant_decks(
+                [DeckId(parent.id), DeckId(child.id), DeckId(grandchild.id)]
+            )
+            assert result == [DeckId(parent.id)]
+
+            # Child should remain when parent not in list
+            result = exclude_descendant_decks([DeckId(child.id), DeckId(grandchild.id)])
+            assert result == [child.id]
+
+    def test_multiple_hierarchies(self, anki_session: AnkiSession):
+        with anki_session.profile_loaded():
+            deck1 = aqt.mw.col.decks.add_normal_deck_with_name("Deck1")
+            child1 = aqt.mw.col.decks.add_normal_deck_with_name("Deck1::Child1")
+            deck2 = aqt.mw.col.decks.add_normal_deck_with_name("Deck2")
+            child2 = aqt.mw.col.decks.add_normal_deck_with_name("Deck2::Child2")
+
+            result = exclude_descendant_decks(
+                [
+                    DeckId(deck1.id),
+                    DeckId(child1.id),
+                    DeckId(deck2.id),
+                    DeckId(child2.id),
+                ]
+            )
+            assert set(result) == {DeckId(deck1.id), DeckId(deck2.id)}
+
+
+class TestGetOriginalDidsForNids:
+    def test_notes_in_regular_decks(
+        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
+    ):
+        with anki_session.profile_loaded():
+            # Create notes
+            note1 = add_anki_note()
+            note2 = add_anki_note()
+
+            # Set did values (odid should be 0 for regular decks)
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 100, odid = 0 WHERE nid = {note1.id}"
+            )
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 200, odid = 0 WHERE nid = {note2.id}"
+            )
+
+            result = get_original_dids_for_nids([note1.id, note2.id])
+            assert result == {DeckId(100), DeckId(200)}
+
+    def test_notes_in_filtered_deck(
+        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
+    ):
+        with anki_session.profile_loaded():
+            # Create a note
+            note = add_anki_note()
+
+            # Simulate card being in a filtered deck (odid = original deck, did = filtered deck)
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET did = 999, odid = 123 WHERE nid = {note.id}"
+            )
+
+            # Should return the original deck ID (odid), not the filtered deck ID (did)
+            result = get_original_dids_for_nids([note.id])
+            assert result == {DeckId(123)}
 
 
 class TestGetFieldsProtectedByTags:
