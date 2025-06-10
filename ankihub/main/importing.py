@@ -649,6 +649,7 @@ class AnkiHubImporter:
             LOGGER.info(
                 "Moved new cards to existing deck.",
                 existing_deck_did=existing_deck_id,
+                is_anking_deck=self._ankihub_did == config.anking_deck_id,
             )
 
             if created_did != existing_deck_id:
@@ -656,6 +657,12 @@ class AnkiHubImporter:
                 LOGGER.info("Removed created deck.", created_did=created_did)
 
             return existing_deck_id
+        else:
+            LOGGER.info(
+                "No existing deck found, keeping the newly created deck.",
+                created_did=created_did,
+                is_anking_deck=self._ankihub_did == config.anking_deck_id,
+            )
 
         return created_did
 
