@@ -918,9 +918,10 @@ class DatadogLogHandler(logging.Handler):
         # as this leads to an error in the shutdown, because at this point no new threads can be created.
         feature_flags = config.get_feature_flags()
 
-        if self.public_config.get("use_staging") or not feature_flags.get(
+        should_send_logs = self.public_config.get("use_staging") or feature_flags.get(
             "send_addon_logs_to_datadog", False
-        ):
+        )
+        if not should_send_logs:
             with self.lock:
                 # Clear the buffer to prevent it from growing indefinitely.
                 self.buffer = []
