@@ -168,6 +168,7 @@ def _show_deck_import_summary_dialog_inner(
         default_button_idx=1,
         scrollable=True,
         callback=on_button_clicked,
+        use_show=True,
     )
 
 
