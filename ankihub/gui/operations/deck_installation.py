@@ -31,12 +31,7 @@ from ...settings import (
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import (
-    deck_download_progress_cb,
-    logged_into_ankiweb,
-    show_dialog,
-    tooltip_icon,
-)
+from ..utils import deck_download_progress_cb, logged_into_ankiweb, show_dialog
 from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -111,7 +106,7 @@ def _on_install_done(
         if deck_contains_subdeck_tags(ah_did):
             build_subdecks_and_move_cards_to_them_in_background(ah_did)
 
-    _show_deck_import_summary_dialog(import_results)
+    _show_deck_import_summary_dialog_inner(import_results)
 
     on_done(future_with_result(None))
 
@@ -141,6 +136,18 @@ def _show_deck_import_summary_dialog(
         aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
         for ah_did in ankihub_dids
     ]
+    _show_deck_import_summary_dialog(
+        ankihub_deck_names=ankihub_deck_names,
+        anki_deck_names=anki_deck_names,
+        import_results=import_results,
+    )
+
+
+def _show_deck_import_summary_dialog_inner(
+    ankihub_deck_names: List[str],
+    anki_deck_names: List[str],
+    import_results: List[AnkiHubImportResult],
+) -> None:
     message = messages.deck_import_summary(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
@@ -160,7 +167,6 @@ def _show_deck_import_summary_dialog(
         buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
         default_button_idx=1,
         scrollable=True,
-        icon=tooltip_icon(),
         callback=on_button_clicked,
     )
 
