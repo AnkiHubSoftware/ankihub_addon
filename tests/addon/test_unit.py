@@ -3471,12 +3471,10 @@ class TestDeckImportSummaryDialog:
 
         message = self.get_dialog_message(mock_dependencies)
         assert (
-            "The deck <b>MCAT Biology</b> was merged into <b>My Custom Biology Deck</b>"
+            "<b>MCAT Biology</b> was merged into <b>My Custom Biology Deck</b>"
             in message
         )
         assert "due to overlapping content" in message
-
-        # qtbot.wait(1000000)
 
     def test_multiple_decks_all_created(
         self, mock_dependencies: Dict[str, Any], qtbot: QtBot
@@ -3629,10 +3627,8 @@ class TestDeckImportSummaryDialog:
 
         message = self.get_dialog_message(mock_dependencies)
 
-        # qtbot.wait(1000000)
-
         # Check header
-        assert "<b>Success!</b> Your decks are ready." in message
+        assert "<b>Success!</b> Your decks are ready:" in message
 
         # Check new decks section
         assert "New deck(s) created (4 decks):" in message
