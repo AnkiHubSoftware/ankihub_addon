@@ -105,8 +105,8 @@ class AnkiHubImportResultFactory(BaseFactory[AnkiHubImportResult]):
     class Meta:
         model = AnkiHubImportResult
 
-    ankihub_did: uuid.UUID = factory.LazyFunction(uuid.uuid4)
-    anki_did: int = factory.Sequence(lambda n: n + 1)
+    ankihub_did: uuid.UUID = factory.LazyFunction(uuid.uuid4)  # type: ignore
+    anki_did: int = factory.Sequence(lambda n: n + 1)  # type: ignore
     updated_nids: List[int] = []
     created_nids: List[int] = [1, 2, 3]
     deleted_nids: List[int] = []
