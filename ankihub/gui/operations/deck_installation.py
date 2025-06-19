@@ -106,7 +106,7 @@ def _on_install_done(
         if deck_contains_subdeck_tags(ah_did):
             build_subdecks_and_move_cards_to_them_in_background(ah_did)
 
-    _show_deck_import_summary_dialog_inner(import_results)
+    _show_deck_import_summary_dialog(import_results)
 
     on_done(future_with_result(None))
 
@@ -136,7 +136,7 @@ def _show_deck_import_summary_dialog(
         aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
         for ah_did in ankihub_dids
     ]
-    _show_deck_import_summary_dialog(
+    _show_deck_import_summary_dialog_inner(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
         import_results=import_results,
