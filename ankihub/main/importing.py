@@ -75,6 +75,7 @@ class AnkiHubImportResult:
     marked_as_deleted_nids: List[NoteId]
     skipped_nids: List[NoteId]
     first_import_of_deck: bool
+    merged_with_existing_deck: bool
 
     def __repr__(self):
         return pformat(self.__dict__)
@@ -166,10 +167,12 @@ class AnkiHubImporter:
                 suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
             )
 
+        merged_with_existing_deck = False
         if self._is_first_import_of_deck:
-            self._local_did = self._cleanup_first_time_deck_import(
-                created_did=self._local_did
-            )
+            (
+                self._local_did,
+                merged_with_existing_deck,
+            ) = self._cleanup_first_time_deck_import(created_did=self._local_did)
             if recommended_deck_settings:
                 set_ankihub_config_for_deck(
                     self._local_did,
@@ -195,6 +198,7 @@ class AnkiHubImporter:
             marked_as_deleted_nids=self._marked_as_deleted_nids,
             skipped_nids=self._skipped_nids,
             first_import_of_deck=self._is_first_import_of_deck,
+            merged_with_existing_deck=merged_with_existing_deck,
         )
         aqt.mw.col.save()
 
@@ -639,9 +643,12 @@ class AnkiHubImporter:
         for ah_nid, note in notes_to_create_by_ah_nid.items():
             note.id = NoteId(notes_data_by_ah_nid[ah_nid].anki_nid)
 
-    def _cleanup_first_time_deck_import(self, created_did: DeckId) -> DeckId:
+    def _cleanup_first_time_deck_import(
+        self, created_did: DeckId
+    ) -> Tuple[DeckId, bool]:
         """If a previous version of the deck already existed in Anki, move the cards to that deck and
         remove the newly created deck.
+        Returns a tupple of (anki_did, merged_with_existing_deck).
         """
         if existing_deck_id := self._get_existing_deck_id(created_did=created_did):
             cids = aqt.mw.col.find_cards(f'deck:"{aqt.mw.col.decks.name(created_did)}"')
@@ -656,7 +663,7 @@ class AnkiHubImporter:
                 aqt.mw.col.decks.remove([created_did])
                 LOGGER.info("Removed created deck.", created_did=created_did)
 
-            return existing_deck_id
+            return existing_deck_id, True
         else:
             LOGGER.info(
                 "No existing deck found, keeping the newly created deck.",
@@ -664,7 +671,7 @@ class AnkiHubImporter:
                 is_anking_deck=self._ankihub_did == config.anking_deck_id,
             )
 
-        return created_did
+        return created_did, False
 
     def _get_existing_deck_id(self, created_did: DeckId) -> Optional[DeckId]:
         """Find the previous version of the deck that was imported into Anki.
