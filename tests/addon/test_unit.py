@@ -3360,7 +3360,8 @@ class TestAddNoteTypeFields:
 class TestDeckImportSummaryDialog:
     """Test suite for deck import summary dialog scenarios."""
 
-    wait = 5000
+    # Set to x to wait x milliseconds after showing the dialog - useful to look at the dialog
+    wait = None
 
     @pytest.fixture
     def mock_dependencies(self, mocker: MockerFixture) -> Dict[str, Any]:
