@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, Generator, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import MagicMock, Mock, call, patch
 
 import aqt
@@ -29,6 +29,7 @@ from requests import Response
 from requests_mock import Mocker
 
 from ..factories import (
+    AnkiHubImportResultFactory,
     DeckExtensionFactory,
     DeckFactory,
     DeckMediaFactory,
@@ -53,6 +54,7 @@ from ..fixtures import (  # type: ignore
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+import ankihub
 from ankihub import entry_point
 from ankihub.addon_ankihub_client import AddonAnkiHubClient
 from ankihub.ankihub_client import (
@@ -98,6 +100,9 @@ from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
+)
+from ankihub.gui.operations.deck_installation import (
+    _show_deck_import_summary_dialog_inner,
 )
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
@@ -3350,3 +3355,325 @@ class TestAddNoteTypeFields:
             # Assert client method was called with the same note type as the one in the db
             note_type_passed_to_client = update_note_type_mock.call_args[0][1]
             assert note_type_passed_to_client == ah_db_note_type
+
+
+class TestDeckImportSummaryDialog:
+    """Test suite for deck import summary dialog scenarios."""
+
+    wait = 5000
+
+    @pytest.fixture
+    def mock_dependencies(self, mocker: MockerFixture) -> Dict[str, Any]:
+        """Mock dependencies needed for the dialog."""
+        # Mock functions
+        mock_logged_into_ankiweb = mocker.patch(
+            "ankihub.gui.operations.deck_installation.logged_into_ankiweb",
+            return_value=True,
+        )
+        mock_show_dialog = mocker.spy(
+            ankihub.gui.operations.deck_installation, "show_dialog"
+        )
+
+        # Mock DeckManagementDialog
+        mock_deck_management = Mock()
+        mocker.patch(
+            "ankihub.gui.decks_dialog.DeckManagementDialog", mock_deck_management
+        )
+
+        return {
+            "logged_into_ankiweb": mock_logged_into_ankiweb,
+            "show_dialog": mock_show_dialog,
+            "deck_management": mock_deck_management,
+        }
+
+    def get_dialog_message(self, mock_dependencies: Dict[str, Any]) -> str:
+        """Extract the HTML message passed to show_dialog."""
+        return mock_dependencies["show_dialog"].call_args[0][0]
+
+    @pytest.mark.parametrize("logged_to_ankiweb", [True, False])
+    def test_single_deck_created_separately(
+        self,
+        mock_dependencies: Dict[str, Any],
+        logged_to_ankiweb: bool,
+        qtbot: QtBot,
+    ):
+        """Test scenario: Single deck was created separately."""
+        mock_dependencies["logged_into_ankiweb"].return_value = logged_to_ankiweb
+
+        ankihub_deck_names = ["Cardiology Deck"]
+        anki_deck_names = ankihub_deck_names.copy()
+
+        import_result = AnkiHubImportResultFactory.create(
+            merged_with_existing_deck=False
+        )
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=[import_result],
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert "The deck <b>Cardiology Deck</b> is ready to study." in message
+
+        if logged_to_ankiweb:
+            assert "Download from AnkiWeb" in message
+        else:
+            assert "Download from AnkiWeb" not in message
+
+    def test_single_deck_merged_same_name(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Single deck was merged into existing deck with same name."""
+        ankihub_deck_names = ["Internal Medicine"]
+        anki_deck_names = ankihub_deck_names.copy()
+
+        import_result = AnkiHubImportResultFactory.create(
+            merged_with_existing_deck=True
+        )
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=[import_result],
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert "You already have the deck <b>Internal Medicine</b>!" in message
+        assert "We've merged the new deck into the existing one." in message
+
+    def test_single_deck_merged_different_name(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Single deck was merged into existing deck with different name."""
+        ankihub_deck_names = ["MCAT Biology"]
+        anki_deck_names = ["My Custom Biology Deck"]
+
+        import_result = AnkiHubImportResultFactory.create(
+            merged_with_existing_deck=True
+        )
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=[import_result],
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert (
+            "The deck <b>MCAT Biology</b> was merged into <b>My Custom Biology Deck</b>"
+            in message
+        )
+        assert "due to overlapping content" in message
+
+        # qtbot.wait(1000000)
+
+    def test_multiple_decks_all_created(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Multiple decks all created separately."""
+        ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
+        anki_deck_names = ankihub_deck_names.copy()
+
+        import_results = [
+            AnkiHubImportResultFactory.create(merged_with_existing_deck=False)
+            for _ in range(3)
+        ]
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=import_results,
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert "The following decks are ready to study:" in message
+        assert "<b>Deck name A</b>" in message
+        assert "<b>Deck name B</b>" in message
+        assert "<b>Deck name C</b>" in message
+
+    def test_multiple_decks_all_merged_same_name(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Multiple decks all merged with same name."""
+        ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
+        anki_deck_names = ankihub_deck_names.copy()
+
+        import_results = [
+            AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
+            for _ in range(3)
+        ]
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=import_results,
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert (
+            "New decks were merged into existing decks with matching names:" in message
+        )
+        assert "<b>Deck name A</b>" in message
+        assert "<b>Deck name B</b>" in message
+        assert "<b>Deck name C</b>" in message
+
+    def test_multiple_decks_all_merged_different_name(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Multiple decks all merged with different name."""
+        ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
+        anki_deck_names = [
+            "Existing Deck Name A",
+            "Existing Deck Name B",
+            "Existing Deck Name C",
+        ]
+
+        import_results = [
+            AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
+            for _ in range(3)
+        ]
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=import_results,
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert (
+            "Some of the decks you subscribed to matched ones you already had."
+            in message
+        )
+        assert "We've merged them to avoid duplicates:" in message
+        assert "<b>Deck name A</b> → <b>Existing Deck Name A</b>" in message
+        assert "<b>Deck name B</b> → <b>Existing Deck Name B</b>" in message
+        assert "<b>Deck name C</b> → <b>Existing Deck Name C</b>" in message
+
+    def test_multiple_subscribed_decks_mixed(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Multiple subscribed decks with mixed scenarios."""
+        # Setup deck names for mixed scenario
+        ankihub_deck_names = [
+            # New decks
+            "Deck name A",
+            "Deck name B",
+            "Deck name C",
+            "Deck name D",
+            # Merged with same name
+            "Deck name E",
+            "Deck name F",
+            "Deck name G",
+            # Merged with different name
+            "Deck name H",
+            "Deck name I",
+            "Deck name J",
+        ]
+
+        anki_deck_names = [
+            # New decks (same as ankihub names)
+            "Deck name A",
+            "Deck name B",
+            "Deck name C",
+            "Deck name D",
+            # Merged with same name
+            "Deck name E",
+            "Deck name F",
+            "Deck name G",
+            # Merged with different name
+            "Existing Deck Name A",
+            "Existing Deck Name B",
+            "Existing Deck Name C",
+        ]
+
+        import_results = []
+        # First 4 are new
+        for _ in range(4):
+            import_results.append(
+                AnkiHubImportResultFactory.create(merged_with_existing_deck=False)
+            )
+        # Next 6 are merged
+        for _ in range(6):
+            import_results.append(
+                AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
+            )
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=import_results,
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+
+        # qtbot.wait(1000000)
+
+        # Check header
+        assert "<b>Success!</b> Your decks are ready." in message
+
+        # Check new decks section
+        assert "New deck(s) created (4 decks):" in message
+        for letter in ["A", "B", "C", "D"]:
+            assert f"<b>Deck name {letter}</b>" in message
+
+        # Check merged same name section
+        assert "Merged into existing deck(s) with matching names (3 decks):" in message
+        for letter in ["E", "F", "G"]:
+            assert f"<b>Deck name {letter}</b>" in message
+
+        # Check merged different name section
+        assert (
+            "Merged into existing deck(s) due to overlapping content (3 decks):"
+            in message
+        )
+        assert "<b>Deck name H</b> → <b>Existing Deck Name A</b>" in message
+        assert "<b>Deck name I</b> → <b>Existing Deck Name B</b>" in message
+        assert "<b>Deck name J</b> → <b>Existing Deck Name C</b>" in message
+
+    def test_deck_with_skipped_notes(
+        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
+    ):
+        """Test scenario: Deck with skipped notes warning."""
+        ankihub_deck_names = ["Pathology Deck"]
+        anki_deck_names = ["Pathology Deck"]
+
+        import_result = AnkiHubImportResultFactory.create(
+            merged_with_existing_deck=False,
+            skipped_nids=[100, 101, 102, 103, 104],
+        )
+
+        _show_deck_import_summary_dialog_inner(
+            ankihub_deck_names=ankihub_deck_names,
+            anki_deck_names=anki_deck_names,
+            import_results=[import_result],
+        )
+
+        if self.wait:
+            qtbot.wait(self.wait)
+
+        message = self.get_dialog_message(mock_dependencies)
+        assert "Some notes in <b>Pathology Deck</b> were skipped" in message
+        assert "have the same ID as notes in another AnkiHub deck" in message
+        assert "this forum topic</a> for details" in message
