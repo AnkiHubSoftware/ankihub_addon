@@ -18,6 +18,7 @@ from ankihub.ankihub_client.models import (
     UserDeckExtensionRelation,
     UserDeckRelation,
 )
+from ankihub.main.importing import AnkiHubImportResult
 
 fake = Faker()
 
@@ -98,3 +99,18 @@ class DeckExtensionFactory(BaseFactory[DeckExtension]):
     tag_group_name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
     description: str = factory.LazyAttribute(lambda _: fake.sentence())  # type: ignore
     user_relation: UserDeckExtensionRelation = UserDeckExtensionRelation.SUBSCRIBER
+
+
+class AnkiHubImportResultFactory(BaseFactory[AnkiHubImportResult]):
+    class Meta:
+        model = AnkiHubImportResult
+
+    ankihub_did: uuid.UUID = factory.LazyFunction(uuid.uuid4)  # type: ignore
+    anki_did: int = factory.Sequence(lambda n: n + 1)  # type: ignore
+    updated_nids: List[int] = []
+    created_nids: List[int] = [1, 2, 3]
+    deleted_nids: List[int] = []
+    marked_as_deleted_nids: List[int] = []
+    skipped_nids: List[int] = []
+    first_import_of_deck: bool = False
+    merged_with_existing_deck: bool = False
