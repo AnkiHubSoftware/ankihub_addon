@@ -44,6 +44,7 @@ from ..main.note_type_management import (
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import (
+    all_notes_in_deck,
     get_deck_for_ah_did,
     move_notes_to_decks_while_respecting_odid,
     note_type_name_without_ankihub_modifications,
@@ -925,18 +926,18 @@ class DeckManagementDialog(QDialog):
 
             new_deck_name = note_type_selector.name
 
-            # Check if cards exist in current deck and show move dialog if needed
-            cards_count = self._count_cards_in_deck(ah_did)
             should_move_cards = False
-
             if (
-                cards_count > 0
-                and current_destination_deck_name
-                and new_deck_name != current_destination_deck_name
+                not current_destination_deck_name
+                or new_deck_name != current_destination_deck_name
             ):
-                should_move_cards = self._show_move_cards_dialog(
-                    current_destination_deck_name, new_deck_name
-                )
+                anki_nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+                if not all_notes_in_deck(
+                    nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
+                ):
+                    should_move_cards = self._show_move_cards_dialog(
+                        current_destination_deck_name, new_deck_name
+                    )
 
             # Update the destination deck configuration
             anki_did = aqt.mw.col.decks.id(new_deck_name)
@@ -1012,15 +1013,21 @@ class DeckManagementDialog(QDialog):
         anki_did = DeckId(deck["id"])
         return aqt.mw.col.decks.card_count(anki_did, include_subdecks=True)
 
-    def _show_move_cards_dialog(self, old_deck_name: str, new_deck_name: str) -> bool:
+    def _show_move_cards_dialog(
+        self, old_deck_name: Optional[str], new_deck_name: str
+    ) -> bool:
         """Show a dialog asking if the user wants to move cards to the new destination deck.
         Returns True if cards should be moved, False if skipped."""
 
         message = (
             f"The new card destination is now <b>{new_deck_name}</b>.<br><br>"
-            f"You still have cards in <b>{old_deck_name}</b>.<br><br>"
-            f"Do you want to move them to <b>{new_deck_name}</b>?<br><br>"
-            f"⚠️ <b>{old_deck_name}</b> may become empty."
+            + (
+                f"You still have cards in <b>{old_deck_name}</b>.<br><br>"
+                if old_deck_name
+                else ""
+            )
+            + f"Do you want to move them to <b>{new_deck_name}</b>?<br><br>"
+            + (f"⚠️ <b>{old_deck_name}</b> may become empty." if old_deck_name else "")
         )
 
         return ask_user(

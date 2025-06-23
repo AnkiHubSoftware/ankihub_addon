@@ -167,6 +167,25 @@ def exclude_descendant_decks(deck_ids: List[DeckId]) -> List[DeckId]:
     return independent_dids
 
 
+def all_notes_in_deck(nids: Sequence[NoteId], anki_did: DeckId) -> bool:
+    """Check if all notes in the given list of note IDs are in the specified Anki deck or its subdecks."""
+    descendant_ids = [id_ for _, id_ in aqt.mw.col.decks.children(anki_did)]
+    deck_ids = [anki_did] + descendant_ids
+    if not nids:
+        return True
+    else:
+        # If there is no note outside the deck, all notes are inside
+        return not aqt.mw.col.db.scalar(
+            f"""
+            SELECT EXISTS(
+                SELECT 1 FROM cards
+                WHERE NOT (did IN {ids2str(deck_ids)} OR odid IN {ids2str(deck_ids)})
+                AND nid IN {ids2str(nids)}
+            )
+            """
+        )
+
+
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
     return [
         mid

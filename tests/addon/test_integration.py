@@ -145,7 +145,7 @@ from ankihub.ankihub_client.models import (
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import decks_dialog, editor, utils
+from ankihub.gui import editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -4737,7 +4737,6 @@ class TestDeckManagementDialog:
             (
                 mock_ask_user,
                 mock_subdeck_operation,
-                mock_refresh_anki_ui_after_moving_cards,
             ) = self._setup_move_cards_test_mocks(
                 mocker,
                 user_accepts_move,
@@ -4864,7 +4863,7 @@ class TestDeckManagementDialog:
         original_anki_did: DeckId,
         original_deck_name: str,
         mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
-    ) -> tuple[Mock, Mock, Mock]:
+    ) -> tuple[Mock, Mock]:
         """Setup all mocks for move cards test."""
         # Mock destination selection dialog
         mock_study_deck_dialog_with_cb(
@@ -4895,14 +4894,9 @@ class TestDeckManagementDialog:
             ],
         )
 
-        mock_refresh_anki_ui_after_moving_cards = mocker.spy(
-            decks_dialog, "refresh_anki_ui_after_moving_cards"
-        )
-
         return (
             mock_ask_user,
             mock_subdeck_operation,
-            mock_refresh_anki_ui_after_moving_cards,
         )
 
     def _mock_dependencies(self, mocker: MockerFixture) -> None:
