@@ -7,8 +7,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 import aqt
 from anki.decks import DeckId
 from anki.utils import is_mac
-from aqt import QCheckBox, sync
+from aqt import QCheckBox, dialogs, sync
 from aqt.addons import check_and_prompt_for_updates
+from aqt.browser import Browser
 from aqt.progress import ProgressDialog
 from aqt.qt import (
     QAbstractAnimation,
@@ -846,3 +847,10 @@ def robust_filter(filter: Callable[..., T]) -> Callable[..., T]:
             return first
 
     return wrapper
+
+
+def refresh_anki_ui_after_moving_cards() -> None:
+    aqt.mw.deckBrowser.refresh()
+    browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
+    if browser is not None:
+        browser.sidebar.refresh()
