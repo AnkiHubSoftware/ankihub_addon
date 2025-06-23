@@ -4588,9 +4588,9 @@ class TestDeckManagementDialog:
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         anki_did: int = None,
-    ) -> Tuple[str, int, uuid.UUID]:
+    ) -> Tuple[str, DeckId, uuid.UUID]:
         """Install a deck with a subdeck tag and return the full subdeck name."""
-        ah_did = install_ah_deck(anki_did=anki_did)
+        ah_did = install_ah_deck(anki_did=DeckId(anki_did))
         subdeck_name = "Subdeck"
         deck_name = config.deck_config(ah_did).name
         deck_name_as_tag = deck_name.replace(" ", "_")
@@ -4717,63 +4717,32 @@ class TestDeckManagementDialog:
         with anki_session_with_addon_data.profile_loaded():
             self._mock_dependencies(mocker)
 
-            # Setup deck based on scenario
-            original_anki_did = next_deterministic_id()
-            if has_cards and subdecks_enabled:
-                # Use deck with subdeck tags for subdeck scenarios
-                _, original_anki_did, ah_did = self._install_deck_with_subdeck_tag(
-                    install_ah_deck, import_ah_note, anki_did=original_anki_did
-                )
-                config.set_subdecks(ah_did, True)
-                expected_note_count = 2  # 1 from subdeck tag + 1 from install_ah_deck
-            elif has_cards:
-                # Regular deck with cards
-                ah_did = install_ah_deck(anki_did=original_anki_did)
-                expected_note_count = 1
-            else:
-                ah_did = install_ah_deck(anki_did=original_anki_did)
-                # Remove note
-                nids = aqt.mw.col.find_notes("")
-                aqt.mw.col.remove_notes(nids)
-                expected_note_count = 0
-
-            # Determine destination deck
-            original_deck_name = config.deck_config(ah_did).name
-            if same_destination:
-                destination_deck_name = original_deck_name
-                new_anki_did = original_anki_did
-            else:
-                destination_deck_name = "New Destination Deck"
-                install_ah_deck(anki_deck_name=destination_deck_name)
-                new_anki_did = aqt.mw.col.decks.id_for_name(destination_deck_name)
-
-            # Mock destination selection dialog
-            mock_study_deck_dialog_with_cb(
-                "ankihub.gui.decks_dialog.SearchableSelectionDialog",
-                deck_name=destination_deck_name,
+            # Setup test scenario (decks, cards, destinations)
+            (
+                ah_did,
+                original_anki_did,
+                new_anki_did,
+                original_deck_name,
+                destination_deck_name,
+                expected_note_count,
+            ) = self._setup_move_cards_when_changing_destination_test_scenario(
+                has_cards,
+                subdecks_enabled,
+                same_destination,
+                install_ah_deck,
+                import_ah_note,
+                next_deterministic_id,
             )
 
-            # Mock user response to move dialog
-            mock_ask_user = mocker.patch("ankihub.gui.decks_dialog.ask_user")
-            if user_accepts_move is not None:
-                mock_ask_user.return_value = user_accepts_move
-
-            # Mock subdeck operation
-            mock_subdeck_operation = mocker.patch(
-                "ankihub.gui.decks_dialog.build_subdecks_and_move_cards_to_them_in_background"
-            )
-
-            # Mock get_deck_subscriptions
-            mocker.patch.object(
-                AnkiHubClient,
-                "get_deck_subscriptions",
-                return_value=[
-                    DeckFactory.create(
-                        ah_did=ah_did,
-                        anki_did=original_anki_did,
-                        name=original_deck_name,
-                    )
-                ],
+            # Setup all mocks
+            mock_ask_user, mock_subdeck_operation = self._setup_move_test_mocks(
+                mocker,
+                user_accepts_move,
+                destination_deck_name,
+                ah_did,
+                original_anki_did,
+                original_deck_name,
+                mock_study_deck_dialog_with_cb,
             )
 
             # Open dialog and select deck
@@ -4832,6 +4801,97 @@ class TestDeckManagementDialog:
                 assert len(call_args[1]["nids"]) == expected_note_count
             else:
                 mock_subdeck_operation.assert_not_called()
+
+    def _setup_move_cards_when_changing_destination_test_scenario(
+        self,
+        has_cards: bool,
+        subdecks_enabled: bool,
+        same_destination: bool,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        next_deterministic_id: Callable[[], int],
+    ) -> tuple[uuid.UUID, DeckId, DeckId, str, str, int]:
+        """Setup deck scenario for move cards test."""
+        original_anki_did = DeckId(next_deterministic_id())
+
+        if has_cards and subdecks_enabled:
+            # Use deck with subdeck tags for subdeck scenarios
+            _, original_anki_did, ah_did = self._install_deck_with_subdeck_tag(
+                install_ah_deck, import_ah_note, anki_did=original_anki_did
+            )
+            config.set_subdecks(ah_did, True)
+            expected_note_count = 2  # 1 from subdeck tag + 1 from install_ah_deck
+        elif has_cards:
+            # Regular deck with cards
+            ah_did = install_ah_deck(anki_did=original_anki_did)
+            expected_note_count = 1
+        else:
+            ah_did = install_ah_deck(anki_did=original_anki_did)
+            # Remove note to create empty deck
+            nids = aqt.mw.col.find_notes("")
+            aqt.mw.col.remove_notes(nids)
+            expected_note_count = 0
+
+        # Determine destination deck
+        original_deck_name = config.deck_config(ah_did).name
+        if same_destination:
+            destination_deck_name = original_deck_name
+            new_anki_did = original_anki_did
+        else:
+            destination_deck_name = "New Destination Deck"
+            install_ah_deck(anki_deck_name=destination_deck_name)
+            new_anki_did = aqt.mw.col.decks.id_for_name(destination_deck_name)
+
+        return (
+            ah_did,
+            original_anki_did,
+            new_anki_did,
+            original_deck_name,
+            destination_deck_name,
+            expected_note_count,
+        )
+
+    def _setup_move_test_mocks(
+        self,
+        mocker: MockerFixture,
+        user_accepts_move: Optional[bool],
+        destination_deck_name: str,
+        ah_did: uuid.UUID,
+        original_anki_did: DeckId,
+        original_deck_name: str,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+    ) -> tuple[Mock, Mock]:
+        """Setup all mocks for move cards test."""
+        # Mock destination selection dialog
+        mock_study_deck_dialog_with_cb(
+            "ankihub.gui.decks_dialog.SearchableSelectionDialog",
+            deck_name=destination_deck_name,
+        )
+
+        # Mock user response to move dialog
+        mock_ask_user = mocker.patch("ankihub.gui.decks_dialog.ask_user")
+        if user_accepts_move is not None:
+            mock_ask_user.return_value = user_accepts_move
+
+        # Mock subdeck operation
+        mock_subdeck_operation = mocker.patch(
+            "ankihub.gui.decks_dialog.build_subdecks_and_move_cards_to_them_in_background"
+        )
+
+        # Mock get_deck_subscriptions
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            return_value=[
+                DeckFactory.create(
+                    ah_did=ah_did,
+                    anki_did=original_anki_did,
+                    name=original_deck_name,
+                )
+            ],
+        )
+
+        return mock_ask_user, mock_subdeck_operation
 
     def _mock_dependencies(self, mocker: MockerFixture) -> None:
         # Mock the config to return that the user is logged in
