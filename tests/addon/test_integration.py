@@ -4640,15 +4640,12 @@ class TestDeckManagementDialog:
             # Mock ask_user to not confirm moving cards
             mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=False)
 
-            # Open the dialog
+            # Open the dialog and selec the deck
             dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
-            qtbot.wait(200)
-
-            # Select the deck and click the Set Updates Destination button
             dialog.decks_list.setCurrentRow(0)
-            qtbot.wait(200)
 
+            # Click the Set Updates Destination button
             dialog.set_new_cards_destination_btn.click()
             qtbot.wait(200)
 
