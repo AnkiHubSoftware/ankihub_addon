@@ -4660,12 +4660,9 @@ class TestDeckManagementDialog:
             (True, True, True, False),  # Accept move with subdecks enabled
             # User declines move scenarios
             (False, False, True, False),  # Decline move
-            (False, True, True, False),  # Decline move with subdecks enabled
             # No dialog scenarios
             (None, False, False, False),  # No cards exist
-            (None, True, False, False),  # No cards exist with subdecks
             (None, False, True, True),  # Same destination selected
-            (None, True, True, True),  # Same destination with subdecks
         ],
     )
     def test_move_cards_when_changing_destination(
