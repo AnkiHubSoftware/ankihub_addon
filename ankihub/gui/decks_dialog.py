@@ -946,49 +946,39 @@ class DeckManagementDialog(QDialog):
             # Move cards if user chose to do so
             if should_move_cards:
                 AddonQueryOp(
-                    op=lambda _: move_cards_to_new_destination(
-                        ah_did=ah_did, new_destination_did=anki_did
-                    ),
+                    op=lambda _: move_cards_to_deck(ah_did=ah_did, anki_did=anki_did),
                     success=on_cards_moved,
                     parent=aqt.mw,
                 ).with_progress("Moving cards...").run_in_background()
 
             self._refresh_new_cards_destination_details_label(ah_did)
 
-        def move_cards_to_new_destination(
+        def move_cards_to_deck(
             ah_did: uuid.UUID,
-            new_destination_did: DeckId,
+            anki_did: DeckId,
         ) -> None:
             """Move all cards of the AnkiHub deck to the new destination deck."""
-
             nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-            if not nids:
-                return  # No notes to move
-
-            # Create mapping of note IDs to new deck ID
-            nid_to_did = {NoteId(nid): DeckId(new_destination_did) for nid in nids}
-
-            # Move the cards and refresh Anki's UI
+            nid_to_did = {NoteId(nid): DeckId(anki_did) for nid in nids}
             move_notes_to_decks_while_respecting_odid(nid_to_did)
 
-            # If subdecks are enabled, reorganize cards into subdecks
+            LOGGER.info(
+                "Moved cards to new destination deck",
+                ah_did=ah_did,
+                card_count=len(nids),
+                destination_deck_name=aqt.mw.col.decks.name(DeckId(anki_did)),
+            )
+
+            # If subdecks are enabled, build subdecks and move cards to them
             deck_config = config.deck_config(ah_did)
             if deck_config.subdecks_enabled:
+                nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
                 aqt.mw.taskman.run_on_main(
                     lambda: build_subdecks_and_move_cards_to_them_in_background(
                         ankihub_did=ah_did,
                         nids=list(nids),
                     )
                 )
-
-            LOGGER.info(
-                "Moved cards to new destination deck",
-                ah_did=ah_did,
-                card_count=len(nids),
-                destination_deck_name=aqt.mw.col.decks.name(
-                    DeckId(new_destination_did)
-                ),
-            )
 
         def on_cards_moved(_) -> None:
             refresh_anki_ui_after_moving_cards()

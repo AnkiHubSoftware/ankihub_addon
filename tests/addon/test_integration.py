@@ -145,7 +145,7 @@ from ankihub.ankihub_client.models import (
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import editor, utils
+from ankihub.gui import decks_dialog, editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -4844,8 +4844,8 @@ class TestDeckManagementDialog:
             mock_ask_user.return_value = user_accepts_move
 
         # Mock subdeck operation
-        mock_subdeck_operation = mocker.patch(
-            "ankihub.gui.decks_dialog.build_subdecks_and_move_cards_to_them_in_background"
+        mock_subdeck_operation = mocker.spy(
+            decks_dialog, "build_subdecks_and_move_cards_to_them_in_background"
         )
 
         # Mock get_deck_subscriptions
