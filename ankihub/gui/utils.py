@@ -456,6 +456,7 @@ def show_dialog(
     scrollable: bool = False,
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
+    use_show: bool = False,
     open_dialog: bool = True,
     add_title_to_body_on_mac: bool = True,
     checkbox: Optional[QCheckBox] = None,
@@ -468,7 +469,7 @@ def show_dialog(
     # MacOS has dialogs without a title bar when using .open(). They have title bars when using .show().
     # The .strip() is used because some callers pass " " as title to avoid the default title "AnkiHub",
     # in this case we don't want to add the title to the text.
-    if is_mac and title.strip() and add_title_to_body_on_mac:
+    if not use_show and is_mac and title.strip() and add_title_to_body_on_mac:
         if text_format == Qt.TextFormat.PlainText:
             text = f"{title}\n\n{text}"
         else:
@@ -488,7 +489,9 @@ def show_dialog(
         checkbox=checkbox,
     )
 
-    if open_dialog:
+    if use_show:
+        dialog.show()
+    elif open_dialog:
         dialog.open()
 
     return dialog
