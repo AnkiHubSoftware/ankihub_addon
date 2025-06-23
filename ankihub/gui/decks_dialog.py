@@ -944,9 +944,8 @@ class DeckManagementDialog(QDialog):
             # Move cards if user chose to do so
             if should_move_cards:
                 self._move_cards_to_new_destination(
-                    current_anki_did=DeckId(current_destination_deck["id"]),
-                    new_anki_did=anki_did,
                     ah_did=ah_did,
+                    new_destination_did=anki_did,
                 )
 
             self._refresh_new_cards_destination_details_label(ah_did)
@@ -991,23 +990,17 @@ class DeckManagementDialog(QDialog):
 
     def _move_cards_to_new_destination(
         self,
-        current_anki_did: DeckId,
-        new_anki_did: DeckId,
         ah_did: uuid.UUID,
+        new_destination_did: DeckId,
     ) -> None:
-        """Move all cards from the current deck to the new destination deck."""
-        if current_anki_did == new_anki_did:
-            return  # No need to move if same deck
+        """Move all cards of the AnkiHub deck to the new destination deck."""
 
-        # Find all notes in the current deck
-        current_deck_name = aqt.mw.col.decks.name(current_anki_did)
-        nids = aqt.mw.col.find_notes(f'deck:"{current_deck_name}"')
-
+        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         if not nids:
             return  # No notes to move
 
         # Create mapping of note IDs to new deck ID
-        nid_to_did = {NoteId(nid): DeckId(new_anki_did) for nid in nids}
+        nid_to_did = {NoteId(nid): DeckId(new_destination_did) for nid in nids}
 
         # Move the cards and refresh Anki's UI
         move_notes_to_decks_while_respecting_odid(nid_to_did)
@@ -1025,8 +1018,7 @@ class DeckManagementDialog(QDialog):
             "Moved cards to new destination deck",
             ah_did=ah_did,
             card_count=len(nids),
-            from_deck=current_deck_name,
-            to_deck=aqt.mw.col.decks.name(DeckId(new_anki_did)),
+            destination_deck_name=aqt.mw.col.decks.name(DeckId(new_destination_did)),
         )
 
     def _on_toggle_subdecks(self):
