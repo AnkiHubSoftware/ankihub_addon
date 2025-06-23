@@ -1004,15 +1004,6 @@ class DeckManagementDialog(QDialog):
             callback=on_destination_selected,
         )
 
-    def _count_cards_in_deck(self, ah_did: uuid.UUID) -> int:
-        """Count the total number of cards in the deck associated with the given AnkiHub deck ID."""
-        deck = get_deck_for_ah_did(ah_did)
-        if not deck:
-            return 0
-
-        anki_did = DeckId(deck["id"])
-        return aqt.mw.col.decks.card_count(anki_did, include_subdecks=True)
-
     def _show_move_cards_dialog(
         self, old_deck_name: Optional[str], new_deck_name: str
     ) -> bool:
