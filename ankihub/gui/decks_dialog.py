@@ -56,6 +56,7 @@ from ..settings import (
     url_deck_base,
     url_decks,
 )
+from .operations import AddonQueryOp
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import (
     build_subdecks_and_move_cards_to_them_in_background,
@@ -918,7 +919,7 @@ class DeckManagementDialog(QDialog):
         if current_destination_deck := get_deck_for_ah_did(ah_did):
             current_destination_deck_name = current_destination_deck["name"]
 
-        def update_deck_config(note_type_selector: SearchableSelectionDialog):
+        def on_destination_selected(note_type_selector: SearchableSelectionDialog):
             if not note_type_selector.name:
                 return
 
@@ -943,12 +944,54 @@ class DeckManagementDialog(QDialog):
 
             # Move cards if user chose to do so
             if should_move_cards:
-                self._move_cards_to_new_destination(
-                    ah_did=ah_did,
-                    new_destination_did=anki_did,
-                )
+                AddonQueryOp(
+                    op=lambda _: move_cards_to_new_destination(
+                        ah_did=ah_did, new_destination_did=anki_did
+                    ),
+                    success=on_cards_moved,
+                    parent=aqt.mw,
+                ).with_progress("Moving cards...").run_in_background()
 
             self._refresh_new_cards_destination_details_label(ah_did)
+
+        def move_cards_to_new_destination(
+            ah_did: uuid.UUID,
+            new_destination_did: DeckId,
+        ) -> None:
+            """Move all cards of the AnkiHub deck to the new destination deck."""
+
+            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+            if not nids:
+                return  # No notes to move
+
+            # Create mapping of note IDs to new deck ID
+            nid_to_did = {NoteId(nid): DeckId(new_destination_did) for nid in nids}
+
+            # Move the cards and refresh Anki's UI
+            move_notes_to_decks_while_respecting_odid(nid_to_did)
+
+            # If subdecks are enabled, reorganize cards into subdecks
+            deck_config = config.deck_config(ah_did)
+            if deck_config.subdecks_enabled:
+                aqt.mw.taskman.run_on_main(
+                    lambda: build_subdecks_and_move_cards_to_them_in_background(
+                        ankihub_did=ah_did,
+                        nids=list(nids),
+                    )
+                )
+
+            LOGGER.info(
+                "Moved cards to new destination deck",
+                ah_did=ah_did,
+                card_count=len(nids),
+                destination_deck_name=aqt.mw.col.decks.name(
+                    DeckId(new_destination_did)
+                ),
+            )
+
+        def on_cards_moved(_) -> None:
+            refresh_anki_ui_after_moving_cards()
+            tooltip("Moved cards to new destination deck", parent=aqt.mw)
 
         # this lets the user pick a deck
         SearchableSelectionDialog(
@@ -957,7 +1000,7 @@ class DeckManagementDialog(QDialog):
             accept="Confirm Destination for New Cards",
             title="Select Destination for New Cards",
             parent=self,
-            callback=update_deck_config,
+            callback=on_destination_selected,
         )
 
     def _count_cards_in_deck(self, ah_did: uuid.UUID) -> int:
@@ -986,39 +1029,6 @@ class DeckManagementDialog(QDialog):
             title="Move existing cards",
             yes_button_label="Move Cards",
             no_button_label="Skip",
-        )
-
-    def _move_cards_to_new_destination(
-        self,
-        ah_did: uuid.UUID,
-        new_destination_did: DeckId,
-    ) -> None:
-        """Move all cards of the AnkiHub deck to the new destination deck."""
-
-        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        if not nids:
-            return  # No notes to move
-
-        # Create mapping of note IDs to new deck ID
-        nid_to_did = {NoteId(nid): DeckId(new_destination_did) for nid in nids}
-
-        # Move the cards and refresh Anki's UI
-        move_notes_to_decks_while_respecting_odid(nid_to_did)
-        refresh_anki_ui_after_moving_cards()
-
-        # If subdecks are enabled, reorganize cards into subdecks
-        deck_config = config.deck_config(ah_did)
-        if deck_config.subdecks_enabled:
-            build_subdecks_and_move_cards_to_them_in_background(
-                ankihub_did=ah_did,
-                nids=list(nids),
-            )
-
-        LOGGER.info(
-            "Moved cards to new destination deck",
-            ah_did=ah_did,
-            card_count=len(nids),
-            destination_deck_name=aqt.mw.col.decks.name(DeckId(new_destination_did)),
         )
 
     def _on_toggle_subdecks(self):

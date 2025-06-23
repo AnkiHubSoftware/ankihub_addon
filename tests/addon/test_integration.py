@@ -112,7 +112,6 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.ankihub_client import (
@@ -146,7 +145,7 @@ from ankihub.ankihub_client.models import (
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import editor, utils
+from ankihub.gui import decks_dialog, editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -4725,7 +4724,7 @@ class TestDeckManagementDialog:
                 original_deck_name,
                 destination_deck_name,
                 expected_note_count,
-            ) = self._setup_move_cards_when_changing_destination_test_scenario(
+            ) = self._setup_move_cards_test_scenario(
                 has_cards,
                 subdecks_enabled,
                 same_destination,
@@ -4735,7 +4734,11 @@ class TestDeckManagementDialog:
             )
 
             # Setup all mocks
-            mock_ask_user, mock_subdeck_operation = self._setup_move_test_mocks(
+            (
+                mock_ask_user,
+                mock_subdeck_operation,
+                mock_refresh_anki_ui_after_moving_cards,
+            ) = self._setup_move_cards_test_mocks(
                 mocker,
                 user_accepts_move,
                 destination_deck_name,
@@ -4758,7 +4761,6 @@ class TestDeckManagementDialog:
 
             # Click the change destination button
             dialog.set_new_cards_destination_btn.click()
-            qtbot.wait(200)
 
             # Verify the destination was updated
             assert config.deck_config(ah_did).anki_id == new_anki_did
@@ -4773,6 +4775,8 @@ class TestDeckManagementDialog:
 
                 # Verify card movement results
                 if not same_destination:
+                    qtbot.wait(500)
+
                     original_card_count_after = aqt.mw.col.decks.card_count(
                         original_anki_did, include_subdecks=True
                     )
@@ -4802,7 +4806,7 @@ class TestDeckManagementDialog:
             else:
                 mock_subdeck_operation.assert_not_called()
 
-    def _setup_move_cards_when_changing_destination_test_scenario(
+    def _setup_move_cards_test_scenario(
         self,
         has_cards: bool,
         subdecks_enabled: bool,
@@ -4851,7 +4855,7 @@ class TestDeckManagementDialog:
             expected_note_count,
         )
 
-    def _setup_move_test_mocks(
+    def _setup_move_cards_test_mocks(
         self,
         mocker: MockerFixture,
         user_accepts_move: Optional[bool],
@@ -4860,7 +4864,7 @@ class TestDeckManagementDialog:
         original_anki_did: DeckId,
         original_deck_name: str,
         mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
-    ) -> tuple[Mock, Mock]:
+    ) -> tuple[Mock, Mock, Mock]:
         """Setup all mocks for move cards test."""
         # Mock destination selection dialog
         mock_study_deck_dialog_with_cb(
@@ -4891,7 +4895,15 @@ class TestDeckManagementDialog:
             ],
         )
 
-        return mock_ask_user, mock_subdeck_operation
+        mock_refresh_anki_ui_after_moving_cards = mocker.spy(
+            decks_dialog, "refresh_anki_ui_after_moving_cards"
+        )
+
+        return (
+            mock_ask_user,
+            mock_subdeck_operation,
+            mock_refresh_anki_ui_after_moving_cards,
+        )
 
     def _mock_dependencies(self, mocker: MockerFixture) -> None:
         # Mock the config to return that the user is logged in
