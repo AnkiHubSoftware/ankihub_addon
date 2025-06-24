@@ -9,6 +9,7 @@ This file provides guidance to AI coding agents when working with code in this r
 - `pytest tests/addon -m sequential -n 0` - Run sequential tests (flaky when run in parallel)
 - `pytest tests/addon -m performance -n 0` - Run performance tests
 - `pytest tests/client` - Run client tests with VCR cassettes
+  - VCR.py simplifies and speeds up tests that make HTTP requests.
 
 ### Code Quality
 - `mypy` - Type checking
