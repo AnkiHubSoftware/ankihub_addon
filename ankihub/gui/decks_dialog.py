@@ -8,7 +8,6 @@ from uuid import UUID
 import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId, NotetypeNameId
-from anki.notes import NoteId
 from aqt.qt import (
     QBoxLayout,
     QCheckBox,
@@ -46,7 +45,7 @@ from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import (
     all_notes_in_deck,
     get_deck_for_ah_did,
-    move_notes_to_decks_while_respecting_odid,
+    move_ankihub_cards_to_deck,
     note_type_name_without_ankihub_modifications,
     truncate_string,
 )
@@ -946,26 +945,22 @@ class DeckManagementDialog(QDialog):
             # Move cards if user chose to do so
             if should_move_cards:
                 AddonQueryOp(
-                    op=lambda _: move_cards_to_deck(ah_did=ah_did, anki_did=anki_did),
-                    success=on_cards_moved,
+                    op=lambda _: move_ankihub_cards_to_deck(
+                        ah_did=ah_did, anki_did=anki_did
+                    ),
+                    success=lambda _: on_cards_moved(anki_did=anki_did),
                     parent=aqt.mw,
                 ).with_progress("Moving cards...").run_in_background()
 
             self._refresh_new_cards_destination_details_label(ah_did)
 
-        def move_cards_to_deck(
-            ah_did: uuid.UUID,
-            anki_did: DeckId,
-        ) -> None:
-            """Move all cards of the AnkiHub deck to the new destination deck."""
-            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-            nid_to_did = {NoteId(nid): DeckId(anki_did) for nid in nids}
-            move_notes_to_decks_while_respecting_odid(nid_to_did)
+        def on_cards_moved(anki_did: DeckId) -> None:
+            refresh_anki_ui_after_moving_cards()
+            tooltip("Moved cards to new destination deck", parent=aqt.mw)
 
             LOGGER.info(
                 "Moved cards to new destination deck",
                 ah_did=ah_did,
-                card_count=len(nids),
                 destination_deck_name=aqt.mw.col.decks.name(DeckId(anki_did)),
             )
 
@@ -979,10 +974,6 @@ class DeckManagementDialog(QDialog):
                         nids=list(nids),
                     )
                 )
-
-        def on_cards_moved(_) -> None:
-            refresh_anki_ui_after_moving_cards()
-            tooltip("Moved cards to new destination deck", parent=aqt.mw)
 
         # this lets the user pick a deck
         SearchableSelectionDialog(

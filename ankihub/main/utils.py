@@ -214,6 +214,14 @@ def get_deck_for_ah_did(ah_did: UUID) -> Optional[DeckDict]:
     return aqt.mw.col.decks.get(deck_config.anki_id, default=False)
 
 
+def move_ankihub_cards_to_deck(ah_did: UUID, anki_did: DeckId) -> None:
+    """Move all AnkiHub cards in the AnkiHub deck with the given ID to the Anki deck with the given ID.
+    Cards in filtered decks are not moved, but their original deck ID is updated."""
+    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+    nid_to_did = {NoteId(nid): DeckId(anki_did) for nid in nids}
+    move_notes_to_decks_while_respecting_odid(nid_to_did)
+
+
 # notes
 
 
