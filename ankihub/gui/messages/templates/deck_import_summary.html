@@ -1,28 +1,116 @@
-{% if ankihub_deck_names|length > 1 %}
-Your AnkiHub decks are ready to study!
+{# Categorize decks into different scenarios #}
+{% set new_decks = [] %}
+{% set merged_same_name = [] %}
+{% set merged_different_name = [] %}
+
+{% for i in range(ankihub_deck_names|length) %}
+    {% if not import_results[i].merged_with_existing_deck %}
+        {% set _ = new_decks.append(ankihub_deck_names[i]) %}
+    {% elif ankihub_deck_names[i] == anki_deck_names[i] %}
+        {% set _ = merged_same_name.append(ankihub_deck_names[i]) %}
+    {% else %}
+        {% set _ = merged_different_name.append({'ankihub': ankihub_deck_names[i], 'anki': anki_deck_names[i]}) %}
+    {% endif %}
+{% endfor %}
+
+{#-------------------------------
+   Shared list‑style helpers
+-------------------------------#}
+{% set outer_ul_style  = "-qt-list-indent:1; margin:0 0 10px -18px; padding-left:0; list-style-position:inside;" %}
+{% set inner_ul_style  = "-qt-list-indent:1; margin:5px 0 10px 30px; padding:0; list-style-position:inside;" %}
+{% set single_ul_style = "-qt-list-indent:1; margin:0 0 0 -18px; padding-left:0; list-style-position:inside;" %}
+
+{# Handle single‑deck scenarios #}
+{% if ankihub_deck_names|length == 1 %}
+    {% if new_decks %}
+        <p>The deck <b>{{ new_decks[0] }}</b> is ready to study.</p>
+    {% elif merged_same_name %}
+        <p>You already have the deck <b>{{ merged_same_name[0] }}</b>! We've merged the new deck into the existing one.</p>
+    {% elif merged_different_name %}
+        <p>
+            <b>{{ merged_different_name[0].ankihub }}</b> was merged into <b>{{ merged_different_name[0].anki }}</b> due to overlapping content.
+            &nbsp;All your notes are now in one place.
+        </p>
+    {% endif %}
 {% else %}
-Your AnkiHub deck is ready to study!
-{% endif %}
-<br>
+    {#---------------------------
+       Multiple‑deck scenarios
+    ---------------------------#}
+    {% if new_decks|length == ankihub_deck_names|length %}
+        <p>The following decks are ready to study:</p>
+        <ul style="{{ single_ul_style }}">
+        {% for deck in new_decks %}
+            <li><b>{{ deck }}</b></li>
+        {% endfor %}
+        </ul>
 
+    {% elif merged_same_name|length == ankihub_deck_names|length %}
+        <p>New decks were merged into existing decks with matching names:</p>
+        <ul style="{{ single_ul_style }}">
+        {% for deck in merged_same_name %}
+            <li><b>{{ deck }}</b></li>
+        {% endfor %}
+        </ul>
+
+    {% elif merged_different_name|length == ankihub_deck_names|length %}
+        <p>
+            Some of the decks you subscribed to matched ones you already had.<br>
+            We've merged them to avoid duplicates:
+        </p>
+        <ul style="{{ single_ul_style }}">
+        {% for mapping in merged_different_name %}
+            <li><b>{{ mapping.ankihub }}</b> → <b>{{ mapping.anki }}</b></li>
+        {% endfor %}
+        </ul>
+
+    {% else %}
+        <p><b>Success!</b> Your decks are ready:</p>
+
+        <ul style="{{ outer_ul_style }}">
+          {% if new_decks %}
+          <li>
+            New deck(s) created ({{ new_decks|length }} deck{% if new_decks|length > 1 %}s{% endif %}):
+            <ul style="{{ inner_ul_style }}">
+              {% for deck in new_decks %}
+              <li><b>{{ deck }}</b></li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% endif %}
+
+          {% if merged_same_name %}
+          <li>
+            Merged into existing deck(s) with matching names ({{ merged_same_name|length }} deck{% if merged_same_name|length > 1 %}s{% endif %}):
+            <ul style="{{ inner_ul_style }}">
+              {% for deck in merged_same_name %}
+              <li><b>{{ deck }}</b></li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% endif %}
+
+          {% if merged_different_name %}
+          <li>
+            Merged into existing deck(s) due to overlapping content ({{ merged_different_name|length }} deck{% if merged_different_name|length > 1 %}s{% endif %}):
+            <ul style="{{ inner_ul_style }}">
+              {% for mapping in merged_different_name %}
+              <li><b>{{ mapping.ankihub }}</b> → <b>{{ mapping.anki }}</b></li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% endif %}
+        </ul>
+    {% endif %}
+{% endif %}
+
+{# AnkiWeb sync warning – appears at the end for all scenarios #}
 {% if logged_to_ankiweb %}
-To access your decks on other devices, you’ll need to go to those devices and sync.
-If prompted, choose <b>Download from AnkiWeb</b>.
-<br>
+<p style="margin-top:12px;">⚠️ To access decks on other devices, go to those devices, sync, and choose <b>Download from AnkiWeb</b> if prompted.</p>
 {% endif %}
 
-{% for ankihub_deck_name, anki_deck_name, import_result in zip(ankihub_deck_names, anki_deck_names, import_results) %}
-{% if ankihub_deck_name != anki_deck_name %}
-The deck <b>{{ankihub_deck_name}}</b> was imported as <b>{{anki_deck_name}}</b>.<br>
-<br>
-{% endif %}
-
-{% if import_result.skipped_nids %}
-Notes in the deck <b>{{ankihub_deck_name}}</b> with the same ID as notes in another AnkiHub deck you have installed were skipped.<br>
-If you have any questions about this, see <a
-    href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum
-    topic</a> for details.
-<br>
-{% endif %}
-
+{# Handle skipped‑notes warnings #}
+{% for ankihub_deck_name, import_result in zip(ankihub_deck_names, import_results) %}
+    {% if import_result.skipped_nids %}
+        <p style="margin-top:12px;">⚠️ Some notes in <b>{{ ankihub_deck_name }}</b> were skipped because they have the same ID as notes in another AnkiHub deck. See <a href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum topic</a> for details.</p>
+    {% endif %}
 {% endfor %}

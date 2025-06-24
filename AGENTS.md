@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## Development Commands
 
@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pytest tests/addon -m sequential -n 0` - Run sequential tests (flaky when run in parallel)
 - `pytest tests/addon -m performance -n 0` - Run performance tests
 - `pytest tests/client` - Run client tests with VCR cassettes
+  - VCR.py simplifies and speeds up tests that make HTTP requests.
 
 ### Code Quality
 - `mypy` - Type checking
@@ -33,7 +34,6 @@ This is an Anki addon that enables collaborative deck sharing through the AnkiHu
 
 ### Key Architectural Patterns
 
-**Multi-Profile Support**: Each Anki profile gets isolated AnkiHub database (UUID-based, supports profile renaming)
 **Dual Database Design**: AnkiHub database tracks "source of truth" separately from local Anki modifications
 **Hook-Based Integration**: Extensive use of Anki's hook system for non-invasive UI integration
 **Async Operations**: Background tasks using `AddonQueryOp`, or `aqt.mw.taskman.run_in_background` for GUI responsiveness
