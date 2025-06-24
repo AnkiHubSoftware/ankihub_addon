@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mypy:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
+    ],
+    "deny": [
+      "Read(.envrc)",
+      "Read(anki_base/**)",
+      "Read(ankihub_base/**)",
+      "Read(dist/**)",
+      "Read(ankihub/lib/**)"
+    ]
+  }
+}
