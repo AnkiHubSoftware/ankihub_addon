@@ -26,22 +26,12 @@ jobs:
       id-token: write
 
     steps:
-      - name: Check user permission
-        id: check
-        uses: scherermichael-oss/action-has-permission@master
-        with:
-          required-permission: write
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repository
-        if: steps.check.outputs.has-permission
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Run Claude Code
-        if: steps.check.outputs.has-permission
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
