@@ -34,7 +34,6 @@ This is an Anki addon that enables collaborative deck sharing through the AnkiHu
 
 ### Key Architectural Patterns
 
-**Multi-Profile Support**: Each Anki profile gets isolated AnkiHub database (UUID-based, supports profile renaming)
 **Dual Database Design**: AnkiHub database tracks "source of truth" separately from local Anki modifications
 **Hook-Based Integration**: Extensive use of Anki's hook system for non-invasive UI integration
 **Async Operations**: Background tasks using `AddonQueryOp`, or `aqt.mw.taskman.run_in_background` for GUI responsiveness
