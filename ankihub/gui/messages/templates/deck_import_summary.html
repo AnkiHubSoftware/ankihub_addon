@@ -103,14 +103,21 @@
     {% endif %}
 {% endif %}
 
+{# Handle skipped‑notes warnings #}
+{% for ankihub_deck_name, import_result in zip(ankihub_deck_names, import_results) %}
+    {% if import_result.skipped_nids %}
+        <p style="margin-top:12px;">
+            ⚠️ Some notes{% if ankihub_deck_names|length > 1 %} in <b>{{ ankihub_deck_name }}</b>{% endif %} were skipped
+            because they share the same ID as notes in another AnkiHub deck.<br>
+            For more details,
+            <a href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>
+                see this topic
+            </a>.
+        </p>
+    {% endif %}
+{% endfor %}
+
 {# AnkiWeb sync warning – appears at the end for all scenarios #}
 {% if logged_to_ankiweb %}
 <p style="margin-top:12px;">⚠️ To access decks on other devices, go to those devices, sync, and choose <b>Download from AnkiWeb</b> if prompted.</p>
 {% endif %}
-
-{# Handle skipped‑notes warnings #}
-{% for ankihub_deck_name, import_result in zip(ankihub_deck_names, import_results) %}
-    {% if import_result.skipped_nids %}
-        <p style="margin-top:12px;">⚠️ Some notes in <b>{{ ankihub_deck_name }}</b> were skipped because they have the same ID as notes in another AnkiHub deck. See <a href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum topic</a> for details.</p>
-    {% endif %}
-{% endfor %}
