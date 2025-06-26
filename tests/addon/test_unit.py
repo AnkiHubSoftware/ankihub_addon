@@ -3671,6 +3671,6 @@ class TestDeckImportSummaryDialog:
             qtbot.wait(self.wait)
 
         message = self.get_dialog_message(mock_dependencies)
-        assert "Some notes in <b>Pathology Deck</b> were skipped" in message
-        assert "have the same ID as notes in another AnkiHub deck" in message
-        assert "this forum topic</a> for details" in message
+        assert "Some notes were skipped" in message
+        assert "share the same ID as notes in another AnkiHub deck" in message
+        assert "see this topic" in message
