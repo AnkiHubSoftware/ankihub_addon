@@ -505,6 +505,7 @@ def ask_user(
     show_cancel_button: bool = False,
     yes_button_label: str = "Yes",
     no_button_label: str = "No",
+    include_icon: bool = True,
 ) -> Optional[bool]:
     "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
 
@@ -529,7 +530,7 @@ def ask_user(
         buttons=buttons,
         default_button_idx=1 if default_no else 0,
         callback=None,
-        icon=question_icon(),
+        icon=question_icon() if include_icon else None,
     )
     dialog.exec()
 

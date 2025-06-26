@@ -934,9 +934,7 @@ class DeckManagementDialog(QDialog):
                 if not all_notes_in_deck(
                     nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
                 ):
-                    should_move_cards = self._show_move_cards_dialog(
-                        current_destination_deck_name, new_deck_name
-                    )
+                    should_move_cards = self._show_move_cards_dialog(new_deck_name)
 
             # Update the destination deck configuration
             anki_did = aqt.mw.col.decks.id(new_deck_name)
@@ -985,21 +983,16 @@ class DeckManagementDialog(QDialog):
             callback=on_destination_selected,
         )
 
-    def _show_move_cards_dialog(
-        self, old_deck_name: Optional[str], new_deck_name: str
-    ) -> bool:
+    def _show_move_cards_dialog(self, new_deck_name: str) -> bool:
         """Show a dialog asking if the user wants to move cards to the new destination deck.
         Returns True if cards should be moved, False if skipped."""
 
         message = (
             f"The new card destination is now <b>{new_deck_name}</b>.<br><br>"
-            + (
-                f"You still have cards in <b>{old_deck_name}</b>.<br><br>"
-                if old_deck_name
-                else ""
-            )
-            + f"Do you want to move them to <b>{new_deck_name}</b>?<br><br>"
-            + (f"⚠️ <b>{old_deck_name}</b> may become empty." if old_deck_name else "")
+            "Some cards are still assigned to other decks.<br>"
+            "Would you like to move all of them to "
+            f"<b>{new_deck_name}</b>?<br><br>"
+            f"⚠️ This action may leave some of those decks empty."
         )
 
         return ask_user(
@@ -1008,6 +1001,7 @@ class DeckManagementDialog(QDialog):
             title="Move existing cards",
             yes_button_label="Move Cards",
             no_button_label="Skip",
+            include_icon=False,
         )
 
     def _on_toggle_subdecks(self):
