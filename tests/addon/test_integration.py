@@ -4746,14 +4746,8 @@ class TestDeckManagementDialog:
                     new_count = aqt.mw.col.decks.card_count(
                         new_anki_did, include_subdecks=True
                     )
-
                     expected_original = 0
-                    expected_new = (
-                        (new_deck_card_count_before + expected_note_count)
-                        if user_accepts_move
-                        else new_deck_card_count_before
-                    )
-
+                    expected_new = new_deck_card_count_before + expected_note_count
                     assert original_count == expected_original
                     assert new_count == expected_new
             else:
