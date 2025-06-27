@@ -112,7 +112,6 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.ankihub_client import (
@@ -146,7 +145,7 @@ from ankihub.ankihub_client.models import (
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.gui import editor, utils
+from ankihub.gui import decks_dialog, editor, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -4584,18 +4583,21 @@ class TestDeckManagementDialog:
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
     def _install_deck_with_subdeck_tag(
-        self, install_ah_deck: InstallAHDeck, import_ah_note: ImportAHNote
-    ) -> Tuple[str, int, uuid.UUID]:
+        self,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        anki_did: int = None,
+    ) -> Tuple[str, DeckId, uuid.UUID]:
         """Install a deck with a subdeck tag and return the full subdeck name."""
-        ah_did = install_ah_deck()
+        ah_did = install_ah_deck(anki_did=DeckId(anki_did))
         subdeck_name = "Subdeck"
         deck_name = config.deck_config(ah_did).name
         deck_name_as_tag = deck_name.replace(" ", "_")
         note_info = NoteInfoFactory.create(
-            tags=[f"{SUBDECK_TAG}::{deck_name_as_tag}::{subdeck_name}"]
+            tags=[f"{SUBDECK_TAG}::{deck_name_as_tag}::{subdeck_name}"],
         )
-        import_ah_note(ah_did=ah_did, note_data=note_info)
         anki_did = config.deck_config(ah_did).anki_id
+        import_ah_note(ah_did=ah_did, note_data=note_info, anki_did=anki_did)
         subdeck_full_name = f"{deck_name}::{subdeck_name}"
         return subdeck_full_name, anki_did, ah_did
 
@@ -4635,20 +4637,224 @@ class TestDeckManagementDialog:
                 deck_name=new_destination_deck_name,
             )
 
-            # Open the dialog
+            # Mock ask_user to not confirm moving cards
+            mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=False)
+
+            # Open the dialog and selec the deck
             dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
-            qtbot.wait(200)
-
-            # Select the deck and click the Set Updates Destination button
             dialog.decks_list.setCurrentRow(0)
-            qtbot.wait(200)
 
+            # Click the Set Updates Destination button
             dialog.set_new_cards_destination_btn.click()
             qtbot.wait(200)
 
             # Assert that the destination deck was updated
             assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+    @pytest.mark.parametrize(
+        "user_accepts_move,subdecks_enabled,has_cards,same_destination",
+        [
+            # User accepts move scenarios
+            (True, False, True, False),  # Basic accept move, no subdecks
+            (True, True, True, False),  # Accept move with subdecks enabled
+            # User declines move scenarios
+            (False, False, True, False),  # Decline move
+            # No dialog scenarios
+            (None, False, False, False),  # No cards exist
+            (None, False, True, True),  # Same destination selected
+        ],
+    )
+    def test_move_cards_when_changing_destination(
+        self,
+        user_accepts_move,
+        subdecks_enabled,
+        has_cards,
+        same_destination,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+        next_deterministic_id: Callable[[], int],
+    ):
+        """Test card moving behavior when changing destination deck."""
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            # Setup test scenario (decks, cards, destinations)
+            (
+                ah_did,
+                original_anki_did,
+                new_anki_did,
+                original_deck_name,
+                destination_deck_name,
+                expected_note_count,
+            ) = self._setup_move_cards_test_scenario(
+                has_cards,
+                subdecks_enabled,
+                same_destination,
+                install_ah_deck,
+                import_ah_note,
+                next_deterministic_id,
+            )
+
+            # Setup all mocks
+            (
+                mock_ask_user,
+                mock_subdeck_operation,
+            ) = self._setup_move_cards_test_mocks(
+                mocker,
+                user_accepts_move,
+                destination_deck_name,
+                ah_did,
+                original_anki_did,
+                original_deck_name,
+                mock_study_deck_dialog_with_cb,
+            )
+
+            # Open dialog and select deck
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            dialog.decks_list.setCurrentRow(0)
+
+            # Count cards before action
+            if not same_destination:
+                new_deck_card_count_before = aqt.mw.col.decks.card_count(
+                    new_anki_did, include_subdecks=True
+                )
+
+            # Click the change destination button
+            dialog.set_new_cards_destination_btn.click()
+
+            # Verify the destination was updated
+            assert config.deck_config(ah_did).anki_id == new_anki_did
+
+            # Verify dialog and card movement behavior
+            should_show_dialog = user_accepts_move is not None
+            should_move_cards = user_accepts_move and not same_destination
+            should_call_subdeck_op = should_move_cards and subdecks_enabled
+
+            if should_show_dialog:
+                mock_ask_user.assert_called_once()
+                if should_move_cards:
+                    qtbot.wait(500)
+                    original_count = aqt.mw.col.decks.card_count(
+                        original_anki_did, include_subdecks=True
+                    )
+                    new_count = aqt.mw.col.decks.card_count(
+                        new_anki_did, include_subdecks=True
+                    )
+                    expected_original = 0
+                    expected_new = new_deck_card_count_before + expected_note_count
+                    assert original_count == expected_original
+                    assert new_count == expected_new
+            else:
+                mock_ask_user.assert_not_called()
+
+            if should_call_subdeck_op:
+                mock_subdeck_operation.assert_called_once()
+                call_args = mock_subdeck_operation.call_args
+                assert call_args[1]["ankihub_did"] == ah_did
+                assert isinstance(call_args[1]["nids"], list)
+                assert len(call_args[1]["nids"]) == expected_note_count
+            else:
+                mock_subdeck_operation.assert_not_called()
+
+    def _setup_move_cards_test_scenario(
+        self,
+        has_cards: bool,
+        subdecks_enabled: bool,
+        same_destination: bool,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        next_deterministic_id: Callable[[], int],
+    ) -> tuple[uuid.UUID, DeckId, DeckId, str, str, int]:
+        """Setup deck scenario for move cards test."""
+        original_anki_did = DeckId(next_deterministic_id())
+
+        if has_cards and subdecks_enabled:
+            # Use deck with subdeck tags for subdeck scenarios
+            _, original_anki_did, ah_did = self._install_deck_with_subdeck_tag(
+                install_ah_deck, import_ah_note, anki_did=original_anki_did
+            )
+            config.set_subdecks(ah_did, True)
+            expected_note_count = 2  # 1 from subdeck tag + 1 from install_ah_deck
+        elif has_cards:
+            # Regular deck with cards
+            ah_did = install_ah_deck(anki_did=original_anki_did)
+            expected_note_count = 1
+        else:
+            ah_did = install_ah_deck(anki_did=original_anki_did)
+            # Remove note to create empty deck
+            nids = aqt.mw.col.find_notes("")
+            aqt.mw.col.remove_notes(nids)
+            expected_note_count = 0
+
+        # Determine destination deck
+        original_deck_name = config.deck_config(ah_did).name
+        if same_destination:
+            destination_deck_name = original_deck_name
+            new_anki_did = original_anki_did
+        else:
+            destination_deck_name = "New Destination Deck"
+            install_ah_deck(anki_deck_name=destination_deck_name)
+            new_anki_did = aqt.mw.col.decks.id_for_name(destination_deck_name)
+
+        return (
+            ah_did,
+            original_anki_did,
+            new_anki_did,
+            original_deck_name,
+            destination_deck_name,
+            expected_note_count,
+        )
+
+    def _setup_move_cards_test_mocks(
+        self,
+        mocker: MockerFixture,
+        user_accepts_move: Optional[bool],
+        destination_deck_name: str,
+        ah_did: uuid.UUID,
+        original_anki_did: DeckId,
+        original_deck_name: str,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+    ) -> tuple[Mock, Mock]:
+        """Setup all mocks for move cards test."""
+        # Mock destination selection dialog
+        mock_study_deck_dialog_with_cb(
+            "ankihub.gui.decks_dialog.SearchableSelectionDialog",
+            deck_name=destination_deck_name,
+        )
+
+        # Mock user response to move dialog
+        mock_ask_user = mocker.patch("ankihub.gui.decks_dialog.ask_user")
+        if user_accepts_move is not None:
+            mock_ask_user.return_value = user_accepts_move
+
+        # Mock subdeck operation
+        mock_subdeck_operation = mocker.spy(
+            decks_dialog, "build_subdecks_and_move_cards_to_them_in_background"
+        )
+
+        # Mock get_deck_subscriptions
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            return_value=[
+                DeckFactory.create(
+                    ah_did=ah_did,
+                    anki_did=original_anki_did,
+                    name=original_deck_name,
+                )
+            ],
+        )
+
+        return (
+            mock_ask_user,
+            mock_subdeck_operation,
+        )
 
     def test_with_deck_not_installed(
         self,
