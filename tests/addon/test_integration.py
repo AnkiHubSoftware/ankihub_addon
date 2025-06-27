@@ -4731,39 +4731,35 @@ class TestDeckManagementDialog:
             # Verify the destination was updated
             assert config.deck_config(ah_did).anki_id == new_anki_did
 
-            # Verify dialog behavior
-            if user_accepts_move is None:
-                # Dialog should not be shown
-                mock_ask_user.assert_not_called()
-            else:
-                # Dialog should be shown
+            # Verify dialog and card movement behavior
+            should_show_dialog = user_accepts_move is not None
+            should_move_cards = user_accepts_move and not same_destination
+            should_call_subdeck_op = should_move_cards and subdecks_enabled
+
+            if should_show_dialog:
                 mock_ask_user.assert_called_once()
-
-                # Verify card movement results
-                if not same_destination:
+                if should_move_cards:
                     qtbot.wait(500)
-
-                    original_card_count_after = aqt.mw.col.decks.card_count(
+                    original_count = aqt.mw.col.decks.card_count(
                         original_anki_did, include_subdecks=True
                     )
-                    new_deck_card_count_after = aqt.mw.col.decks.card_count(
+                    new_count = aqt.mw.col.decks.card_count(
                         new_anki_did, include_subdecks=True
                     )
 
-                    if user_accepts_move:
-                        # Cards were moved
-                        assert original_card_count_after == 0
-                        assert (
-                            new_deck_card_count_after
-                            == new_deck_card_count_before + expected_note_count
-                        )
-                    else:
-                        # Cards were not moved
-                        assert original_card_count_after == expected_note_count
-                        assert new_deck_card_count_after == new_deck_card_count_before
+                    expected_original = 0
+                    expected_new = (
+                        (new_deck_card_count_before + expected_note_count)
+                        if user_accepts_move
+                        else new_deck_card_count_before
+                    )
 
-            # Verify subdeck operation behavior
-            if user_accepts_move and subdecks_enabled and not same_destination:
+                    assert original_count == expected_original
+                    assert new_count == expected_new
+            else:
+                mock_ask_user.assert_not_called()
+
+            if should_call_subdeck_op:
                 mock_subdeck_operation.assert_called_once()
                 call_args = mock_subdeck_operation.call_args
                 assert call_args[1]["ankihub_did"] == ah_did
