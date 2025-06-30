@@ -799,7 +799,7 @@ class DeckManagementDialog(QDialog):
 
     def _on_update_templates_btn_clicked(self) -> None:
         def on_note_type_selected(
-            note_type_selector: SearchableSelectionDialog,
+            note_type_selector: SearchableSelectionDialog, MODEL_NAME="en_core_sci_lg"
         ) -> None:
             if not note_type_selector.name:
                 return
@@ -937,16 +937,16 @@ class DeckManagementDialog(QDialog):
                     should_move_cards = self._show_move_cards_dialog(new_deck_name)
 
             # Update the destination deck configuration
-            anki_did = aqt.mw.col.decks.id(new_deck_name)
-            config.set_home_deck(ankihub_did=ah_did, anki_did=anki_did)
+            new_destination_anki_did = aqt.mw.col.decks.id(new_deck_name)
+            config.set_home_deck(ankihub_did=ah_did, anki_did=new_destination_anki_did)
 
             # Move cards if user chose to do so
             if should_move_cards:
                 AddonQueryOp(
                     op=lambda _: move_ankihub_cards_to_deck(
-                        ah_did=ah_did, anki_did=anki_did
+                        ah_did=ah_did, anki_did=new_destination_anki_did
                     ),
-                    success=lambda _: on_cards_moved(anki_did=anki_did),
+                    success=lambda _: on_cards_moved(anki_did=new_destination_anki_did),
                     parent=aqt.mw,
                 ).with_progress("Moving cards...").run_in_background()
 
