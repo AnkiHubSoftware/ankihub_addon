@@ -6,6 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 import aqt
+from anki.decks import DeckId
 from anki.models import NotetypeId, NotetypeNameId
 from aqt.qt import (
     QBoxLayout,
@@ -42,7 +43,9 @@ from ..main.note_type_management import (
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import (
+    all_notes_in_deck,
     get_deck_for_ah_did,
+    move_ankihub_cards_to_deck,
     note_type_name_without_ankihub_modifications,
     truncate_string,
 )
@@ -53,13 +56,18 @@ from ..settings import (
     url_deck_base,
     url_decks,
 )
+from .operations import AddonQueryOp
 from .operations.ankihub_sync import sync_with_ankihub
-from .operations.subdecks import confirm_and_toggle_subdecks
+from .operations.subdecks import (
+    build_subdecks_and_move_cards_to_them_in_background,
+    confirm_and_toggle_subdecks,
+)
 from .utils import (
     SearchableSelectionDialog,
     ask_user,
     choose_subset,
     clear_layout,
+    refresh_anki_ui_after_moving_cards,
     set_styled_tooltip,
     show_dialog,
     tooltip_icon,
@@ -791,7 +799,7 @@ class DeckManagementDialog(QDialog):
 
     def _on_update_templates_btn_clicked(self) -> None:
         def on_note_type_selected(
-            note_type_selector: SearchableSelectionDialog,
+            note_type_selector: SearchableSelectionDialog, MODEL_NAME="en_core_sci_lg"
         ) -> None:
             if not note_type_selector.name:
                 return
@@ -911,13 +919,59 @@ class DeckManagementDialog(QDialog):
         if current_destination_deck := get_deck_for_ah_did(ah_did):
             current_destination_deck_name = current_destination_deck["name"]
 
-        def update_deck_config(note_type_selector: SearchableSelectionDialog):
+        def on_destination_selected(note_type_selector: SearchableSelectionDialog):
             if not note_type_selector.name:
                 return
 
-            anki_did = aqt.mw.col.decks.id(note_type_selector.name)
-            config.set_home_deck(ankihub_did=ah_did, anki_did=anki_did)
+            new_deck_name = note_type_selector.name
+
+            should_move_cards = False
+            if (
+                not current_destination_deck_name
+                or new_deck_name != current_destination_deck_name
+            ):
+                anki_nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+                if not all_notes_in_deck(
+                    nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
+                ):
+                    should_move_cards = self._show_move_cards_dialog(new_deck_name)
+
+            # Update the destination deck configuration
+            new_destination_anki_did = aqt.mw.col.decks.id(new_deck_name)
+            config.set_home_deck(ankihub_did=ah_did, anki_did=new_destination_anki_did)
+
+            # Move cards if user chose to do so
+            if should_move_cards:
+                AddonQueryOp(
+                    op=lambda _: move_ankihub_cards_to_deck(
+                        ah_did=ah_did, anki_did=new_destination_anki_did
+                    ),
+                    success=lambda _: on_cards_moved(anki_did=new_destination_anki_did),
+                    parent=aqt.mw,
+                ).with_progress("Moving cards...").run_in_background()
+
             self._refresh_new_cards_destination_details_label(ah_did)
+
+        def on_cards_moved(anki_did: DeckId) -> None:
+            refresh_anki_ui_after_moving_cards()
+            tooltip("Moved cards to new destination deck", parent=aqt.mw)
+
+            LOGGER.info(
+                "Moved cards to new destination deck",
+                ah_did=ah_did,
+                destination_deck_name=aqt.mw.col.decks.name(DeckId(anki_did)),
+            )
+
+            # If subdecks are enabled, build subdecks and move cards to them
+            deck_config = config.deck_config(ah_did)
+            if deck_config.subdecks_enabled:
+                nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+                aqt.mw.taskman.run_on_main(
+                    lambda: build_subdecks_and_move_cards_to_them_in_background(
+                        ankihub_did=ah_did,
+                        nids=list(nids),
+                    )
+                )
 
         # this lets the user pick a deck
         SearchableSelectionDialog(
@@ -926,7 +980,28 @@ class DeckManagementDialog(QDialog):
             accept="Confirm Destination for New Cards",
             title="Select Destination for New Cards",
             parent=self,
-            callback=update_deck_config,
+            callback=on_destination_selected,
+        )
+
+    def _show_move_cards_dialog(self, new_deck_name: str) -> bool:
+        """Show a dialog asking if the user wants to move cards to the new destination deck.
+        Returns True if cards should be moved, False if skipped."""
+
+        message = (
+            f"The new card destination is now <b>{new_deck_name}</b>.<br><br>"
+            "Some cards are still assigned to other decks.<br>"
+            "Would you like to move all of them to "
+            f"<b>{new_deck_name}</b>?<br><br>"
+            f"⚠️ This action may leave some of those decks empty."
+        )
+
+        return ask_user(
+            message,
+            parent=self,
+            title="Move existing cards",
+            yes_button_label="Move Cards",
+            no_button_label="Skip",
+            include_icon=False,
         )
 
     def _on_toggle_subdecks(self):

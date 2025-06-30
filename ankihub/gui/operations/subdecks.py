@@ -4,13 +4,11 @@ from typing import List, Optional
 
 import aqt
 from anki.notes import NoteId
-from aqt import dialogs
-from aqt.browser import Browser
 
 from ... import LOGGER
 from ...main.subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
 from ...settings import config
-from ..utils import ask_user, tooltip
+from ..utils import ask_user, refresh_anki_ui_after_moving_cards, tooltip
 
 
 def build_subdecks_and_move_cards_to_them_in_background(
@@ -78,7 +76,4 @@ def _on_subdecks_updated(future: Future[None]) -> None:
     LOGGER.info("Subdecks updated.")
     tooltip("Subdecks updated.", parent=aqt.mw)
 
-    aqt.mw.deckBrowser.refresh()
-    browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
-    if browser is not None:
-        browser.sidebar.refresh()
+    refresh_anki_ui_after_moving_cards()
