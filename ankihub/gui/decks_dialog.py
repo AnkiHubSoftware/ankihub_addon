@@ -936,9 +936,15 @@ class DeckManagementDialog(QDialog):
                 ):
                     should_move_cards = self._show_move_cards_dialog(new_deck_name)
 
+            if should_move_cards is None:
+                aqt.mw.taskman.run_on_main(self._on_new_cards_destination_btn_clicked)
+                return
+
             # Update the destination deck configuration
             new_destination_anki_did = aqt.mw.col.decks.id(new_deck_name)
             config.set_home_deck(ankihub_did=ah_did, anki_did=new_destination_anki_did)
+
+            self._refresh_new_cards_destination_details_label(ah_did)
 
             # Move cards if user chose to do so
             if should_move_cards:
@@ -949,8 +955,6 @@ class DeckManagementDialog(QDialog):
                     success=lambda _: on_cards_moved(anki_did=new_destination_anki_did),
                     parent=aqt.mw,
                 ).with_progress("Moving cards...").run_in_background()
-
-            self._refresh_new_cards_destination_details_label(ah_did)
 
         def on_cards_moved(anki_did: DeckId) -> None:
             refresh_anki_ui_after_moving_cards()
@@ -983,7 +987,7 @@ class DeckManagementDialog(QDialog):
             callback=on_destination_selected,
         )
 
-    def _show_move_cards_dialog(self, new_deck_name: str) -> bool:
+    def _show_move_cards_dialog(self, new_deck_name: str) -> Optional[bool]:
         """Show a dialog asking if the user wants to move cards to the new destination deck.
         Returns True if cards should be moved, False if skipped."""
 
@@ -1001,6 +1005,7 @@ class DeckManagementDialog(QDialog):
             title="Move existing cards",
             yes_button_label="Move Cards",
             no_button_label="Skip",
+            show_cancel_button=True,
             include_icon=False,
         )
 
