@@ -1004,7 +1004,7 @@ class DeckManagementDialog(QDialog):
             parent=self,
             title="Move existing cards",
             yes_button_label="Move Cards",
-            no_button_label="Skip",
+            no_button_label="Don't Move",
             show_cancel_button=True,
             include_icon=False,
         )
