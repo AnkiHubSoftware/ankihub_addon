@@ -926,15 +926,11 @@ class DeckManagementDialog(QDialog):
             new_deck_name = note_type_selector.name
 
             should_move_cards = False
-            if (
-                not current_destination_deck_name
-                or new_deck_name != current_destination_deck_name
+            anki_nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+            if not all_notes_in_deck(
+                nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
             ):
-                anki_nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-                if not all_notes_in_deck(
-                    nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
-                ):
-                    should_move_cards = self._show_move_cards_dialog(new_deck_name)
+                should_move_cards = self._show_move_cards_dialog(new_deck_name)
 
             if should_move_cards is None:
                 aqt.mw.taskman.run_on_main(self._on_new_cards_destination_btn_clicked)
