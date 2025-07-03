@@ -1,6 +1,7 @@
 """Modifies the Anki browser (aqt.browser) to add AnkiHub features."""
 
 import re
+import uuid
 from concurrent.futures import Future
 from typing import List, Optional, Sequence
 
@@ -48,6 +49,7 @@ from aqt.utils import showInfo, showWarning, tooltip, tr
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
 from ...db import ankihub_db
+from ...gui.webview import AnkiHubWebViewDialog
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -202,11 +204,39 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
             lambda: _on_copy_ankihub_nid_action(browser, selected_nids),
             exactly_one_ah_note_selected,
         ),
+        (
+            "AI Chatbot",
+            lambda: _on_open_chatbot_action(browser, selected_nids),
+            exactly_one_ah_note_selected,
+        ),
     ]
 
     for name, func, enabled in actions:
         action = context_menu.addAction(name, func)
         action.setEnabled(enabled)
+
+
+class ChatbotDialog(AnkiHubWebViewDialog):
+    def __init__(self, parent, ah_nid: uuid.UUID) -> None:
+        super().__init__(parent, show_footer=False)
+
+        self.ah_nid = ah_nid
+
+        self.setWindowTitle("AI Chatbot")
+        self.setMinimumHeight(800)
+        self.setMinimumWidth(700)
+
+    def _get_embed_url(self) -> str:
+        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/?is_on_anki=true"
+
+    def _get_non_embed_url(self):
+        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
+
+
+def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nids[0])
+    dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
+    dialog.display()
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
