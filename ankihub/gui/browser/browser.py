@@ -296,7 +296,7 @@ class ChatbotDialog(AnkiHubWebViewDialog):
         self.setMinimumWidth(700)
 
     def _get_embed_url(self) -> str:
-        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/?is_on_anki=true"
+        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/?is_on_anki=true&source=anki_browser"
 
     def _get_non_embed_url(self):
         return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
