@@ -985,8 +985,12 @@ class DeckManagementDialog(QDialog):
 
     def _show_move_cards_dialog(self, new_deck_name: str) -> Optional[bool]:
         """Show a dialog asking if the user wants to move cards to the new destination deck.
-        Returns True if cards should be moved, False if skipped."""
 
+        Returns:
+            True if the user chose to move cards to the new destination deck.
+            False if the user chose not to move the cards.
+            None if the user cancelled the dialog.
+        """
         message = (
             f"The new card destination is now <b>{new_deck_name}</b>.<br><br>"
             "Some cards are still assigned to other decks.<br>"
@@ -995,7 +999,7 @@ class DeckManagementDialog(QDialog):
             f"⚠️ This action may leave some of those decks empty."
         )
 
-        return ask_user(
+        result = ask_user(
             message,
             parent=self,
             title="Move existing cards",
@@ -1004,6 +1008,15 @@ class DeckManagementDialog(QDialog):
             show_cancel_button=True,
             include_icon=False,
         )
+
+        LOGGER.info(
+            "move_cards_on_destination_deck_change_dialog_choice",
+            ah_did=self._selected_ah_did(),
+            new_deck_name=new_deck_name,
+            user_choice=result,
+        )
+
+        return result
 
     def _on_toggle_subdecks(self):
         ah_did = self._selected_ah_did()
