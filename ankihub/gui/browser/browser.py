@@ -31,7 +31,17 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
     dialog_manager_did_open_dialog,
 )
-from aqt.qt import QAction, QMenu, QSize, Qt, QToolBar, QToolButton, QWidget, qconnect
+from aqt.qt import (
+    QAction,
+    QFont,
+    QMenu,
+    QSize,
+    Qt,
+    QToolBar,
+    QToolButton,
+    QWidget,
+    qconnect,
+)
 from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
@@ -130,6 +140,14 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     context_menu.addSeparator()
 
+    # Add AnkiHub section header
+    label_action = context_menu.addAction("ANKIHUB")
+    label_action.setEnabled(False)
+    font = QFont()
+    font.setBold(True)
+    font.setPointSize(10)
+    label_action.setFont(font)
+
     selected_nids = browser.selected_notes()
 
     mids = mids_of_notes(selected_nids)
@@ -146,12 +164,12 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
     # List of (name, function, enabled) tuples for the actions to add to the context menu.
     actions = [
         (
-            "AnkiHub: Bulk suggest notes",
+            "Bulk suggest notes",
             lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Suggest to delete note",
+            "Suggest to delete note",
             lambda: _on_bulk_notes_suggest_action(
                 browser,
                 nids=selected_nids,
@@ -160,27 +178,27 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Protect fields",
+            "Protect fields",
             lambda: _on_protect_fields_action(browser, nids=selected_nids),
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Reset local changes",
+            "Reset local changes",
             lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Suggest Optional Tags",
+            "Suggest Optional Tags",
             lambda: _on_suggest_optional_tags_action(browser),
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Copy Anki Note ID to clipboard",
+            "Copy Anki Note ID to clipboard",
             lambda: _on_copy_anki_nid_action(browser, selected_nids),
             exactly_one_note_selected,
         ),
         (
-            "AnkiHub: Copy AnkiHub Note ID to clipboard",
+            "Copy AnkiHub Note ID to clipboard",
             lambda: _on_copy_ankihub_nid_action(browser, selected_nids),
             exactly_one_ah_note_selected,
         ),
