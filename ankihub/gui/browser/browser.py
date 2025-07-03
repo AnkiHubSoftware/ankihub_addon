@@ -293,7 +293,7 @@ class ChatbotDialog(AnkiHubWebViewDialog):
 
         self.setWindowTitle("AI Chatbot")
         self.setMinimumHeight(800)
-        self.setMinimumWidth(700)
+        self.setMinimumWidth(800)
 
     def _get_embed_url(self) -> str:
         return f"{config.app_url}/ai/chatbot/{self.ah_nid}/?is_on_anki=true&source=anki_browser"
@@ -303,7 +303,6 @@ class ChatbotDialog(AnkiHubWebViewDialog):
 
 
 def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    # Validate selection and show appropriate tooltips
     if len(nids) == 0:
         tooltip("Please select a note to use the AI Chatbot.", parent=browser)
         return
