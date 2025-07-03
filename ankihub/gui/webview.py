@@ -35,7 +35,7 @@ class AnkiHubWebViewDialog(QDialog):
 
         self._setup_ui()
 
-    def display(self) -> bool:
+    def display(self, use_open=False) -> bool:
         """Display the dialog. Return True if the initialization was successful, False otherwise."""
         if not config.token():
             self._handle_auth_failure()
@@ -44,7 +44,11 @@ class AnkiHubWebViewDialog(QDialog):
         self._load_page()
         self.activateWindow()
         self.raise_()
-        self.show()
+
+        if use_open:
+            self.open()
+        else:
+            self.show()
 
         return True
 

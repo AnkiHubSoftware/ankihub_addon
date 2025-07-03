@@ -236,7 +236,7 @@ class ChatbotDialog(AnkiHubWebViewDialog):
 def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nids[0])
     dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
-    dialog.display()
+    dialog.display(use_open=True)
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
