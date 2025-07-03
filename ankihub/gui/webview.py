@@ -66,18 +66,18 @@ class AnkiHubWebViewDialog(QDialog):
 
         theme_did_change.append(self._update_page_theme)
 
-        self.view_in_web_browser_button = QPushButton("View in web browser")
-        self.view_in_web_browser_button.setAutoDefault(False)
-        qconnect(
-            self.view_in_web_browser_button.clicked,
-            self._on_view_in_web_browser_button_clicked,
-        )
-
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 5)
         self.layout_.addWidget(self.web)
 
         if self.show_footer:
+            self.view_in_web_browser_button = QPushButton("View in web browser")
+            self.view_in_web_browser_button.setAutoDefault(False)
+            qconnect(
+                self.view_in_web_browser_button.clicked,
+                self._on_view_in_web_browser_button_clicked,
+            )
+
             self.close_button = QPushButton("Close")
             self.close_button.setAutoDefault(False)
             qconnect(self.close_button.clicked, self.close)
@@ -89,6 +89,7 @@ class AnkiHubWebViewDialog(QDialog):
             self.button_layout.addStretch()
             self.button_layout.addWidget(self.close_button)
             self.button_layout.addSpacing(20)
+
             self.layout_.addLayout(self.button_layout)
 
         self.setLayout(self.layout_)
