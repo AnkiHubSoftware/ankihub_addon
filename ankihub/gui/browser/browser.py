@@ -1,8 +1,10 @@
 """Modifies the Anki browser (aqt.browser) to add AnkiHub features."""
 
 import re
+import uuid
 from concurrent.futures import Future
-from typing import List, Optional, Sequence
+from dataclasses import dataclass
+from typing import Callable, List, Optional, Sequence
 
 import aqt
 from anki.collection import SearchNode
@@ -31,13 +33,24 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
     dialog_manager_did_open_dialog,
 )
-from aqt.qt import QAction, QMenu, QSize, Qt, QToolBar, QToolButton, QWidget, qconnect
+from aqt.qt import (
+    QAction,
+    QFont,
+    QMenu,
+    QSize,
+    Qt,
+    QToolBar,
+    QToolButton,
+    QWidget,
+    qconnect,
+)
 from aqt.theme import theme_manager
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
 from ...db import ankihub_db
+from ...gui.webview import AnkiHubWebViewDialog
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -78,6 +91,26 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+
+
+@dataclass
+class ContextMenuAction:
+    """Configuration for a context menu action."""
+
+    name: str
+    function: Callable
+    enabled: bool
+    mac_shortcut: Optional[str] = None
+    other_shortcut: Optional[str] = None
+
+    def get_shortcut(self) -> Optional[str]:
+        """Get the appropriate shortcut for the current platform."""
+        if is_mac and self.mac_shortcut:
+            return self.mac_shortcut
+        elif not is_mac and self.other_shortcut:
+            return self.other_shortcut
+        return None
+
 
 # Maximum number of notes that can be selected for bulk suggestions.
 BULK_SUGGESTION_LIMIT = 2000
@@ -123,15 +156,47 @@ def _store_browser_reference(browser_: Browser) -> None:
 # context menu
 def _setup_context_menu():
     browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
+    browser_will_show.append(_setup_global_shortcuts)
 
 
-def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
-    """Adds AnkiHub menu actions to the browser context menu."""
-
-    context_menu.addSeparator()
-
+def _setup_global_shortcuts(browser: Browser) -> None:
+    """Set up global keyboard shortcuts for context menu actions that have shortcuts defined."""
     selected_nids = browser.selected_notes()
+    actions = _get_context_menu_actions(browser, selected_nids)
 
+    for action_config in actions:
+        shortcut = action_config.get_shortcut()
+        if not shortcut:
+            continue
+
+        global_action = QAction(action_config.name, browser)
+        global_action.setShortcut(shortcut)
+        qconnect(
+            global_action.triggered,
+            _create_shortcut_trigger(browser, action_config.name),
+        )
+        browser.addAction(global_action)
+
+
+def _create_shortcut_trigger(browser: Browser, action_name: str) -> Callable[[], None]:
+    """Create a trigger function for a specific context menu action."""
+
+    def trigger() -> None:
+        current_nids = browser.selected_notes()
+        current_actions = _get_context_menu_actions(browser, current_nids)
+        # Find the matching action and execute it
+        for current_action in current_actions:
+            if current_action.name == action_name:
+                current_action.function()
+                break
+
+    return trigger
+
+
+def _get_context_menu_actions(
+    browser: Browser, selected_nids: Sequence[NoteId]
+) -> List[ContextMenuAction]:
+    """Get the list of context menu actions for the given browser and selected notes."""
     mids = mids_of_notes(selected_nids)
     at_least_one_note_has_ah_note_type = any(
         ankihub_db.is_ankihub_note_type(mid) for mid in mids
@@ -143,52 +208,115 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         ankihub_db.ankihub_nid_for_anki_nid(selected_nids[0])
     )
 
-    # List of (name, function, enabled) tuples for the actions to add to the context menu.
-    actions = [
-        (
-            "AnkiHub: Bulk suggest notes",
-            lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
-            at_least_one_note_has_ah_note_type,
+    return [
+        ContextMenuAction(
+            name="Bulk suggest notes",
+            function=lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+            enabled=at_least_one_note_has_ah_note_type,
         ),
-        (
-            "AnkiHub: Suggest to delete note",
-            lambda: _on_bulk_notes_suggest_action(
+        ContextMenuAction(
+            name="Suggest to delete note",
+            function=lambda: _on_bulk_notes_suggest_action(
                 browser,
                 nids=selected_nids,
                 preselected_change_type=SuggestionType.DELETE,
             ),
-            at_least_one_note_has_ah_note_type,
+            enabled=at_least_one_note_has_ah_note_type,
         ),
-        (
-            "AnkiHub: Protect fields",
-            lambda: _on_protect_fields_action(browser, nids=selected_nids),
-            at_least_one_note_has_ah_note_type,
+        ContextMenuAction(
+            name="Protect fields",
+            function=lambda: _on_protect_fields_action(browser, nids=selected_nids),
+            enabled=at_least_one_note_has_ah_note_type,
         ),
-        (
-            "AnkiHub: Reset local changes",
-            lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
-            at_least_one_note_has_ah_note_type,
+        ContextMenuAction(
+            name="Reset local changes",
+            function=lambda: _on_reset_local_changes_action(
+                browser, nids=selected_nids
+            ),
+            enabled=at_least_one_note_has_ah_note_type,
         ),
-        (
-            "AnkiHub: Suggest Optional Tags",
-            lambda: _on_suggest_optional_tags_action(browser),
-            at_least_one_note_has_ah_note_type,
+        ContextMenuAction(
+            name="Suggest Optional Tags",
+            function=lambda: _on_suggest_optional_tags_action(browser),
+            enabled=at_least_one_note_has_ah_note_type,
         ),
-        (
-            "AnkiHub: Copy Anki Note ID to clipboard",
-            lambda: _on_copy_anki_nid_action(browser, selected_nids),
-            exactly_one_note_selected,
+        ContextMenuAction(
+            name="Copy Anki Note ID to clipboard",
+            function=lambda: _on_copy_anki_nid_action(browser, selected_nids),
+            enabled=exactly_one_note_selected,
         ),
-        (
-            "AnkiHub: Copy AnkiHub Note ID to clipboard",
-            lambda: _on_copy_ankihub_nid_action(browser, selected_nids),
-            exactly_one_ah_note_selected,
+        ContextMenuAction(
+            name="Copy AnkiHub Note ID to clipboard",
+            function=lambda: _on_copy_ankihub_nid_action(browser, selected_nids),
+            enabled=exactly_one_ah_note_selected,
+        ),
+        ContextMenuAction(
+            name="AI Chatbot",
+            function=lambda: _on_open_chatbot_action(browser, selected_nids),
+            enabled=exactly_one_ah_note_selected,
+            mac_shortcut="Option+K",
+            other_shortcut="Shift+Alt+K",
         ),
     ]
 
-    for name, func, enabled in actions:
-        action = context_menu.addAction(name, func)
-        action.setEnabled(enabled)
+
+def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+    """Adds AnkiHub menu actions to the browser context menu."""
+
+    context_menu.addSeparator()
+
+    # Add AnkiHub section header
+    label_action = context_menu.addAction("ANKIHUB")
+    label_action.setEnabled(False)
+    font = QFont()
+    font.setBold(True)
+    font.setPointSize(10)
+    label_action.setFont(font)
+
+    # Add context menu actions
+    selected_nids = browser.selected_notes()
+    actions = _get_context_menu_actions(browser, selected_nids)
+
+    for action_config in actions:
+        action = context_menu.addAction(action_config.name, action_config.function)
+        action.setEnabled(action_config.enabled)
+        shortcut = action_config.get_shortcut()
+        if shortcut:
+            action.setShortcut(shortcut)
+
+
+class ChatbotDialog(AnkiHubWebViewDialog):
+    def __init__(self, parent, ah_nid: uuid.UUID) -> None:
+        super().__init__(parent, show_footer=False)
+
+        self.ah_nid = ah_nid
+
+        self.setWindowTitle("AI Chatbot")
+        self.setMinimumHeight(800)
+        self.setMinimumWidth(800)
+
+    def _get_embed_url(self) -> str:
+        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/?is_on_anki=true&source=anki_browser"
+
+    def _get_non_embed_url(self):
+        return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
+
+
+def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    if len(nids) == 0:
+        tooltip("Please select a note to use the AI Chatbot.", parent=browser)
+        return
+    elif len(nids) > 1:
+        tooltip("AI Chatbot only works with one note selected.", parent=browser)
+        return
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nids[0])
+    if not ah_nid:
+        tooltip("AI Chatbot only works with AnkiHub notes.", parent=browser)
+        return
+
+    dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
+    dialog.display(use_open=True)
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:

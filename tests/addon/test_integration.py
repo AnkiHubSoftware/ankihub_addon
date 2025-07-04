@@ -4330,13 +4330,15 @@ class TestBrowserContextMenu:
             texts = [action.text() for action in actions]
 
             expected_texts = [
-                "AnkiHub: Bulk suggest notes",
-                "AnkiHub: Suggest to delete note",
-                "AnkiHub: Protect fields",
-                "AnkiHub: Reset local changes",
-                "AnkiHub: Suggest Optional Tags",
-                "AnkiHub: Copy Anki Note ID to clipboard",
-                "AnkiHub: Copy AnkiHub Note ID to clipboard",
+                "ANKIHUB",
+                "Bulk suggest notes",
+                "Suggest to delete note",
+                "Protect fields",
+                "Reset local changes",
+                "Suggest Optional Tags",
+                "Copy Anki Note ID to clipboard",
+                "Copy AnkiHub Note ID to clipboard",
+                "AI Chatbot",
             ]
 
             assert texts == expected_texts
@@ -4364,9 +4366,9 @@ class TestBrowserContextMenu:
         "action_text, expected_change_type_text",
         [
             # The suggestion type which is selected by default is UPDATED_CONTENT
-            ("AnkiHub: Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
+            ("Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
             # When the user uses the "Suggest to delete note" action, the suggestion type is DELETE
-            ("AnkiHub: Suggest to delete note", SuggestionType.DELETE.value[1]),
+            ("Suggest to delete note", SuggestionType.DELETE.value[1]),
         ],
     )
     def test_note_suggestion_actions(
@@ -4408,8 +4410,8 @@ class TestBrowserContextMenu:
     @pytest.mark.parametrize(
         "action_text, expected_note_attribute_in_clipboard",
         [
-            ("AnkiHub: Copy Anki Note ID to clipboard", "anki_nid"),
-            ("AnkiHub: Copy AnkiHub Note ID to clipboard", "ah_nid"),
+            ("Copy Anki Note ID to clipboard", "anki_nid"),
+            ("Copy AnkiHub Note ID to clipboard", "ah_nid"),
         ],
     )
     def test_copy_nid_actions(

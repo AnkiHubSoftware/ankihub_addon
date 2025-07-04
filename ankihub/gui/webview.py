@@ -28,11 +28,14 @@ class AnkiHubWebViewDialog(QDialog):
     This class handles setting up the web view, loading the page, styling and authentication.
     """
 
-    def __init__(self, parent: Any) -> None:
+    def __init__(self, parent: Any, show_footer=True) -> None:
         super().__init__(parent)
+
+        self.show_footer = show_footer
+
         self._setup_ui()
 
-    def display(self) -> bool:
+    def display(self, use_open=False) -> bool:
         """Display the dialog. Return True if the initialization was successful, False otherwise."""
         if not config.token():
             self._handle_auth_failure()
@@ -41,7 +44,11 @@ class AnkiHubWebViewDialog(QDialog):
         self._load_page()
         self.activateWindow()
         self.raise_()
-        self.show()
+
+        if use_open:
+            self.open()
+        else:
+            self.show()
 
         return True
 
@@ -59,29 +66,31 @@ class AnkiHubWebViewDialog(QDialog):
 
         theme_did_change.append(self._update_page_theme)
 
-        self.view_in_web_browser_button = QPushButton("View in web browser")
-        self.view_in_web_browser_button.setAutoDefault(False)
-        qconnect(
-            self.view_in_web_browser_button.clicked,
-            self._on_view_in_web_browser_button_clicked,
-        )
-
-        self.close_button = QPushButton("Close")
-        self.close_button.setAutoDefault(False)
-        qconnect(self.close_button.clicked, self.close)
-
-        self.button_layout = QHBoxLayout()
-        self.button_layout.setContentsMargins(10, 5, 10, 10)
-        self.button_layout.addSpacing(20)
-        self.button_layout.addWidget(self.view_in_web_browser_button)
-        self.button_layout.addStretch()
-        self.button_layout.addWidget(self.close_button)
-        self.button_layout.addSpacing(20)
-
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 5)
         self.layout_.addWidget(self.web)
-        self.layout_.addLayout(self.button_layout)
+
+        if self.show_footer:
+            self.view_in_web_browser_button = QPushButton("View in web browser")
+            self.view_in_web_browser_button.setAutoDefault(False)
+            qconnect(
+                self.view_in_web_browser_button.clicked,
+                self._on_view_in_web_browser_button_clicked,
+            )
+
+            self.close_button = QPushButton("Close")
+            self.close_button.setAutoDefault(False)
+            qconnect(self.close_button.clicked, self.close)
+
+            self.button_layout = QHBoxLayout()
+            self.button_layout.setContentsMargins(10, 5, 10, 10)
+            self.button_layout.addSpacing(20)
+            self.button_layout.addWidget(self.view_in_web_browser_button)
+            self.button_layout.addStretch()
+            self.button_layout.addWidget(self.close_button)
+            self.button_layout.addSpacing(20)
+
+            self.layout_.addLayout(self.button_layout)
 
         self.setLayout(self.layout_)
 
