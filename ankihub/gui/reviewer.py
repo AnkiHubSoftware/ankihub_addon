@@ -236,6 +236,7 @@ class ReviewerSidebar:
             self.header_webview.setFixedHeight(88)
 
         self.header_webview.setHtml(html)
+        self.header_webview.set_open_links_externally(False)
 
     def open_sidebar(self) -> bool:
         """Opens the sidebar if it's not already open.
@@ -289,6 +290,7 @@ class ReviewerSidebar:
                 resource_type=self.get_page_type().value,
             )
             self.content_webview.setHtml(html)
+            self.content_webview.set_open_links_externally(False)
 
     def refresh_page_content(self):
         self.content_webview.reload()
