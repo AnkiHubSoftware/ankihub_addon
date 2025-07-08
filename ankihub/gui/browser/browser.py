@@ -286,7 +286,9 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
 
 class ChatbotDialog(AnkiHubWebViewDialog):
-    def __init__(self, parent, ah_nid: uuid.UUID) -> None:
+    _instance: Optional["ChatbotDialog"] = None
+
+    def __init__(self, ah_nid: uuid.UUID, parent) -> None:
         super().__init__(parent, show_footer=False)
 
         self.ah_nid = ah_nid
@@ -300,6 +302,16 @@ class ChatbotDialog(AnkiHubWebViewDialog):
 
     def _get_non_embed_url(self):
         return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
+
+    @classmethod
+    def display_for_ah_nid(cls, ah_nid: uuid.UUID, parent) -> "ChatbotDialog":
+        """Display the chatbot dialog for the given note ID."""
+        cls._instance = cls(ah_nid=ah_nid, parent=parent)
+
+        if not cls._instance.display(Qt.WindowModality.ApplicationModal):
+            cls._instance = None
+
+        return cls._instance
 
 
 def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
@@ -315,8 +327,7 @@ def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         tooltip("AI Chatbot only works with AnkiHub notes.", parent=browser)
         return
 
-    dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
-    dialog.display(Qt.WindowModality.ApplicationModal)
+    ChatbotDialog.display_for_ah_nid(ah_nid=ah_nid, parent=browser)
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
