@@ -65,7 +65,7 @@ class AnkiHubWebViewDialog(QDialog):
         theme_did_change.append(self._update_page_theme)
 
         self.layout_ = QVBoxLayout()
-        self.layout_.setContentsMargins(0, 0, 0, 5)
+        self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
 
         if self.show_footer:
