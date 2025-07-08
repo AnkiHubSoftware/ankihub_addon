@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any, Callable
 
-from aqt import QWebEnginePage, QWebEngineProfile, pyqtSlot
+from aqt import Qt, QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QDialog,
@@ -34,7 +34,7 @@ class AnkiHubWebViewDialog(QDialog):
 
         self._setup_ui()
 
-    def display(self, use_open=False) -> bool:
+    def display(self, modality: Qt.WindowModality = Qt.WindowModality.NonModal) -> bool:
         """Display the dialog. Return True if the initialization was successful, False otherwise."""
         if not config.token():
             self._handle_auth_failure()
@@ -43,11 +43,8 @@ class AnkiHubWebViewDialog(QDialog):
         self._load_page()
         self.activateWindow()
         self.raise_()
-
-        if use_open:
-            self.open()
-        else:
-            self.show()
+        self.setWindowModality(modality)
+        self.show()
 
         return True
 

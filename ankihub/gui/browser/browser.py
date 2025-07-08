@@ -316,7 +316,7 @@ def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         return
 
     dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
-    dialog.display(use_open=True)
+    dialog.display(Qt.WindowModality.ApplicationModal)
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
