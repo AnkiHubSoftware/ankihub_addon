@@ -316,7 +316,7 @@ class ChatbotDialog(AnkiHubWebViewDialog):
         return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
 
     @classmethod
-    def display_for_ah_nid(cls, ah_nid: uuid.UUID, parent) -> "ChatbotDialog":
+    def display_for_ah_nid(cls, ah_nid: uuid.UUID, parent) -> Optional["ChatbotDialog"]:
         """Display the chatbot dialog for the given note ID."""
         cls._instance = cls(ah_nid=ah_nid, parent=parent)
 
