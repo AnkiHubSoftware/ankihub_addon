@@ -4,7 +4,6 @@ from typing import Any, Callable
 from aqt import QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
-    QColor,
     QDialog,
     QHBoxLayout,
     QPushButton,
@@ -58,7 +57,6 @@ class AnkiHubWebViewDialog(QDialog):
 
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
-        self.web.page().setBackgroundColor(QColor("white"))
 
         # Set the context to self so that self gets passed as context to the webview_did_receive_js_message hook
         # when a pycmd is called from the web view.
