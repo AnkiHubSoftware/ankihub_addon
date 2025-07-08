@@ -253,11 +253,23 @@ def _get_context_menu_actions(
         ContextMenuAction(
             name="AI Chatbot",
             function=lambda: _on_open_chatbot_action(browser, selected_nids),
-            enabled=exactly_one_ah_note_selected,
+            enabled=(
+                exactly_one_ah_note_selected
+                and _related_ah_deck_has_note_embeddings(selected_nids[0])
+            ),
             mac_shortcut="Option+K",
             other_shortcut="Shift+Alt+K",
         ),
     ]
+
+
+def _related_ah_deck_has_note_embeddings(anki_nid: NoteId) -> bool:
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(anki_nid)
+    if not ah_did:
+        return False
+
+    deck_config = config.deck_config(ah_did)
+    return deck_config.has_note_embeddings
 
 
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -322,9 +334,15 @@ def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         tooltip("AI Chatbot only works with one note selected.", parent=browser)
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nids[0])
+    nid = nids[0]
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nid)
     if not ah_nid:
         tooltip("AI Chatbot only works with AnkiHub notes.", parent=browser)
+        return
+
+    if not _related_ah_deck_has_note_embeddings(nid):
+        tooltip("AI Chatbot isn't enabled for this note's deck.", parent=browser)
         return
 
     ChatbotDialog.display_for_ah_nid(ah_nid=ah_nid, parent=browser)
