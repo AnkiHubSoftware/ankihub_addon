@@ -100,16 +100,7 @@ class ContextMenuAction:
     name: str
     function: Callable
     enabled: bool
-    mac_shortcut: Optional[str] = None
-    other_shortcut: Optional[str] = None
-
-    def get_shortcut(self) -> Optional[str]:
-        """Get the appropriate shortcut for the current platform."""
-        if is_mac and self.mac_shortcut:
-            return self.mac_shortcut
-        elif not is_mac and self.other_shortcut:
-            return self.other_shortcut
-        return None
+    shortcut: Optional[str] = None
 
 
 # Maximum number of notes that can be selected for bulk suggestions.
@@ -165,12 +156,11 @@ def _setup_global_shortcuts(browser: Browser) -> None:
     actions = _get_context_menu_actions(browser, selected_nids)
 
     for action_config in actions:
-        shortcut = action_config.get_shortcut()
-        if not shortcut:
+        if not action_config.shortcut:
             continue
 
         global_action = QAction(action_config.name, browser)
-        global_action.setShortcut(shortcut)
+        global_action.setShortcut(action_config.shortcut)
         qconnect(
             global_action.triggered,
             _create_shortcut_trigger(browser, action_config.name),
@@ -257,8 +247,7 @@ def _get_context_menu_actions(
                 exactly_one_ah_note_selected
                 and _related_ah_deck_has_note_embeddings(selected_nids[0])
             ),
-            mac_shortcut="Option+K",
-            other_shortcut="Shift+Alt+K",
+            shortcut="Shift+Alt+K",
         ),
     ]
 
@@ -292,7 +281,7 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
     for action_config in actions:
         action = context_menu.addAction(action_config.name, action_config.function)
         action.setEnabled(action_config.enabled)
-        shortcut = action_config.get_shortcut()
+        shortcut = action_config.shortcut
         if shortcut:
             action.setShortcut(shortcut)
 
