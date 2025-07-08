@@ -32,6 +32,6 @@ repos:
           - id: no_absolute_imports_from_ankihub
             name: no_absolute_imports_from_ankihub
             types: [python]
-            exclude: ^tests/*
+            exclude: ^tests/
             entry: "from ankihub([.]| import )"
             language: pygrep
