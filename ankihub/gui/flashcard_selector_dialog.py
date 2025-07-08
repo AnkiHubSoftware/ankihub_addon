@@ -14,7 +14,6 @@ from ..settings import (
     url_flashcard_selector_embed,
     url_plans_page,
 )
-from .menu import AnkiHubLogin
 from .operations import AddonQueryOp
 from .utils import show_dialog
 
@@ -58,16 +57,6 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
     def _get_non_embed_url(self) -> str:
         return url_flashcard_selector(self.ah_did)
-
-    def _handle_auth_failure(self) -> None:
-        # Close the flashcard selector dialog and prompt them to log in,
-        # then they can open the dialog again
-        self.close()
-
-        AnkiHubLogin.display_login()
-        LOGGER.info(
-            "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
-        )
 
 
 def _show_upsell(user_details: dict) -> None:

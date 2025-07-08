@@ -100,10 +100,18 @@ class AnkiHubWebViewDialog(QDialog):
         """Return the URL to load in the default browser."""
         ...  # pragma: no cover
 
-    @abstractmethod
     def _handle_auth_failure(self) -> None:
         """Handle an authentication failure, e.g. prompt the user to log in."""
-        ...  # pragma: no cover
+        # Close the dialog and prompt them to log in,
+        # then they can open the dialog again
+        self.close()
+
+        from .menu import AnkiHubLogin  # Lazy import to avoid circular dependency
+
+        AnkiHubLogin.display_login()
+        LOGGER.info(
+            f"Prompted user to log in to AnkiHub, after failed authentication in {self.__class__.__name__}."
+        )
 
     def _on_successful_page_load(self) -> None:
         ...  # pragma: no cover
