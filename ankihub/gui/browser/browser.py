@@ -100,16 +100,7 @@ class ContextMenuAction:
     name: str
     function: Callable
     enabled: bool
-    mac_shortcut: Optional[str] = None
-    other_shortcut: Optional[str] = None
-
-    def get_shortcut(self) -> Optional[str]:
-        """Get the appropriate shortcut for the current platform."""
-        if is_mac and self.mac_shortcut:
-            return self.mac_shortcut
-        elif not is_mac and self.other_shortcut:
-            return self.other_shortcut
-        return None
+    shortcut: Optional[str] = None
 
 
 # Maximum number of notes that can be selected for bulk suggestions.
@@ -165,12 +156,11 @@ def _setup_global_shortcuts(browser: Browser) -> None:
     actions = _get_context_menu_actions(browser, selected_nids)
 
     for action_config in actions:
-        shortcut = action_config.get_shortcut()
-        if not shortcut:
+        if not action_config.shortcut:
             continue
 
         global_action = QAction(action_config.name, browser)
-        global_action.setShortcut(shortcut)
+        global_action.setShortcut(action_config.shortcut)
         qconnect(
             global_action.triggered,
             _create_shortcut_trigger(browser, action_config.name),
@@ -253,11 +243,22 @@ def _get_context_menu_actions(
         ContextMenuAction(
             name="AI Chatbot",
             function=lambda: _on_open_chatbot_action(browser, selected_nids),
-            enabled=exactly_one_ah_note_selected,
-            mac_shortcut="Option+K",
-            other_shortcut="Shift+Alt+K",
+            enabled=(
+                exactly_one_ah_note_selected
+                and _related_ah_deck_has_note_embeddings(selected_nids[0])
+            ),
+            shortcut="Shift+Alt+K",
         ),
     ]
+
+
+def _related_ah_deck_has_note_embeddings(anki_nid: NoteId) -> bool:
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(anki_nid)
+    if not ah_did:
+        return False
+
+    deck_config = config.deck_config(ah_did)
+    return deck_config.has_note_embeddings
 
 
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -280,13 +281,15 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
     for action_config in actions:
         action = context_menu.addAction(action_config.name, action_config.function)
         action.setEnabled(action_config.enabled)
-        shortcut = action_config.get_shortcut()
+        shortcut = action_config.shortcut
         if shortcut:
             action.setShortcut(shortcut)
 
 
 class ChatbotDialog(AnkiHubWebViewDialog):
-    def __init__(self, parent, ah_nid: uuid.UUID) -> None:
+    _instance: Optional["ChatbotDialog"] = None
+
+    def __init__(self, ah_nid: uuid.UUID, parent) -> None:
         super().__init__(parent, show_footer=False)
 
         self.ah_nid = ah_nid
@@ -301,6 +304,16 @@ class ChatbotDialog(AnkiHubWebViewDialog):
     def _get_non_embed_url(self):
         return f"{config.app_url}/ai/chatbot/{self.ah_nid}/"
 
+    @classmethod
+    def display_for_ah_nid(cls, ah_nid: uuid.UUID, parent) -> Optional["ChatbotDialog"]:
+        """Display the chatbot dialog for the given note ID."""
+        cls._instance = cls(ah_nid=ah_nid, parent=parent)
+
+        if not cls._instance.display(Qt.WindowModality.ApplicationModal):
+            cls._instance = None
+
+        return cls._instance
+
 
 def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     if len(nids) == 0:
@@ -310,13 +323,18 @@ def _on_open_chatbot_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         tooltip("AI Chatbot only works with one note selected.", parent=browser)
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nids[0])
+    nid = nids[0]
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nid)
     if not ah_nid:
         tooltip("AI Chatbot only works with AnkiHub notes.", parent=browser)
         return
 
-    dialog = ChatbotDialog(parent=browser, ah_nid=ah_nid)
-    dialog.display(use_open=True)
+    if not _related_ah_deck_has_note_embeddings(nid):
+        tooltip("AI Chatbot isn't enabled for this note's deck.", parent=browser)
+        return
+
+    ChatbotDialog.display_for_ah_nid(ah_nid=ah_nid, parent=browser)
 
 
 def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:

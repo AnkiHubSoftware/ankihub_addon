@@ -1,10 +1,9 @@
 from abc import abstractmethod
 from typing import Any, Callable
 
-from aqt import QWebEnginePage, QWebEngineProfile, pyqtSlot
+from aqt import Qt, QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
-    QColor,
     QDialog,
     QHBoxLayout,
     QPushButton,
@@ -35,7 +34,7 @@ class AnkiHubWebViewDialog(QDialog):
 
         self._setup_ui()
 
-    def display(self, use_open=False) -> bool:
+    def display(self, modality: Qt.WindowModality = Qt.WindowModality.NonModal) -> bool:
         """Display the dialog. Return True if the initialization was successful, False otherwise."""
         if not config.token():
             self._handle_auth_failure()
@@ -44,11 +43,8 @@ class AnkiHubWebViewDialog(QDialog):
         self._load_page()
         self.activateWindow()
         self.raise_()
-
-        if use_open:
-            self.open()
-        else:
-            self.show()
+        self.setWindowModality(modality)
+        self.show()
 
         return True
 
@@ -58,7 +54,6 @@ class AnkiHubWebViewDialog(QDialog):
 
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
-        self.web.page().setBackgroundColor(QColor("white"))
 
         # Set the context to self so that self gets passed as context to the webview_did_receive_js_message hook
         # when a pycmd is called from the web view.
@@ -67,7 +62,7 @@ class AnkiHubWebViewDialog(QDialog):
         theme_did_change.append(self._update_page_theme)
 
         self.layout_ = QVBoxLayout()
-        self.layout_.setContentsMargins(0, 0, 0, 5)
+        self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
 
         if self.show_footer:
@@ -91,6 +86,7 @@ class AnkiHubWebViewDialog(QDialog):
             self.button_layout.addSpacing(20)
 
             self.layout_.addLayout(self.button_layout)
+            self.layout_.addSpacing(2)
 
         self.setLayout(self.layout_)
 
@@ -104,10 +100,18 @@ class AnkiHubWebViewDialog(QDialog):
         """Return the URL to load in the default browser."""
         ...  # pragma: no cover
 
-    @abstractmethod
     def _handle_auth_failure(self) -> None:
         """Handle an authentication failure, e.g. prompt the user to log in."""
-        ...  # pragma: no cover
+        # Close the dialog and prompt them to log in,
+        # then they can open the dialog again
+        self.close()
+
+        from .menu import AnkiHubLogin  # Lazy import to avoid circular dependency
+
+        AnkiHubLogin.display_login()
+        LOGGER.info(
+            f"Prompted user to log in to AnkiHub, after failed authentication in {self.__class__.__name__}."
+        )
 
     def _on_successful_page_load(self) -> None:
         ...  # pragma: no cover

@@ -4316,14 +4316,16 @@ class TestBrowserContextMenu:
     def test_ankihub_actions_are_added_to_the_browser_context_menu(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             note_info = NoteInfoFactory.create()
-            import_ah_note(note_info)
+            ah_did = install_ah_deck()
+            import_ah_note(note_info, ah_did=ah_did)
 
-            menu = self.open_browser_context_menu_with_all_notes_selected()
+            menu = self.open_browser_context_menu_with_one_note_selected()
 
             # Get the texts of the actions in the menu
             actions = [action for action in menu.actions() if not action.isSeparator()]
@@ -4347,16 +4349,26 @@ class TestBrowserContextMenu:
             with qtbot.wait_callback() as callback:
                 dialogs.closeAll(onsuccess=callback)
 
-    def open_browser_context_menu_with_all_notes_selected(self) -> QMenu:
-        """Returns a menu with just our context menu actions. The actions behave as if
-        all notes in the Anki collection were selected."""
-        # Set up our browser modifications, open the browser and select all notes
+    def open_browser_context_menu_with_one_note_selected(
+        self, anki_nid: Optional[NoteId] = None
+    ) -> QMenu:
+        """Returns a menu with just our context menu actions.
+        If anki_nid is provided, it will select the note with that ID in the browser,
+        otherwise it will select some random note."""
+
+        # Set up our browser modifications, open the browser and select a note
         setup_browser()
         browser: Browser = dialogs.open("Browser", aqt.mw)
         browser.search_for(search="")  # The empty search matches all notes
-        browser.table.select_all()
+        cids = (
+            aqt.mw.col.find_cards(f"nid:{anki_nid}")
+            if anki_nid
+            else aqt.mw.col.find_cards("")
+        )
+        if cids:
+            browser.table.select_single_card(cids[0])
 
-        # Call Anki's hoks for the context menu and let it add the actions to a menu
+        # Call Anki's hooks for the context menu and let it add the actions to a menu
         menu = QMenu()
         browser_will_show_context_menu(browser=browser, menu=menu)
 
@@ -4386,7 +4398,7 @@ class TestBrowserContextMenu:
             note_info = NoteInfoFactory.create()
             import_ah_note(note_info, ah_did=ah_did)
 
-            menu = self.open_browser_context_menu_with_all_notes_selected()
+            menu = self.open_browser_context_menu_with_one_note_selected()
 
             latest_instance_tracker.track(SuggestionDialog)
 
@@ -4417,6 +4429,7 @@ class TestBrowserContextMenu:
     def test_copy_nid_actions(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         qtbot: QtBot,
@@ -4424,10 +4437,13 @@ class TestBrowserContextMenu:
         expected_note_attribute_in_clipboard: str,
     ):
         with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
             note_info = NoteInfoFactory.create()
-            import_ah_note(note_info)
+            import_ah_note(note_info, ah_did=ah_did)
 
-            menu = self.open_browser_context_menu_with_all_notes_selected()
+            menu = self.open_browser_context_menu_with_one_note_selected(
+                anki_nid=NoteId(note_info.anki_nid)
+            )
 
             # Trigger the action
             action: QAction = next(
