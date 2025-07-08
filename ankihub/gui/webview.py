@@ -89,6 +89,7 @@ class AnkiHubWebViewDialog(QDialog):
             self.button_layout.addSpacing(20)
 
             self.layout_.addLayout(self.button_layout)
+            self.layout_.addSpacing(2)
 
         self.setLayout(self.layout_)
 
