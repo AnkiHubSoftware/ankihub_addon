@@ -17,16 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version-file: ".python-version"
+
 
       - name: Install deps
         run: |
-          python -m pip install -r ./requirements/base.txt
+          uv pip install -r ./requirements/base.txt
 
       - name: Create ankiaddon file
         run: |
@@ -36,16 +42,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install git+https://github.com/nateshmbhat/webbot.git@333f51840cd5a1fcde0b014bd6ab401d51e62860
-          python -m pip install webdriver_manager==4.0.2
-          python -m pip uninstall -y selenium
-          python -m pip install selenium==3.141.0
-          python -m pip uninstall -y urllib3
-          python -m pip install urllib3==1.26.14
+          uv pip install git+https://github.com/nateshmbhat/webbot.git@333f51840cd5a1fcde0b014bd6ab401d51e62860
+          uv pip install webdriver_manager==4.0.2
+          uv pip uninstall -y selenium
+          uv pip install selenium==3.141.0
+          uv pip uninstall -y urllib3
+          uv pip install urllib3==1.26.14
 
       - name: Run upload script
         run: |
-          python scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net/support
+          uv run scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net/support
         env:
           ANKI_USERNAME: ${{ secrets.ANKIWEB_USERNAME }}
           ANKI_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}
