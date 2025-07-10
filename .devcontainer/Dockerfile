@@ -7,6 +7,7 @@ ENV UV_LINK_MODE=copy
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
+    build-essential \
     findutils \
     g++ \
     gcc \
@@ -16,19 +17,37 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     libegl1 \
     libfontconfig1 \
     libgl1 \
+    libgl1-mesa-dev \
     libgstreamer-gl1.0-0 \
     libgstreamer-plugins-base1.0 \
     libgstreamer1.0-0 \
     libnss3 \
+    libpulse-dev \
     libpulse-mainloop-glib0 \
     libpulse-mainloop-glib0 \
     libssl-dev \
+    libxcb-cursor-dev \
+    libxcb-glx0 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-render0 \
+    libxcb-shape0 \
+    libxcb-shm0 \
+    libxcb-sync1 \
+    libxcb-util1 \
+    libxcb-xfixes0 \
+    libxcb-xinerama0 \
+    libxcb-xkb-dev \
+    libxcb1 \
     libxcomposite1 \
     libxcursor1 \
     libxi6 \
+    libxkbcommon-dev \
     libxkbcommon-x11-0 \
     libxkbcommon0 \
-    libxcb-cursor-dev \
     libxkbfile1	\
     libxrandr2 \
     libxrender1 \
