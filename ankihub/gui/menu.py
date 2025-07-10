@@ -24,6 +24,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..labs.gui.menu import setup_labs_menu
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config
 from .config_dialog import get_config_dialog_manager
@@ -74,6 +75,8 @@ def refresh_ankihub_menu() -> None:
     _config_setup(parent=menu_state.ankihub_menu)
     _ankihub_terms_and_policy_setup(parent=menu_state.ankihub_menu)
     _ankihub_help_setup(parent=menu_state.ankihub_menu)
+    if config.labs_enabled:
+        setup_labs_menu(menu_state.ankihub_menu)
 
 
 class AnkiHubLogin(QWidget):
