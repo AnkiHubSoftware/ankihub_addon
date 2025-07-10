@@ -1,5 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
+# Install UV from the official distroless image with a pinned version
+COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
+ENV UV_SYSTEM_PYTHON 1
+
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     findutils \
@@ -49,20 +53,25 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
-# Setup virtual environment
-ENV VIRTUAL_ENV="/home/vscode/venv"
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-
 # Update shell initialization files for runtime sessions
 RUN echo 'export PATH="'${VIRTUAL_ENV}'/bin:$PATH"' >> /home/vscode/.profile
 
-# Install requirements
-COPY ./requirements /requirements
-RUN pip3 install --upgrade pip && \
-    pip3 --no-cache-dir install -r /requirements/dev.txt && \
-    rm -rf /tmp/pip-tmp
+# Copy dependency files for Docker layer caching.
+COPY pyproject.toml uv.lock ./
 
+# Install dependencies using UV
+# https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --dev
+
+# This is copied last to take advantage of Docker layer caching.
+COPY . .
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --dev
 
 # Install Anki
 ARG ANKI_DIR=/opt/anki
