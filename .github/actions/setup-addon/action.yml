@@ -18,11 +18,7 @@ runs:
 
     - name: Install deps
       run: |
-        # We need to use Qt5 instead of Qt6 for CI because Qt6 has
-        # compatibility issues in the CI environment.
-        sed -i 's/\[qt6\]/[qt5]/' requirements/*.txt
-
-        uv pip install -r ./requirements/dev.txt
+        uv sync --locked --dev
       shell: bash
 
     - name: Build
