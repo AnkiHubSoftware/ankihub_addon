@@ -154,12 +154,8 @@ jobs:
           coverage combine coverage_*/.coverage
           coverage html --fail-under=76
 
-      - name: Install smokeshow
-        run: |
-          uv pip install smokeshow
-
       - name: Upload coverage report with smokeshow
-        run: uv run smokeshow upload coverage_html_report
+        run: uv run --with smokeshow -- smokeshow upload coverage_html_report
         if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
