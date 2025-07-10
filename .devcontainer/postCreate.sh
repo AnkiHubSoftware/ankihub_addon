@@ -13,3 +13,5 @@ uv run pre-commit install
 
 # TODO: Set api key properly
 sudo GOOGLE_API_KEY="fake_google_api_key" uv run scripts/build.py
+
+cp -r .vscode.dist .vscode
