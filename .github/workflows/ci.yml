@@ -159,7 +159,7 @@ jobs:
           uv pip install smokeshow
 
       - name: Upload coverage report with smokeshow
-        run: smokeshow upload coverage_html_report
+        run: uv run smokeshow upload coverage_html_report
         if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
@@ -188,7 +188,7 @@ jobs:
           path: ankihub.ankiaddon
 
       - name: Run pre-commit
-        run: pre-commit run --all
+        run: uv run pre-commit run --all
 
       - name: Run mypy
-        run: mypy
+        run: uv run mypy
