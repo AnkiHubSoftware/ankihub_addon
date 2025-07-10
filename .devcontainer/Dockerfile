@@ -2,8 +2,6 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 
 # Install UV from the official distroless image with a pinned version
 COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
-ENV UV_SYSTEM_PYTHON=1
-ENV UV_LINK_MODE=copy
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
