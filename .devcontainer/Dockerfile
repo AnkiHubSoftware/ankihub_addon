@@ -84,14 +84,14 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --dev
+    uv sync --locked --no-install-project --dev --group production
 
 # This is copied last to take advantage of Docker layer caching.
 COPY . .
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --dev
+    uv sync --locked --dev --group production
 
 # Install Anki
 ARG ANKI_DIR=/opt/anki
