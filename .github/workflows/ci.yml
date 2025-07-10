@@ -151,8 +151,8 @@ jobs:
 
       - name: Run coverage
         run: |
-          coverage combine coverage_*/.coverage
-          coverage html --fail-under=76
+          uv run coverage combine coverage_*/.coverage
+          uv run coverage html --fail-under=76
 
       - name: Upload coverage report with smokeshow
         run: uv run --with smokeshow -- smokeshow upload coverage_html_report
