@@ -73,9 +73,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
-# Update shell initialization files for runtime sessions
-RUN echo 'export PATH="'${VIRTUAL_ENV}'/bin:$PATH"' >> /home/vscode/.profile
-
 # Copy dependency files for Docker layer caching.
 COPY pyproject.toml uv.lock ./
 
