@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.11
+FROM mcr.microsoft.com/devcontainers/python:3.9
 
 # Install UV from the official distroless image with a pinned version
 COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
