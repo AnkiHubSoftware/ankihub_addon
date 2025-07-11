@@ -45,6 +45,9 @@ dev = [
   "approvaltests==12.2.0"
 ]
 
+[tool.uv]
+default-groups = ["production", "dev"]
+
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
 
