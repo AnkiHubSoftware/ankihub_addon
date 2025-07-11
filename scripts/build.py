@@ -23,8 +23,7 @@ subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJEC
 
 subprocess.run(
     [
-        "python3",
-        "-m",
+        "uv",
         "pip",
         "install",
         "--no-deps",
@@ -32,7 +31,6 @@ subprocess.run(
         str(MEDIA_IMPORT_LIBS),
         "-r",
         str(MEDIA_IMPORT_REQUIREMENTS),
-        "--no-user",  # needed for gitpod because it adds --user automatically and it conflicts with --target
     ],
     check=True,
 )
