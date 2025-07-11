@@ -87,7 +87,7 @@ COPY . .
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --dev --group production
+    uv sync --locked
 
 # Install Anki
 ARG ANKI_DIR=/opt/anki
