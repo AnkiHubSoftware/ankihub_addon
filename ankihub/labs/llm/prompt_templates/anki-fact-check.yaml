@@ -1,0 +1,5 @@
+model: perplexity
+system: "Your job is to fact check the following bit of information. Respond succinctly, with no more than a single paragraph explaining why the provided information is true or false."
+prompt: |
+  Here is the card to improve:
+  $input

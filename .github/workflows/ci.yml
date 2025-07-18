@@ -39,6 +39,18 @@ jobs:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
 
+      - name: Create ankiaddon file
+        run: |
+          bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
+      - name: Archive .ankiaddon
+        uses: actions/upload-artifact@v4
+        with:
+          name: ankihub_addon_${{ github.sha }}
+          path: ankihub.ankiaddon
+
       - name: Replace Anki version
         if: ${{ matrix.replace_anki_version }}
         run: pip install "${{ matrix.anki_package_version }}"
@@ -159,18 +171,6 @@ jobs:
         uses: codecov/codecov-action@v1
         with:
           fail_ci_if_error: false
-
-      - name: Create ankiaddon file
-        run: |
-          bash ./scripts/release.sh
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-
-      - name: Archive .ankiaddon
-        uses: actions/upload-artifact@v4
-        with:
-          name: ankihub_addon_${{ github.sha }}
-          path: ankihub.ankiaddon
 
       - name: Run pre-commit
         run: pre-commit run --all

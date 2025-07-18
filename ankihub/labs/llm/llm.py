@@ -1,0 +1,608 @@
+"""Module for handling LLM prompt functionality in the editor."""
+
+import difflib
+import json
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, List
+
+import yaml
+from aqt import QFont, gui_hooks
+from aqt.editor import Editor
+from aqt.qt import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+from aqt.utils import showWarning, tooltip
+from jinja2 import Template
+
+from ... import LOGGER
+from ...gui.operations import AddonQueryOp
+from ...gui.utils import active_window_or_mw, ask_user
+
+PROMPT_SELECTOR_BTN_ID = "ankihub-btn-llm-prompt"
+
+# Modify the system path by prepending $HOME/.local/bin with sys.path.insert
+sys.path.insert(0, str(Path.home() / ".local/bin"))
+
+
+def run_llm_script(command: str, *params: Any) -> str:
+    script_path = (
+        Path(__file__).parent
+        / f"llm.{'ps1' if platform.system() == 'Windows' else 'sh'}"
+    )
+    if platform.system() == "Windows":
+        args = [shutil.which("powershell"), "-File", str(script_path)]
+    else:
+        args = [str(script_path)]
+    args.extend([command, *params])
+    result = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    return result.stdout
+
+
+class TemplateManager:
+    """Manages LLM template operations and caching."""
+
+    _templates_path = None
+    _local_templates_dir = Path(__file__).parent / "prompt_templates"
+
+    @classmethod
+    def initialize(cls) -> None:
+        """Initialize the template manager by finding the templates directory."""
+        try:
+            result = run_llm_script("get_templates_path")
+            cls._templates_path = Path(result.strip())
+            LOGGER.info("Templates directory found", path=str(cls._templates_path))
+
+            # After finding templates path, try to copy local templates
+            cls._copy_local_templates()
+        except subprocess.CalledProcessError as e:
+            LOGGER.error("Error finding templates directory", error=str(e.stderr))
+            cls._templates_path = None
+        except Exception as e:
+            LOGGER.error("Unexpected error finding templates directory", error=str(e))
+            cls._templates_path = None
+
+    @classmethod
+    def _copy_local_templates(cls) -> None:
+        """Copy local templates to user's templates directory if they don't exist."""
+        if not cls._templates_path or not cls._local_templates_dir.exists():
+            return
+
+        try:
+            # Create templates directory if it doesn't exist
+            cls._templates_path.mkdir(parents=True, exist_ok=True)
+
+            # Copy each template that doesn't already exist
+            for template_file in cls._local_templates_dir.glob("*.yaml"):
+                target_path = cls._templates_path / template_file.name
+                if not target_path.exists():
+                    LOGGER.info("Copying template", template=template_file.name)
+                    target_path.write_text(
+                        template_file.read_text(encoding="utf-8"), encoding="utf-8"
+                    )
+                else:
+                    LOGGER.info("Template already exists", template=template_file.name)
+        except Exception as e:
+            LOGGER.error(
+                "Error copying templates", error=str(e), path=str(cls._templates_path)
+            )
+
+    @classmethod
+    def get_templates_path(cls):
+        """Get the cached templates path."""
+        if cls._templates_path is None:
+            cls.initialize()
+        return cls._templates_path
+
+    @classmethod
+    def get_template_content(cls, template_name: str) -> str:
+        """Get the content of a specific template."""
+        templates_path = cls.get_templates_path()
+        if not templates_path:
+            return "Error: Templates directory not found"
+
+        template_file = templates_path / f"{template_name}.yaml"
+        if not template_file.exists():
+            return "Template file not found"
+
+        try:
+            return template_file.read_text(encoding="utf-8")
+        except Exception as e:
+            return f"Error reading template: {str(e)}"
+
+    @classmethod
+    def get_anki_templates(cls) -> List[str]:
+        """Get list of Anki-specific template names."""
+        templates_path = cls.get_templates_path()
+        if not templates_path or not templates_path.exists():
+            return ["No prompt templates found"]
+
+        try:
+            yaml_files = [
+                f.stem
+                for f in templates_path.glob("*.yaml")
+                if f.is_file() and f.stem.lower().startswith("anki")
+            ]
+            yaml_files.sort()
+            return yaml_files or ["No Anki templates found"]
+        except Exception:
+            return ["Error listing templates"]
+
+    @classmethod
+    def save_template(cls, template_name: str, content: str) -> None:
+        """Save a template with the given content.
+
+        Args:
+            template_name: Name of the template without .yaml extension
+            content: YAML content to save
+
+        Raises:
+            Exception: If templates directory is not found or if saving fails
+        """
+        templates_path = cls.get_templates_path()
+        if not templates_path:
+            raise Exception("Templates directory not found")
+
+        try:
+            # Validate YAML content before saving
+            yaml.safe_load(content)
+
+            template_file = templates_path / f"{template_name}.yaml"
+            template_file.write_text(content)
+        except yaml.YAMLError as e:
+            raise Exception(f"Invalid YAML content: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to save template: {str(e)}")
+
+
+class PromptPreviewDialog(QDialog):
+    """Dialog for previewing and editing a prompt template before execution."""
+
+    def __init__(self, parent, template_name: str, editor: Editor) -> None:
+        super().__init__(parent)
+        self.template_name = template_name
+        self.editor = editor
+        self.template_content = TemplateManager.get_template_content(template_name)
+        try:
+            self.yaml_data = yaml.safe_load(self.template_content)
+            if not isinstance(self.yaml_data, dict):
+                self.yaml_data = {}
+        except yaml.YAMLError:
+            self.yaml_data = {}
+
+        self.section_editors = {}  # Store references to editors for each section
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        """Set up the dialog UI with all YAML sections visible."""
+        self.setWindowTitle(f"Preview Template: {self.template_name}")
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
+
+        layout = QVBoxLayout()
+
+        # Add description label
+        description = QLabel("Edit the template sections below:")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        # Create a scroll area for sections
+        scroll_area = QWidget()
+        scroll_layout = QVBoxLayout()
+        scroll_area.setLayout(scroll_layout)
+
+        # Create an editor for each YAML section
+        for key, value in self.yaml_data.items():
+            section_widget = QWidget()
+            section_layout = QVBoxLayout()
+
+            # Add section label
+            label = QLabel(f"{key}:")
+            label.setFont(QFont("Consolas"))
+            section_layout.addWidget(label)
+
+            # Add section editor
+            editor = QTextEdit()
+            editor.setPlainText(str(value))
+            editor.setFont(QFont("Consolas"))
+            editor.setMinimumHeight(100)  # Ensure minimum visibility
+            section_layout.addWidget(editor)
+
+            # Store reference to editor
+            self.section_editors[key] = editor
+
+            section_widget.setLayout(section_layout)
+            scroll_layout.addWidget(section_widget)
+
+        # Add spacer at the bottom to push content up
+        scroll_layout.addStretch()
+
+        # Create a scroll area container
+        scroll_container = QScrollArea()
+        scroll_container.setWidget(scroll_area)
+        scroll_container.setWidgetResizable(True)
+        layout.addWidget(scroll_container)
+
+        # Add button row
+        button_layout = QHBoxLayout()
+
+        # Execute button
+        execute_button = QPushButton("Execute Prompt")
+        execute_button.clicked.connect(self._on_execute)
+        button_layout.addWidget(execute_button)
+
+        # Save button
+        save_button = QPushButton("Save Template")
+        save_button.clicked.connect(self._on_save)
+        button_layout.addWidget(save_button)
+
+        # Reset button
+        reset_button = QPushButton("Reset Template")
+        reset_button.clicked.connect(self._on_reset)
+        button_layout.addWidget(reset_button)
+
+        # Cancel button
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+    def _get_yaml_content(self) -> str:
+        """Generate valid YAML content from the current field values and save template."""
+        data = {
+            key: editor.toPlainText() for key, editor in self.section_editors.items()
+        }
+        content = yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
+        # Save the template
+        TemplateManager.save_template(self.template_name, content)
+        return content
+
+    def _on_save(self) -> None:
+        """Save the modified template."""
+        try:
+            modified_content = self._get_yaml_content()
+            TemplateManager.save_template(self.template_name, modified_content)
+            QMessageBox.information(self, "Success", "Template saved successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save template: {str(e)}")
+
+    def _on_execute(self) -> None:
+        """Handle the execute button click."""
+        modified_content = self._get_yaml_content()
+        self.accept()
+        _execute_prompt_template(self.editor, self.template_name, modified_content)
+
+    def _update_editors(self) -> None:
+        """Update the YAML editors with the current yaml_data."""
+        for key, editor in self.section_editors.items():
+            if key in self.yaml_data:
+                editor.setPlainText(str(self.yaml_data[key]))
+            else:
+                editor.setPlainText("")
+
+    def _on_reset(self) -> None:
+        """Reset the template to the version in the local templates directory."""
+        if ask_user(
+            "Are you sure you want to reset the template to the original version?"
+        ):
+            local_template_path = (
+                TemplateManager._local_templates_dir / f"{self.template_name}.yaml"
+            )
+
+            if not local_template_path.exists():
+                QMessageBox.warning(
+                    self,
+                    "Template Not Found",
+                    f"No local template found for {self.template_name}. Cannot reset to original version.",
+                )
+                return
+
+            try:
+                self.template_content = local_template_path.read_text(encoding="utf-8")
+                self.yaml_data = yaml.safe_load(self.template_content)
+                if not isinstance(self.yaml_data, dict):
+                    self.yaml_data = {}
+                self._update_editors()  # Update the editors with the reset content
+                TemplateManager.save_template(self.template_name, self.template_content)
+                tooltip("Template reset.", parent=self)
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Reset Failed",
+                    f"Failed to reset template: {str(e)}",
+                )
+
+
+def _check_and_install_uv() -> None:
+    """Check if uv is installed and install it if not."""
+    try:
+        run_llm_script("check_uv")
+        LOGGER.info("uv is installed")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            run_llm_script("install_uv")
+        except subprocess.CalledProcessError as e:
+            LOGGER.warning("Failed to install uv", error=str(e))
+            raise e
+
+
+def _install_llm() -> None:
+    """Install llm and additional providers using uv if not already installed."""
+    # TODO Prompt users to set up their API keys.
+    try:
+        run_llm_script("check_llm")
+        LOGGER.info("llm is already installed")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            if platform.system() == "Windows":
+                subprocess.run(["uv", "tool", "install", "llm"], check=True)
+            else:
+                run_llm_script("install_llm")
+            LOGGER.info("Successfully installed llm")
+        except subprocess.CalledProcessError as e:
+            LOGGER.warning("Failed to install llm", error=str(e))
+            raise e
+
+    # Check installed providers
+    try:
+        result = subprocess.run(
+            ["llm", "plugins"], capture_output=True, text=True, check=True
+        )
+        installed_plugins = {plugin["name"] for plugin in json.loads(result.stdout)}
+    except subprocess.CalledProcessError as e:
+        LOGGER.warning("Failed to check installed providers", error=str(e))
+        installed_plugins = set()
+
+    # Install providers if not already installed
+    providers = ["llm-gemini", "llm-perplexity", "llm-anthropic"]
+    for provider in providers:
+        if provider in installed_plugins:
+            LOGGER.info(f"{provider} is already installed")
+        else:
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(
+                        ["uv", "run", "--no-project", "llm", "install", "-U", provider],
+                        check=True,
+                    )
+                else:
+                    run_llm_script("install_provider", provider)
+                LOGGER.info(f"Successfully installed {provider}")
+            except subprocess.CalledProcessError as e:
+                LOGGER.warning(f"Failed to install {provider}", error=str(e))
+                raise e
+
+
+def setup() -> None:
+    """Set up the LLM prompt functionality."""
+
+    def _install_labs_dependencies():
+        _check_and_install_uv()
+        _install_llm()
+
+    AddonQueryOp(
+        parent=active_window_or_mw(),
+        op=lambda _: _install_labs_dependencies(),
+        success=lambda _: None,
+    ).without_collection().with_progress("Setting up AnkiHub Labs").run_in_background()
+
+    TemplateManager.initialize()  # Initialize templates path
+    gui_hooks.editor_did_init_buttons.append(_setup_prompt_selector_button)
+    gui_hooks.webview_did_receive_js_message.append(_handle_js_message)
+
+
+def _setup_prompt_selector_button(buttons: List[str], editor: Editor) -> None:
+    """Add the LLM prompt selector button to the editor."""
+    prompt_button = editor.addButton(
+        icon=None,
+        cmd=PROMPT_SELECTOR_BTN_ID,
+        func=_on_prompt_button_press,
+        label="✨ LLM Prompts",
+        id=PROMPT_SELECTOR_BTN_ID,
+        disables=False,
+    )
+    buttons.append(prompt_button)
+
+    # Add button styling
+    buttons.append(
+        "<style> "
+        f"  #{PROMPT_SELECTOR_BTN_ID} {{ width:auto; padding:1px; }}\n"
+        f"  #{PROMPT_SELECTOR_BTN_ID}[disabled] {{ opacity:.4; }}\n"
+        "</style>"
+    )
+
+
+def _get_prompt_templates() -> List[str]:
+    """Get list of prompt template files from the LLM templates directory."""
+    return TemplateManager.get_anki_templates()
+
+
+def _on_prompt_button_press(editor: Editor) -> None:
+    """Handle the prompt selector button click by showing a dropdown menu."""
+    prompts = _get_prompt_templates()
+
+    # Read and render the JavaScript template
+    js_template_path = Path(__file__).parent / "prompt_selector.js"
+    with open(js_template_path, "r") as f:
+        template = Template(f.read())
+
+    script = template.render(
+        button_id=PROMPT_SELECTOR_BTN_ID, options=json.dumps(prompts)
+    )
+    editor.web.eval(script)
+
+
+def _get_note_content(editor: Editor) -> str:
+    """Extract content from the current note's fields."""
+    note = editor.note
+    if not note:
+        return ""
+
+    fields_dict = {name: note[name] for name in note.keys()}
+    return json.dumps(fields_dict)
+
+
+def _update_note_fields(editor: Editor, new_fields: Dict[str, str]) -> None:
+    """Update the note fields with new content."""
+    note = editor.note
+    if not note:
+        return
+
+    # Only update fields that exist in the note
+    for field_name, new_content in new_fields.items():
+        if field_name in note:
+            note[field_name] = new_content
+
+    editor.loadNoteKeepingFocus()
+
+
+def _create_diff_html(original: str, suggested: str) -> str:
+    """Create HTML diff between original and suggested text."""
+    differ = difflib.Differ()
+    diff = list(differ.compare(original.splitlines(True), suggested.splitlines(True)))
+
+    html = []
+    for line in diff:
+        if line.startswith("+"):
+            html.append(f'<span style="background-color: #e6ffe6">{line[2:]}</span>')
+        elif line.startswith("-"):
+            html.append(
+                f'<span style="background-color: #ffe6e6; text-decoration: line-through">{line[2:]}</span>'
+            )
+        elif line.startswith("?"):
+            continue
+        else:
+            html.append(line[2:])
+
+    return "".join(html)
+
+
+def _show_llm_response(editor: Editor, response: str) -> None:
+    """Display the LLM response in a dialog with option to update note."""
+    dialog = QDialog(editor.parentWindow)
+    dialog.setWindowTitle("LLM Response - Field Changes")
+    dialog.setMinimumWidth(800)
+    dialog.setMinimumHeight(600)
+
+    layout = QVBoxLayout()
+
+    # Create text display area with HTML formatting
+    text_edit = QTextEdit()
+    text_edit.setReadOnly(True)
+
+    # Build HTML content showing diff for the first field
+    html_content = [
+        "<style>",
+        "body { font-family: monospace; }",
+        ".field-name { font-weight: bold; font-size: 1.1em; margin-top: 1em; }",
+        ".field-content { margin-left: 1em; white-space: pre-wrap; }",
+        "</style>",
+    ]
+
+    # Get the first field's name and content
+    note = editor.note
+    if note and note.keys():
+        field_name = note.keys()[0]
+        original_content = note[field_name]
+        html_content.append(f'<div class="field-name">{field_name}:</div>')
+        html_content.append('<div class="field-content">')
+        html_content.append(_create_diff_html(original_content, response))
+        html_content.append("</div>")
+
+    text_edit.setHtml("".join(html_content))
+    layout.addWidget(text_edit)
+
+    # Create button row
+    button_layout = QHBoxLayout()
+
+    # Add update button
+    update_button = QPushButton("Update Note")
+    update_button.clicked.connect(lambda: _handle_update_note(editor, response, dialog))
+    button_layout.addWidget(update_button)
+
+    # Add close button
+    close_button = QPushButton("Close")
+    close_button.clicked.connect(dialog.accept)
+    button_layout.addWidget(close_button)
+
+    layout.addLayout(button_layout)
+    dialog.setLayout(layout)
+    dialog.open()
+
+
+def _handle_update_note(editor: Editor, response: str, dialog: QDialog) -> None:
+    """Handle the update note button click."""
+    dialog.accept()
+
+    try:
+        note = editor.note
+        if note and note.keys():
+            # Update only the first field
+            field_name = note.keys()[0]
+            note[field_name] = response
+            editor.loadNoteKeepingFocus()
+            tooltip("Note updated successfully")
+    except Exception as e:
+        showWarning(f"Error updating note: {str(e)}")
+
+
+def _handle_prompt_selection(editor: Editor, template_name: str) -> None:
+    """Handle the selection of a prompt template."""
+    dialog = PromptPreviewDialog(active_window_or_mw(), template_name, editor)
+    dialog.open()
+
+
+def _execute_prompt_template(
+    editor: Editor, template_name: str, template_content=None
+) -> None:
+    """Execute the selected prompt template with the current note as input."""
+    note_content = _get_note_content(editor)
+    text_field = editor.note.items()[0][1]
+    if not note_content:
+        tooltip("No note content available")
+        return
+
+    try:
+        # Run the LLM command with the template and note content
+        result = run_llm_script("execute_prompt", template_name, text_field)
+
+        # Show the response in a dialog
+        _show_llm_response(editor, result)
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Error running LLM command: {e.stderr}"
+        tooltip(error_msg)
+        raise Exception(error_msg)
+    except Exception as e:
+        tooltip(f"Unexpected error: {str(e)}")
+        raise Exception(f"Unexpected error: {str(e)}")
+
+
+def _handle_js_message(
+    handled: tuple[bool, Any], message: str, context: Any
+) -> tuple[bool, Any]:
+    """Handle JavaScript messages for prompt template selection."""
+    if message.startswith("prompt-select:"):
+        template_name = message.split(":", 1)[1]
+        _handle_prompt_selection(context, template_name)
+        return (True, None)
+    return handled

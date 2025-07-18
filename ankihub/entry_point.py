@@ -266,6 +266,23 @@ def _general_setup() -> None:
     LOGGER.info(
         "Set up feature flag fetching (flags will be fetched in the background)."
     )
+    # Make all .sh files executable
+    for sh_file in Path(__file__).parent.rglob("*.sh"):
+        current_mode = sh_file.stat().st_mode
+        executable_mode = (
+            current_mode | 0o111
+        )  # Add execute permission for user, group and others
+        sh_file.chmod(executable_mode)
+    LOGGER.info("Made all .sh files executable.")
+
+    if config.labs_enabled:
+        from .labs.llm import llm
+
+        try:
+            llm.setup()
+            LOGGER.info("Set up LLM prompt functionality.")
+        except Exception as e:
+            LOGGER.exception("Failed to set up LLM prompt functionality", error=e)
 
 
 def _copy_web_media_to_media_folder() -> None:
