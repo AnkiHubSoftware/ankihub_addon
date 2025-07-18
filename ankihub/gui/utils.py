@@ -726,13 +726,17 @@ def extract_argument(
     new_kwargs = {}
     for param in signature.parameters.values():
         if param.name in bound_args.arguments:
-            if param.kind in [
-                inspect.Parameter.POSITIONAL_ONLY,
+            if param.kind == inspect.Parameter.POSITIONAL_ONLY:
+                new_args.append(bound_args.arguments[param.name])
+            elif param.kind in [
+                inspect.Parameter.KEYWORD_ONLY,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
             ]:
-                new_args.append(bound_args.arguments[param.name])
-            elif param.kind == inspect.Parameter.KEYWORD_ONLY:
                 new_kwargs[param.name] = bound_args.arguments[param.name]
+            elif param.kind == inspect.Parameter.VAR_POSITIONAL:
+                new_args.extend(bound_args.arguments[param.name])
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
+                new_kwargs.update(bound_args.arguments[param.name])
 
     return tuple(new_args), new_kwargs, arg_value
 
