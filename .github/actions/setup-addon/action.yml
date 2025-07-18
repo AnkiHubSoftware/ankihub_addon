@@ -7,23 +7,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Get pip cache dir
-      id: pip-cache
-      run: |
-        python -m pip install --upgrade pip
-        echo "::set-output name=dir::$(pip cache dir)"
-      shell: bash
-
-    - name: pip cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ${{ steps.pip-cache.outputs.dir }}
-          ~/.cache/pre-commit
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
     - name: Install Qt
       if: ${{ inputs.install_qt == 'true' }}
       uses: jurplel/install-qt-action@v4
@@ -35,16 +18,12 @@ runs:
 
     - name: Install deps
       run: |
-        # We need to use Qt5 instead of Qt6 for CI because Qt6 has
-        # compatibility issues in the CI environment.
-        sed -i 's/\[qt6\]/[qt5]/' requirements/*.txt
-
-        python -m pip install -r ./requirements/dev.txt
+        uv sync --locked --no-default-groups --dev --group tests
       shell: bash
 
     - name: Build
       run: |
-        python ./scripts/build.py
+        uv run ./scripts/build.py
       shell: bash
       env:
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}

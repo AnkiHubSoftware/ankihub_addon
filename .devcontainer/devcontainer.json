@@ -4,10 +4,7 @@
 	"name": "Python 3",
 	"build": {
 		"dockerfile": "Dockerfile",
-		"context": "..",
-		"args": {
-			"VARIANT": "3.11",
-		}
+		"context": ".."
 	},
 	"runArgs": [
 		"--env-file",
@@ -15,9 +12,9 @@
 	],
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
-		"python.defaultInterpreterPath": "/home/vscode/venv/bin/python3",
+		"python.defaultInterpreterPath": "/workspaces/ankihub_addon/.venv/bin/python3",
 		"editor.minimap.enabled": false,
-		"python.linting.enabled": true,
+		"python.linting.enabled": true
 	},
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [

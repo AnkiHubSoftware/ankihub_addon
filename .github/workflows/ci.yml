@@ -26,12 +26,16 @@ jobs:
             anki_package_version: 'aqt[qt5]==2.1.56'
     timeout-minutes: 30
     steps:
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-
       - name: Checkout ankihub_addon
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
@@ -41,13 +45,13 @@ jobs:
 
       - name: Replace Anki version
         if: ${{ matrix.replace_anki_version }}
-        run: pip install "${{ matrix.anki_package_version }}"
+        run: uv pip install "${{ matrix.anki_package_version }}"
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          uv run pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          uv run pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -64,12 +68,16 @@ jobs:
         group: [1, 2]
     timeout-minutes: 30
     steps:
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-
       - name: Checkout ankihub_addon
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
@@ -83,7 +91,7 @@ jobs:
           ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
 
       - name: Checkout ankipalace/ankihub web app repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ankipalace/ankihub
           ref: dev
@@ -104,7 +112,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml \
+          uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage
@@ -119,11 +127,18 @@ jobs:
     needs: ["test-addon", "test-client"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.9"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
@@ -136,15 +151,11 @@ jobs:
 
       - name: Run coverage
         run: |
-          coverage combine coverage_*/.coverage
-          coverage html --fail-under=76
-
-      - name: Install smokeshow
-        run: |
-          python -m pip install smokeshow
+          uv run coverage combine coverage_*/.coverage
+          uv run coverage html --fail-under=76
 
       - name: Upload coverage report with smokeshow
-        run: smokeshow upload coverage_html_report
+        run: uv run --with smokeshow -- smokeshow upload coverage_html_report
         if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
@@ -173,7 +184,7 @@ jobs:
           path: ankihub.ankiaddon
 
       - name: Run pre-commit
-        run: pre-commit run --all
+        run: uv run pre-commit run --all
 
       - name: Run mypy
-        run: mypy
+        run: uv run mypy
