@@ -2,7 +2,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 from uuid import UUID
 
 import aqt
@@ -26,7 +26,7 @@ from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import logged_into_ankiweb, sync_with_ankiweb
+from ..utils import extract_argument, logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
@@ -348,12 +348,40 @@ def _upload_if_full_sync_triggered_by_ankihub(
             aqt.sync.full_upload(mw, on_done)  # type: ignore
         config.set_schema_to_do_full_upload_for_once(None)
     else:
+        LOGGER.info("Full sync not triggered by AnkiHub.", out=out)
         _old(mw, out, on_done)
+
+
+def wrapped_ask_user_dialog(
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """A wrapper for ask_user_dialog() to add some logging for debugging."""
+
+    LOGGER.info("ask_user_dialog called", args=args, kwargs=kwargs)
+    _old = kwargs.pop("_old")
+    args, kwargs, callback = extract_argument(
+        func=_old,
+        args=args,
+        kwargs=kwargs,
+        arg_name="callback",
+    )
+
+    def wrapped_callback(choice: int) -> None:
+        LOGGER.info("ask_user_dialog callback called", choice=choice)
+        callback(choice)
+
+    return _old(*args, **kwargs, callback=wrapped_callback)
 
 
 def setup_full_sync_patch() -> None:
     aqt.sync.full_sync = wrap(  # type: ignore
         aqt.sync.full_sync,
         _upload_if_full_sync_triggered_by_ankihub,
+        "around",
+    )
+    aqt.sync.ask_user_dialog = wrap(  # type: ignore
+        aqt.sync.ask_user_dialog,
+        wrapped_ask_user_dialog,
         "around",
     )
