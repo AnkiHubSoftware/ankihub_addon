@@ -161,3 +161,6 @@ ankihub/media_export/*
 # envrc
 .envrc
 /ankihub.code-workspace
+
+# Visual Studio Code
+.vscode
