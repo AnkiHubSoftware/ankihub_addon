@@ -44,9 +44,9 @@ jobs:
         run: |
           uv pip install git+https://github.com/nateshmbhat/webbot.git@333f51840cd5a1fcde0b014bd6ab401d51e62860
           uv pip install webdriver_manager==4.0.2
-          uv pip uninstall -y selenium
+          uv pip uninstall selenium
           uv pip install selenium==3.141.0
-          uv pip uninstall -y urllib3
+          uv pip uninstall urllib3
           uv pip install urllib3==1.26.14
 
       - name: Run upload script
