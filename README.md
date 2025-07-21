@@ -16,7 +16,7 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 #### Set up a virtual environment and VSCode
 
 - Install uv: https://docs.astral.sh/uv/getting-started/installation/
-- Set up project environment and install dependencies: `uv sync --dev --group production`
+- Set up project environment and install dependencies: `uv sync --dev --group production` or `just install` (if you have [just](https://github.com/casey/just) installed).
 - Open VSCode in this repo:  `code .`
 - Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
 - Install [`direnv`](https://direnv.net/docs/installation.html).
