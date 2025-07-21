@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Run Anki with AnkiHub add-on",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "stopOnEntry": false,
             "program": "${command:python.interpreterPath}/../anki",

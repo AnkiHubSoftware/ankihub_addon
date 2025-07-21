@@ -15,8 +15,9 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 ### Requirements for creating a development environment (without the devcontainer).
 #### Set up a virtual environment and VSCode
 
-- Create a python virtual environment in your preferred manner.
-- Install the dependencies into that environment: `pip install -r ./requirements/dev.txt`
+- Install uv: https://docs.astral.sh/uv/getting-started/installation/
+- Set up project environment and install dependencies: `uv sync --dev --group production` or `just install` (if you have [just](https://github.com/casey/just) installed).
+- Copy `.vscode.dist` as `.vscode`.
 - Open VSCode in this repo:  `code .`
 - Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
 - Install [`direnv`](https://direnv.net/docs/installation.html).
@@ -34,12 +35,12 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 - Set `REPORT_ERRORS` from 0 to 1 if you want to capture Sentry errors
 
 #### Run the build script
-`python scripts/build.py`
+`uv run scripts/build.py`
 
 You only have to do this once.
 
 #### Setup pre-commit hooks
-`pre-commit install`
+`uv run pre-commit install`
 
 This will ensure linters and code auto-formatters are run before each commit.
 
@@ -108,34 +109,34 @@ Tests are seperated into add-on tests and client tests.
 #### Running add-on tests
 #### Run all tests except tests that need to be run sequentially and performance tests
 ```
-pytest tests/addon
+uv run pytest tests/addon
 ```
 
 #### Run sequential tests
 These are test that are flaky when run in parallel with other tests using `pytest-xdist`.
 ```
-pytest tests/addon -m sequential -n 1
+uv run pytest tests/addon -m sequential -n 1
 ```
 
 #### Run performance tests
 ```
-pytest tests/addon -m performance -n 1
+uv run pytest tests/addon -m performance -n 1
 ```
 
 #### Running client tests
 ##### With vcr
 ```
-pytest tests/client
+uv run pytest tests/client
 ```
 See https://vcrpy.readthedocs.io/en/latest/.
 
 ##### Without vcr
 This requires ankihub runnig locally on localhost:8000. **The test setup clears the ankihub database.**
 ```
-pytest tests/client --disable-vcr
+uv run pytest tests/client --disable-vcr
 ```
 
 #### Type checking
 ```
-mypy
+uv run mypy
 ```
