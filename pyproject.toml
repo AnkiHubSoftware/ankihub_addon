@@ -19,6 +19,7 @@ tests = [
 dev = [
   "pyqt5==5.15.5; platform_system != 'Windows'",
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
+  "ruff",
   "black==22.6.0",
   "flake8==5.0.4",
   "mypy==0.971",
@@ -96,3 +97,10 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = 'anki._vendor.*'
 ignore_missing_imports = true
+
+[tool.ruff]
+extend-exclude = ["lib", "media_import", "media_export", "ankihub/gui/ankiaddonconfig"]
+line-length = 120
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E722", "E731", "E203", "E402"]
