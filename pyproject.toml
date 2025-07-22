@@ -21,7 +21,6 @@ dev = [
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "ruff",
   "black==22.6.0",
-  "flake8==5.0.4",
   "mypy==0.971",
   "coverage==6.5.0",
   "pre-commit==2.20.0",
