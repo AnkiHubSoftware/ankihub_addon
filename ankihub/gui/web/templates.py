@@ -4,14 +4,10 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 TEMPLATES_PATH = (pathlib.Path(__file__).parent).absolute()
 
-env = Environment(
-    loader=FileSystemLoader(TEMPLATES_PATH), autoescape=select_autoescape()
-)
+env = Environment(loader=FileSystemLoader(TEMPLATES_PATH), autoescape=select_autoescape())
 
 
-def get_header_webview_html(
-    tabs, current_active_tab_url: str, page_title: str, theme: str
-) -> str:
+def get_header_webview_html(tabs, current_active_tab_url: str, page_title: str, theme: str) -> str:
     return env.get_template("sidebar_tabs.html").render(
         {
             "tabs": tabs,
@@ -27,9 +23,7 @@ def get_reviewer_buttons_js(theme: str) -> str:
 
 
 def get_empty_state_html(theme: str, resource_type: str) -> str:
-    return env.get_template("mh_no_urls_empty_state.html").render(
-        {"theme": theme, "resource_type": resource_type}
-    )
+    return env.get_template("mh_no_urls_empty_state.html").render({"theme": theme, "resource_type": resource_type})
 
 
 def get_remove_anking_button_js() -> str:

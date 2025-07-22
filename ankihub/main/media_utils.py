@@ -1,4 +1,5 @@
 """Performant functions for working with media in Anki"""
+
 import aqt
 
 

@@ -58,20 +58,14 @@ ANKIHUB_CSS_END_COMMENT = (
     "*/"
 )
 
-ANKIHUB_HTML_END_COMMENT_RE = re.compile(
-    rf"{re.escape(ANKIHUB_HTML_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
-)
-ANKIHUB_CSS_COMMENT_RE = re.compile(
-    rf"{re.escape(ANKIHUB_CSS_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)"
-)
+ANKIHUB_HTML_END_COMMENT_RE = re.compile(rf"{re.escape(ANKIHUB_HTML_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)")
+ANKIHUB_CSS_COMMENT_RE = re.compile(rf"{re.escape(ANKIHUB_CSS_END_COMMENT)}(?P<text_to_migrate>[\w\W]*)")
 
 # decks
 
 
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
-    source_did = aqt.mw.col.decks.add_normal_deck_with_name(
-        get_unique_ankihub_deck_name(deck_name)
-    ).id
+    source_did = aqt.mw.col.decks.add_normal_deck_with_name(get_unique_ankihub_deck_name(deck_name)).id
     aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
     aqt.mw.col.save()
@@ -85,9 +79,7 @@ def all_dids() -> Set[DeckId]:
 
 def lowest_level_common_ancestor_did(dids: Iterable[DeckId]) -> Optional[DeckId]:
     return aqt.mw.col.decks.id_for_name(
-        lowest_level_common_ancestor_deck_name(
-            [aqt.mw.col.decks.name(did) for did in dids]
-        )
+        lowest_level_common_ancestor_deck_name([aqt.mw.col.decks.name(did) for did in dids])
     )
 
 
@@ -187,11 +179,7 @@ def all_notes_in_deck(nids: Sequence[NoteId], anki_did: DeckId) -> bool:
 
 
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
-    return [
-        mid
-        for mid in aqt.mw.col.models.ids()
-        if has_ankihub_id_field(aqt.mw.col.models.get(mid))
-    ]
+    return [mid for mid in aqt.mw.col.models.ids() if has_ankihub_id_field(aqt.mw.col.models.get(mid))]
 
 
 def has_ankihub_id_field(model: NotetypeDict) -> bool:
@@ -290,14 +278,10 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
     aqt.mw.col.save()
 
-    LOGGER.info(
-        "Created note type.", note_type_name=note_type["name"], note_type_id=mid
-    )
+    LOGGER.info("Created note type.", note_type_name=note_type["name"], note_type_id=mid)
 
 
-def note_type_contains_field(
-    note_type: NoteType, field=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
-) -> bool:
+def note_type_contains_field(note_type: NoteType, field=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME) -> bool:
     """Check that a field is defined in the note type."""
     fields: List[Dict] = note_type["flds"]
     field_names = [field["name"] for field in fields]
@@ -324,9 +308,7 @@ def change_note_types_of_notes(
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
     # Group notes by source and target note type
-    notes_grouped_by_type_change: Dict[
-        Tuple[NotetypeId, NotetypeId], List[NoteId]
-    ] = defaultdict(list)
+    notes_grouped_by_type_change: Dict[Tuple[NotetypeId, NotetypeId], List[NoteId]] = defaultdict(list)
     for nid, mid in nid_mid_pairs:
         current_mid = aqt.mw.col.db.scalar(f"SELECT mid FROM notes WHERE id={nid}")
         if current_mid is None:
@@ -337,8 +319,7 @@ def change_note_types_of_notes(
 
     if raise_if_full_sync_required and notes_grouped_by_type_change:
         affected_note_type_ids = set(
-            target_note_type_id
-            for _, target_note_type_id in notes_grouped_by_type_change.keys()
+            target_note_type_id for _, target_note_type_id in notes_grouped_by_type_change.keys()
         )
         LOGGER.info(
             "Changing note types of notes requires full sync.",
@@ -371,32 +352,19 @@ def change_note_types_of_notes(
 
 def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
     """Returns the note type ids of the given notes."""
-    return set(
-        aqt.mw.col.db.list(
-            f"SELECT DISTINCT mid FROM notes WHERE id in {ids2str(nids)}"
-        )
-    )
+    return set(aqt.mw.col.db.list(f"SELECT DISTINCT mid FROM notes WHERE id in {ids2str(nids)}"))
 
 
 def retain_nids_with_ah_note_type(nids: Collection[NoteId]) -> Collection[NoteId]:
     """Return nids that have an AnkiHub note type. Other nids are not included in the result."""
     nids_to_mids = get_anki_nid_to_mid_dict(nids)
-    mid_to_is_ankihub_note_type = {
-        mid: ankihub_db.is_ankihub_note_type(mid) for mid in set(nids_to_mids.values())
-    }
-    result = [
-        nid for nid, mid in nids_to_mids.items() if mid_to_is_ankihub_note_type[mid]
-    ]
+    mid_to_is_ankihub_note_type = {mid: ankihub_db.is_ankihub_note_type(mid) for mid in set(nids_to_mids.values())}
+    result = [nid for nid, mid in nids_to_mids.items() if mid_to_is_ankihub_note_type[mid]]
     return result
 
 
 def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeId]:
-    result = {
-        id_: mid
-        for id_, mid in aqt.mw.col.db.execute(
-            f"select id, mid from notes where id in {ids2str(nids)}"
-        )
-    }
+    result = {id_: mid for id_, mid in aqt.mw.col.db.execute(f"select id, mid from notes where id in {ids2str(nids)}")}
     return result
 
 
@@ -408,9 +376,7 @@ def note_type_name_without_ankihub_modifications(name: str) -> str:
 
 
 def modified_ankihub_note_type_name(note_type_name: str, deck_name) -> str:
-    name_without_modifications = note_type_name_without_ankihub_modifications(
-        note_type_name
-    )
+    name_without_modifications = note_type_name_without_ankihub_modifications(note_type_name)
     name = f"{name_without_modifications} ({deck_name} / {config.username_or_email()})"
     return name
 
@@ -555,9 +521,7 @@ def note_type_with_updated_templates_and_css(
     """
 
     updated_templates = []
-    new_template_amount = (
-        len(new_note_type["tmpls"]) if new_note_type else len(old_note_type["tmpls"])
-    )
+    new_template_amount = len(new_note_type["tmpls"]) if new_note_type else len(old_note_type["tmpls"])
     for template_idx in range(new_template_amount):
         if template_idx < len(old_note_type["tmpls"]):
             old_template = old_note_type["tmpls"][template_idx]
@@ -633,13 +597,7 @@ def _updated_note_type_content(
         result = _template_side_with_view_on_ankihub_snippet(result)
 
     # Add the AnkiHub end comment and the content below it back.
-    return (
-        result.rstrip("\n ")
-        + "\n\n"
-        + end_comment
-        + "\n"
-        + text_to_migrate.strip("\n ")
-    )
+    return result.rstrip("\n ") + "\n\n" + end_comment + "\n" + text_to_migrate.strip("\n ")
 
 
 # ... undo modifications
@@ -808,9 +766,7 @@ def mh_tag_to_resource(tag: str) -> Optional[Resource]:
             path_parts = path_parts[:-1]
 
         path_parts = [part.lower() for part in path_parts]
-        content_numbers = [
-            str(int(re.match(r"\d+", part).group(0))) for part in path_parts
-        ]
+        content_numbers = [str(int(re.match(r"\d+", part).group(0))) for part in path_parts]
         slug = f"step{step}-{resource_slug_str}-{'-'.join(content_numbers)}"
 
         title = re.sub(r"\d+_", "", path_parts[-1])

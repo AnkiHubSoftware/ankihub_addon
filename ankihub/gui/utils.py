@@ -51,9 +51,7 @@ ButtonParam = Union[
 ]
 
 
-def add_button_from_param(
-    button_box: QDialogButtonBox, button: ButtonParam
-) -> QPushButton:
+def add_button_from_param(button_box: QDialogButtonBox, button: ButtonParam) -> QPushButton:
     if isinstance(button, str):
         button = button_box.addButton(button, QDialogButtonBox.ButtonRole.ActionRole)
     elif isinstance(button, QDialogButtonBox.StandardButton):
@@ -78,9 +76,7 @@ def show_tooltip(message: str, parent=aqt.mw, *args, **kwargs) -> None:
 
     Note: all parameters accepted by aqt.utils.tooltip can also be passed in the function call
     """
-    aqt.mw.taskman.run_on_main(
-        lambda: _show_tooltip(message, *args, parent=parent, **kwargs)
-    )
+    aqt.mw.taskman.run_on_main(lambda: _show_tooltip(message, *args, parent=parent, **kwargs))
 
 
 def _show_tooltip(message: str, *args, **kwargs) -> None:
@@ -126,9 +122,7 @@ def choose_subset(
     for choice in choices:
         item = QListWidgetItem(choice)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)  # type: ignore
-        item.setCheckState(
-            Qt.CheckState.Checked if choice in current else Qt.CheckState.Unchecked
-        )
+        item.setCheckState(Qt.CheckState.Checked if choice in current else Qt.CheckState.Unchecked)
         list_widget.addItem(item)
 
     if description_html:
@@ -142,8 +136,7 @@ def choose_subset(
     # Add a "Select All" button
     def select_all() -> None:
         all_selected = all(
-            list_widget.item(i).checkState() == Qt.CheckState.Checked
-            for i in range(list_widget.count())
+            list_widget.item(i).checkState() == Qt.CheckState.Checked for i in range(list_widget.count())
         )
         if all_selected:
             for i in range(list_widget.count()):
@@ -168,17 +161,14 @@ def choose_subset(
     layout.addWidget(button_box)
 
     if adjust_height_to_content:
-        list_widget.setMinimumHeight(
-            list_widget.sizeHintForRow(0) * list_widget.count() + 20
-        )
+        list_widget.setMinimumHeight(list_widget.sizeHintForRow(0) * list_widget.count() + 20)
 
     def update_accept_button_state():
         accept_button = next(
             (
                 button
                 for button in button_box.buttons()
-                if button_box.buttonRole(button)
-                == QDialogButtonBox.ButtonRole.AcceptRole
+                if button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole
             ),
             None,
         )
@@ -213,9 +203,7 @@ class SearchableSelectionDialog(StudyDeck):
             kwargs["buttons"] = []  # This removes the "Add" button
         super().__init__(*args, **kwargs)
 
-        self.form.buttonBox.removeButton(
-            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
-        )
+        self.form.buttonBox.removeButton(self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help))
 
 
 class CustomListWidget(QListWidget):
@@ -248,9 +236,7 @@ class CustomListWidget(QListWidget):
         super().mouseReleaseEvent(event)
 
 
-def choose_list(
-    prompt: str, choices: list[str], startrow: int = 0, parent: Any = None
-) -> Optional[int]:
+def choose_list(prompt: str, choices: list[str], startrow: int = 0, parent: Any = None) -> Optional[int]:
     # adapted from aqt.utils.chooseList
     if not parent:
         parent = active_window_or_mw()
@@ -277,9 +263,7 @@ def choose_list(
         return None
 
 
-def choose_ankihub_deck(
-    prompt: str, parent: QWidget, ah_dids: Optional[List[uuid.UUID]] = None
-) -> Optional[uuid.UUID]:
+def choose_ankihub_deck(prompt: str, parent: QWidget, ah_dids: Optional[List[uuid.UUID]] = None) -> Optional[uuid.UUID]:
     """Ask the user to choose a deck from the list of decks that the user subscribed to from the add-on.
     Returns the deck ID of the chosen deck, or None if none.
 
@@ -288,9 +272,7 @@ def choose_ankihub_deck(
     """
     ah_dids = ah_dids or config.deck_ids()
     ah_did_deck_config_tuples = [
-        (ah_did, deck_config)
-        for ah_did in ah_dids
-        if (deck_config := config.deck_config(ah_did)) is not None
+        (ah_did, deck_config) for ah_did in ah_dids if (deck_config := config.deck_config(ah_did)) is not None
     ]
     chosen_deck_idx = choose_list(
         prompt=prompt,
@@ -557,23 +539,15 @@ def chevron_down_icon() -> QIcon:
 
 
 def tooltip_icon() -> QIcon:
-    return QIcon(
-        QApplication.style().standardIcon(
-            QStyle.StandardPixmap.SP_MessageBoxInformation
-        )
-    )
+    return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
 
 
 def warning_icon() -> QIcon:
-    return QIcon(
-        QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning)
-    )
+    return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
 
 
 def question_icon() -> QIcon:
-    return QIcon(
-        QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
-    )
+    return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
 
 
 def tooltip_stylesheet() -> str:
@@ -614,9 +588,7 @@ class CollapsibleSection(QWidget):
         toggle_button_font = self.toggle_button.font()
         toggle_button_font.setPointSize(toggle_button_font.pointSize() + 1)
         self.toggle_button.setFont(toggle_button_font)
-        self.toggle_button.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-        )
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setStyleSheet(
             """
             QToolButton {
@@ -631,9 +603,7 @@ class CollapsibleSection(QWidget):
         qconnect(self.toggle_button.toggled, self.on_toggled)  # type: ignore
 
         self.content_widget = QWidget()
-        self.content_widget.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
+        self.content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.content_widget.setMaximumHeight(0)
 
         layout = QVBoxLayout(self)
@@ -662,15 +632,11 @@ class CollapsibleSection(QWidget):
     @pyqtSlot(bool)
     def on_toggled(self, checked):
         # Update chevron icon
-        self.toggle_button.setIcon(
-            self.chevron_up_icon if checked else self.chevron_down_icon
-        )
+        self.toggle_button.setIcon(self.chevron_up_icon if checked else self.chevron_down_icon)
 
         # Set animation direction based on toggle state
         self.animation.setDirection(
-            QAbstractAnimation.Direction.Forward
-            if checked
-            else QAbstractAnimation.Direction.Backward
+            QAbstractAnimation.Direction.Forward if checked else QAbstractAnimation.Direction.Backward
         )
         self.animation.start()
 
@@ -696,9 +662,7 @@ def clear_layout(layout: QLayout) -> None:
             clear_layout(child.layout())
 
 
-def extract_argument(
-    func: Callable, args: Tuple, kwargs: Dict, arg_name: str
-) -> Tuple[Tuple, Dict, Any]:
+def extract_argument(func: Callable, args: Tuple, kwargs: Dict, arg_name: str) -> Tuple[Tuple, Dict, Any]:
     """
     Extract and remove an argument from args or kwargs based on the function signature.
 
@@ -801,11 +765,7 @@ def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
 def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]:
     anki_dids = [anki_did] + [deck["id"] for deck in aqt.mw.col.decks.parents(anki_did)]
     return next(
-        (
-            ah_did
-            for anki_did in anki_dids
-            if (ah_did := config.get_deck_uuid_by_did(anki_did))
-        ),
+        (ah_did for anki_did in anki_dids if (ah_did := config.get_deck_uuid_by_did(anki_did))),
         None,
     )
 

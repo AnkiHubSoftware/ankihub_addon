@@ -131,9 +131,7 @@ def _should_retry_for_response(response: Response) -> bool:
     return result
 
 
-RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_exception_type(
-    REQUEST_RETRY_EXCEPTION_TYPES
-)
+RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_exception_type(REQUEST_RETRY_EXCEPTION_TYPES)
 
 
 class AnkiHubHTTPError(Exception):
@@ -143,9 +141,7 @@ class AnkiHubHTTPError(Exception):
         self.response = response
 
     def __str__(self):
-        return (
-            f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
-        )
+        return f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
 
 
 class AnkiHubRequestException(Exception):
@@ -261,16 +257,12 @@ class AnkiHubClient:
         """
         timeout: Union[int, Tuple[int, int]]
         if api == API.ANKIHUB:
-            read_timeout = (
-                LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
-            )
+            read_timeout = LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
             timeout = (CONNECTION_TIMEOUT, read_timeout)
         else:
             timeout = S3_TIMEOUT
 
-        max_retries = (
-            LONG_RUNNING_MAX_RETRIES if is_long_running else STANDARD_MAX_RETRIES
-        )
+        max_retries = LONG_RUNNING_MAX_RETRIES if is_long_running else STANDARD_MAX_RETRIES
 
         @retry(
             stop=stop_after_attempt(max_retries),
@@ -278,9 +270,7 @@ class AnkiHubClient:
             retry=RETRY_CONDITION,
         )
         def send_with_retry() -> Response:
-            return self.thread_local_session.get().send(
-                request, stream=stream, timeout=timeout
-            )
+            return self.thread_local_session.get().send(request, stream=stream, timeout=timeout)
 
         try:
             return send_with_retry()
@@ -320,13 +310,9 @@ class AnkiHubClient:
         deck_name_normalized = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
         deck_file_name = f"{deck_name_normalized}-{uuid.uuid4()}.json.gz"
 
-        s3_url_suffix = self._presigned_url_suffix_from_key(
-            key=deck_file_name, action="upload"
-        )
+        s3_url_suffix = self._presigned_url_suffix_from_key(key=deck_file_name, action="upload")
 
-        notes_data_transformed = [
-            note_info_for_upload(note_data).to_dict() for note_data in notes_data
-        ]
+        notes_data_transformed = [note_info_for_upload(note_data).to_dict() for note_data in notes_data]
         data = self._gzip_compress_string(
             json.dumps(
                 {
@@ -377,9 +363,7 @@ class AnkiHubClient:
         result = gzip.decompress(string).decode("utf-8")
         return result
 
-    def generate_media_files_with_hashed_names(
-        self, media_file_paths: Sequence[Path]
-    ) -> Dict[str, str]:
+    def generate_media_files_with_hashed_names(self, media_file_paths: Sequence[Path]) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped,
         but the mapping still will be made with the existing filename.
@@ -398,9 +382,7 @@ class AnkiHubClient:
 
             # Store the new filename under the old filename key in the dict
             # that will be returned
-            new_media_path = for_old_media_path.parent / (
-                file_content_hash.hexdigest() + for_old_media_path.suffix
-            )
+            new_media_path = for_old_media_path.parent / (file_content_hash.hexdigest() + for_old_media_path.suffix)
 
             if self._media_file_should_be_converted_to_webp(for_old_media_path):
                 # The lambda will convert images to the webp format if they are uploaded with a .webp extension and
@@ -424,10 +406,10 @@ class AnkiHubClient:
     def _media_file_should_be_converted_to_webp(self, media_path: Path) -> bool:
         """Whether the media file should be converted to webp once its uploaded to s3."""
         # We don't want to convert svgs, because they don't benefit from the conversion in most cases.
-        result = (
-            media_path.suffix.lower() in IMAGE_FILE_EXTENSIONS
-            and media_path.suffix.lower() not in [".svg", ".webp"]
-        )
+        result = media_path.suffix.lower() in IMAGE_FILE_EXTENSIONS and media_path.suffix.lower() not in [
+            ".svg",
+            ".webp",
+        ]
         return result
 
     def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
@@ -458,9 +440,7 @@ class AnkiHubClient:
                     media_path_chunks.append(chunk)
 
         # Get a S3 presigned URL that allows uploading multiple files with a given prefix
-        s3_presigned_info = self._get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{ah_did}"
-        )
+        s3_presigned_info = self._get_presigned_url_for_multiple_uploads(prefix=f"deck_assets/{ah_did}")
 
         # Use ThreadPoolExecutor to zip & upload media files
         with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
@@ -498,10 +478,7 @@ class AnkiHubClient:
         s3_presigned_info: dict,
     ) -> None:
         # Zip the media files found locally
-        zip_filepath = Path(
-            self.local_media_dir_path_cb()
-            / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
-        )
+        zip_filepath = Path(self.local_media_dir_path_cb() / f"{ah_did}_{chunk_number}_deck_assets_part.zip")
         LOGGER.debug("Creating zipped media file", zip_filepath=zip_filepath)
         with ZipFile(zip_filepath, "w") as media_zip:
             for media_path in chunk:
@@ -510,9 +487,7 @@ class AnkiHubClient:
 
         # Upload to S3
         LOGGER.debug("Uploading file to S3", zip_filepath=zip_filepath.name)
-        self._upload_file_to_s3_with_reusable_presigned_url(
-            s3_presigned_info=s3_presigned_info, filepath=zip_filepath
-        )
+        self._upload_file_to_s3_with_reusable_presigned_url(s3_presigned_info=s3_presigned_info, filepath=zip_filepath)
         LOGGER.debug("Successfully uploaded file to S3", zip_filepath=zip_filepath.name)
 
         # Remove the zip file from the local machine after the upload
@@ -525,9 +500,7 @@ class AnkiHubClient:
                 zip_filepath=zip_filepath.name,
             )
 
-    def _upload_file_to_s3_with_reusable_presigned_url(
-        self, s3_presigned_info: dict, filepath: Path
-    ) -> None:
+    def _upload_file_to_s3_with_reusable_presigned_url(self, s3_presigned_info: dict, filepath: Path) -> None:
         """Opens and uploads the file data to S3 using a reusable presigned URL. Useful when uploading
         multiple media files to the same path while keeping the original filename.
         :param s3_presigned_info: dict with the reusable presigned URL info.
@@ -556,18 +529,14 @@ class AnkiHubClient:
             futures: List[Future] = []
             for media_name in media_names:
                 media_path = media_dir_path / media_name
-                media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(
-                    media_name
-                )
+                media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(media_name)
 
                 # First we check if the media file already exists.
                 # If yes, we skip this iteration.
                 if os.path.isfile(media_path):
                     continue
 
-                futures.append(
-                    executor.submit(self._download_media, media_path, media_remote_path)
-                )
+                futures.append(executor.submit(self._download_media, media_path, media_remote_path))
 
             downloaded_media_count = 0
             for future in as_completed(futures):
@@ -636,22 +605,16 @@ class AnkiHubClient:
 
     def get_owned_decks(self) -> List[Deck]:
         decks = self.get_decks_with_user_relation()
-        result = [
-            deck for deck in decks if deck.user_relation == UserDeckRelation.OWNER
-        ]
+        result = [deck for deck in decks if deck.user_relation == UserDeckRelation.OWNER]
         return result
 
     def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
-        response = self._send_request(
-            "POST", API.ANKIHUB, "/decks/subscriptions/", json={"deck": str(deck_id)}
-        )
+        response = self._send_request("POST", API.ANKIHUB, "/decks/subscriptions/", json={"deck": str(deck_id)})
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
     def unsubscribe_from_deck(self, deck_id: uuid.UUID) -> None:
-        response = self._send_request(
-            "DELETE", API.ANKIHUB, f"/decks/{deck_id}/subscriptions/"
-        )
+        response = self._send_request("DELETE", API.ANKIHUB, f"/decks/{deck_id}/subscriptions/")
         if response.status_code not in (204, 404):
             raise AnkiHubHTTPError(response)
 
@@ -663,20 +626,14 @@ class AnkiHubClient:
     ) -> List[NoteInfo]:
         if not s3_presigned_url:
             deck_info = self.get_deck_by_id(ah_did)
-            s3_url_suffix = self._presigned_url_suffix_from_key(
-                key=deck_info.csv_notes_filename, action="download"
-            )
+            s3_url_suffix = self._presigned_url_suffix_from_key(key=deck_info.csv_notes_filename, action="download")
         else:
             s3_url_suffix = self._presigned_url_suffix_from_url(s3_presigned_url)
 
         if download_progress_cb:
-            s3_response_content = self._download_with_progress_cb(
-                s3_url_suffix, download_progress_cb
-            )
+            s3_response_content = self._download_with_progress_cb(s3_url_suffix, download_progress_cb)
         else:
-            s3_response = self._send_request(
-                "GET", API.S3, s3_url_suffix, is_long_running=True
-            )
+            s3_response = self._send_request("GET", API.S3, s3_url_suffix, is_long_running=True)
             if s3_response.status_code != 200:
                 raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
@@ -687,9 +644,7 @@ class AnkiHubClient:
         else:
             deck_csv_content = s3_response_content.decode("utf-8")
 
-        reader = csv.DictReader(
-            deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
-        )
+        reader = csv.DictReader(deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'")
         # TODO Validate .csv
         notes_data_raw = [row for row in reader]
         notes_data_raw = _transform_notes_data(notes_data_raw)
@@ -697,12 +652,8 @@ class AnkiHubClient:
 
         return notes_data
 
-    def _download_with_progress_cb(
-        self, s3_url_suffix: str, progress_cb: Callable[[int], None]
-    ) -> bytes:
-        with self._send_request(
-            "GET", API.S3, s3_url_suffix, stream=True, is_long_running=True
-        ) as response:
+    def _download_with_progress_cb(self, s3_url_suffix: str, progress_cb: Callable[[int], None]) -> bytes:
+        with self._send_request("GET", API.S3, s3_url_suffix, stream=True, is_long_running=True) as response:
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
 
@@ -712,9 +663,7 @@ class AnkiHubClient:
 
             content = b""
             chunk_size = int(min(total_size * 0.05, 10**6))
-            for i, chunk in enumerate(
-                response.iter_content(chunk_size=chunk_size), start=1
-            ):
+            for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size), start=1):
                 if chunk:
                     percent = int(i * chunk_size / total_size * 100)
                     progress_cb(percent)
@@ -770,16 +719,12 @@ class AnkiHubClient:
                 notes_data_from_json.extend(chunk.notes)
 
             # Each chunk contains the latest update timestamp of the notes in it, we need the latest one
-            latest_update = max(
-                chunk.latest_update, latest_update or chunk.latest_update
-            )
+            latest_update = max(chunk.latest_update, latest_update or chunk.latest_update)
 
         # When a note is both in the CSV and JSON, the JSON version is the more recent one and
         # the CSV version should be discarded.
         ah_nids_from_json = {note.ah_nid for note in notes_data_from_json}
-        filtered_notes_data_from_csv = [
-            note for note in notes_data_from_csv if note.ah_nid not in ah_nids_from_json
-        ]
+        filtered_notes_data_from_csv = [note for note in notes_data_from_csv if note.ah_nid not in ah_nids_from_json]
         notes_data = notes_data_from_json + filtered_notes_data_from_csv
 
         return DeckUpdates(
@@ -825,9 +770,7 @@ class AnkiHubClient:
                 raise AnkiHubHTTPError(response)
 
             data = response.json()
-            url_suffix = (
-                data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
-            )
+            url_suffix = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
             if data["external_notes_url"]:
                 notes_data_deck = self.download_deck(
@@ -894,18 +837,14 @@ class AnkiHubClient:
                 raise AnkiHubHTTPError(response)
 
             data = response.json()
-            url_suffix = (
-                data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
-            )
+            url_suffix = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
             media_updates = DeckMediaUpdateChunk.from_dict(data)
             yield media_updates
 
             first_request = False
 
-    def get_pending_notes_actions_for_deck(
-        self, ah_did: uuid.UUID
-    ) -> List[NotesAction]:
+    def get_pending_notes_actions_for_deck(self, ah_did: uuid.UUID) -> List[NotesAction]:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
@@ -1066,9 +1005,7 @@ class AnkiHubClient:
         return result
 
     def get_note_type(self, anki_note_type_id: int) -> Dict[str, Any]:
-        response = self._send_request(
-            "GET", API.ANKIHUB, f"/note-types/{anki_note_type_id}/"
-        )
+        response = self._send_request("GET", API.ANKIHUB, f"/note-types/{anki_note_type_id}/")
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
 
@@ -1076,13 +1013,9 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
-    def create_note_type(
-        self, ah_did: uuid.UUID, note_type: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def create_note_type(self, ah_did: uuid.UUID, note_type: Dict[str, Any]) -> Dict[str, Any]:
         note_type = _to_ankihub_note_type(note_type.copy())
-        response = self._send_request(
-            "POST", API.ANKIHUB, f"/decks/{ah_did}/create-note-type/", json=note_type
-        )
+        response = self._send_request("POST", API.ANKIHUB, f"/decks/{ah_did}/create-note-type/", json=note_type)
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
         data = response.json()
@@ -1110,20 +1043,13 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
-    def get_note_types_dict_for_deck(
-        self, ah_did: uuid.UUID
-    ) -> Dict[int, Dict[str, Any]]:
-        response = self._send_request(
-            "GET", API.ANKIHUB, f"/decks/{ah_did}/note-types/"
-        )
+    def get_note_types_dict_for_deck(self, ah_did: uuid.UUID) -> Dict[int, Dict[str, Any]]:
+        response = self._send_request("GET", API.ANKIHUB, f"/decks/{ah_did}/note-types/")
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
 
         data = response.json()
-        return {
-            note_type_data["anki_id"]: _to_anki_note_type(note_type_data)
-            for note_type_data in data
-        }
+        return {note_type_data["anki_id"]: _to_anki_note_type(note_type_data) for note_type_data in data}
 
     def get_protected_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
@@ -1137,10 +1063,7 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
-        result = {
-            int(field_id): field_names
-            for field_id, field_names in protected_fields_raw.items()
-        }
+        result = {int(field_id): field_names for field_id, field_names in protected_fields_raw.items()}
         return result
 
     def get_protected_tags(self, ah_did: uuid.UUID) -> List[str]:
@@ -1170,10 +1093,7 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
-        result = {
-            int(field_id): field_names
-            for field_id, field_names in protected_fields_raw.items()
-        }
+        result = {int(field_id): field_names for field_id, field_names in protected_fields_raw.items()}
         return result
 
     def get_deck_extensions(self) -> List[DeckExtension]:
@@ -1187,9 +1107,7 @@ class AnkiHubClient:
         return result
 
     def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID) -> List[DeckExtension]:
-        response = self._send_request(
-            "GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id}
-        )
+        response = self._send_request("GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id})
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
 
@@ -1241,12 +1159,8 @@ class AnkiHubClient:
             if download_progress_cb:
                 download_progress_cb(customizations_count)
 
-    def prevalidate_tag_groups(
-        self, ah_did: uuid.UUID, tag_group_names: List[str]
-    ) -> List[TagGroupValidationResponse]:
-        suggestions = [
-            {"tag_group_name": tag_group_name} for tag_group_name in tag_group_names
-        ]
+    def prevalidate_tag_groups(self, ah_did: uuid.UUID, tag_group_names: List[str]) -> List[TagGroupValidationResponse]:
+        suggestions = [{"tag_group_name": tag_group_name} for tag_group_name in tag_group_names]
         response = self._send_request(
             "POST",
             API.ANKIHUB,
@@ -1258,10 +1172,7 @@ class AnkiHubClient:
 
         data = response.json()
         suggestions = data["suggestions"]
-        tag_group_validation_objects = [
-            TagGroupValidationResponse.from_dict(suggestion)
-            for suggestion in suggestions
-        ]
+        tag_group_validation_objects = [TagGroupValidationResponse.from_dict(suggestion) for suggestion in suggestions]
         return tag_group_validation_objects
 
     def suggest_optional_tags(
@@ -1269,14 +1180,10 @@ class AnkiHubClient:
         suggestions: List[OptionalTagSuggestion],
         auto_accept: bool = False,
     ) -> None:
-        deck_extension_ids = set(
-            suggestion.deck_extension_id for suggestion in suggestions
-        )
+        deck_extension_ids = set(suggestion.deck_extension_id for suggestion in suggestions)
         for deck_extension_id in deck_extension_ids:
             suggestions_for_deck_extension = [
-                suggestion
-                for suggestion in suggestions
-                if suggestion.deck_extension_id == deck_extension_id
+                suggestion for suggestion in suggestions if suggestion.deck_extension_id == deck_extension_id
             ]
             self._suggest_optional_tags_for_deck_extension(
                 deck_extension_id=deck_extension_id,
@@ -1319,10 +1226,7 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         data = response.json()
-        result = {
-            flag_name: flag_data["is_active"]
-            for flag_name, flag_data in data["flags"].items()
-        }
+        result = {flag_name: flag_data["is_active"] for flag_name, flag_data in data["flags"].items()}
         return result
 
     def is_media_upload_finished(self, ah_did: uuid.UUID) -> bool:
@@ -1361,9 +1265,7 @@ class AnkiHubClient:
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
 
-    def send_daily_card_review_summaries(
-        self, daily_card_review_summaries: List[DailyCardReviewSummary]
-    ) -> None:
+    def send_daily_card_review_summaries(self, daily_card_review_summaries: List[DailyCardReviewSummary]) -> None:
         response = self._send_request(
             "POST",
             API.ANKIHUB,
@@ -1397,23 +1299,13 @@ def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
         {
             **note_data,
             "fields": (
-                json.loads(note_data["fields"])
-                if isinstance(note_data["fields"], str)
-                else note_data["fields"]
+                json.loads(note_data["fields"]) if isinstance(note_data["fields"], str) else note_data["fields"]
             ),
             "anki_id": int((note_data["anki_id"])),
-            "note_id": note_data.get(
-                "note_id", note_data.get("ankihub_id", note_data.get("id"))
-            ),
+            "note_id": note_data.get("note_id", note_data.get("ankihub_id", note_data.get("id"))),
             "note_type_id": int(note_data["note_type_id"]),
-            "tags": (
-                json.loads(note_data["tags"])
-                if isinstance(note_data["tags"], str)
-                else note_data["tags"]
-            ),
-            "last_update_type": (
-                SuggestionType.DELETE.value[0] if note_data.get("deleted") else None
-            ),
+            "tags": (json.loads(note_data["tags"]) if isinstance(note_data["tags"], str) else note_data["tags"]),
+            "last_update_type": (SuggestionType.DELETE.value[0] if note_data.get("deleted") else None),
         }
         for note_data in notes_data
     ]

@@ -86,9 +86,7 @@ def _on_deck_infos_fetched(
 
 
 @pass_exceptions_to_on_done
-def _on_install_done(
-    future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future], None]
-):
+def _on_install_done(future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future], None]):
     import_results: List[AnkiHubImportResult] = future.result()
 
     LOGGER.info(
@@ -132,10 +130,7 @@ def _show_deck_import_summary_dialog(
 ) -> None:
     ankihub_dids = [import_result.ankihub_did for import_result in import_results]
     ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]
-    anki_deck_names = [
-        aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
-        for ah_did in ankihub_dids
-    ]
+    anki_deck_names = [aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id) for ah_did in ankihub_dids]
     _show_deck_import_summary_dialog_inner(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
@@ -182,9 +177,7 @@ def _download_and_install_decks_inner(
     result = []
     exceptions = []
     if config.get_feature_flags().get("fsrs_in_recommended_deck_settings"):
-        is_anking_deck_in_the_list = any(
-            deck.ah_did == config.anking_deck_id for deck in decks
-        )
+        is_anking_deck_in_the_list = any(deck.ah_did == config.anking_deck_id for deck in decks)
         if (
             is_anking_deck_in_the_list
             and recommended_deck_settings
@@ -210,9 +203,7 @@ def _download_and_install_decks_inner(
                     ankihub_did=deck.ah_did,
                 )
             )
-            LOGGER.warning(
-                "Failed to download and install deck.", ah_did=deck.ah_did, exc_info=e
-            )
+            LOGGER.warning("Failed to download and install deck.", ah_did=deck.ah_did, exc_info=e)
 
     if exceptions:
         # Raise the first exception that occurred
@@ -230,9 +221,7 @@ def _download_and_install_single_deck(
         deck.ah_did, download_progress_cb=deck_download_progress_cb
     )
 
-    aqt.mw.taskman.run_on_main(
-        lambda: aqt.mw.progress.update(label="Installing deck...", max=0, value=0)
-    )
+    aqt.mw.taskman.run_on_main(lambda: aqt.mw.progress.update(label="Installing deck...", max=0, value=0))
 
     result = _install_deck(
         notes_data=notes_data,
@@ -281,9 +270,7 @@ def _install_deck(
         protected_fields=protected_fields,
         protected_tags=protected_tags,
         suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
-        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-            ankihub_did
-        ),
+        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ankihub_did),
         recommended_deck_settings=recommended_deck_settings,
         raise_if_full_sync_required=False,
     )

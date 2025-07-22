@@ -46,9 +46,7 @@ TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 @pytest.fixture
-def anki_session(
-    request: FixtureRequest, qtbot: QtBot
-) -> Generator[AnkiSession, None, None]:
+def anki_session(request: FixtureRequest, qtbot: QtBot) -> Generator[AnkiSession, None, None]:
     """Overwrites the anki_session fixture from pytest-anki to disable web debugging by default.
     This is done because web debugging is not used in any tests and it sometimes leads to errors.
     Otherwise the fixture is the same as the original.
@@ -161,9 +159,7 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
     # call maybe_auto_sync_on_open_close.
     # Because of this, we need to set CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC to False.
     # Then _on_profile_did_open is called, because AnkiSession.profile_loaded calls profile_did_open.
-    monkeypatch.setattr(
-        "ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", False
-    )
+    monkeypatch.setattr("ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", False)
 
 
 def pytest_set_filtered_exceptions() -> List[Exception]:

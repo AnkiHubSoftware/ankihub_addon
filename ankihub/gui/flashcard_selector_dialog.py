@@ -19,7 +19,6 @@ from .utils import show_dialog
 
 
 class FlashCardSelectorDialog(AnkiHubWebViewDialog):
-
     dialog: Optional["FlashCardSelectorDialog"] = None
 
     def __init__(self, ah_did: uuid.UUID, parent) -> None:
@@ -28,9 +27,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         self.ah_did = ah_did
 
     @classmethod
-    def display_for_ah_did(
-        cls, ah_did: uuid.UUID, parent: Any
-    ) -> "FlashCardSelectorDialog":
+    def display_for_ah_did(cls, ah_did: uuid.UUID, parent: Any) -> "FlashCardSelectorDialog":
         """Display the flashcard selector dialog for the given deck.
         Reuses the dialog if it is already open for the same deck.
         Otherwise, closes the existing dialog and opens a new one."""

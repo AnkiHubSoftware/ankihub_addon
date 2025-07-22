@@ -25,10 +25,7 @@ def pass_exceptions_to_on_done(func: Callable) -> Callable:
     """
     sig = inspect.signature(func)
     params = sig.parameters
-    if (
-        "on_done" not in params
-        or params["on_done"].default is not inspect.Parameter.empty
-    ):
+    if "on_done" not in params or params["on_done"].default is not inspect.Parameter.empty:
         raise ValueError(  # pragma: no cover
             f"Function {func.__name__} must have a required 'on_done' parameter"
         )

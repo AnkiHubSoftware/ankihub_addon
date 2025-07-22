@@ -58,9 +58,7 @@ def create_ankihub_deck(
         add_subdeck_tags_to_notes(anki_deck_name=deck_name, ankihub_deck_name=deck_name)
 
     nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
-    notes_data = [
-        to_note_data(aqt.mw.col.get_note(nid), set_new_id=True) for nid in nids
-    ]
+    notes_data = [to_note_data(aqt.mw.col.get_note(nid), set_new_id=True) for nid in nids]
 
     _set_ankihub_id_fields_based_on_notes_data(notes_data)
 
@@ -88,9 +86,7 @@ def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:
         new_model = modified_note_type(aqt.mw.col.models.get(mid))
-        new_model["name"] = modified_ankihub_note_type_name(
-            new_model["name"], aqt.mw.col.decks.name(deck_id)
-        )
+        new_model["name"] = modified_ankihub_note_type_name(new_model["name"], aqt.mw.col.decks.name(deck_id))
         aqt.mw.col.models.ensure_name_unique(new_model)
         new_model["id"] = 0
         aqt.mw.col.models.add_dict(new_model)
@@ -98,9 +94,7 @@ def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]
     return result
 
 
-def _change_note_types_of_notes(
-    note_ids: typing.List[NoteId], note_type_mapping: dict
-) -> None:
+def _change_note_types_of_notes(note_ids: typing.List[NoteId], note_type_mapping: dict) -> None:
     LOGGER.info("Changing note types of notes...", note_type_mapping=note_type_mapping)
     nid_mid_pairs = []
     for note_id in note_ids:
@@ -133,9 +127,7 @@ def _upload_deck(
 
     deck_name = aqt.mw.col.decks.name(did)
 
-    note_types_data = [
-        aqt.mw.col.models.get(mid) for mid in get_note_types_in_deck(did)
-    ]
+    note_types_data = [aqt.mw.col.models.get(mid) for mid in get_note_types_in_deck(did)]
 
     client = AnkiHubClient()
     ankihub_did = client.upload_deck(

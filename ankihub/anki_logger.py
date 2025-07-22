@@ -17,14 +17,10 @@ def setup() -> None:
     sync_did_finish.append(lambda: LOGGER.info("AnkiWeb sync did finish."))
 
     collection_will_temporarily_close.append(
-        lambda _: LOGGER.info(
-            "Collection will temporarily close.", trace=_get_current_trace()
-        )
+        lambda _: LOGGER.info("Collection will temporarily close.", trace=_get_current_trace())
     )
     collection_did_temporarily_close.append(
-        lambda _: LOGGER.info(
-            "Collection did temporarily close.", trace=_get_current_trace()
-        )
+        lambda _: LOGGER.info("Collection did temporarily close.", trace=_get_current_trace())
     )
 
 

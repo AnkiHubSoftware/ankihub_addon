@@ -102,11 +102,7 @@ class Deck(DataClassJSONMixinWithConfig):
     anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
-        metadata=field_options(
-            deserialize=lambda x: (
-                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
-            )
-        )
+        metadata=field_options(deserialize=lambda x: (datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None))
     )
     csv_notes_filename: str
     media_upload_finished: bool
@@ -120,10 +116,7 @@ class Deck(DataClassJSONMixinWithConfig):
 
     @property
     def is_user_relation_owner_or_maintainer(self):
-        return (
-            self.user_relation == UserDeckRelation.OWNER
-            or self.user_relation == UserDeckRelation.MAINTAINER
-        )
+        return self.user_relation == UserDeckRelation.OWNER or self.user_relation == UserDeckRelation.MAINTAINER
 
     @property
     def is_user_relation_subscriber(self):
@@ -142,9 +135,7 @@ class Deck(DataClassJSONMixinWithConfig):
 class DeckUpdates(DataClassJSONMixinWithConfig):
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: (
-                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
-            ),
+            deserialize=lambda x: (datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None),
         ),
     )
     protected_fields: Dict[int, List[str]]
@@ -162,9 +153,7 @@ class DeckMedia(DataClassJSONMixinWithConfig):
     name: str
     file_content_hash: str
     modified: datetime = dataclasses.field(
-        metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-        ),
+        metadata=field_options(deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)),
     )
     referenced_on_accepted_note: bool
     exists_on_s3: bool
@@ -175,9 +164,7 @@ class DeckMedia(DataClassJSONMixinWithConfig):
 class DeckMediaUpdateChunk(DataClassJSONMixinWithConfig):
     media: List[DeckMedia]
     latest_update: Optional[datetime] = dataclasses.field(
-        metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-        )
+        metadata=field_options(deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR))
     )
 
 
@@ -296,9 +283,7 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
     note_customizations: List[NoteCustomization]
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: (
-                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
-            ),
+            deserialize=lambda x: (datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None),
         ),
         default=None,
     )
@@ -310,14 +295,10 @@ class CardReviewData(DataClassJSONMixinWithConfig):
     total_card_reviews_last_7_days: int
     total_card_reviews_last_30_days: int
     first_card_review_at: datetime = dataclasses.field(
-        metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-        ),
+        metadata=field_options(deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)),
     )
     last_card_review_at: datetime = dataclasses.field(
-        metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-        ),
+        metadata=field_options(deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)),
     )
 
 
@@ -338,36 +319,22 @@ class DailyCardReviewSummary(DataClassJSONMixinWithConfig):
 def get_media_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
     """Return the names of all media files on the given notes.
     Only returns names of local files, not remote files."""
-    return {
-        name for note in notes_data for name in get_media_names_from_note_info(note)
-    }
+    return {name for note in notes_data for name in get_media_names_from_note_info(note)}
 
 
 def get_media_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
     """Return the names of all media files on the given suggestions.
     Only returns names of local files, not remote files."""
-    return {
-        name
-        for suggestion in suggestions
-        for name in get_media_names_from_suggestion(suggestion)
-    }
+    return {name for suggestion in suggestions for name in get_media_names_from_suggestion(suggestion)}
 
 
 def get_media_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
-    result = {
-        name
-        for field in suggestion.fields
-        for name in _get_media_names_from_field(field)
-    }
+    result = {name for field in suggestion.fields for name in _get_media_names_from_field(field)}
     return result
 
 
 def get_media_names_from_note_info(note_info: NoteInfo) -> Set[str]:
-    result = {
-        name
-        for field in note_info.fields
-        for name in _get_media_names_from_field(field)
-    }
+    result = {name for field in note_info.fields for name in _get_media_names_from_field(field)}
     return result
 
 

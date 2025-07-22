@@ -17,9 +17,7 @@ from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 # tag for notes which were deleted from the webapp
 TAG_FOR_DELETED_NOTES = "AnkiHub_Deleted"
 
-DELETED_NOTES_FILE = (
-    Path(__file__).parent.parent / "resources/deleted_notes_from_anking_deck.json"
-)
+DELETED_NOTES_FILE = Path(__file__).parent.parent / "resources/deleted_notes_from_anking_deck.json"
 
 
 def handle_notes_deleted_from_webapp() -> None:
@@ -38,9 +36,7 @@ def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
     delete notes that people have studied."""
 
     anki_nids = [x for x in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if x]
-    anki_nids_which_exist_in_anki_db = aqt.mw.col.db.list(
-        f"SELECT id FROM notes WHERE id IN {ids2str(anki_nids)}"
-    )
+    anki_nids_which_exist_in_anki_db = aqt.mw.col.db.list(f"SELECT id FROM notes WHERE id IN {ids2str(anki_nids)}")
 
     if not anki_nids_which_exist_in_anki_db:
         LOGGER.info("No notes to delete.")

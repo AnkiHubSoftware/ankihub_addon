@@ -43,7 +43,7 @@ def upload(
 
     if manifest_dict["ankiweb_id"]:
         # update existing addon
-        web.go_to(f'https://ankiweb.net/shared/upload?id={manifest_dict["ankiweb_id"]}')
+        web.go_to(f"https://ankiweb.net/shared/upload?id={manifest_dict['ankiweb_id']}")
     else:
         # upload new addon
         web.go_to("https://ankiweb.net/shared/upload")

@@ -14,15 +14,11 @@ from ..utils import ask_user, refresh_anki_ui_after_moving_cards, tooltip
 def build_subdecks_and_move_cards_to_them_in_background(
     ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
-    LOGGER.info(
-        "Building subdecks and moving cards to them...", ankihub_did=ankihub_did
-    )
+    LOGGER.info("Building subdecks and moving cards to them...", ankihub_did=ankihub_did)
 
     aqt.mw.taskman.with_progress(
         label="Building subdecks and moving cards...",
-        task=lambda: build_subdecks_and_move_cards_to_them(
-            ankihub_did=ankihub_did, nids=nids
-        ),
+        task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ankihub_did, nids=nids),
         on_done=_on_subdecks_updated,
     )
     config.set_subdecks(ankihub_did, True)

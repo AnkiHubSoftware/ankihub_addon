@@ -71,7 +71,6 @@ def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
     result = []
     ah_dids = ankihub_db.ankihub_dids()
     for ah_did in ah_dids:
-
         # add ah_did to results if for any note type of the deck the AnkiHub ID field does not exist
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         for mid in mids:
@@ -81,11 +80,7 @@ def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
                 continue
 
             ankihub_id_field = next(
-                (
-                    field_dict
-                    for field_dict in note_type["flds"]
-                    if field_dict["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME
-                ),
+                (field_dict for field_dict in note_type["flds"] if field_dict["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME),
                 None,
             )
             if ankihub_id_field is None:
@@ -171,10 +166,6 @@ def _check_ankihub_update_tags() -> None:
 
 
 def _remove_ankihub_update_tags():
-    tags_to_remove = [
-        tag
-        for tag in aqt.mw.col.tags.all()
-        if tag.lower().startswith("ankihub_update::")
-    ]
+    tags_to_remove = [tag for tag in aqt.mw.col.tags.all() if tag.lower().startswith("ankihub_update::")]
     tags_to_remove_str = " ".join(tags_to_remove)
     aqt.mw.col.tags.remove(tags_to_remove_str)

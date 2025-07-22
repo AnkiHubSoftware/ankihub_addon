@@ -22,20 +22,14 @@ def send_review_data() -> None:
     now = datetime.now()
     card_review_data: List[CardReviewData] = []
     for ah_did in config.deck_ids():
-        first_and_last_review_times = _get_first_and_last_review_datetime_for_ah_deck(
-            ah_did
-        )
+        first_and_last_review_times = _get_first_and_last_review_datetime_for_ah_deck(ah_did)
         if first_and_last_review_times is None:
             # This deck has no reviews yet
             continue
 
         first_review_at, last_review_at = first_and_last_review_times
-        total_card_reviews_last_7_days = _get_review_count_for_ah_deck_since(
-            ah_did, now - timedelta(days=7)
-        )
-        total_card_reviews_last_30_days = _get_review_count_for_ah_deck_since(
-            ah_did, now - timedelta(days=30)
-        )
+        total_card_reviews_last_7_days = _get_review_count_for_ah_deck_since(ah_did, now - timedelta(days=7))
+        total_card_reviews_last_30_days = _get_review_count_for_ah_deck_since(ah_did, now - timedelta(days=30))
         card_review_data.append(
             CardReviewData(
                 ah_did=ah_did,
@@ -61,7 +55,7 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
         JOIN cards as c ON r.cid = c.id
         WHERE r.id > ?
             AND r.type != {anki_consts.REVLOG_RESCHED}
-            AND c.nid IN ({','.join(map(str, anki_nids))})
+            AND c.nid IN ({",".join(map(str, anki_nids))})
         """,
         timestamp_ms,
     )
@@ -79,7 +73,7 @@ def _get_first_and_last_review_datetime_for_ah_deck(
         FROM revlog as r
         JOIN cards as c ON r.cid = c.id
         WHERE r.type != {anki_consts.REVLOG_RESCHED}
-            AND c.nid IN ({','.join(map(str, anki_nids))})
+            AND c.nid IN ({",".join(map(str, anki_nids))})
         """,
     )
     if row[0] is None:
@@ -155,9 +149,7 @@ def get_daily_review_summaries_since_last_sync(
 
 def send_daily_review_summaries(last_summary_sent_date: date) -> None:
     """Send daily review summaries to the server."""
-    daily_review_summaries = get_daily_review_summaries_since_last_sync(
-        last_summary_sent_date
-    )
+    daily_review_summaries = get_daily_review_summaries_since_last_sync(last_summary_sent_date)
     client = AnkiHubClient()
     if daily_review_summaries:
         client.send_daily_card_review_summaries(daily_review_summaries)

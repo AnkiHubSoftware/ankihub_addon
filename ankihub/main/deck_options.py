@@ -82,9 +82,7 @@ def create_or_reset_deck_preset(
         conf = aqt.mw.col.decks.add_config(preset_name)
     fsrs_enabled = aqt.mw.col.get_config("fsrs")
     for option, value in DECK_CONFIG.items():
-        if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (
-            not fsrs_enabled and option.startswith("fsrs_")
-        ):
+        if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (not fsrs_enabled and option.startswith("fsrs_")):
             continue
         option_paths = CONFIG_NAME_TO_DECK_OPTIONS_PATH[option]
         for path in option_paths:
@@ -100,9 +98,7 @@ def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -
     if not deck:
         return
 
-    if is_anking_deck and config.get_feature_flags().get(
-        "fsrs_in_recommended_deck_settings"
-    ):
+    if is_anking_deck and config.get_feature_flags().get("fsrs_in_recommended_deck_settings"):
         conf = create_or_reset_deck_preset(preset_name="AnKing")
     else:
         conf = create_or_reset_deck_preset()
@@ -113,9 +109,7 @@ def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -
 
 def get_fsrs_version() -> Optional[int]:
     """Get the version of the FSRS scheduler available in the current Anki version."""
-    deck_config_field_names = set(
-        deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys()
-    )
+    deck_config_field_names = set(deck_config_pb2.DeckConfig.Config.DESCRIPTOR.fields_by_name.keys())
     return max(
         (
             int(m.group(1))

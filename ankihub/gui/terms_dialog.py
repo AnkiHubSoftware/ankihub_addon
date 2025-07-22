@@ -28,9 +28,7 @@ class TermsAndConditionsDialog(QDialog):
         self.web.setPage(page)
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
         self.web.page().setBackgroundColor(QColor("white"))
-        self.web.page().setUrl(
-            QUrl(f"{config.app_url}/users/school-info-and-terms-and-conditions/")
-        )
+        self.web.page().setUrl(QUrl(f"{config.app_url}/users/school-info-and-terms-and-conditions/"))
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

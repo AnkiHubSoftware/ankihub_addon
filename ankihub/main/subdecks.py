@@ -36,9 +36,7 @@ def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
     ).exists()
 
 
-def build_subdecks_and_move_cards_to_them(
-    ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
-) -> None:
+def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None) -> None:
     """Move cards belonging to the ankihub deck into their subdeck based on the subdeck tags of the notes.
     If nids is None, all of the cards belonging to the deck will be moved.
     If nids is not None, only the cards belonging to the provided notes will be moved.
@@ -56,19 +54,14 @@ def build_subdecks_and_move_cards_to_them(
     anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
 
     # create mapping between notes and destination decks
-    nid_to_dest_deck_name = _nid_to_destination_deck_name(
-        nids, anki_root_deck_name=anki_root_deck_name
-    )
+    nid_to_dest_deck_name = _nid_to_destination_deck_name(nids, anki_root_deck_name=anki_root_deck_name)
 
     # create missing subdecks
     deck_names = set(nid_to_dest_deck_name.values())
     _create_decks(deck_names)
 
     # move cards to their destination decks
-    nid_to_did = {
-        nid: aqt.mw.col.decks.id_for_name(deck_name)
-        for nid, deck_name in nid_to_dest_deck_name.items()
-    }
+    nid_to_did = {nid: aqt.mw.col.decks.id_for_name(deck_name) for nid, deck_name in nid_to_dest_deck_name.items()}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
     # Remove empty subdecks, keeping filtered decks
@@ -83,9 +76,7 @@ def build_subdecks_and_move_cards_to_them(
         if is_empty and not aqt.mw.col.decks.is_filtered(deck_id):
             # Find any filtered decks that need to be preserved by reparenting
             filtered_child_deck_ids = [
-                child_id
-                for _, child_id in aqt.mw.col.decks.children(deck_id)
-                if aqt.mw.col.decks.is_filtered(child_id)
+                child_id for _, child_id in aqt.mw.col.decks.children(deck_id) if aqt.mw.col.decks.is_filtered(child_id)
             ]
 
             # Get the parent deck ID to reparent filtered decks to
@@ -103,9 +94,7 @@ def build_subdecks_and_move_cards_to_them(
     LOGGER.info("Built subdecks and moved cards to them.")
 
 
-def _nid_to_destination_deck_name(
-    nids: List[NoteId], anki_root_deck_name: str
-) -> Dict[NoteId, str]:
+def _nid_to_destination_deck_name(nids: List[NoteId], anki_root_deck_name: str) -> Dict[NoteId, str]:
     result = dict()
     missing_nids = []
     for nid in nids:
@@ -189,19 +178,13 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
 
     # Get all child decks and separate them into filtered and regular decks
     child_decks = aqt.mw.col.decks.children(root_deck_id)
-    filtered_deck_ids = [
-        did for _, did in child_decks if aqt.mw.col.decks.is_filtered(did)
-    ]
-    regular_deck_ids = [
-        did for _, did in child_decks if not aqt.mw.col.decks.is_filtered(did)
-    ]
+    filtered_deck_ids = [did for _, did in child_decks if aqt.mw.col.decks.is_filtered(did)]
+    regular_deck_ids = [did for _, did in child_decks if not aqt.mw.col.decks.is_filtered(did)]
 
     # Reparent all filtered subdecks to the root deck - we don't want to delete them
     if filtered_deck_ids:
         aqt.mw.col.decks.reparent(filtered_deck_ids, root_deck_id)
-        LOGGER.info(
-            f"Reparented {len(filtered_deck_ids)} filtered deck(s) to root deck"
-        )
+        LOGGER.info(f"Reparented {len(filtered_deck_ids)} filtered deck(s) to root deck")
 
     # Remove all regular subdecks
     if regular_deck_ids:

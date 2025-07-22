@@ -173,25 +173,17 @@ def _on_view_note_history_button_press(editor: Editor) -> None:
         return
 
     ankihub_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
-    url = url_view_note_history().format(
-        ankihub_did=ankihub_did, ankihub_nid=ankihub_nid
-    )
+    url = url_view_note_history().format(ankihub_did=ankihub_did, ankihub_nid=ankihub_nid)
     openLink(url)
 
 
-def _hide_ankihub_field_in_editor(
-    js: str, note: anki.notes.Note, _: aqt.editor.Editor
-) -> str:
+def _hide_ankihub_field_in_editor(js: str, note: anki.notes.Note, _: aqt.editor.Editor) -> str:
     """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
     hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
     if ANKI_INT_VERSION >= 50:
-        refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(
-            hide_last_field
-        )
+        refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field)
     else:
-        refresh_fields_js = _refresh_editor_fields_for_anki_below_v50_js(
-            hide_last_field
-        )
+        refresh_fields_js = _refresh_editor_fields_for_anki_below_v50_js(hide_last_field)
 
     result = js + refresh_fields_js
     return result
@@ -235,9 +227,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
                 changeVisibilityOfField(num_fields - 1, false);
             }
         })
-        """ % (
-        "true" if hide_last_field else "false"
-    )
+        """ % ("true" if hide_last_field else "false")
 
     result = change_visiblility_js + refresh_fields_js
     return result
@@ -330,9 +320,7 @@ def _disable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
     _set_enabled_states_of_buttons(editor, button_ids, False)
 
 
-def _set_enabled_states_of_buttons(
-    editor: Editor, button_ids: list[str], enabled: bool
-) -> None:
+def _set_enabled_states_of_buttons(editor: Editor, button_ids: list[str], enabled: bool) -> None:
     disable_btns_script = f"""
         for (const btnId of {button_ids}) {{
             document.getElementById(btnId).disabled={str(not enabled).lower()};
@@ -342,9 +330,7 @@ def _set_enabled_states_of_buttons(
 
 
 def _set_suggestion_button_label(editor: Editor, label: str) -> None:
-    set_label_script = (
-        f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
-    )
+    set_label_script = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
     editor.web.eval(set_label_script.format(label))
 
 
@@ -367,17 +353,11 @@ def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
 
 
 def _setup_editor_did_load_js_message(editor: Editor) -> None:
-    script = (
-        "require('anki/ui').loaded.then(() => setTimeout( () => {"
-        "   pycmd('editor_did_load') "
-        "}));"
-    )
+    script = "require('anki/ui').loaded.then(() => setTimeout( () => {   pycmd('editor_did_load') }));"
     editor.web.eval(script)
 
 
-def _on_js_message(
-    handled: tuple[bool, Any], message: str, context: Any
-) -> Tuple[bool, Any]:
+def _on_js_message(handled: tuple[bool, Any], message: str, context: Any) -> Tuple[bool, Any]:
     if message == "editor_did_load":
         _refresh_buttons(context)
         return (True, None)

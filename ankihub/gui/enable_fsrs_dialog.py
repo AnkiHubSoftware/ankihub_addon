@@ -28,10 +28,7 @@ def maybe_show_enable_fsrs_reminder() -> None:
         return
 
     days_since_last_reminder = config.get_days_since_last_enable_fsrs_reminder()
-    if (
-        days_since_last_reminder is None
-        or days_since_last_reminder >= ENABLE_FSRS_REMINDER_INTERVAL_DAYS
-    ):
+    if days_since_last_reminder is None or days_since_last_reminder >= ENABLE_FSRS_REMINDER_INTERVAL_DAYS:
         config.set_last_enable_fsrs_reminder_date(date.today())
         _show_enable_fsrs_reminder()
 

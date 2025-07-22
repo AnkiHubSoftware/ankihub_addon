@@ -65,9 +65,7 @@ DEFAULT_CHUNK_SIZE = 30_000
 # Timeout duration for the write lock. We use a timeout to make sure that deadlocks don't occur.
 WRITE_LOCK_TIMEOUT_SECONDS = 10
 
-NOTE_NOT_DELETED_CONDITION = DQ(last_update_type__is=None) | DQ(
-    last_update_type__ne=SuggestionType.DELETE.value[0]
-)
+NOTE_NOT_DELETED_CONDITION = DQ(last_update_type__is=None) | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
 
 
 class _AnkiHubDB:
@@ -126,15 +124,9 @@ class _AnkiHubDB:
                 f"missing from the AnkiHub DB: {missing_mids}"
             )
 
-        skipped_notes = self._determine_notes_to_skip(
-            notes_data, ankihub_did=ankihub_did
-        )
+        skipped_notes = self._determine_notes_to_skip(notes_data, ankihub_did=ankihub_did)
         nids_to_skip = set(note_data.anki_nid for note_data in skipped_notes)
-        notes_data = [
-            note_data
-            for note_data in notes_data
-            if note_data.anki_nid not in nids_to_skip
-        ]
+        notes_data = [note_data for note_data in notes_data if note_data.anki_nid not in nids_to_skip]
 
         upserted_notes: List[NoteInfo] = []
         note_dicts = []
@@ -156,9 +148,7 @@ class _AnkiHubDB:
                     "tags": tags,
                     "guid": note_data.guid,
                     "last_update_type": (
-                        note_data.last_update_type.value[0]
-                        if note_data.last_update_type is not None
-                        else None
+                        note_data.last_update_type.value[0] if note_data.last_update_type is not None else None
                     ),
                 }
             )
@@ -172,9 +162,7 @@ class _AnkiHubDB:
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
-    def _determine_notes_to_skip(
-        self, notes_data: List[NoteInfo], ankihub_did: uuid.UUID
-    ) -> List[NoteInfo]:
+    def _determine_notes_to_skip(self, notes_data: List[NoteInfo], ankihub_did: uuid.UUID) -> List[NoteInfo]:
         """
         Determines which notes data to skip when upserting notes data into the AnkiHub DB.
 
@@ -210,27 +198,17 @@ class _AnkiHubDB:
             )
         )
 
-        return [
-            note_data
-            for note_data in notes_data
-            if note_data.anki_nid in conflicting_anki_nids
-        ]
+        return [note_data for note_data in notes_data if note_data.anki_nid in conflicting_anki_nids]
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
         with self.write_lock, self.db.atomic():
             execute_modifying_query_in_chunks(
-                lambda ah_nids: (
-                    AnkiHubNote.delete()
-                    .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
-                    .execute(),
-                ),
+                lambda ah_nids: (AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute(),),
                 ids=ah_nids,
             )
 
-    def update_mod_values_based_on_anki_db(
-        self, notes_data: Sequence[NoteInfo]
-    ) -> None:
+    def update_mod_values_based_on_anki_db(self, notes_data: Sequence[NoteInfo]) -> None:
         """Updates the 'mod' values of notes in the AnkiHub database based on
         their corresponding values in the Anki database.
 
@@ -241,9 +219,7 @@ class _AnkiHubDB:
         database, its 'mod' value is set to the current time.
         """
         anki_nids = [note_data.anki_nid for note_data in notes_data]
-        nid_mod_tuples = aqt.mw.col.db.all(
-            f"SELECT id, mod FROM notes WHERE id IN {ids2str(anki_nids)}"
-        )
+        nid_mod_tuples = aqt.mw.col.db.all(f"SELECT id, mod FROM notes WHERE id IN {ids2str(anki_nids)}")
         nid_to_mod_dict = {nid: mod for nid, mod in nid_mod_tuples}
 
         notes = []
@@ -258,9 +234,7 @@ class _AnkiHubDB:
         with self.write_lock, self.db.atomic():
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each entry. The purpose is to avoid the "too many SQL variables" error.
-            AnkiHubNote.bulk_update(
-                notes, fields=[AnkiHubNote.mod], batch_size=int(DEFAULT_CHUNK_SIZE / 10)
-            )
+            AnkiHubNote.bulk_update(notes, fields=[AnkiHubNote.mod], batch_size=int(DEFAULT_CHUNK_SIZE / 10))
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
@@ -286,21 +260,15 @@ class _AnkiHubDB:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
         # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
         # in the AnkiHub DB but in different deck.
-        return AnkiHubNote.filter(
-            NOTE_NOT_DELETED_CONDITION, ankihub_note_id=ankihub_nid
-        ).exists()
+        return AnkiHubNote.filter(NOTE_NOT_DELETED_CONDITION, ankihub_note_id=ankihub_nid).exists()
 
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
-        note = AnkiHubNote.filter(
-            NOTE_NOT_DELETED_CONDITION, anki_note_id=anki_note_id
-        ).get_or_none()
+        note = AnkiHubNote.filter(NOTE_NOT_DELETED_CONDITION, anki_note_id=anki_note_id).get_or_none()
 
         if not note:
             return None
 
-        field_names = self.note_type_field_names(
-            anki_note_type_id=note.anki_note_type_id
-        )
+        field_names = self.note_type_field_names(anki_note_type_id=note.anki_note_type_id)
 
         return self._build_note_info(note, {note.anki_note_type_id: field_names})
 
@@ -324,9 +292,7 @@ class _AnkiHubDB:
 
         return [self._build_note_info(note, field_names_by_mid) for note in notes]
 
-    def _build_note_info(
-        self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]
-    ) -> NoteInfo:
+    def _build_note_info(self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]) -> NoteInfo:
         if note.fields is None:
             raise MissingValueError(ah_did=cast(uuid.UUID, note.ankihub_deck_id))
 
@@ -340,16 +306,12 @@ class _AnkiHubDB:
                     name=field_name,
                     value=note.fields.get(field_name, ""),  # type: ignore
                 )
-                for field_name in field_names_by_mid[
-                    cast(NotetypeId, note.anki_note_type_id)
-                ]
+                for field_name in field_names_by_mid[cast(NotetypeId, note.anki_note_type_id)]
                 if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
             ],
             guid=cast(str, note.guid),
             last_update_type=(
-                suggestion_type_from_str(cast(str, note.last_update_type))
-                if note.last_update_type
-                else None
+                suggestion_type_from_str(cast(str, note.last_update_type)) if note.last_update_type else None
             ),
         )
 
@@ -370,9 +332,7 @@ class _AnkiHubDB:
             .scalar()
         )
 
-    def ankihub_dids_for_anki_nids(
-        self, anki_nids: Iterable[NoteId]
-    ) -> List[uuid.UUID]:
+    def ankihub_dids_for_anki_nids(self, anki_nids: Iterable[NoteId]) -> List[uuid.UUID]:
         return execute_list_query_in_chunks(
             lambda anki_nids: (
                 AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
@@ -383,17 +343,13 @@ class _AnkiHubDB:
             ids=list(anki_nids),
         )
 
-    def anki_nid_to_ah_did_dict(
-        self, anki_nids: Iterable[NoteId]
-    ) -> Dict[NoteId, uuid.UUID]:
+    def anki_nid_to_ah_did_dict(self, anki_nids: Iterable[NoteId]) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
         return dict(
             execute_list_query_in_chunks(
                 lambda anki_nids: (
-                    AnkiHubNote.select(
-                        AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id
-                    )
+                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id)
                     .filter(NOTE_NOT_DELETED_CONDITION, anki_note_id__in=anki_nids)
                     .tuples()
                 ),
@@ -408,15 +364,11 @@ class _AnkiHubDB:
             .scalar()
         )
 
-    def ankihub_nids_to_anki_nids(
-        self, ankihub_nids: List[uuid.UUID]
-    ) -> Dict[uuid.UUID, NoteId]:
+    def ankihub_nids_to_anki_nids(self, ankihub_nids: List[uuid.UUID]) -> Dict[uuid.UUID, NoteId]:
         ah_nid_to_anki_nid = dict(
             execute_list_query_in_chunks(
                 lambda ankihub_nids: (
-                    AnkiHubNote.select(
-                        AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
-                    )
+                    AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id)
                     .filter(
                         NOTE_NOT_DELETED_CONDITION,
                         ankihub_note_id__in=ankihub_nids,
@@ -440,18 +392,12 @@ class _AnkiHubDB:
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
         with self.write_lock, self.db.atomic():
-            AnkiHubNote.delete().where(
-                AnkiHubNote.ankihub_deck_id == ankihub_did
-            ).execute()
+            AnkiHubNote.delete().where(AnkiHubNote.ankihub_deck_id == ankihub_did).execute()
             self.remove_note_types_of_deck(ankihub_did)
             DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
-        return (
-            AnkiHubNote.select(AnkiHubNote.mod)
-            .filter(ankihub_note_id=ankihub_note_id)
-            .scalar()
-        )
+        return AnkiHubNote.select(AnkiHubNote.mod).filter(ankihub_note_id=ankihub_note_id).scalar()
 
     def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
@@ -508,10 +454,7 @@ class _AnkiHubDB:
         """Returns the names of all media files which are referenced on notes in the given deck."""
         notes = AnkiHubNote.select(AnkiHubNote.fields).filter(
             NOTE_NOT_DELETED_CONDITION,
-            (
-                AnkiHubNote.fields.cast("text").ilike("%<img%")
-                | AnkiHubNote.fields.cast("text").ilike("%[sound:%")
-            ),
+            (AnkiHubNote.fields.cast("text").ilike("%<img%") | AnkiHubNote.fields.cast("text").ilike("%[sound:%")),
             ankihub_deck_id=ah_did,
         )
         return {
@@ -521,9 +464,7 @@ class _AnkiHubDB:
             for media_name in local_media_names_from_html(field_value)
         }
 
-    def media_names_exist_for_ankihub_deck(
-        self, ah_did: uuid.UUID, media_names: Set[str]
-    ) -> Dict[str, bool]:
+    def media_names_exist_for_ankihub_deck(self, ah_did: uuid.UUID, media_names: Set[str]) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean
         indicating whether the media file is referenced on a note in the given deck.
         The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
@@ -556,9 +497,7 @@ class _AnkiHubDB:
 
         # Remove media files with None as hash because they can't be matched
         media_to_hash = {
-            media_name: media_hash
-            for media_name, media_hash in media_to_hash.items()
-            if media_hash is not None
+            media_name: media_hash for media_name, media_hash in media_to_hash.items() if media_hash is not None
         }
 
         # Return early if no valid hashes remain
@@ -601,9 +540,7 @@ class _AnkiHubDB:
 
     def remove_note_types_of_deck(self, ankihub_did: uuid.UUID) -> None:
         with self.write_lock:
-            AnkiHubNoteType.delete().where(
-                AnkiHubNoteType.ankihub_deck_id == ankihub_did
-            ).execute()
+            AnkiHubNoteType.delete().where(AnkiHubNoteType.ankihub_deck_id == ankihub_did).execute()
 
     def note_type_dict(self, note_type_id: NotetypeId) -> NotetypeDict:
         return (
@@ -615,45 +552,29 @@ class _AnkiHubDB:
         )
 
     def note_type_id_by_name(self, name: str) -> Optional[NotetypeId]:
-        return (
-            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
-            .filter(AnkiHubNoteType.name == name)
-            .scalar()
-        )
+        return AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).filter(AnkiHubNoteType.name == name).scalar()
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
         return AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).objects(flat)
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        return (
-            AnkiHubNoteType.select()
-            .filter(anki_note_type_id=anki_note_type_id)
-            .exists()
-        )
+        return AnkiHubNoteType.select().filter(anki_note_type_id=anki_note_type_id).exists()
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
         return (
-            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
-            .filter(ankihub_deck_id=ankihub_did)
-            .objects(flat)
+            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).filter(ankihub_deck_id=ankihub_did).objects(flat)
         )
 
-    def note_type_names_and_ids_for_ankihub_deck(
-        self, ankihub_did: uuid.UUID
-    ) -> List[Tuple[str, NotetypeId]]:
+    def note_type_names_and_ids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[Tuple[str, NotetypeId]]:
         return (
-            AnkiHubNoteType.select(
-                AnkiHubNoteType.name, AnkiHubNoteType.anki_note_type_id
-            )
+            AnkiHubNoteType.select(AnkiHubNoteType.name, AnkiHubNoteType.anki_note_type_id)
             .filter(ankihub_deck_id=ankihub_did)
             .objects(lambda name, anki_note_type_id: (name, anki_note_type_id))
         )
 
     def ankihub_did_for_note_type(self, anki_note_type_id: NotetypeId) -> uuid.UUID:
         return (
-            AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
-            .filter(anki_note_type_id=anki_note_type_id)
-            .scalar()
+            AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id).filter(anki_note_type_id=anki_note_type_id).scalar()
         )
 
     def note_type_field_names(self, anki_note_type_id: NotetypeId) -> List[str]:

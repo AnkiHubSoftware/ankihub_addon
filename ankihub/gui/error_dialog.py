@@ -1,4 +1,5 @@
 """Error dialog for errors related to the AnkiHub add-on."""
+
 from textwrap import dedent
 from traceback import format_exception
 from typing import Optional
@@ -25,9 +26,7 @@ from .utils import active_window_or_mw
 class ErrorDialog(QDialog):
     """Error dialog for errors related to the AnkiHub add-on."""
 
-    def __init__(
-        self, exception: BaseException, sentry_event_id: Optional[str], parent=None
-    ):
+    def __init__(self, exception: BaseException, sentry_event_id: Optional[str], parent=None):
         super().__init__(parent or active_window_or_mw())
         self.setWindowTitle("AnkiHub add-on error")
         self.setMinimumHeight(400)
@@ -89,14 +88,10 @@ class ErrorDialog(QDialog):
 
         self.debug_info_area.setWidget(self.debug_info_widget)
         self.debug_info_area.setWidgetResizable(True)
-        self.debug_info_area.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
+        self.debug_info_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.spacer_widget = layout.spacer_widget = QWidget()  # type: ignore
-        self.spacer_widget.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
+        self.spacer_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.spacer_widget)
 
         # Hide debug info by default
@@ -114,9 +109,7 @@ class ErrorDialog(QDialog):
 
 
 def _debug_info(exception: BaseException) -> str:
-    exception_text = "\n".join(
-        format_exception(None, value=exception, tb=exception.__traceback__)
-    )
+    exception_text = "\n".join(format_exception(None, value=exception, tb=exception.__traceback__))
     result = f"{utils.supportText()}\n{exception_text}"
     return result
 
@@ -145,8 +138,7 @@ def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
         sentry_url = f"https://ankihub.sentry.io/issues/?project=6546414&query=id:{sentry_event_id}"
         forum_post_text += f"\n\n[Sentry link (for developers)]({sentry_url})"
 
-    result = (
-        "https://community.ankihub.net/new-topic?category=bug&tags=add-on-error&body="
-        + quote(forum_post_text, safe="")
+    result = "https://community.ankihub.net/new-topic?category=bug&tags=add-on-error&body=" + quote(
+        forum_post_text, safe=""
     )
     return result

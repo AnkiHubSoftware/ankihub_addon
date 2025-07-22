@@ -1,12 +1,11 @@
 """This module contains utility functions used by both ankihub addon and by ankihub client."""
+
 import re
 from typing import Set
 
 # Regex to find the name of image files inside an <img> tag in HTML
 # excluding the ones that start with http:// or https://
-IMG_NAME_IN_IMG_TAG_REGEX = re.compile(
-    r"<img.*?src=[\"'](?!http://|https://)(.+?)[\"']"
-)
+IMG_NAME_IN_IMG_TAG_REGEX = re.compile(r"<img.*?src=[\"'](?!http://|https://)(.+?)[\"']")
 # Regex to find the name of sound files inside a [sound] tag (specific to Anki)
 # excluding the ones that start with http:// or https://
 SOUND_NAME_IN_SOUND_TAG_REGEX = re.compile(r"\[sound:(?!http://|https://)(.+?)\]")

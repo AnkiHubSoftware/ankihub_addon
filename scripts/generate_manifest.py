@@ -13,9 +13,7 @@ VERSION_SCRIPT = Path(__file__).parent / "calver.sh"
 
 def generate_manifest():
     addon_properties = json.load(ADDON_INFO_FILE.open("r"))
-    addon_version = subprocess.run(
-        [str(VERSION_SCRIPT)], capture_output=True, text=True
-    ).stdout.strip()
+    addon_version = subprocess.run([str(VERSION_SCRIPT)], capture_output=True, text=True).stdout.strip()
     manifest = {
         "package": addon_properties["ankiweb_id"],
         "name": addon_properties["display_name"],
@@ -37,9 +35,7 @@ def generate_manifest():
         f.write("\n")
 
 
-def _max_point_version(
-    max_anki_version: str = None, tested_anki_version: str = None
-) -> int:
+def _max_point_version(max_anki_version: str = None, tested_anki_version: str = None) -> int:
     if max_anki_version is not None:
         # A negative max_point_version prevents the add-on from being downloaded on any newer versions.
         return -1 * to_point_version(max_anki_version)

@@ -93,9 +93,7 @@ def open_suggestion_dialog_for_single_suggestion(
     change type dropdown when the dialog is opened.
     """
 
-    assert ankihub_db.is_ankihub_note_type(
-        note.mid
-    ), f"Note type {note.mid} is not associated with an AnkiHub deck."
+    assert ankihub_db.is_ankihub_note_type(note.mid), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested([note.id], parent)
     if not ah_did:
@@ -130,9 +128,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        all_no_changes_errors = all(
-            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
-        )
+        all_no_changes_errors = all(ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors)
         if all_no_changes_errors:
             dialog = show_dialog(
                 title="Invalid suggestion",
@@ -166,10 +162,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             dialog.open()
         else:
             showInfo(
-                text=(
-                    "There are some problems with this suggestion:<br><br>"
-                    f"<b>{error_message}</b>"
-                ),
+                text=(f"There are some problems with this suggestion:<br><br><b>{error_message}</b>"),
                 title="Problem with suggestion",
             )
         LOGGER.info("Can't submit suggestion.", error_message=error_message)
@@ -251,9 +244,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     change type dropdown when the dialog is opened.
     """
 
-    ah_did = _determine_ah_did_for_nids_to_be_suggested(
-        anki_nids=anki_nids, parent=parent
-    )
+    ah_did = _determine_ah_did_for_nids_to_be_suggested(anki_nids=anki_nids, parent=parent)
     if ah_did is None:
         LOGGER.info("Bulk suggestion cancelled.")
         return
@@ -290,9 +281,7 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
 
     def media_upload_cb(media_names: Set[str], ankihub_did: uuid.UUID) -> None:
         aqt.mw.taskman.run_on_main(
-            lambda: media_sync.start_media_upload(
-                media_names=media_names, ankihub_did=ankihub_did
-            )
+            lambda: media_sync.start_media_upload(media_names=media_names, ankihub_did=ankihub_did)
         )
 
     aqt.mw.taskman.with_progress(
@@ -317,9 +306,7 @@ def _can_submit_without_review(ah_did: uuid.UUID) -> bool:
     return result
 
 
-def _determine_ah_did_for_nids_to_be_suggested(
-    anki_nids: Collection[NoteId], parent: QWidget
-) -> Optional[uuid.UUID]:
+def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], parent: QWidget) -> Optional[uuid.UUID]:
     """Return an AnkiHub deck id that the notes will be suggested to. If the
     choice of deck is ambiguous, the user is asked to choose a deck from a list
     of viable decks.
@@ -329,14 +316,10 @@ def _determine_ah_did_for_nids_to_be_suggested(
     ah_dids = set(anki_nid_to_ah_did.values())
 
     if len(ah_dids) == 0:
-        LOGGER.info(
-            "User tried to submit suggestions for notes which don't belong to any AnkiHub deck."
-        )
+        LOGGER.info("User tried to submit suggestions for notes which don't belong to any AnkiHub deck.")
         return None
     if len(ah_dids) != 1:
-        LOGGER.info(
-            "User tried to submit suggestions for notes that belong to multiple AnkiHub decks."
-        )
+        LOGGER.info("User tried to submit suggestions for notes that belong to multiple AnkiHub decks.")
         show_info("Please choose notes for one AnkiHub deck only.", parent=parent)
         return None
 
@@ -396,24 +379,20 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     )
 
     notes_without_changes = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
+        note for note, errors in suggestions_result.errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
     notes_that_dont_exist_on_ankihub = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if "Note object does not exist" in str(errors)
+        note for note, errors in suggestions_result.errors_by_nid.items() if "Note object does not exist" in str(errors)
     ]
     msg_about_failed_suggestions = (
         (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
-            f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
+            f"{', '.join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n"
             f"Notes without changes ({len(notes_without_changes)}):\n"
-            f'{", ".join(str(nid) for nid in notes_without_changes)}\n\n'
+            f"{', '.join(str(nid) for nid in notes_without_changes)}\n\n"
             f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
-            f'{", ".join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}'
+            f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
         )
         if suggestions_result.errors_by_nid
         else ""
@@ -490,9 +469,7 @@ class SuggestionDialog(QDialog):
 
         self._refresh_source_widget()
 
-        self.hint_for_note_deletions = QLabel(
-            "💡 When deleting a note, any changes<br>to fields will not be applied."
-        )
+        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes<br>to fields will not be applied.")
         self.hint_for_note_deletions.hide()
         self.layout_.addWidget(self.hint_for_note_deletions)
         self.layout_.addSpacing(10)
@@ -505,10 +482,7 @@ class SuggestionDialog(QDialog):
         self.layout_.addWidget(self.rationale_edit)
 
         def limit_length():
-            while (
-                len(self.rationale_edit.toPlainText())
-                >= RATIONALE_FOR_CHANGE_MAX_LENGTH
-            ):
+            while len(self.rationale_edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
                 self.rationale_edit.textCursor().deletePreviousChar()
 
         qconnect(self.rationale_edit.textChanged, limit_length)
@@ -552,11 +526,7 @@ class SuggestionDialog(QDialog):
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
-            source=(
-                self.source_widget.suggestion_source()
-                if self._source_needed()
-                else None
-            ),
+            source=(self.source_widget.suggestion_source() if self._source_needed() else None),
         )
 
     def _on_change_type_changed(self) -> None:
@@ -582,9 +552,7 @@ class SuggestionDialog(QDialog):
         ) or (self._change_type() == SuggestionType.DELETE)
 
     def _refresh_hint_for_note_deletions(self) -> None:
-        self.hint_for_note_deletions.setVisible(
-            self._change_type() == SuggestionType.DELETE
-        )
+        self.hint_for_note_deletions.setVisible(self._change_type() == SuggestionType.DELETE)
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
@@ -608,11 +576,7 @@ class SuggestionDialog(QDialog):
         if self._is_new_note_suggestion:
             return None
         else:
-            return next(
-                x
-                for x in SuggestionType
-                if x.value[1] == self.change_type_select.currentText()
-            )
+            return next(x for x in SuggestionType if x.value[1] == self.change_type_select.currentText())
 
     def _comment(self) -> str:
         return self.rationale_edit.toPlainText()
@@ -683,9 +647,7 @@ class SourceWidget(QWidget):
         # Setup source type dropdown
         self.source_type_select = QComboBox()
         self.layout_.addWidget(self.source_type_select)
-        qconnect(
-            self.source_type_select.currentTextChanged, self._on_source_type_change
-        )
+        qconnect(self.source_type_select.currentTextChanged, self._on_source_type_change)
 
         # Setup space below source type select.
         # Its size will be changed depending on whether the source type select is visible or not.
@@ -713,9 +675,7 @@ class SourceWidget(QWidget):
         source_types = change_type_to_source_types[change_type]
 
         self.source_type_select.clear()
-        self.source_type_select.addItems(
-            [source_type.value for source_type in source_types]
-        )
+        self.source_type_select.addItems([source_type.value for source_type in source_types])
 
         if len(source_types) > 1:
             self.source_type_select.show()
@@ -770,9 +730,7 @@ class SourceWidget(QWidget):
 
         self.source_input_label.setText(text)
 
-        place_holder_text = source_type_to_source_place_holder_text.get(
-            self._source_type(), ""
-        )
+        place_holder_text = source_type_to_source_place_holder_text.get(self._source_type(), "")
         self.source_edit.setPlaceholderText(place_holder_text)
 
     def _source_type(self) -> Optional[SourceType]:

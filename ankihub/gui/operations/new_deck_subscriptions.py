@@ -17,9 +17,7 @@ from .utils import future_with_result, pass_exceptions_to_on_done
 
 
 @pass_exceptions_to_on_done
-def check_and_install_new_deck_subscriptions(
-    subscribed_decks: List[Deck], on_done: Callable[[Future], None]
-) -> None:
+def check_and_install_new_deck_subscriptions(subscribed_decks: List[Deck], on_done: Callable[[Future], None]) -> None:
     """Check if there are any new deck subscriptions and install them if the user confirms."""
 
     LOGGER.info(
@@ -36,9 +34,7 @@ def check_and_install_new_deck_subscriptions(
     recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
     recommended_deck_settings_cb.setChecked(True)
 
-    is_anking_deck_in_the_list = any(
-        deck.ah_did == config.anking_deck_id for deck in decks
-    )
+    is_anking_deck_in_the_list = any(deck.ah_did == config.anking_deck_id for deck in decks)
     if (
         config.get_feature_flags().get("fsrs_in_recommended_deck_settings")
         and ANKI_INT_VERSION >= MIN_ANKI_VERSION_FOR_FSRS_FEATURES
@@ -56,16 +52,12 @@ def check_and_install_new_deck_subscriptions(
             "Change these settings at any time in your deck options area."
         )
     recommended_deck_settings_cb.setIcon(
-        recommended_deck_settings_cb.style().standardIcon(
-            QStyle.StandardPixmap.SP_MessageBoxInformation
-        )
+        recommended_deck_settings_cb.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation)
     )
 
     confirmation_dialog = show_dialog(
         title="AnkiHub | Sync",
-        text=messages.deck_install_confirmation(
-            decks, logged_to_ankiweb=logged_into_ankiweb()
-        ),
+        text=messages.deck_install_confirmation(decks, logged_to_ankiweb=logged_into_ankiweb()),
         parent=aqt.mw,
         buttons=[
             ("Skip", QDialogButtonBox.ButtonRole.RejectRole),

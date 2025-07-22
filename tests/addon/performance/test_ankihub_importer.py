@@ -25,8 +25,7 @@ class ImportAnkingNotes(Protocol):
     def __call__(
         self,
         anking_notes_data: List[NoteInfo],
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @pytest.fixture
@@ -92,9 +91,7 @@ def test_anking_deck_update(
         current_note_type = aqt.mw.col.models.get(NotetypeId(notes_data[0].mid))
         new_note_type = aqt.mw.col.models.copy(current_note_type)
 
-        nid_mid_pairs = [
-            (NoteId(note.anki_nid), new_note_type["id"]) for note in notes_data
-        ]
+        nid_mid_pairs = [(NoteId(note.anki_nid), new_note_type["id"]) for note in notes_data]
         change_note_types_of_notes(nid_mid_pairs=nid_mid_pairs)
 
         # Change the fields and tags of notes so that the import has to update them.

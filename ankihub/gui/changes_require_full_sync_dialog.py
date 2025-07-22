@@ -42,9 +42,7 @@ class ChangesRequireFullSyncDialog(QDialog):
 
         # Collapsible Note Type Updates Section, with a maximum expanded height.
         collapsible = CollapsibleSection("Note type updates", expanded_max_height=160)
-        collapsible.toggle_button.setStyleSheet(
-            collapsible.toggle_button.styleSheet() + "QToolButton { color: gray; }"
-        )
+        collapsible.toggle_button.setStyleSheet(collapsible.toggle_button.styleSheet() + "QToolButton { color: gray; }")
 
         # Layout for the collapsible content
         content_layout = QVBoxLayout()
@@ -55,14 +53,11 @@ class ChangesRequireFullSyncDialog(QDialog):
         self.note_updates_text.setTextColor(QColor("#808080"))
         self.note_updates_text.setText(
             "\n".join(
-                aqt.mw.col.models.get(mid)["name"]
-                for mid in changes_require_full_sync_error.affected_note_type_ids
+                aqt.mw.col.models.get(mid)["name"] for mid in changes_require_full_sync_error.affected_note_type_ids
             )
         )
         self.note_updates_text.setReadOnly(True)
-        self.note_updates_text.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
+        self.note_updates_text.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         content_layout.addWidget(self.note_updates_text)
 
         collapsible.setContentLayout(content_layout)
@@ -111,12 +106,8 @@ class ChangesRequireFullSyncDialog(QDialog):
         self.run_full_sync_button = QPushButton("Run Full Sync")
         self.push_button_style_sheet = self.run_full_sync_button.styleSheet()
 
-        self.skip_button.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
-        )
-        self.run_full_sync_button.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
-        )
+        self.skip_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.run_full_sync_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         # Add hidden button so that the skip button is not styled as default button.
         self.hidden_button = QPushButton("")

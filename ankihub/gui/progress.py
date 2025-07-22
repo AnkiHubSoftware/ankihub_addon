@@ -1,4 +1,5 @@
 """Modifies to Anki's progress dialog (aqt.progress)."""
+
 from typing import Callable, Optional
 
 from anki.hooks import wrap
@@ -22,9 +23,7 @@ def setup():
     )
 
 
-def _with_patched_isdeleted(
-    self: ProgressManager, _old: Callable[[ProgressManager], None]
-):
+def _with_patched_isdeleted(self: ProgressManager, _old: Callable[[ProgressManager], None]):
     original_is_deleted = sip.isdeleted
 
     def patched_isdeleted(x: Optional[sip.simplewrapper]) -> bool:

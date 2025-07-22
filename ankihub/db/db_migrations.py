@@ -11,21 +11,15 @@ from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, get_peewee_database
 def migrate_ankihub_db():
     """Migrate the AnkiHub DB to the latest schema version."""
 
-    LOGGER.info(
-        "AnkiHub DB schema version.", schema_version=ankihub_db.schema_version()
-    )
+    LOGGER.info("AnkiHub DB schema version.", schema_version=ankihub_db.schema_version())
 
     peewee_db = get_peewee_database()
     schema_version = ankihub_db.schema_version()
 
     if schema_version < 2:
         with peewee_db.atomic():
-            peewee_db.execute_sql(
-                "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)"
-            )
-            peewee_db.execute_sql(
-                "CREATE INDEX anki_note_id_idx ON notes (anki_note_id)"
-            )
+            peewee_db.execute_sql("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)")
+            peewee_db.execute_sql("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
             peewee_db.pragma("user_version", 2)
 
     if schema_version < 3:
@@ -50,9 +44,7 @@ def migrate_ankihub_db():
 
     if schema_version < 5:
         with peewee_db.atomic():
-            peewee_db.execute_sql(
-                "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)"
-            )
+            peewee_db.execute_sql("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)")
             peewee_db.pragma("user_version", 5)
         LOGGER.info(
             "AnkiHub DB migrated to schema version",
@@ -85,15 +77,11 @@ def migrate_ankihub_db():
             # You can't add a unique constraint to an existing table in sqlite and
             # this is equlivalent, see https://www.sqlite.org/lang_createtable.html#constraints
             peewee_db.execute_sql("DROP INDEX anki_note_id_idx")
-            peewee_db.execute_sql(
-                "CREATE UNIQUE INDEX anki_note_id_idx ON notes (anki_note_id)"
-            )
+            peewee_db.execute_sql("CREATE UNIQUE INDEX anki_note_id_idx ON notes (anki_note_id)")
 
             # rename anki_note_type_id index to anki_note_type_id_idx to be consistent with other indexes
             peewee_db.execute_sql("DROP INDEX anki_note_type_id")
-            peewee_db.execute_sql(
-                "CREATE INDEX anki_note_type_id_idx ON notes (anki_note_type_id)"
-            )
+            peewee_db.execute_sql("CREATE INDEX anki_note_type_id_idx ON notes (anki_note_type_id)")
 
             peewee_db.pragma("user_version", 6)
 
@@ -205,8 +193,7 @@ def migrate_ankihub_db():
             .objects(flat)
         )
         mid_to_field_names = {
-            note_type_id: _note_type_field_names(note_type_id=note_type_id)
-            for note_type_id in note_type_ids
+            note_type_id: _note_type_field_names(note_type_id=note_type_id) for note_type_id in note_type_ids
         }
 
         notes = []
@@ -218,10 +205,7 @@ def migrate_ankihub_db():
             if len(field_names) != len(field_values):
                 value = None
             else:
-                value = {
-                    field_name: field_value
-                    for field_name, field_value in zip(field_names, field_values)
-                }
+                value = {field_name: field_value for field_name, field_value in zip(field_names, field_values)}
             note.fields = value
             notes.append(note)
 
@@ -255,9 +239,7 @@ def _recreate_peewee_table(model: Model, on_conflict: str = "ABORT") -> None:
 
     # Rename the current table if it exists
     try:
-        get_peewee_database().execute_sql(
-            f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
-        )
+        get_peewee_database().execute_sql(f"ALTER TABLE {table_name} RENAME TO {temp_table_name}")
     except Exception as e:
         # Renaming a table can't be rolled back in SQLite. If a previous run of this migration
         # was interrupted after renaming the table, the table will still have the temp_ prefix.
@@ -275,9 +257,7 @@ def _recreate_peewee_table(model: Model, on_conflict: str = "ABORT") -> None:
     model.create_table()
 
     # Copy the data to the new table
-    get_peewee_database().execute_sql(
-        f"INSERT OR {on_conflict} INTO {table_name} SELECT * FROM {temp_table_name}"
-    )
+    get_peewee_database().execute_sql(f"INSERT OR {on_conflict} INTO {table_name} SELECT * FROM {temp_table_name}")
 
     # Drop the old table
     get_peewee_database().execute_sql(f"DROP TABLE {temp_table_name}")
@@ -315,9 +295,7 @@ def _setup_deck_media_table(peewee_db: Database) -> None:
             );
             """
         )
-        peewee_db.execute_sql(
-            "CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);"
-        )
+        peewee_db.execute_sql("CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);")
         LOGGER.info("Created deck_media table")
 
 
