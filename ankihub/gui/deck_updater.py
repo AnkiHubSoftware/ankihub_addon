@@ -166,16 +166,10 @@ class _AnkiHubDeckUpdater:
 
         return True
 
-    def fetch_and_apply_pending_notes_actions_for_deck(
-        self, ankihub_did: uuid.UUID
-    ) -> None:
-        pending_notes_actions = self._client.get_pending_notes_actions_for_deck(
-            ankihub_did
-        )
+    def fetch_and_apply_pending_notes_actions_for_deck(self, ankihub_did: uuid.UUID) -> None:
+        pending_notes_actions = self._client.get_pending_notes_actions_for_deck(ankihub_did)
         if not pending_notes_actions:
-            LOGGER.info(
-                "No pending notes actions to apply for deck", ah_did=ankihub_did
-            )
+            LOGGER.info("No pending notes actions to apply for deck", ah_did=ankihub_did)
             return
 
         for pending_note_action in pending_notes_actions:
@@ -187,9 +181,7 @@ class _AnkiHubDeckUpdater:
 
     def _fetch_and_apply_deck_extension_updates(self, ankihub_did: uuid.UUID) -> bool:
         # returns True if the update was successful, False if the user cancelled it
-        if not (
-            deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)
-        ):
+        if not (deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)):
             LOGGER.info("No extensions to update for deck", ah_did=ankihub_did)
             return True
 
@@ -220,9 +212,7 @@ class _AnkiHubDeckUpdater:
                 return False
 
             for customization in chunk.note_customizations:
-                anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
-                    customization.ankihub_nid
-                )
+                anki_nid = ankihub_db.anki_nid_for_ankihub_nid(customization.ankihub_nid)
                 try:
                     note = aqt.mw.col.get_note(anki_nid)
                 except NotFoundError:
@@ -234,17 +224,13 @@ class _AnkiHubDeckUpdater:
                 else:
                     # Only tags from this tag group should be modified.
                     tags_not_from_this_tag_group = [
-                        tag
-                        for tag in note.tags
-                        if not is_tag_for_group(tag, deck_extension.tag_group_name)
+                        tag for tag in note.tags if not is_tag_for_group(tag, deck_extension.tag_group_name)
                     ]
                     note.tags = tags_not_from_this_tag_group + customization.tags
                     updated_notes.append(note)
 
             # each chunk contains the latest update timestamp of the notes in it, we need the latest one
-            latest_update = max(
-                chunk.latest_update, latest_update or chunk.latest_update
-            )
+            latest_update = max(chunk.latest_update, latest_update or chunk.latest_update)
 
         if updated_notes:
             aqt.mw.col.update_notes(updated_notes)
@@ -310,24 +296,16 @@ def show_tooltip_about_last_deck_updates_results() -> None:
         )
 
 
-def _update_deck_updates_download_progress_cb(
-    notes_count: int, ankihub_did: uuid.UUID
-) -> None:
+def _update_deck_updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID) -> None:
     aqt.mw.taskman.run_on_main(
-        lambda: _update_deck_updates_download_progress_cb_inner(
-            notes_count=notes_count, ankihub_did=ankihub_did
-        )
+        lambda: _update_deck_updates_download_progress_cb_inner(notes_count=notes_count, ankihub_did=ankihub_did)
     )
 
 
-def _update_deck_updates_download_progress_cb_inner(
-    notes_count: int, ankihub_did: uuid.UUID
-) -> None:
+def _update_deck_updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID) -> None:
     try:
         aqt.mw.progress.update(
-            "Downloading updates\n"
-            f"for {config.deck_config(ankihub_did).name}\n"
-            f"Notes downloaded: {notes_count}"
+            f"Downloading updates\nfor {config.deck_config(ankihub_did).name}\nNotes downloaded: {notes_count}"
         )
     except AttributeError:
         # There were sentry reports of this error:
@@ -341,9 +319,7 @@ def _update_deck_updates_download_progress_cb_inner(
         # calling its methods (at least in Anki 2.1.54).
         # It should be safe to ignore this error and let the sync continue.
 
-        LOGGER.warning(
-            "Unable to update progress bar to show download progress of deck updates."
-        )
+        LOGGER.warning("Unable to update progress bar to show download progress of deck updates.")
     except RuntimeError as e:
         if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
             return
@@ -351,19 +327,13 @@ def _update_deck_updates_download_progress_cb_inner(
             raise e
 
 
-def _update_extension_download_progress_cb(
-    note_customizations_count: int, deck_extension_id: int
-):
+def _update_extension_download_progress_cb(note_customizations_count: int, deck_extension_id: int):
     aqt.mw.taskman.run_on_main(
-        lambda: _update_extension_download_progress_cb_inner(
-            note_customizations_count, deck_extension_id
-        )
+        lambda: _update_extension_download_progress_cb_inner(note_customizations_count, deck_extension_id)
     )
 
 
-def _update_extension_download_progress_cb_inner(
-    note_customizations_count: int, deck_extension_id: int
-):
+def _update_extension_download_progress_cb_inner(note_customizations_count: int, deck_extension_id: int):
     try:
         aqt.mw.progress.update(
             "Downloading extension updates\n"
@@ -371,6 +341,4 @@ def _update_extension_download_progress_cb_inner(
             f"Note customizations downloaded: {note_customizations_count}"
         )
     except AttributeError:
-        LOGGER.warning(
-            "Unable to update progress bar to show download progress of deck updates."
-        )
+        LOGGER.warning("Unable to update progress bar to show download progress of deck updates.")

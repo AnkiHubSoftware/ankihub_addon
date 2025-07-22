@@ -43,14 +43,8 @@ class TestBuildSubdecksAndMoveCardsToThem:
             nids = [note_info.anki_nid for note_info in note_infos]
 
             # Profile the operation
-            duration_seconds = profile(
-                lambda: build_subdecks_and_move_cards_to_them(
-                    ankihub_did=ah_did, nids=nids
-                )
-            )
-            print(
-                f"Moving {len(nids)} cards to their subdecks took {duration_seconds} seconds"
-            )
+            duration_seconds = profile(lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ah_did, nids=nids))
+            print(f"Moving {len(nids)} cards to their subdecks took {duration_seconds} seconds")
             assert duration_seconds < 0.2
 
 
@@ -81,7 +75,5 @@ class TestFlattenDeck:
 
             # Profile the operation
             duration_seconds = profile(lambda: flatten_deck(ankihub_did=ah_did))
-            print(
-                f"Flattening deck with {len(nids)} cards took {duration_seconds} seconds"
-            )
+            print(f"Flattening deck with {len(nids)} cards took {duration_seconds} seconds")
             assert duration_seconds < 0.2

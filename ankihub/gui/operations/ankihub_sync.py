@@ -82,9 +82,7 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
         client = AnkiHubClient()
         subscribed_decks = client.get_deck_subscriptions()
 
-        _uninstall_decks_the_user_is_not_longer_subscribed_to(
-            subscribed_decks=subscribed_decks
-        )
+        _uninstall_decks_the_user_is_not_longer_subscribed_to(subscribed_decks=subscribed_decks)
 
         return subscribed_decks
 
@@ -92,15 +90,11 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
         op=lambda _: get_subscriptions_and_clean_up(),
         success=partial(_on_subscriptions_fetched, on_done=on_done),
         parent=aqt.mw,
-    ).failure(
-        lambda e: on_done(future_with_exception(e))
-    ).with_progress().run_in_background()
+    ).failure(lambda e: on_done(future_with_exception(e))).with_progress().run_in_background()
 
 
 @pass_exceptions_to_on_done
-def _on_subscriptions_fetched(
-    subscribed_decks: List[Deck], on_done: Callable[[Future], None]
-) -> None:
+def _on_subscriptions_fetched(subscribed_decks: List[Deck], on_done: Callable[[Future], None]) -> None:
     sync_state.schema_before_new_decks_installation = collection_schema()
 
     check_and_install_new_deck_subscriptions(
@@ -130,18 +124,12 @@ def _on_new_deck_subscriptions_done(
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
     to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
 
-    update_decks_and_media(
-        on_done=on_done, ah_dids=list(to_sync_ah_dids), start_media_sync=True
-    )
+    update_decks_and_media(on_done=on_done, ah_dids=list(to_sync_ah_dids), start_media_sync=True)
 
 
 @pass_exceptions_to_on_done
-def update_decks_and_media(
-    on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool
-) -> None:
-    def run_update(
-        raise_if_full_sync_required: bool, do_full_upload: bool, start_media_sync: bool
-    ) -> None:
+def update_decks_and_media(on_done: Callable[[Future], None], ah_dids: List[UUID], start_media_sync: bool) -> None:
+    def run_update(raise_if_full_sync_required: bool, do_full_upload: bool, start_media_sync: bool) -> None:
         AddonQueryOp(
             op=lambda _: ah_deck_updater.update_decks_and_media(
                 ah_dids,
@@ -163,9 +151,7 @@ def update_decks_and_media(
             changes=exception.affected_note_type_ids,
         )
 
-        dialog = ChangesRequireFullSyncDialog(
-            changes_require_full_sync_error=exception, parent=aqt.mw
-        )
+        dialog = ChangesRequireFullSyncDialog(changes_require_full_sync_error=exception, parent=aqt.mw)
 
         qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
         qconnect(
@@ -236,12 +222,8 @@ def _schedule_post_sync_ui_refresh_and_tasks() -> None:
         if new is None:
             return
         aqt.mw.reset()
-        aqt.mw.taskman.run_in_background(
-            aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
-        )
-        aqt.mw.taskman.run_in_background(
-            send_review_data, on_done=_on_send_review_data_done
-        )
+        aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
+        aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
         _maybe_send_daily_review_summaries()
         gui_hooks.focus_did_change.remove(refresh_ui_and_start_after_sync_tasks_once)
 
@@ -276,9 +258,7 @@ def _on_send_review_data_done(future: Future) -> None:
 def _maybe_send_daily_review_summaries() -> None:
     last_sent_summary_date = config.get_last_sent_summary_date()
     if not last_sent_summary_date:
-        last_sent_summary_date = (
-            get_end_cutoff_date_for_sending_review_summaries() - timedelta(days=1)
-        )
+        last_sent_summary_date = get_end_cutoff_date_for_sending_review_summaries() - timedelta(days=1)
 
     feature_flags = config.get_feature_flags()
     if feature_flags.get("daily_card_review_summary", False) and (
@@ -293,9 +273,7 @@ def _maybe_send_daily_review_summaries() -> None:
 def _on_send_daily_review_summaries_done(future: Future) -> None:
     exception = future.exception()
     if not exception:
-        config.save_last_sent_summary_date(
-            get_end_cutoff_date_for_sending_review_summaries()
-        )
+        config.save_last_sent_summary_date(get_end_cutoff_date_for_sending_review_summaries())
 
         LOGGER.info("Daily review summaries sent successfully")
         return

@@ -10,16 +10,12 @@ from ...db import ankihub_db
 from ...main.utils import truncated_list
 
 
-def suspend_notes(
-    ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None
-) -> None:
+def suspend_notes(ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None) -> None:
     """Suspend cards of notes in Anki based on their AnkiHub note IDs."""
     _change_suspension_state_of_notes(ah_nids, suspend=True, on_done=on_done)
 
 
-def unsuspend_notes(
-    ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None
-) -> None:
+def unsuspend_notes(ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None) -> None:
     """Unsuspend cards of notes in Anki based on their AnkiHub note IDs."""
     _change_suspension_state_of_notes(ah_nids, suspend=False, on_done=on_done)
 
@@ -27,12 +23,8 @@ def unsuspend_notes(
 def _change_suspension_state_of_notes(
     ah_nids: List[uuid.UUID], suspend: bool, on_done: Optional[Callable[[], None]]
 ) -> None:
-    anki_nids = [
-        nid for nid in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if nid
-    ]
-    anki_cids = aqt.mw.col.db.list(
-        f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
-    )
+    anki_nids = [nid for nid in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if nid]
+    anki_cids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}")
     if not anki_cids:  # pragma: no cover
         LOGGER.info(
             "No cards to change suspension state for",
@@ -65,8 +57,5 @@ def _change_suspension_state_of_notes(
         operation = unsuspend_cards
 
     aqt.mw.taskman.run_on_main(
-        lambda: operation(parent=aqt.mw, card_ids=anki_cids)
-        .success(on_success)
-        .failure(on_failure)
-        .run_in_background()
+        lambda: operation(parent=aqt.mw, card_ids=anki_cids).success(on_success).failure(on_failure).run_in_background()
     )

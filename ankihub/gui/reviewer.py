@@ -99,9 +99,7 @@ class ReviewerSidebar:
         parent_widget = self.reviewer.mw
 
         if parent_widget is None:
-            raise ValueError(
-                "Reviewer does not have a parent widget to hold the splitter."
-            )
+            raise ValueError("Reviewer does not have a parent widget to hold the splitter.")
 
         self.splitter = aqt.QSplitter()
         self.container = aqt.QWidget()
@@ -111,41 +109,29 @@ class ReviewerSidebar:
         self.container.setLayout(container_layout)
 
         self.header_webview = aqt.webview.AnkiWebView()
-        self.header_webview.set_bridge_command(
-            self.header_webview.defaultOnBridgeCmd, context=self
-        )
+        self.header_webview.set_bridge_command(self.header_webview.defaultOnBridgeCmd, context=self)
         self.header_webview.setSizePolicy(
-            aqt.QSizePolicy(
-                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed
-            )
+            aqt.QSizePolicy(aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Fixed)
         )
 
         # Create a QWebEngineProfile with persistent storage
         self.profile = aqt.QWebEngineProfile("AnkiHubProfile", parent_widget)
-        self.profile.setHttpUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
-        )
+        self.profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36")
 
         self.content_webview = aqt.webview.AnkiWebView()
-        self.content_webview.set_bridge_command(
-            self.content_webview.defaultOnBridgeCmd, context=self
-        )
+        self.content_webview.set_bridge_command(self.content_webview.defaultOnBridgeCmd, context=self)
         # Set the content_webview as the webview which will receive messages from js message handlers
         self.web = self.content_webview
 
         self.content_webview.setMinimumWidth(self.original_mw_min_width)
 
         self.update_header_button_timer = QTimer(self.content_webview)
-        qconnect(
-            self.update_header_button_timer.timeout, self._update_header_button_state
-        )
+        qconnect(self.update_header_button_timer.timeout, self._update_header_button_state)
         self.update_header_button_timer.start(200)
 
         self.interceptor = AuthenticationRequestInterceptor(self.content_webview)
 
-        page = CustomWebPage(
-            self.content_webview, self.profile, self.content_webview._onBridgeCmd
-        )
+        page = CustomWebPage(self.content_webview, self.profile, self.content_webview._onBridgeCmd)
         page.profile().setUrlRequestInterceptor(self.interceptor)
         # Prevent white flicker on dark mode
         page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
@@ -165,11 +151,7 @@ class ReviewerSidebar:
             parent_widget.setLayout(layout)
 
         layout.addWidget(self.splitter)
-        self.splitter.setSizePolicy(
-            aqt.QSizePolicy(
-                aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Expanding
-            )
-        )
+        self.splitter.setSizePolicy(aqt.QSizePolicy(aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Expanding))
 
         widget = self.reviewer.web
         # For compatibility with other add-ons that add a sidebar too (e.g. AMBOSS)
@@ -185,9 +167,7 @@ class ReviewerSidebar:
 
         parent_widget.mainLayout.insertWidget(widget_index, self.splitter)
 
-    def show_resource_tabs(
-        self, page_type: SidebarPageType, resources: List[Resource]
-    ) -> None:
+    def show_resource_tabs(self, page_type: SidebarPageType, resources: List[Resource]) -> None:
         self.page_type = page_type
         self.resources = resources
 
@@ -213,9 +193,7 @@ class ReviewerSidebar:
             return
 
         # We only want to enable the "Open in Browser" button if the content is not hosted on AnkiHub.
-        enable_open_in_browser_button = not self.get_content_url().startswith(
-            config.app_url
-        )
+        enable_open_in_browser_button = not self.get_content_url().startswith(config.app_url)
         self.header_webview.eval(
             f"setOpenInBrowserButtonState({'true' if enable_open_in_browser_button else 'false'});"
         )
@@ -316,9 +294,7 @@ class ReviewerSidebar:
             else:
                 LOGGER.error("Failed to load page.")
 
-        self.content_webview.evalWithCallback(
-            "document.body.innerHTML", check_auth_failure_callback
-        )
+        self.content_webview.evalWithCallback("document.body.innerHTML", check_auth_failure_callback)
 
     def set_on_auth_failure_hook(self, hook: Callable) -> None:
         self.on_auth_failure_hook = hook
@@ -369,11 +345,7 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     """Adds the "View on AnkiHub" button to the reviewer toolbar if it doesn't exist yet,
     or refreshes it if it does exist already."""
 
-    if (
-        not aqt.mw.reviewer
-        or not aqt.mw.reviewer.bottom
-        or not aqt.mw.reviewer.bottom.web
-    ):
+    if not aqt.mw.reviewer or not aqt.mw.reviewer.bottom or not aqt.mw.reviewer.bottom.web:
         return
 
     html = dedent(
@@ -401,9 +373,7 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
             }}
         </style>
         """
-    ).replace(
-        "\n", " "
-    )  # remove newlines to make insertAdjacentHTML work
+    ).replace("\n", " ")  # remove newlines to make insertAdjacentHTML work
 
     ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     js = dedent(
@@ -424,9 +394,7 @@ def _add_or_refresh_view_note_button(card: Card) -> None:
     aqt.mw.reviewer.bottom.web.eval(js)
 
 
-def _inject_ankihub_features_and_setup_sidebar(
-    web_content: WebContent, context
-) -> None:
+def _inject_ankihub_features_and_setup_sidebar(web_content: WebContent, context) -> None:
     if not isinstance(context, Reviewer):
         return
 
@@ -484,17 +452,9 @@ def _check_access_and_notify_buttons() -> None:
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
     ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(note.id)
     ah_did_of_note_type = ankihub_db.ankihub_did_for_note_type(note.mid)
-    ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
-        aqt.mw.col.decks.current()["id"]
-    )
+    ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(aqt.mw.col.decks.current()["id"])
     ah_dids = {ah_did_of_note, ah_did_of_deck, ah_did_of_note_type} - {None}
-    return any(
-        (
-            (deck_config := config.deck_config(ah_did))
-            and deck_config.has_note_embeddings
-        )
-        for ah_did in ah_dids
-    )
+    return any(((deck_config := config.deck_config(ah_did)) and deck_config.has_note_embeddings) for ah_did in ah_dids)
 
 
 def _notify_ankihub_ai_of_card_change(card: Card) -> None:
@@ -621,8 +581,7 @@ def _get_resources(tags: List[str], resource_type: ResourceType) -> List[Resourc
         for tag in resource_tags
         if (
             (resource := mh_tag_to_resource(tag))
-            and resource.usmle_step
-            in _get_enabled_steps_for_resource_type(resource_type)
+            and resource.usmle_step in _get_enabled_steps_for_resource_type(resource_type)
         )
     }
     return list(sorted(result, key=lambda x: x.title))
@@ -634,11 +593,7 @@ def _get_enabled_steps_for_resource_type(resource_type: ResourceType) -> Set[int
         ResourceType.FIRST_AID: "first_aid_forward",
     }
     config_key_prefix = resource_type_to_config_key_prefix[resource_type]
-    return {
-        step
-        for step in [1, 2]
-        if config.public_config.get(f"{config_key_prefix}_step_{step}")
-    }
+    return {step for step in [1, 2] if config.public_config.get(f"{config_key_prefix}_step_{step}")}
 
 
 def _get_resource_tags(tags: List[str], resource_type: ResourceType) -> Set[str]:
@@ -678,9 +633,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     elif message == CLOSE_SIDEBAR_PYCMD:
         reviewer_sidebar.close_sidebar()
 
-        js = _wrap_with_reviewer_buttons_check(
-            "ankihubReviewerButtons.unselectAllButtons()"
-        )
+        js = _wrap_with_reviewer_buttons_check("ankihubReviewerButtons.unselectAllButtons()")
         aqt.mw.reviewer.web.eval(js)
 
         return True, None
@@ -703,9 +656,7 @@ def _handle_auth_failure():
     if reviewer_sidebar:
         reviewer_sidebar.close_sidebar()
 
-    js = _wrap_with_reviewer_buttons_check(
-        "ankihubReviewerButtons.unselectAllButtons()"
-    )
+    js = _wrap_with_reviewer_buttons_check("ankihubReviewerButtons.unselectAllButtons()")
     aqt.mw.reviewer.web.eval(js)
 
     AnkiHubLogin.display_login()

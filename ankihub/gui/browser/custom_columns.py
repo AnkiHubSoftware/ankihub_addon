@@ -1,4 +1,5 @@
 """Custom Anki browser columns."""
+
 import uuid
 from abc import abstractmethod
 from typing import Sequence
@@ -21,11 +22,7 @@ class CustomColumn:
         row: CellRow,
         active_columns: Sequence[str],
     ) -> None:
-        if (
-            index := active_columns.index(self.key)
-            if self.key in active_columns
-            else None
-        ) is None:
+        if (index := active_columns.index(self.key) if self.key in active_columns else None) is None:
             return
 
         note = browser.table._state.get_note(item_id)

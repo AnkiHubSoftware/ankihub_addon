@@ -85,9 +85,7 @@ class _AnkiHubMediaSync:
         AddonQueryOp(
             parent=aqt.mw,
             op=lambda _: self._client.upload_media(media_paths, ankihub_did),
-            success=lambda _: self._on_upload_finished(
-                ankihub_deck_id=ankihub_did, on_success=on_success
-            ),
+            success=lambda _: self._on_upload_finished(ankihub_deck_id=ankihub_did, on_success=on_success),
         ).failure(on_failure).without_collection().run_in_background()
 
     def stop_background_threads(self):
@@ -165,31 +163,19 @@ class _AnkiHubMediaSync:
                 continue
 
             media_list += chunk.media
-            latest_update = (
-                max(chunk.latest_update, latest_update)
-                if latest_update
-                else chunk.latest_update
-            )
+            latest_update = max(chunk.latest_update, latest_update) if latest_update else chunk.latest_update
 
             if self._stop_background_threads:
-                LOGGER.info(
-                    "Background threads stopped, aborting download of deck media objects..."
-                )
+                LOGGER.info("Background threads stopped, aborting download of deck media objects...")
                 return
 
             if self._anki_profile_id_at_download_start != get_anki_profile_id():
-                LOGGER.info(
-                    "Anki profile changed during media download, aborting download of deck media objects..."
-                )
+                LOGGER.info("Anki profile changed during media download, aborting download of deck media objects...")
                 return
 
         if media_list:
-            ankihub_db.upsert_deck_media_infos(
-                ankihub_did=ankihub_did, media_list=media_list
-            )
-            config.save_latest_deck_media_update(
-                ankihub_did, latest_media_update=latest_update
-            )
+            ankihub_db.upsert_deck_media_infos(ankihub_did=ankihub_did, media_list=media_list)
+            config.save_latest_deck_media_update(ankihub_did, latest_media_update=latest_update)
         else:
             LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
@@ -197,11 +183,7 @@ class _AnkiHubMediaSync:
         media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
-        result = [
-            media_name
-            for media_name in media_names
-            if not (media_dir_path / media_name).exists()
-        ]
+        result = [media_name for media_name in media_names if not (media_dir_path / media_name).exists()]
         return result
 
     def _on_download_finished(self, _: None) -> None:
@@ -223,9 +205,7 @@ class _AnkiHubMediaSync:
         try:
             self._status_action.setText(f"🔃️ Media Sync: {text}")
         except RuntimeError:
-            LOGGER.warning(
-                "Could not set text of media sync status action because the object was deleted."
-            )
+            LOGGER.warning("Could not set text of media sync status action because the object was deleted.")
 
 
 media_sync = _AnkiHubMediaSync()

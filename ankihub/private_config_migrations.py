@@ -23,9 +23,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     """
     _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict)
     _maybe_reset_media_update_timestamps(private_config_dict)
-    _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
-        private_config_dict
-    )
+    _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(private_config_dict)
     _remove_orphaned_deck_extensions(private_config_dict)
     _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
     _move_credentials_to_profile_config(private_config_dict)
@@ -37,9 +35,7 @@ def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
     # fetched again.
     # The endpoint was fixed in API version 15.0.
     if _is_api_version_on_last_sync_below_threshold(private_config_dict, 15.0):
-        LOGGER.info(
-            "Resetting media update timestamps because api version is below 15.0."
-        )
+        LOGGER.info("Resetting media update timestamps because api version is below 15.0.")
         for deck in private_config_dict.get("decks", {}).values():
             deck["latest_media_update"] = None
 
@@ -52,9 +48,7 @@ def _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None
     for deck_extension in deck_extension_dict.values():
         if old_field_name in deck_extension:
             deck_extension[new_field_name] = deck_extension.pop(old_field_name)
-            LOGGER.info(
-                f"Renamed {old_field_name} to {new_field_name} in deck extension config."
-            )
+            LOGGER.info(f"Renamed {old_field_name} to {new_field_name} in deck extension config.")
 
 
 def _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
@@ -69,14 +63,10 @@ def _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
     for ah_did, deck in decks.items():
         if ah_did == config.anking_deck_id and deck.get(field_name) is None:
             deck[field_name] = True
-            LOGGER.info(
-                f"Set {field_name} to True for the previously installed AnKing deck."
-            )
+            LOGGER.info(f"Set {field_name} to True for the previously installed AnKing deck.")
 
 
-def _is_api_version_on_last_sync_below_threshold(
-    private_config_dict: Dict, version_threshold: float
-) -> bool:
+def _is_api_version_on_last_sync_below_threshold(private_config_dict: Dict, version_threshold: float) -> bool:
     """Check if the stored API version is below the given threshold."""
     api_version = private_config_dict.get("api_version_on_last_sync")
     if api_version is None:
@@ -113,13 +103,9 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
         return
 
     for ah_did_str in decks_dict.keys():
-        decks_dict[ah_did_str][
-            field_name
-        ] = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value
+        decks_dict[ah_did_str][field_name] = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value
 
-    LOGGER.info(
-        f"Set {field_name} to {BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value} for all decks."
-    )
+    LOGGER.info(f"Set {field_name} to {BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value} for all decks.")
 
 
 def _move_credentials_to_profile_config(
@@ -131,12 +117,8 @@ def _move_credentials_to_profile_config(
     as the keys used by Anki have changed.
     """
 
-    token = private_config_dict.pop("token", None) or aqt.mw.pm.profile.pop(
-        "ankiHubToken", None
-    )
-    username = private_config_dict.pop("user", None) or aqt.mw.pm.profile.pop(
-        "ankiHubUsername", None
-    )
+    token = private_config_dict.pop("token", None) or aqt.mw.pm.profile.pop("ankiHubToken", None)
+    username = private_config_dict.pop("user", None) or aqt.mw.pm.profile.pop("ankiHubUsername", None)
     if token:
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token

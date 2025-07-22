@@ -27,13 +27,9 @@ ANKI_INTERNAL_TAGS = ["leech", "marked"]
 
 INTERNAL_TAGS = ADDON_INTERNAL_TAGS + ANKI_INTERNAL_TAGS
 INTERNAL_TAGS = [tag.lower() for tag in INTERNAL_TAGS]
-INTERNAL_TAGS_REGEX = re.compile(
-    "|".join(f"^{tag}($|::)" for tag in INTERNAL_TAGS), flags=re.IGNORECASE
-)
+INTERNAL_TAGS_REGEX = re.compile("|".join(f"^{tag}($|::)" for tag in INTERNAL_TAGS), flags=re.IGNORECASE)
 
-OPTIONAL_TAG_REGEX = re.compile(
-    f"^{TAG_FOR_OPTIONAL_TAGS.lower()}::", flags=re.IGNORECASE
-)
+OPTIONAL_TAG_REGEX = re.compile(f"^{TAG_FOR_OPTIONAL_TAGS.lower()}::", flags=re.IGNORECASE)
 
 
 def is_internal_tag(tag: str) -> bool:
@@ -59,25 +55,15 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
 
 def _get_fields_protected_by_tags(tags: List[str], field_names: List[str]) -> List[str]:
     if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, tags):
-        return [
-            field_name
-            for field_name in field_names
-            if field_name != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
-        ]
+        return [field_name for field_name in field_names if field_name != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME]
 
     tag_prefix = f"{TAG_FOR_PROTECTING_FIELDS}::".lower()
-    field_names_from_tags = [
-        tag[len(tag_prefix) :] for tag in tags if tag.lower().startswith(tag_prefix)
-    ]
+    field_names_from_tags = [tag[len(tag_prefix) :] for tag in tags if tag.lower().startswith(tag_prefix)]
 
     # Both a field and the field with underscores replaced with spaces should be protected.
     # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
-    standardized_field_names_from_tags = [
-        field.replace("_", " ").lower() for field in field_names_from_tags
-    ]
-    standardized_field_names_from_note = [
-        field.replace("_", " ").lower() for field in field_names
-    ]
+    standardized_field_names_from_tags = [field.replace("_", " ").lower() for field in field_names_from_tags]
+    standardized_field_names_from_note = [field.replace("_", " ").lower() for field in field_names]
 
     result = [
         field

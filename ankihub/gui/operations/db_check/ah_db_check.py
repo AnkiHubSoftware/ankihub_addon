@@ -67,9 +67,7 @@ def _try_reinstall_decks_with_missing_deck_configs(
 
             on_success()
 
-        download_and_install_decks(
-            ah_dids_missing_from_config, on_done=on_download_and_install_done
-        )
+        download_and_install_decks(ah_dids_missing_from_config, on_done=on_download_and_install_done)
         return True
 
     return False

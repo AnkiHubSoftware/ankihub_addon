@@ -58,9 +58,7 @@ class OptionalTagsSuggestionDialog(QDialog):
 
         self.tag_group_list = QListWidget()
         # allow selecting multiple items at once
-        self.tag_group_list.setSelectionMode(
-            QAbstractItemView.SelectionMode.ExtendedSelection
-        )
+        self.tag_group_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         qconnect(self.tag_group_list.itemSelectionChanged, self._on_selection_changed)
 
         self.submit_btn = QPushButton("Submit Suggestions")
@@ -108,8 +106,7 @@ class OptionalTagsSuggestionDialog(QDialog):
         ]
 
         can_submit_without_review = selected_deck_extensions and all(
-            deck_extension.user_relation
-            in [UserDeckExtensionRelation.OWNER, UserDeckExtensionRelation.MAINTAINER]
+            deck_extension.user_relation in [UserDeckExtensionRelation.OWNER, UserDeckExtensionRelation.MAINTAINER]
             for deck_extension in selected_deck_extensions
         )
         self.auto_accept_cb.setHidden(not can_submit_without_review)
@@ -197,18 +194,14 @@ class OptionalTagsSuggestionDialog(QDialog):
         self, tag_group_validation_responses: List[TagGroupValidationResponse]
     ) -> None:
         self._valid_tag_groups = [
-            response.tag_group_name
-            for response in tag_group_validation_responses
-            if response.success
+            response.tag_group_name for response in tag_group_validation_responses if response.success
         ]
 
         # update icons and tooltips
         for i in range(self.tag_group_list.count()):
             item = self.tag_group_list.item(i)
             response = next(
-                response
-                for response in tag_group_validation_responses
-                if response.tag_group_name == item.text()
+                response for response in tag_group_validation_responses if response.tag_group_name == item.text()
             )
 
             if response.success:

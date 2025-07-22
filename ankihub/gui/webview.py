@@ -109,12 +109,9 @@ class AnkiHubWebViewDialog(QDialog):
         from .menu import AnkiHubLogin  # Lazy import to avoid circular dependency
 
         AnkiHubLogin.display_login()
-        LOGGER.info(
-            f"Prompted user to log in to AnkiHub, after failed authentication in {self.__class__.__name__}."
-        )
+        LOGGER.info(f"Prompted user to log in to AnkiHub, after failed authentication in {self.__class__.__name__}.")
 
-    def _on_successful_page_load(self) -> None:
-        ...  # pragma: no cover
+    def _on_successful_page_load(self) -> None: ...  # pragma: no cover
 
     def _load_page(self) -> None:
         self._update_page_theme()
@@ -144,9 +141,7 @@ class AnkiHubWebViewDialog(QDialog):
             if value.strip().endswith("Invalid token"):
                 self._handle_auth_failure()
 
-        self.web.evalWithCallback(
-            "document.body.innerHTML", check_auth_failure_callback
-        )
+        self.web.evalWithCallback("document.body.innerHTML", check_auth_failure_callback)
 
     def _adjust_web_styling(self) -> None:
         css = """
@@ -237,9 +232,7 @@ class CustomWebPage(AnkiWebPage):
         qconnect(self.featurePermissionRequested, self.handlePermissionRequested)  # type: ignore
 
     @pyqtSlot(QUrl, QWebEnginePage.Feature)
-    def handlePermissionRequested(
-        self, securityOrigin: QUrl, feature: QWebEnginePage.Feature
-    ) -> None:
+    def handlePermissionRequested(self, securityOrigin: QUrl, feature: QWebEnginePage.Feature) -> None:
         # Without this logging into Boards and Beyond doesn't work.
         if feature == QWebEnginePage.Feature.Notifications:
             self.setFeaturePermission(

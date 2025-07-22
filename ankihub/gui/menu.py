@@ -141,9 +141,7 @@ class AnkiHubLogin(QWidget):
         )
         self.recover_password_help_text.setOpenExternalLinks(True)
         self.sign_up_and_recover_password_container.addWidget(self.sign_up_help_text)
-        self.sign_up_and_recover_password_container.addWidget(
-            self.recover_password_help_text
-        )
+        self.sign_up_and_recover_password_container.addWidget(self.recover_password_help_text)
         self.box_left.addLayout(self.sign_up_and_recover_password_container)
 
         # Add left and right layouts to upper
@@ -285,9 +283,7 @@ class LogUploadResultDialog(QDialog):
 
 
 def _upload_logs_action() -> None:
-    if not ask_user(
-        "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
-    ):
+    if not ask_user("Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"):
         return
 
     upload_logs_in_background(on_done=_on_logs_uploaded, hide_username=True)
@@ -371,9 +367,7 @@ def _upload_deck_media_action() -> None:
         return
 
     # The user owns one or more Decks but they are not installed locally
-    if owned_ah_dids and not any(
-        [did for did in owned_ah_dids if did in config.deck_ids()]
-    ):
+    if owned_ah_dids and not any([did for did in owned_ah_dids if did in config.deck_ids()]):
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
             "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
@@ -409,9 +403,7 @@ def _upload_deck_media_action() -> None:
         return
 
     media_dir = Path(aqt.mw.col.media.dir())
-    media_names_with_existing_files = [
-        media_name for media_name in media_names if (media_dir / media_name).is_file()
-    ]
+    media_names_with_existing_files = [media_name for media_name in media_names if (media_dir / media_name).is_file()]
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
     if not media_names_with_existing_files:
@@ -435,9 +427,7 @@ def _upload_deck_media_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    media_sync.start_media_upload(
-        media_names_with_existing_files, ah_did, on_success=on_success
-    )
+    media_sync.start_media_upload(media_names_with_existing_files, ah_did, on_success=on_success)
 
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
@@ -485,12 +475,8 @@ def _ankihub_help_setup(parent: QMenu):
     qconnect(q_upload_logs_and_data_action.triggered, _upload_logs_and_data_action)
     help_menu.addAction(q_upload_logs_and_data_action)
 
-    q_downgrade_from_beta_version_action = QAction(
-        "Downgrade from add-on beta version", help_menu
-    )
-    qconnect(
-        q_downgrade_from_beta_version_action.triggered, _trigger_install_release_version
-    )
+    q_downgrade_from_beta_version_action = QAction("Downgrade from add-on beta version", help_menu)
+    qconnect(q_downgrade_from_beta_version_action.triggered, _trigger_install_release_version)
     help_menu.addAction(q_downgrade_from_beta_version_action)
 
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
@@ -523,9 +509,7 @@ def _ankihub_terms_and_policy_setup(parent: QMenu):
     """Set up the sub menu for terms and policy related items."""
     terms_and_policy_menu = QMenu("🤝 Terms and Policy", parent)
 
-    q_terms_and_conditions_action = QAction(
-        "Terms && Conditions", terms_and_policy_menu
-    )
+    q_terms_and_conditions_action = QAction("Terms && Conditions", terms_and_policy_menu)
     qconnect(
         q_terms_and_conditions_action.triggered,
         lambda: openLink("https://community.ankihub.net/tos"),

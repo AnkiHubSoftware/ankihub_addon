@@ -37,9 +37,7 @@ def notes_data_from_csv_gz(csv_path: Path) -> List[NoteInfo]:
     else:
         deck_csv_content = content.decode("utf-8")
 
-    reader = csv.DictReader(
-        deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
-    )
+    reader = csv.DictReader(deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'")
     notes_data_raw = [row for row in reader]
     notes_data_raw = _transform_notes_data(notes_data_raw)
     reuslt = [NoteInfo.from_dict(row) for row in notes_data_raw]
@@ -52,22 +50,16 @@ def note_types_from_json(json_path: Path) -> dict[NotetypeId, NotetypeDict]:
 
 
 class WriteProfilingStats(Protocol):
-    def __call__(self, profiler: cProfile.Profile) -> None:
-        ...
+    def __call__(self, profiler: cProfile.Profile) -> None: ...
 
 
 @pytest.fixture
-def write_profiling_stats(
-    current_test_parent_node_name: str, current_test_name: str
-) -> WriteProfilingStats:
+def write_profiling_stats(current_test_parent_node_name: str, current_test_name: str) -> WriteProfilingStats:
     """Write the profiling stats to a file in the profiling stats directory.
     The file is named after the current test name and its parent node."""
 
     def _write_profiling_stats(profiler: cProfile.Profile) -> None:
-        stats_path = (
-            PROFILING_STATS_DIR
-            / f"{current_test_parent_node_name.split('.')[0]}_{current_test_name}.pstats"
-        )
+        stats_path = PROFILING_STATS_DIR / f"{current_test_parent_node_name.split('.')[0]}_{current_test_name}.pstats"
         profiler.dump_stats(stats_path)
 
     return _write_profiling_stats
@@ -84,8 +76,7 @@ def current_test_parent_node_name(request) -> str:
 
 
 class Profile(Protocol):
-    def __call__(self, func: Callable[[], Any]) -> float:
-        ...
+    def __call__(self, func: Callable[[], Any]) -> float: ...
 
 
 @pytest.fixture

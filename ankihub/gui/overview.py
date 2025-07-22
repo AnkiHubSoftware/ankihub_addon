@@ -24,9 +24,7 @@ from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter
 
-ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
-    Path(__file__).parent / "web/add_flashcard_selector_button.js"
-)
+ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = Path(__file__).parent / "web/add_flashcard_selector_button.js"
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 
@@ -38,9 +36,7 @@ REFRESH_SUSPENSION_FILTER_EVENT_NAME = "refresh-suspension-state-filter"
 
 def setup() -> None:
     """Add a button to the deck browser that opens the flashcard selector dialog."""
-    overview_did_refresh.append(
-        lambda *args, **kwargs: _maybe_add_flashcard_selector_button()
-    )
+    overview_did_refresh.append(lambda *args, **kwargs: _maybe_add_flashcard_selector_button())
     # We need to call this here, because the deck browser is already rendered at this point
     _maybe_add_flashcard_selector_button()
 
@@ -66,9 +62,7 @@ def _maybe_add_flashcard_selector_button() -> None:
 
     feature_flags = config.get_feature_flags()
     if not feature_flags.get("show_flashcards_selector_button", False):
-        LOGGER.debug(
-            "Feature flag to show flashcard selector button is disabled, not adding the button."
-        )
+        LOGGER.debug("Feature flag to show flashcard selector button is disabled, not adding the button.")
         return
 
     overview_web: AnkiWebView = aqt.mw.overview.web
@@ -83,9 +77,7 @@ def _maybe_add_flashcard_selector_button() -> None:
 
 
 @robust_filter
-def _handle_flashcard_selector_py_commands(
-    handled: tuple[bool, Any], message: str, context: Any
-) -> tuple[bool, Any]:
+def _handle_flashcard_selector_py_commands(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
     if message.startswith(FLASHCARD_SELECTOR_OPEN_PYCMD):
         kwargs = parse_js_message_kwargs(message)
         ah_did = UUID(kwargs.get("deck_id"))
@@ -98,31 +90,21 @@ def _handle_flashcard_selector_py_commands(
         deck_id = UUID(kwargs.get("deckId"))
 
         aqt.mw.taskman.run_in_background(
-            lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(
-                deck_id
-            ),
-            on_done=partial(
-                _on_fetch_and_apply_pending_notes_actions_done, web=context.web
-            ),
+            lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(deck_id),
+            on_done=partial(_on_fetch_and_apply_pending_notes_actions_done, web=context.web),
         )
         return (True, None)
     else:
         return handled
 
 
-def _on_fetch_and_apply_pending_notes_actions_done(
-    future: Future, web: AnkiWebView
-) -> None:
+def _on_fetch_and_apply_pending_notes_actions_done(future: Future, web: AnkiWebView) -> None:
     future.result()
 
     LOGGER.info("Successfully fetched and applied pending notes actions.")
     tooltip(
         "Unsuspended flashcards.",
-        parent=(
-            FlashCardSelectorDialog.dialog if FlashCardSelectorDialog.dialog else aqt.mw
-        ),
+        parent=(FlashCardSelectorDialog.dialog if FlashCardSelectorDialog.dialog else aqt.mw),
     )
 
-    web.eval(
-        f"window.dispatchEvent(new Event('{REFRESH_SUSPENSION_FILTER_EVENT_NAME}'))"
-    )
+    web.eval(f"window.dispatchEvent(new Event('{REFRESH_SUSPENSION_FILTER_EVENT_NAME}'))")

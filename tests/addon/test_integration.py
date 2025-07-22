@@ -288,16 +288,12 @@ ANKIHUB_ANKIADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
 
 skip_test_fsrs_unsupported = pytest.mark.skipif(
     ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
-    reason=(
-        f"FSRS requires Anki ≥{MIN_ANKI_VERSION_FOR_FSRS_FEATURES}; "
-        f"you have {ANKI_INT_VERSION}"
-    ),
+    reason=(f"FSRS requires Anki ≥{MIN_ANKI_VERSION_FOR_FSRS_FEATURES}; you have {ANKI_INT_VERSION}"),
 )
 
 
 class InstallSampleAHDeck(Protocol):
-    def __call__(self) -> Tuple[DeckId, uuid.UUID]:
-        ...
+    def __call__(self) -> Tuple[DeckId, uuid.UUID]: ...
 
 
 @fixture
@@ -305,7 +301,6 @@ def install_sample_ah_deck(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ) -> InstallSampleAHDeck:
-
     ah_did = next_deterministic_uuid()
 
     def _install_sample_ah_deck():
@@ -323,9 +318,7 @@ def install_sample_ah_deck(
     return _install_sample_ah_deck
 
 
-def import_sample_ankihub_deck(
-    ankihub_did: uuid.UUID, assert_created_deck=True
-) -> DeckId:
+def import_sample_ankihub_deck(ankihub_did: uuid.UUID, assert_created_deck=True) -> DeckId:
     # import the deck from the notes data
     dids_before_import = all_dids()
     importer = AnkiHubImporter()
@@ -338,9 +331,7 @@ def import_sample_ankihub_deck(
         protected_fields={},
         protected_tags=[],
         note_types=SAMPLE_NOTE_TYPES,
-        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-            ankihub_did
-        ),
+        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ankihub_did),
         suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
     ).anki_did
     new_dids = all_dids() - dids_before_import
@@ -357,8 +348,7 @@ class CreateAnkiAHNote(Protocol):
         self,
         ankihub_nid: uuid.UUID = None,
         note_type_id: Optional[NotetypeId] = None,
-    ) -> Note:
-        ...
+    ) -> Note: ...
 
 
 @fixture
@@ -384,9 +374,7 @@ def create_anki_ah_note(
             ankihub_nid = next_deterministic_uuid()
 
         if note_type_id is None:
-            note_type = create_or_get_ah_version_of_note_type(
-                mw=mw, note_type=mw.col.models.by_name("Basic")
-            )
+            note_type = create_or_get_ah_version_of_note_type(mw=mw, note_type=mw.col.models.by_name("Basic"))
         else:
             note_type = mw.col.models.get(note_type_id)
             assert note_type is not None
@@ -438,14 +426,11 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
     deck_updates_mock.latest_update = None
-    mocker.patch.object(
-        AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock
-    )
+    mocker.patch.object(AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock)
 
 
 class MockClientGetNoteType(Protocol):
-    def __call__(self, note_types: List[NotetypeDict]) -> None:
-        ...
+    def __call__(self, note_types: List[NotetypeDict]) -> None: ...
 
 
 @fixture
@@ -456,11 +441,7 @@ def mock_client_get_note_type(mocker: MockerFixture) -> MockClientGetNoteType:
     def _mock_client_note_types(note_types: List[NotetypeDict]) -> None:
         def note_type_by_id(self, note_type_id: int) -> NotetypeDict:
             result = next(
-                (
-                    note_type
-                    for note_type in note_types
-                    if note_type["id"] == note_type_id
-                ),
+                (note_type for note_type in note_types if note_type["id"] == note_type_id),
                 None,
             )
             assert result is not None
@@ -472,8 +453,7 @@ def mock_client_get_note_type(mocker: MockerFixture) -> MockClientGetNoteType:
 
 
 class SyncWithAnkiHub(Protocol):
-    def __call__(self) -> None:
-        ...
+    def __call__(self) -> None: ...
 
 
 @pytest.fixture
@@ -491,14 +471,11 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
 
 
 class CreateChangeSuggestion(Protocol):
-    def __call__(self, note: Note, wait_for_media_upload: bool) -> Mock:
-        ...
+    def __call__(self, note: Note, wait_for_media_upload: bool) -> Mock: ...
 
 
 @pytest.fixture
-def create_change_suggestion(
-    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock
-):
+def create_change_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock):
     """Create a change suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_change_note_suggestion method. It can be used to get information
     about the suggestion that was passed to the client."""
@@ -526,16 +503,11 @@ def create_change_suggestion(
 
 
 class CreateNewNoteSuggestion(Protocol):
-    def __call__(
-        self, note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
-    ) -> Mock:
-        ...
+    def __call__(self, note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool) -> Mock: ...
 
 
 @pytest.fixture
-def create_new_note_suggestion(
-    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock
-):
+def create_new_note_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock):
     """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
     about the suggestion that was passed to the client."""
@@ -545,9 +517,7 @@ def create_new_note_suggestion(
         "create_new_note_suggestion",
     )
 
-    def create_new_note_suggestion_inner(
-        note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
-    ):
+    def create_new_note_suggestion_inner(note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool):
         suggest_new_note(
             note=note,
             comment="test",
@@ -577,13 +547,9 @@ class TestEntryPoint:
         # When CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC is True, _on_profile_did_open should be called
         # when maybe_auto_sync_on_open_close is called.
         # (It should not be called when the profile is getting closed. We are not checking this in this test.)
-        mocker.patch(
-            "ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", True
-        )
+        mocker.patch("ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", True)
 
-        on_profile_did_open_mock = mocker.patch(
-            "ankihub.entry_point._on_profile_did_open"
-        )
+        on_profile_did_open_mock = mocker.patch("ankihub.entry_point._on_profile_did_open")
         entry_point.run()
         aqt.mw.maybe_auto_sync_on_open_close(Mock())
 
@@ -620,20 +586,12 @@ class TestEditor:
 
             mock_suggestion_dialog(
                 user_cancels=False,
-                suggestion_type=(
-                    SuggestionType.DELETE
-                    if suggest_deletion
-                    else SuggestionType.UPDATED_CONTENT
-                ),
+                suggestion_type=(SuggestionType.DELETE if suggest_deletion else SuggestionType.UPDATED_CONTENT),
             )
 
-            create_change_note_suggestion_mock = mocker.patch.object(
-                AnkiHubClient, "create_change_note_suggestion"
-            )
+            create_change_note_suggestion_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
 
-            show_tooltip_mock = mocker.patch(
-                "ankihub.gui.suggestion_dialog.show_tooltip"
-            )
+            show_tooltip_mock = mocker.patch("ankihub.gui.suggestion_dialog.show_tooltip")
 
             ah_did = install_ah_deck()
             ah_note = import_ah_note(ah_did=ah_did)
@@ -663,11 +621,9 @@ class TestEditor:
             elif note_fields_changed or suggest_deletion:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
-                change_note_suggestion: ChangeNoteSuggestion = (
-                    create_change_note_suggestion_mock.call_args.kwargs[
-                        "change_note_suggestion"
-                    ]
-                )
+                change_note_suggestion: ChangeNoteSuggestion = create_change_note_suggestion_mock.call_args.kwargs[
+                    "change_note_suggestion"
+                ]
                 if suggest_deletion:
                     assert not change_note_suggestion.fields
                 else:
@@ -696,9 +652,7 @@ class TestEditor:
             mocker.patch.object(config, "is_logged_in", return_value=logged_in)
             mock_suggestion_dialog(user_cancels=False)
 
-            create_new_note_suggestion_mock = mocker.patch.object(
-                AnkiHubClient, "create_new_note_suggestion"
-            )
+            create_new_note_suggestion_mock = mocker.patch.object(AnkiHubClient, "create_new_note_suggestion")
 
             ah_did = install_ah_deck()
             ah_note_type = import_ah_note_type(ah_did=ah_did)
@@ -727,11 +681,9 @@ class TestEditor:
             else:
                 # Assert that the suggestion was created with the correct data
                 qtbot.wait_until(lambda: create_new_note_suggestion_mock.called)
-                new_note_suggestion: NewNoteSuggestion = (
-                    create_new_note_suggestion_mock.call_args.kwargs[
-                        "new_note_suggestion"
-                    ]
-                )
+                new_note_suggestion: NewNoteSuggestion = create_new_note_suggestion_mock.call_args.kwargs[
+                    "new_note_suggestion"
+                ]
                 assert new_note_suggestion.fields[0].value == field_value
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
@@ -757,9 +709,7 @@ class TestEditor:
                 addcards=add_cards_dialog,
                 expected_text="",
             )
-            self.assert_suggestion_button_enabled_status(
-                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False
-            )
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
@@ -781,9 +731,9 @@ class TestEditor:
             anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
             if is_deleted:
-                AnkiHubNote.update(
-                    last_update_type=SuggestionType.DELETE.value[0]
-                ).where(AnkiHubNote.ankihub_note_id == ah_note.ah_nid).execute()
+                AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                    AnkiHubNote.ankihub_note_id == ah_note.ah_nid
+                ).execute()
 
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             add_cards_dialog.editor.set_note(anki_note)
@@ -834,9 +784,7 @@ class TestEditor:
             new_field_value = "new field value"
             anki_note["Front"] = new_field_value
 
-            show_error_dialog_mock = mocker.patch(
-                "ankihub.gui.suggestion_dialog.show_error_dialog"
-            )
+            show_error_dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.show_error_dialog")
 
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             add_cards_dialog.editor.set_note(anki_note)
@@ -858,9 +806,7 @@ class TestEditor:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
         qtbot.wait_until(lambda: refresh_buttons_spy.called)
 
-    def assert_suggestion_button_text(
-        self, qtbot: QtBot, addcards: AddCards, expected_text: str
-    ) -> None:
+    def assert_suggestion_button_text(self, qtbot: QtBot, addcards: AddCards, expected_text: str) -> None:
         with qtbot.wait_callback() as callback:
             addcards.editor.web.evalWithCallback(
                 f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent",
@@ -868,9 +814,7 @@ class TestEditor:
             )
         callback.assert_called_with(expected_text)
 
-    def assert_suggestion_button_enabled_status(
-        self, qtbot: QtBot, addcards: AddCards, expected_enabled: bool
-    ) -> None:
+    def assert_suggestion_button_enabled_status(self, qtbot: QtBot, addcards: AddCards, expected_enabled: bool) -> None:
         with qtbot.wait_callback() as callback:
             addcards.editor.web.evalWithCallback(
                 f"document.getElementById('{SUGGESTION_BTN_ID}').disabled",
@@ -879,9 +823,7 @@ class TestEditor:
         callback.assert_called_with(not expected_enabled)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
-        addcards.editor.web.eval(
-            f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
-        )
+        addcards.editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').click()")
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
@@ -988,15 +930,12 @@ def test_create_note_type(
     install_sample_ah_deck: InstallSampleAHDeck,
     requests_mock: Mocker,
 ):
-
     with anki_session_with_addon_data.profile_loaded():
         _, ah_did = install_sample_ah_deck()
         note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
         note_type["name"] = "New Type"
         note_type["id"] = 0
-        note_type = aqt.mw.col.models.get(
-            NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
-        )
+        note_type = aqt.mw.col.models.get(NotetypeId(aqt.mw.col.models.add_dict(note_type).id))
         expected_data = note_type.copy()
         requests_mock.post(
             f"{config.api_url}/decks/{ah_did}/create-note-type/",
@@ -1055,9 +994,7 @@ class TestDownloadAndInstallDecks:
                     tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
                 )
             ]
-            mocks = mock_download_and_install_deck_dependencies(
-                deck, notes_data, ankihub_basic_note_type
-            )
+            mocks = mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
 
             # Download and install the deck
             with qtbot.wait_callback() as callback:
@@ -1081,9 +1018,7 @@ class TestDownloadAndInstallDecks:
 
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
-                assert (
-                    mock.call_count == 1
-                ), f"Mock {name} was not called once, but {mock.call_count} times"
+                assert mock.call_count == 1, f"Mock {name} was not called once, but {mock.call_count} times"
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
@@ -1125,12 +1060,9 @@ class TestDownloadAndInstallDecks:
         response_status_code: int,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             deck = DeckFactory.create()
             notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
-            mock_download_and_install_deck_dependencies(
-                deck, notes_data, ankihub_basic_note_type
-            )
+            mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
 
             response = Response()
             response.status_code = response_status_code
@@ -1165,12 +1097,9 @@ class TestDownloadAndInstallDecks:
         ankihub_basic_note_type: NotetypeDict,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             deck = DeckFactory.create()
             notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
-            mock_download_and_install_deck_dependencies(
-                deck, notes_data, ankihub_basic_note_type
-            )
+            mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
 
             exception_message = "test exception"
             mocker.patch(
@@ -1207,9 +1136,7 @@ class TestDownloadAndInstallDecks:
                 "get_feature_flags",
                 return_value={"fsrs_in_recommended_deck_settings": True},
             )
-            mocker.patch.object(
-                config, "anking_deck_id", return_value="mock_anking_deck_id"
-            )
+            mocker.patch.object(config, "anking_deck_id", return_value="mock_anking_deck_id")
             mocker.patch(
                 "ankihub.gui.operations.deck_installation.ANKI_INT_VERSION",
                 MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
@@ -1222,9 +1149,7 @@ class TestDownloadAndInstallDecks:
 
             deck = DeckFactory.create(ah_did=config.anking_deck_id)
             notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
-            mock_download_and_install_deck_dependencies(
-                deck, notes_data, ankihub_basic_note_type
-            )
+            mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
 
             # Call the function
             with qtbot.wait_callback() as callback:
@@ -1261,17 +1186,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
             # Mock download and install operation to only call the on_done callback
             download_and_install_decks_mock = mocker.patch(
                 "ankihub.gui.operations.new_deck_subscriptions.download_and_install_decks",
-                side_effect=lambda *args, on_done, **kwargs: on_done(
-                    future_with_result(None)
-                ),
+                side_effect=lambda *args, on_done, **kwargs: on_done(future_with_result(None)),
             )
 
             # Call the function with a deck
             deck = DeckFactory.create()
             with qtbot.wait_callback() as callback:
-                check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=callback
-                )
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
 
             # Assert that the on_done callback was called with a future with a result of None
             assert callback.args[0].result() is None
@@ -1297,9 +1218,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             # Call the function with a deck
             deck = DeckFactory.create()
             with qtbot.wait_callback() as callback:
-                check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=callback
-                )
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
 
             # Assert that the on_done callback was called with a future with a result of None
             assert callback.args[0].result() is None
@@ -1313,9 +1232,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         with anki_session.profile_loaded():
             # Call the function with an empty list
             with qtbot.wait_callback() as callback:
-                check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[], on_done=callback
-                )
+                check_and_install_new_deck_subscriptions(subscribed_decks=[], on_done=callback)
 
             # Assert that the on_done callback was called with a future with a result of None
             assert callback.args[0].result() is None
@@ -1339,9 +1256,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             deck = DeckFactory.create()
 
             with qtbot.wait_callback() as callback:
-                check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=callback
-                )
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
 
             # Assert that the on_done callback was called with a future with an exception
             assert callback.args[0].exception() is not None
@@ -1373,9 +1288,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             # Call the function with a deck
             deck = DeckFactory.create()
             with qtbot.wait_callback() as callback:
-                check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=callback
-                )
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
 
             # Assert that the on_done callback was called with a future with an exception
             assert callback.args[0].exception() is not None
@@ -1384,9 +1297,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert download_and_install_decks_mock.call_count == 1
 
 
-def test_get_deck_by_id(
-    requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
-):
+def test_get_deck_by_id(requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]):
     client = AnkiHubClient()
     client.local_media_dir_path_cb = lambda: Path("/tmp/ankihub_media")
 
@@ -1459,9 +1370,7 @@ def test_suggest_note_update(
 
         # Update the note in the database to match the note in the collection
         # so that the changes are detected relative to this state of the note.
-        ankihub_db.upsert_notes_data(
-            ankihub_did=ah_did, notes_data=[to_note_data(note)]
-        )
+        ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
 
         # Make some changes to the note
         note["Front"] = "updated"
@@ -1571,17 +1480,13 @@ class TestSuggestNotesInBulk:
         import_ah_note_type: ImportAHNoteType,
         add_anki_note: AddAnkiNote,
     ):
-        bulk_suggestions_method_mock = mocker.patch.object(
-            AnkiHubClient, "create_suggestions_in_bulk"
-        )
+        bulk_suggestions_method_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk")
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
             # Add a new note where the note type has an extra local field which should be ignored
             note_type = import_ah_note_type(ah_did=ah_did)
-            add_field_to_local_note_type(
-                note_type=note_type, field_name="New Field", position=1
-            )
+            add_field_to_local_note_type(note_type=note_type, field_name="New Field", position=1)
 
             new_note = add_anki_note(note_type=note_type)
             new_note["Front"] = "front"
@@ -1641,9 +1546,7 @@ class TestSuggestNotesInBulk:
         note_has_changes: bool,
         note_is_marked_as_deleted: bool,
     ):
-        bulk_suggestions_method_mock = mocker.patch.object(
-            AnkiHubClient, "create_suggestions_in_bulk"
-        )
+        bulk_suggestions_method_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk")
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -1651,9 +1554,7 @@ class TestSuggestNotesInBulk:
 
             # Update note type to add an extra local field which should be ignored
             note_type = aqt.mw.col.models.get(NotetypeId(ah_note.mid))
-            add_field_to_local_note_type(
-                note_type=note_type, field_name="New Field", position=1
-            )
+            add_field_to_local_note_type(note_type=note_type, field_name="New Field", position=1)
 
             changed_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
@@ -1664,9 +1565,9 @@ class TestSuggestNotesInBulk:
                 changed_note.flush()
 
             if note_is_marked_as_deleted:
-                AnkiHubNote.update(
-                    last_update_type=SuggestionType.DELETE.value[0]
-                ).where(AnkiHubNote.anki_note_id == changed_note.id).execute()
+                AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                    AnkiHubNote.anki_note_id == changed_note.id
+                ).execute()
 
             result = suggest_notes_in_bulk(
                 ankihub_did=ah_did,
@@ -1710,13 +1611,9 @@ class TestSuggestNotesInBulk:
                 assert result.new_note_suggestions_count == 0
                 assert len(result.errors_by_nid) == 1
                 if note_is_marked_as_deleted:
-                    assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(
-                        result.errors_by_nid[changed_note.id]
-                    )
+                    assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(result.errors_by_nid[changed_note.id])
                 else:
-                    assert ANKIHUB_NO_CHANGE_ERROR in str(
-                        result.errors_by_nid[changed_note.id]
-                    )
+                    assert ANKIHUB_NO_CHANGE_ERROR in str(result.errors_by_nid[changed_note.id])
 
     def test_suggestion_for_multiple_notes(
         self,
@@ -1729,9 +1626,7 @@ class TestSuggestNotesInBulk:
         import_ah_note: ImportAHNote,
     ):
         anki_session = anki_session_with_addon_data
-        bulk_suggestions_method_mock = mocker.patch.object(
-            AnkiHubClient, "create_suggestions_in_bulk"
-        )
+        bulk_suggestions_method_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk")
         with anki_session.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -1744,9 +1639,7 @@ class TestSuggestNotesInBulk:
 
             # Add multiple notes for change note suggestions
             ah_notes = [import_ah_note(ah_did=ah_did) for _ in range(3)]
-            changed_notes = [
-                aqt.mw.col.get_note(NoteId(ah_note.anki_nid)) for ah_note in ah_notes
-            ]
+            changed_notes = [aqt.mw.col.get_note(NoteId(ah_note.anki_nid)) for ah_note in ah_notes]
             for note in changed_notes:
                 note["Front"] = "new front"
                 note.flush()
@@ -1770,9 +1663,7 @@ class TestSuggestNotesInBulk:
             kwargs = bulk_suggestions_method_mock.call_args.kwargs
 
             assert len(kwargs["new_note_suggestions"]) == 3
-            assert (
-                get_ah_nids_from_suggestions(kwargs["new_note_suggestions"]) == ah_nids
-            )
+            assert get_ah_nids_from_suggestions(kwargs["new_note_suggestions"]) == ah_nids
 
             assert len(kwargs["change_note_suggestions"]) == 3
             assert get_ah_nids_from_suggestions(kwargs["change_note_suggestions"]) == [
@@ -1887,19 +1778,13 @@ class TestAdjustNoteTypes:
 
             # Verify field structure was updated correctly
             updated_note_type = aqt.mw.col.models.get(mid)
-            assert [
-                field["name"] for field in updated_note_type["flds"]
-            ] == expected_field_names
+            assert [field["name"] for field in updated_note_type["flds"]] == expected_field_names
 
             # Reload the note to check field content preservation
             updated_note = aqt.mw.col.get_note(note.id)
 
-            expected_fields = self._build_expected_fields(
-                local_field_names, expected_field_names, remote_note_type
-            )
-            assert (
-                dict(updated_note.items()) == expected_fields
-            ), "Field contents were not preserved correctly"
+            expected_fields = self._build_expected_fields(local_field_names, expected_field_names, remote_note_type)
+            assert dict(updated_note.items()) == expected_fields, "Field contents were not preserved correctly"
 
     def _build_expected_fields(
         self,
@@ -1910,15 +1795,9 @@ class TestAdjustNoteTypes:
         def with_casing_from_remote_note_type(field_name: str) -> str:
             # The field name is normalized to match the field name in the remote note type,
             # if it exists.
-            remote_note_type_field_names = [
-                field["name"] for field in remote_note_type["flds"]
-            ]
+            remote_note_type_field_names = [field["name"] for field in remote_note_type["flds"]]
             return next(
-                (
-                    name
-                    for name in remote_note_type_field_names
-                    if field_name.lower() == name.lower()
-                ),
+                (name for name in remote_note_type_field_names if field_name.lower() == name.lower()),
                 field_name,
             )
 
@@ -1929,9 +1808,7 @@ class TestAdjustNoteTypes:
             name
             for name in expected_field_names
             if with_casing_from_remote_note_type(name)
-            not in [
-                with_casing_from_remote_note_type(name) for name in local_field_names
-            ]
+            not in [with_casing_from_remote_note_type(name) for name in local_field_names]
         ]
         for field_name in added_field_names:
             result[with_casing_from_remote_note_type(field_name)] = ""
@@ -1946,7 +1823,6 @@ class TestAdjustNoteTypes:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # for testing creating missing note type
             ankihub_basic_1 = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
             ankihub_basic_1["id"] = 1
@@ -1982,14 +1858,8 @@ class TestAdjustNoteTypes:
                 importer._adjust_note_types_in_anki_db(remote_note_types)
 
                 assert aqt.mw.col.models.by_name("AnkiHub Basic 1") is not None
-                assert (
-                    aqt.mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"]
-                    == "foo"
-                )
-                assert (
-                    aqt.mw.col.models.get(ankihub_basic_2["id"])["name"]
-                    == "AnkiHub Basic 2 (new)"
-                )
+                assert aqt.mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+                assert aqt.mw.col.models.get(ankihub_basic_2["id"])["name"] == "AnkiHub Basic 2 (new)"
 
 
 def test_reset_note_types_of_notes(anki_session_with_addon_data: AnkiSession):
@@ -2043,9 +1913,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
@@ -2088,9 +1956,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
@@ -2137,9 +2003,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
@@ -2194,9 +2058,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
@@ -2219,20 +2081,15 @@ class TestAnkiHubImporter:
         ankihub_basic_note_type: NotetypeDict,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             # Mock the threshold to 1 for easier testing
             mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
 
             # Create an existing AnKing deck
-            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing Overhaul"
-            ).id
+            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing Overhaul").id
 
             # Create a note that will be part of the AnKing deck
             ah_did = config.anking_deck_id  # Use the actual AnKing deck ID
-            note_info = NoteInfoFactory.create(
-                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
-            )
+            note_info = NoteInfoFactory.create(ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"])
 
             # Add the note to the existing Anki deck
             note = add_anki_note(
@@ -2273,22 +2130,14 @@ class TestAnkiHubImporter:
             mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
 
             # Create multiple decks with "anking" in the name
-            anking_deck1_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing v11"
-            ).id
-            anking_deck2_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing v12"
-            ).id
+            anking_deck1_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing v11").id
+            anking_deck2_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing v12").id
 
             ah_did = config.anking_deck_id
 
             # Create notes for both decks
-            note_info1 = NoteInfoFactory.create(
-                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
-            )
-            note_info2 = NoteInfoFactory.create(
-                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
-            )
+            note_info1 = NoteInfoFactory.create(ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"])
+            note_info2 = NoteInfoFactory.create(ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"])
 
             # Add notes to different AnKing decks
             note1 = add_anki_note(
@@ -2336,19 +2185,13 @@ class TestAnkiHubImporter:
             mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", 1)
 
             # Create nested AnKing decks
-            parent_deck_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing Parent"
-            ).id
-            child_deck_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing Parent::AnKing Child"
-            ).id
+            parent_deck_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing Parent").id
+            child_deck_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing Parent::AnKing Child").id
 
             ah_did = config.anking_deck_id
 
             # Create a note in the child deck
-            note_info = NoteInfoFactory.create(
-                ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
-            )
+            note_info = NoteInfoFactory.create(ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"])
 
             # Add the note to the child deck
             note = add_anki_note(
@@ -2396,23 +2239,17 @@ class TestAnkiHubImporter:
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock the threshold
-            mocker.patch(
-                "ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", threshold
-            )
+            mocker.patch("ankihub.main.importing.MIN_ANKING_CARDS_FOR_PREVIOUS_DECK", threshold)
 
             # Create an existing AnKing deck
-            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name(
-                "AnKing Overhaul"
-            ).id
+            existing_anking_did = aqt.mw.col.decks.add_normal_deck_with_name("AnKing Overhaul").id
 
             ah_did = config.anking_deck_id
 
             # Create the specified number of notes in the existing deck
             note_infos = []
             for i in range(num_cards):
-                note_info = NoteInfoFactory.create(
-                    ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"]
-                )
+                note_info = NoteInfoFactory.create(ah_nid=next_deterministic_uuid(), mid=ankihub_basic_note_type["id"])
                 note_infos.append(note_info)
 
                 # Add the note to the existing Anki deck
@@ -2466,9 +2303,7 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
@@ -2514,9 +2349,7 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
@@ -2661,9 +2494,7 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 anki_did=anki_did,
                 subdecks=True,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
@@ -2725,9 +2556,7 @@ class TestAnkiHubImporter:
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 note_types=SAMPLE_NOTE_TYPES,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
 
@@ -2768,9 +2597,7 @@ class TestAnkiHubImporter:
                 anki_nid=anki_nid,
                 tags=["tag1"],
                 mid=mid_1,
-                last_update_type=(
-                    SuggestionType.DELETE if first_note_is_soft_deleted else None
-                ),
+                last_update_type=(SuggestionType.DELETE if first_note_is_soft_deleted else None),
             )
             import_result = self._import_notes(
                 [note_info_1],
@@ -2867,14 +2694,8 @@ class TestAnkiHubImporter:
 
             assert not new_dids
 
-            if (
-                behavior_on_remote_note_deleted
-                == BehaviorOnRemoteNoteDeleted.NEVER_DELETE
-                or (
-                    behavior_on_remote_note_deleted
-                    == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
-                    and note_has_review
-                )
+            if behavior_on_remote_note_deleted == BehaviorOnRemoteNoteDeleted.NEVER_DELETE or (
+                behavior_on_remote_note_deleted == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS and note_has_review
             ):
                 anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
                 assert TAG_FOR_DELETED_NOTES in anki_note.tags
@@ -2884,10 +2705,7 @@ class TestAnkiHubImporter:
                 assert len(import_result.updated_nids) == 0
                 assert len(import_result.marked_as_deleted_nids) == 1
                 assert len(import_result.deleted_nids) == 0
-            elif (
-                behavior_on_remote_note_deleted
-                == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
-            ):
+            elif behavior_on_remote_note_deleted == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS:
                 with pytest.raises(NotFoundError):
                     aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
@@ -3000,9 +2818,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
                 recommended_deck_settings=recommended_deck_settings,
             )
@@ -3047,14 +2863,10 @@ class TestAnkiHubImporter:
                 )
 
             if raise_if_full_sync_required:
-                with pytest.raises(
-                    ChangesRequireFullSyncError
-                ) as changes_require_full_sync_error:
+                with pytest.raises(ChangesRequireFullSyncError) as changes_require_full_sync_error:
                     import_note_type(updated_note_type)
 
-                assert changes_require_full_sync_error.value.affected_note_type_ids == {
-                    updated_note_type["id"]
-                }
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {updated_note_type["id"]}
             else:
                 import_result = import_note_type(updated_note_type)
                 assert len(import_result.created_nids) == 0
@@ -3062,9 +2874,7 @@ class TestAnkiHubImporter:
                 assert len(import_result.deleted_nids) == 0
 
                 note_type = aqt.mw.col.models.get(NotetypeId(updated_note_type["id"]))
-                assert (
-                    len(note_type["flds"]) == len(ankihub_basic_note_type["flds"]) + 1
-                )
+                assert len(note_type["flds"]) == len(ankihub_basic_note_type["flds"]) + 1
                 assert note_type["flds"][-1]["name"] == "new_field"
 
     @pytest.mark.parametrize(
@@ -3105,14 +2915,10 @@ class TestAnkiHubImporter:
                 with pytest.raises(ChangesRequireFullSyncError):
                     import_note_type(updated_note_type)
 
-                with pytest.raises(
-                    ChangesRequireFullSyncError
-                ) as changes_require_full_sync_error:
+                with pytest.raises(ChangesRequireFullSyncError) as changes_require_full_sync_error:
                     import_note_type(updated_note_type)
 
-                assert changes_require_full_sync_error.value.affected_note_type_ids == {
-                    updated_note_type["id"]
-                }
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {updated_note_type["id"]}
             else:
                 import_result = import_note_type(updated_note_type)
                 assert len(import_result.created_nids) == 0
@@ -3120,9 +2926,7 @@ class TestAnkiHubImporter:
                 assert len(import_result.deleted_nids) == 0
 
                 note_type = aqt.mw.col.models.get(NotetypeId(updated_note_type["id"]))
-                assert (
-                    len(note_type["tmpls"]) == len(ankihub_basic_note_type["tmpls"]) + 1
-                )
+                assert len(note_type["tmpls"]) == len(ankihub_basic_note_type["tmpls"]) + 1
                 assert note_type["tmpls"][-1]["name"] == "new_template"
 
     @pytest.mark.parametrize(
@@ -3159,14 +2963,10 @@ class TestAnkiHubImporter:
                 )
 
             if raise_if_full_sync_required:
-                with pytest.raises(
-                    ChangesRequireFullSyncError
-                ) as changes_require_full_sync_error:
+                with pytest.raises(ChangesRequireFullSyncError) as changes_require_full_sync_error:
                     import_note(note_info)
 
-                assert changes_require_full_sync_error.value.affected_note_type_ids == {
-                    new_note_type["id"]
-                }
+                assert changes_require_full_sync_error.value.affected_note_type_ids == {new_note_type["id"]}
             else:
                 import_result = import_note(note_info)
                 assert len(import_result.created_nids) == 0
@@ -3308,9 +3108,7 @@ class TestAnkiHubImporter:
             note_types=note_types,
             protected_fields={},
             protected_tags=[],
-            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                ah_did
-            ),
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             raise_if_full_sync_required=raise_if_full_sync_required,
             clear_ah_note_types_before_import=clear_ah_note_types_before_import,
@@ -3371,14 +3169,10 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
             )
 
             # Assert the old card has the same suspension state as before
-            assert old_card.queue == (
-                QUEUE_TYPE_SUSPENDED if existing_card_suspended else QUEUE_TYPE_NEW
-            )
+            assert old_card.queue == (QUEUE_TYPE_SUSPENDED if existing_card_suspended else QUEUE_TYPE_NEW)
 
             # Assert the new card is suspended or not suspended depending on the option value
-            assert new_card.queue == (
-                QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
-            )
+            assert new_card.queue == (QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW)
 
     def _create_and_update_note_with_new_card(
         self,
@@ -3392,9 +3186,7 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         # getting created for the added cloze.
         # Return the old and new card.
 
-        ankihub_cloze = create_or_get_ah_version_of_note_type(
-            aqt.mw, aqt.mw.col.models.by_name("Cloze")
-        )
+        ankihub_cloze = create_or_get_ah_version_of_note_type(aqt.mw, aqt.mw.col.models.by_name("Cloze"))
 
         note = aqt.mw.col.new_note(ankihub_cloze)
         note["Text"] = "{{c1::foo}}"
@@ -3454,9 +3246,7 @@ class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
             new_card = note.cards()[0]
 
             # Assert the new card is suspended or not suspended depending on the option value
-            assert new_card.queue == (
-                QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
-            )
+            assert new_card.queue == (QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW)
 
 
 def test_keep_notes_with_instructions_tag_unsuspended(
@@ -3512,18 +3302,14 @@ def test_unsubscribe_from_deck(
         )
 
         # Check that the note types have modifications before unsubscribing
-        assert_ankihub_modifications_in_note_types(
-            mids, should_have_modifications=True, mw=aqt.mw
-        )
+        assert_ankihub_modifications_in_note_types(mids, should_have_modifications=True, mw=aqt.mw)
 
         # Open the dialog
         dialog = DeckManagementDialog()
 
         mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=True)
 
-        requests_mock.get(
-            f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
-        )
+        requests_mock.get(f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[])
         unsubscribe_from_deck_mock = mocker.patch.object(
             AnkiHubClient,
             "unsubscribe_from_deck",
@@ -3539,9 +3325,7 @@ def test_unsubscribe_from_deck(
         assert dialog.decks_list.count() == 0
 
         # check that note type modifications were removed
-        assert_ankihub_modifications_in_note_types(
-            mids, should_have_modifications=False, mw=aqt.mw
-        )
+        assert_ankihub_modifications_in_note_types(mids, should_have_modifications=False, mw=aqt.mw)
 
         # check that the deck was removed from the db
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -3551,16 +3335,10 @@ def test_unsubscribe_from_deck(
         assert len(nids) == 0
 
 
-def assert_ankihub_modifications_in_note_types(
-    mids: List[NotetypeId], should_have_modifications: bool, mw: AnkiQt
-):
+def assert_ankihub_modifications_in_note_types(mids: List[NotetypeId], should_have_modifications: bool, mw: AnkiQt):
+    assert all(note_type_contains_field(mw.col.models.get(mid)) == should_have_modifications for mid in mids)
     assert all(
-        note_type_contains_field(mw.col.models.get(mid)) == should_have_modifications
-        for mid in mids
-    )
-    assert all(
-        bool(re.search(ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]))
-        == should_have_modifications
+        bool(re.search(ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"])) == should_have_modifications
         for mid in mids
     )
     assert all(
@@ -3575,8 +3353,7 @@ def assert_ankihub_modifications_in_note_types(
         for mid in mids
     )
     assert all(
-        bool(re.search(ANKIHUB_CSS_COMMENT_RE, mw.col.models.get(mid)["css"]))
-        == should_have_modifications
+        bool(re.search(ANKIHUB_CSS_COMMENT_RE, mw.col.models.get(mid)["css"])) == should_have_modifications
         for mid in mids
     )
 
@@ -3713,9 +3490,9 @@ class TestPrepareNote:
             ah_basic_variation["id"] = 0
             ah_basic_variation["name"] = "AnkiHub Basic Variation"
             ah_basic_variation["flds"][0]["name"] = field_name_with_spaces
-            ah_basic_variation["tmpls"][0]["qfmt"] = ankihub_basic_note_type["tmpls"][
-                0
-            ]["qfmt"].replace("Front", field_name_with_spaces)
+            ah_basic_variation["tmpls"][0]["qfmt"] = ankihub_basic_note_type["tmpls"][0]["qfmt"].replace(
+                "Front", field_name_with_spaces
+            )
             mw.col.models.add_dict(ah_basic_variation)
             ah_basic_variation = mw.col.models.by_name(ah_basic_variation["name"])
             ah_basic_variation_id = ah_basic_variation["id"]
@@ -3725,9 +3502,7 @@ class TestPrepareNote:
                 ankihub_nid=ankihub_nid,
                 note_type_id=ah_basic_variation_id,
             )
-            note.tags = [
-                f"{TAG_FOR_PROTECTING_FIELDS}::{field_name_with_spaces.replace(' ', '_')}"
-            ]
+            note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::{field_name_with_spaces.replace(' ', '_')}"]
             note_changed = prepare_note(
                 note=note,
                 ankihub_nid=ankihub_nid,
@@ -3857,12 +3632,8 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            assert (
-                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
-            )
-            assert set(
-                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)
-            ) == set(all_nids)
+            assert ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
+            assert set(ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)) == set(all_nids)
 
             # we can't use freeze_time here because note.mod is set by the Rust backend
             sleep(1.1)
@@ -3891,12 +3662,8 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = False
 
-            assert (
-                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids) == []
-            )
-            assert set(
-                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)
-            ) == set(all_cids)
+            assert ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids) == []
+            assert set(ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)) == set(all_cids)
 
             # we can't use freeze_time here because note.mod is set by the Rust backend
             sleep(1.1)
@@ -3921,15 +3688,11 @@ class TestCustomSearchNodes:
             browser.table.is_notes_mode.return_value = True
 
             import_ah_note()
-            AnkiHubNote.update(
-                last_update_type=SuggestionType.DELETE.value[0]
-            ).execute()
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).execute()
 
             # The note is soft deleted, so it should not be included in the search results
             all_nids = aqt.mw.col.find_notes("")
-            assert (
-                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
-            )
+            assert ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
             assert ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids) == []
 
     def test_UpdatedInTheLastXDaysSearchNode(
@@ -3948,25 +3711,14 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            assert (
-                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
-                == all_nids
-            )
-            assert (
-                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                == all_nids
-            )
+            assert UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == all_nids
+            assert UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids) == all_nids
 
             yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
             AnkiHubNote.update(mod=yesterday_timestamp).execute()
 
-            assert (
-                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
-            )
-            assert (
-                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                == all_nids
-            )
+            assert UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
+            assert UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids) == all_nids
 
     def test_NewNoteSearchNode(
         self,
@@ -3983,9 +3735,7 @@ class TestCustomSearchNodes:
             notes_data[1].last_update_type = None
             notes_data[2].last_update_type = SuggestionType.OTHER
 
-            ankihub_models = {
-                m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
-            }
+            ankihub_models = {m["id"]: m for m in mw.col.models.all() if "/" in m["name"]}
             ah_did = next_deterministic_uuid()
             AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=ah_did,
@@ -3996,9 +3746,7 @@ class TestCustomSearchNodes:
                 deck_name="Test-Deck",
                 is_first_import_of_deck=True,
                 behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
 
@@ -4028,9 +3776,7 @@ class TestCustomSearchNodes:
             notes_data[1].last_update_type = SuggestionType.NEW_CONTENT
             notes_data[2].last_update_type = SuggestionType.SPELLING_GRAMMATICAL
 
-            ankihub_models = {
-                m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
-            }
+            ankihub_models = {m["id"]: m for m in mw.col.models.all() if "/" in m["name"]}
             ah_did = next_deterministic_uuid()
             AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=ah_did,
@@ -4040,9 +3786,7 @@ class TestCustomSearchNodes:
                 protected_tags=[],
                 deck_name="Test-Deck",
                 behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did
-                ),
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
                 is_first_import_of_deck=True,
             )
@@ -4052,15 +3796,13 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            assert SuggestionTypeSearchNode(
-                browser, SuggestionType.NEW_CONTENT.value[0]
-            ).filter_ids(all_nids) == [
+            assert SuggestionTypeSearchNode(browser, SuggestionType.NEW_CONTENT.value[0]).filter_ids(all_nids) == [
                 notes_data[0].anki_nid,
                 notes_data[1].anki_nid,
             ]
-            assert SuggestionTypeSearchNode(
-                browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]
-            ).filter_ids(all_nids) == [notes_data[2].anki_nid]
+            assert SuggestionTypeSearchNode(browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]).filter_ids(
+                all_nids
+            ) == [notes_data[2].anki_nid]
 
     def test_UpdatedSinceLastReviewSearchNode(
         self,
@@ -4078,9 +3820,7 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            assert (
-                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
-            )
+            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
 
             # Add a review entry for a card to the database.
             nid = all_nids[0]
@@ -4093,17 +3833,13 @@ class TestCustomSearchNodes:
             AnkiHubNote.update(mod=2).where(AnkiHubNote.anki_note_id == nid).execute()
 
             # Check that the note of the card is now included in the search results.
-            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
-                all_nids
-            ) == [nid]
+            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == [nid]
 
             # Add another review entry for the card to the database.
             record_review(cid, time_of_review_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
-            assert (
-                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
-            )
+            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
 
     def test_AnkiHubNoteSearchNode_yes(
         self,
@@ -4146,9 +3882,7 @@ class TestCustomSearchNodes:
             note = add_anki_note()
 
             all_nids = aqt.mw.col.find_notes("")
-            assert AnkiHubNoteSearchNode(browser, "no").filter_ids(all_nids) == [
-                note.id
-            ]
+            assert AnkiHubNoteSearchNode(browser, "no").filter_ids(all_nids) == [note.id]
 
     def test_AnkiHubNoteSearchNode_invalid_value(
         self,
@@ -4205,9 +3939,7 @@ class TestBrowserTreeView:
 
             updated_today_item = ankihub_item.children[4]
             assert updated_today_item.name == "Updated Today"
-            updated_today_child_item_names = [
-                item.name for item in updated_today_item.children
-            ]
+            updated_today_child_item_names = [item.name for item in updated_today_item.children]
             assert updated_today_child_item_names == [
                 "New Note",
                 *[x.value[1] for x in SuggestionType],
@@ -4349,9 +4081,7 @@ class TestBrowserContextMenu:
             with qtbot.wait_callback() as callback:
                 dialogs.closeAll(onsuccess=callback)
 
-    def open_browser_context_menu_with_one_note_selected(
-        self, anki_nid: Optional[NoteId] = None
-    ) -> QMenu:
+    def open_browser_context_menu_with_one_note_selected(self, anki_nid: Optional[NoteId] = None) -> QMenu:
         """Returns a menu with just our context menu actions.
         If anki_nid is provided, it will select the note with that ID in the browser,
         otherwise it will select some random note."""
@@ -4360,11 +4090,7 @@ class TestBrowserContextMenu:
         setup_browser()
         browser: Browser = dialogs.open("Browser", aqt.mw)
         browser.search_for(search="")  # The empty search matches all notes
-        cids = (
-            aqt.mw.col.find_cards(f"nid:{anki_nid}")
-            if anki_nid
-            else aqt.mw.col.find_cards("")
-        )
+        cids = aqt.mw.col.find_cards(f"nid:{anki_nid}") if anki_nid else aqt.mw.col.find_cards("")
         if cids:
             browser.table.select_single_card(cids[0])
 
@@ -4403,15 +4129,11 @@ class TestBrowserContextMenu:
             latest_instance_tracker.track(SuggestionDialog)
 
             # Trigger the action
-            action: QAction = next(
-                action for action in menu.actions() if action.text() == action_text
-            )
+            action: QAction = next(action for action in menu.actions() if action.text() == action_text)
             action.trigger()
 
             # Assert the suggestion dialog was opened with the right suggestion type
-            dialog: SuggestionDialog = latest_instance_tracker.get_latest_instance(
-                SuggestionDialog
-            )
+            dialog: SuggestionDialog = latest_instance_tracker.get_latest_instance(SuggestionDialog)
             assert dialog.isVisible()
             assert dialog.change_type_select.currentText() == expected_change_type_text
 
@@ -4441,14 +4163,10 @@ class TestBrowserContextMenu:
             note_info = NoteInfoFactory.create()
             import_ah_note(note_info, ah_did=ah_did)
 
-            menu = self.open_browser_context_menu_with_one_note_selected(
-                anki_nid=NoteId(note_info.anki_nid)
-            )
+            menu = self.open_browser_context_menu_with_one_note_selected(anki_nid=NoteId(note_info.anki_nid))
 
             # Trigger the action
-            action: QAction = next(
-                action for action in menu.actions() if action.text() == action_text
-            )
+            action: QAction = next(action for action in menu.actions() if action.text() == action_text)
             clipboard = aqt.mw.app.clipboard()
             clipboard_setText_mock = mocker.patch.object(clipboard, "setText")
             action.trigger()
@@ -4456,9 +4174,7 @@ class TestBrowserContextMenu:
             # Assert that the clipboard contains the expected nid
             qtbot.wait_until(lambda: clipboard_setText_mock.called)
 
-            expected_clipboard_text = str(
-                getattr(note_info, expected_note_attribute_in_clipboard)
-            )
+            expected_clipboard_text = str(getattr(note_info, expected_note_attribute_in_clipboard))
             clipboard_setText_mock.assert_called_once_with(expected_clipboard_text)
 
             # Close the browser to prevent RuntimeErrors getting raised during teardown
@@ -4532,9 +4248,7 @@ class TestDeckManagementDialog:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                return_value=[
-                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
-                ],
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)],
             )
 
             theme_manager.night_mode = nightmode
@@ -4563,9 +4277,7 @@ class TestDeckManagementDialog:
             self._mock_dependencies(mocker)
 
             # Install a deck with subdeck tags
-            subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
-                install_ah_deck, import_ah_note
-            )
+            subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(install_ah_deck, import_ah_note)
             # ... The subdeck should not exist yet
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
@@ -4636,20 +4348,14 @@ class TestDeckManagementDialog:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                return_value=[
-                    DeckFactory.create(
-                        ah_did=ah_did, anki_did=config.deck_config(ah_did).anki_id
-                    )
-                ],
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=config.deck_config(ah_did).anki_id)],
             )
 
             # Mock the dialog that asks the user for the destination deck to choose
             # a new deck.
             new_destination_deck_name = "New Deck"
             install_ah_deck(anki_deck_name=new_destination_deck_name)
-            new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(
-                new_destination_deck_name
-            )
+            new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(new_destination_deck_name)
             mock_study_deck_dialog_with_cb(
                 "ankihub.gui.decks_dialog.SearchableSelectionDialog",
                 deck_name=new_destination_deck_name,
@@ -4739,9 +4445,7 @@ class TestDeckManagementDialog:
 
             # Count cards before action
             if not same_destination:
-                new_deck_card_count_before = aqt.mw.col.decks.card_count(
-                    new_anki_did, include_subdecks=True
-                )
+                new_deck_card_count_before = aqt.mw.col.decks.card_count(new_anki_did, include_subdecks=True)
 
             # Click the change destination button
             dialog.set_new_cards_destination_btn.click()
@@ -4758,12 +4462,8 @@ class TestDeckManagementDialog:
                 mock_ask_user.assert_called_once()
                 if should_move_cards:
                     qtbot.wait(500)
-                    original_count = aqt.mw.col.decks.card_count(
-                        original_anki_did, include_subdecks=True
-                    )
-                    new_count = aqt.mw.col.decks.card_count(
-                        new_anki_did, include_subdecks=True
-                    )
+                    original_count = aqt.mw.col.decks.card_count(original_anki_did, include_subdecks=True)
+                    new_count = aqt.mw.col.decks.card_count(new_anki_did, include_subdecks=True)
                     expected_original = 0
                     expected_new = new_deck_card_count_before + expected_note_count
                     assert original_count == expected_original
@@ -4852,9 +4552,7 @@ class TestDeckManagementDialog:
             mock_ask_user.return_value = user_accepts_move
 
         # Mock subdeck operation
-        mock_subdeck_operation = mocker.spy(
-            decks_dialog, "build_subdecks_and_move_cards_to_them_in_background"
-        )
+        mock_subdeck_operation = mocker.spy(decks_dialog, "build_subdecks_and_move_cards_to_them_in_background")
 
         # Mock get_deck_subscriptions
         mocker.patch.object(
@@ -4932,9 +4630,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # add subdeck tags to notes
             nids = mw.col.find_notes("deck:Testdeck")
             note1 = mw.col.get_note(nids[0])
-            subdeck_tag_prefix = (
-                SUBDECK_TAG.lower() if use_lower_case_subdeck_tags else SUBDECK_TAG
-            )
+            subdeck_tag_prefix = SUBDECK_TAG.lower() if use_lower_case_subdeck_tags else SUBDECK_TAG
             note1.tags = [f"{subdeck_tag_prefix}::Testdeck"]
             note1.flush()
 
@@ -5226,9 +4922,7 @@ class TestFlattenDeck:
                 assert card.did == filtered_deck_id
 
                 # Assert: The odid should now point to the root deck
-                assert (
-                    card.odid == root_deck_id
-                ), "Card's original deck ID should now point to root deck"
+                assert card.odid == root_deck_id, "Card's original deck ID should now point to root deck"
 
 
 def test_reset_local_changes_to_notes(
@@ -5295,11 +4989,9 @@ def test_migrate_profile_data_from_old_location(
         pass
 
     # Assert that the profile data was migrated
-    assert {
-        x.name
-        for x in profile_files_path().glob("*")
-        if not x.name.startswith("ankihub.db")
-    } == {".private_config.json"}
+    assert {x.name for x in profile_files_path().glob("*") if not x.name.startswith("ankihub.db")} == {
+        ".private_config.json"
+    }
     assert config.user() == "user1"
     assert len(config.deck_ids()) == 1
 
@@ -5427,9 +5119,7 @@ class TestDeckUpdater:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_note_types_dict_for_deck",
-                return_value={
-                    note_info.mid: aqt.mw.col.models.get(NotetypeId(note_info.mid))
-                },
+                return_value={note_info.mid: aqt.mw.col.models.get(NotetypeId(note_info.mid))},
             )
 
             # Use the deck updater to update the deck
@@ -5517,9 +5207,7 @@ class TestDeckUpdater:
                 return_value=DeckFactory.create(ah_did=ah_did),
             )
 
-            deck_extension = DeckExtensionFactory.create(
-                ah_did=ah_did, tag_group_name="tag_group"
-            )
+            deck_extension = DeckExtensionFactory.create(ah_did=ah_did, tag_group_name="tag_group")
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_extensions_by_deck_id",
@@ -5555,9 +5243,7 @@ class TestDeckUpdater:
             assert set(note.tags) == set(expected_tags)
 
             # Assert that the deck extension info was saved in the config
-            assert config.deck_extension_config(
-                extension_id=deck_extension.id
-            ) == DeckExtensionConfig(
+            assert config.deck_extension_config(extension_id=deck_extension.id) == DeckExtensionConfig(
                 ah_did=ah_did,
                 owner_id=deck_extension.owner_id,
                 name=deck_extension.name,
@@ -5658,20 +5344,11 @@ class TestSyncWithAnkiHub:
             assert config.deck_ids() == ([ah_did] if subscribed_to_deck else [])
             assert ankihub_db.ankihub_dids() == ([ah_did] if subscribed_to_deck else [])
 
-            mids = [
-                mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")
-            ]
+            mids = [mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")]
             is_ankihub_note_type = [
-                note_type_contains_field(
-                    mw.col.models.get(mid), ANKIHUB_NOTE_TYPE_FIELD_NAME
-                )
-                for mid in mids
+                note_type_contains_field(mw.col.models.get(mid), ANKIHUB_NOTE_TYPE_FIELD_NAME) for mid in mids
             ]
-            assert (
-                all(is_ankihub_note_type)
-                if subscribed_to_deck
-                else not any(is_ankihub_note_type)
-            )
+            assert all(is_ankihub_note_type) if subscribed_to_deck else not any(is_ankihub_note_type)
 
     @pytest.mark.qt_no_exception_capture
     def test_sync_updates_api_version_on_last_sync(
@@ -5705,9 +5382,7 @@ class TestSyncWithAnkiHub:
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Setup deck with a note that has a suspended card
-            ah_did = install_ah_deck(
-                ah_did=config.anking_deck_id if is_for_anking_deck else None
-            )
+            ah_did = install_ah_deck(ah_did=config.anking_deck_id if is_for_anking_deck else None)
             note_info = import_ah_note(
                 ah_did=ah_did,
             )
@@ -5718,15 +5393,11 @@ class TestSyncWithAnkiHub:
 
             # Mock client methods
             deck = DeckFactory.create(ah_did=ah_did)
-            mocker.patch.object(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[deck])
             mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
 
             # ... Mock get_pending_notes_actions_for_deck to return an unsuspend action for the note
-            notes_action = NotesAction(
-                action=NotesActionChoices.UNSUSPEND, note_ids=[note_info.ah_nid]
-            )
+            notes_action = NotesAction(action=NotesActionChoices.UNSUSPEND, note_ids=[note_info.ah_nid])
             mocker.patch.object(
                 AnkiHubClient,
                 "get_pending_notes_actions_for_deck",
@@ -5883,10 +5554,7 @@ class TestSyncWithAnkiHub:
                 assert note.mid == new_note_type["id"]
 
                 # If the user is logged into AnkiWeb, a full upload to AnkiWeb should be done
-                assert (
-                    bool(config.schema_to_do_full_upload_for_once())
-                    == logged_into_ankiweb
-                )
+                assert bool(config.schema_to_do_full_upload_for_once()) == logged_into_ankiweb
             else:
                 assert note.mid == original_note_type_id
                 assert not config.schema_to_do_full_upload_for_once()
@@ -6100,18 +5768,14 @@ class TestAutoSync:
         mocker.patch.object(config, "token", return_value="test_token")
 
         # Mock update_decks_and_media so it does nothing.
-        self.udpate_decks_and_media_mock = mocker.patch.object(
-            ah_deck_updater, "update_decks_and_media"
-        )
+        self.udpate_decks_and_media_mock = mocker.patch.object(ah_deck_updater, "update_decks_and_media")
 
         # Mock the AnkiWeb sync so it only calls its callback on the main thread.
         def run_callback_on_main(*args, **kwargs) -> None:
             on_done = kwargs["on_done"]
             aqt.mw.taskman.run_on_main(on_done)
 
-        self.ankiweb_sync_mock = mocker.patch.object(
-            aqt.sync, "sync_collection", side_effect=run_callback_on_main
-        )
+        self.ankiweb_sync_mock = mocker.patch.object(aqt.sync, "sync_collection", side_effect=run_callback_on_main)
         # ... and reload aqt.main so the mock is used.
         importlib.reload(aqt.main)
 
@@ -6123,8 +5787,8 @@ class TestAutoSync:
         self.check_and_install_new_deck_subscriptions_mock = mocker.patch(
             "ankihub.gui.operations.ankihub_sync.check_and_install_new_deck_subscriptions"
         )
-        self.check_and_install_new_deck_subscriptions_mock.side_effect = (
-            lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
+        self.check_and_install_new_deck_subscriptions_mock.side_effect = lambda *args, **kwargs: kwargs["on_done"](
+            future_with_result(None)
         )
 
 
@@ -6150,9 +5814,7 @@ class TestAutoSyncRateLimit:
         # Run the entry point so that the auto sync and rate limit is set up.
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            sync_with_ankihub_mock = mocker.patch(
-                "ankihub.gui.auto_sync.sync_with_ankihub"
-            )
+            sync_with_ankihub_mock = mocker.patch("ankihub.gui.auto_sync.sync_with_ankihub")
 
             # Trigger the sync two times, with a delay in between.
             aqt.mw._sync_collection_and_media(lambda: None)
@@ -6228,9 +5890,7 @@ def test_optional_tag_suggestion_dialog(
         )
 
         # Open the dialog
-        dialog = OptionalTagsSuggestionDialog(
-            parent=aqt.mw, nids=[note.id for note in notes]
-        )
+        dialog = OptionalTagsSuggestionDialog(parent=aqt.mw, nids=[note.id for note in notes])
         dialog.show()
 
         qtbot.wait(500)
@@ -6363,9 +6023,7 @@ def test_reset_optional_tags_action(
         assert update_decks_and_media_mock.call_count == 1
 
         # the other note should not be affected, because it is in a different deck
-        assert mw.col.get_note(other_note.id).tags == [
-            f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
-        ]
+        assert mw.col.get_note(other_note.id).tags == [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"]
 
 
 class TestMediaSyncMediaDownload:
@@ -6392,9 +6050,7 @@ class TestMediaSyncMediaDownload:
                 AnkiHubClient,
                 "get_deck_media_updates",
                 return_value=[
-                    DeckMediaUpdateChunk(
-                        media=[deck_media], latest_update=latest_media_update
-                    ),
+                    DeckMediaUpdateChunk(media=[deck_media], latest_update=latest_media_update),
                 ],
             )
 
@@ -6413,18 +6069,13 @@ class TestMediaSyncMediaDownload:
             download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
             # Assert that the deck media was added to the database
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == {
-                deck_media.name
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == {deck_media.name}
+            assert ankihub_db.media_names_exist_for_ankihub_deck(ah_did=ah_did, media_names={deck_media.name}) == {
+                deck_media.name: True
             }
-            assert ankihub_db.media_names_exist_for_ankihub_deck(
-                ah_did=ah_did, media_names={deck_media.name}
-            ) == {deck_media.name: True}
 
             # Assert that the latest media update time was updated in the config
-            assert (
-                config.deck_config(ankihub_did=ah_did).latest_media_update
-                == latest_media_update
-            )
+            assert config.deck_config(ankihub_did=ah_did).latest_media_update == latest_media_update
 
     def test_download_media_with_no_updates(
         self,
@@ -6440,9 +6091,7 @@ class TestMediaSyncMediaDownload:
             get_deck_media_updates_mock = mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_media_updates",
-                return_value=[
-                    DeckMediaUpdateChunk(media=[], latest_update=datetime.now())
-                ],
+                return_value=[DeckMediaUpdateChunk(media=[], latest_update=datetime.now())],
             )
 
             # Mock the client method for downloading media
@@ -6508,9 +6157,7 @@ class TestSuggestionsWithMedia:
             note.flush()
 
             # Create a suggestion for the note
-            create_change_suggestion_mock = create_change_suggestion(
-                note, wait_for_media_upload=True
-            )
+            create_change_suggestion_mock = create_change_suggestion(note, wait_for_media_upload=True)
 
             # Assert that the suggestion was created with the correct media file name
             expected_file_name = self._new_media_file_name(media_file_name)
@@ -6601,9 +6248,7 @@ class TestSuggestionsWithMedia:
             note.flush()
 
             # Create a suggestion for the note
-            create_change_suggestion_mock = create_change_suggestion(
-                note=note, wait_for_media_upload=False
-            )
+            create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
             assert create_change_suggestion_mock.called_once
@@ -6630,9 +6275,7 @@ class TestSuggestionsWithMedia:
             note.flush()
 
             # Create a suggestion for the note
-            create_change_suggestion_mock = create_change_suggestion(
-                note=note, wait_for_media_upload=False
-            )
+            create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
             assert create_change_suggestion_mock.called_once
@@ -6689,9 +6332,7 @@ class TestSuggestionsWithMedia:
             note["Front"] = note_content
             note.flush()
 
-            create_change_suggestion_mock = create_change_suggestion(
-                note=note, wait_for_media_upload=False
-            )
+            create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created.
             assert create_change_suggestion_mock.called_once  # type: ignore
@@ -6726,16 +6367,12 @@ class TestSuggestionsWithMedia:
         # Assert that the media name in the suggestion is as expected.
         suggestion: Union[ChangeNoteSuggestion, NewNoteSuggestion] = None
         if "change_note_suggestion" in suggestion_request_mock.call_args.kwargs:
-            suggestion = suggestion_request_mock.call_args.kwargs[
-                "change_note_suggestion"
-            ]
+            suggestion = suggestion_request_mock.call_args.kwargs["change_note_suggestion"]
         else:
             suggestion = suggestion_request_mock.call_args.kwargs["new_note_suggestion"]
 
         first_field_value = suggestion.fields[0].value
-        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
-            0
-        ]
+        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[0]
         assert media_name_in_suggestion == expected_media_name
 
     def _assert_media_name_in_zip_as_expected(
@@ -6891,9 +6528,7 @@ class TestConfigDialog:
             )
             assert config_action is not None
 
-    def test_open_config_dialog(
-        self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
-    ):
+    def test_open_config_dialog(self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
         with anki_session_with_addon_data.profile_loaded():
             setup_config_dialog_manager()
 
@@ -6932,9 +6567,7 @@ class TestFlashCardSelector:
         feature_flag_active: bool,
         expected_button_exists: bool,
     ):
-        set_feature_flag_state(
-            "show_flashcards_selector_button", is_active=feature_flag_active
-        )
+        set_feature_flag_state("show_flashcards_selector_button", is_active=feature_flag_active)
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
@@ -7188,11 +6821,7 @@ class TestFlashCardSelector:
                 dialog: QWidget = aqt.mw.app.activeWindow()
                 if not isinstance(dialog, utils._Dialog):
                     return False
-                return (
-                    "Trial" in dialog.windowTitle()
-                    if show_trial_ended_message
-                    else True
-                )
+                return "Trial" in dialog.windowTitle() if show_trial_ended_message else True
 
             qtbot.wait_until(upsell_dialog_opened)
 
@@ -7289,9 +6918,7 @@ class TestFlashCardSelector:
             js = f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {json.dumps(kwargs)}')"
             dialog.web.eval(js)
 
-            qtbot.wait_until(
-                lambda: fetch_and_apply_pending_notes_actions_for_deck.called
-            )
+            qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
     def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
         original_load_url = aqt.webview.AnkiWebView.load_url
@@ -7333,9 +6960,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
 
         mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=True)
 
-        unsubscribe_from_deck_mock = mocker.patch.object(
-            AnkiHubClient, "unsubscribe_from_deck"
-        )
+        unsubscribe_from_deck_mock = mocker.patch.object(AnkiHubClient, "unsubscribe_from_deck")
         mw.deckBrowser._delete(anki_deck_id)
         unsubscribe_from_deck_mock.assert_called_once()
 
@@ -7345,12 +6970,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
 
         # Assert that the note type modifications were undone
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
-        assert all(
-            not re.search(
-                ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
-            )
-            for mid in mids
-        )
+        assert all(not re.search(ANKIHUB_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]) for mid in mids)
 
         # Assert that the deck was removed from the AnkiHub database
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -7434,9 +7054,7 @@ class TestAHDBCheck:
             # Mock dependencies for downloading and installing deck
             deck = DeckFactory.create(ah_did=ah_did)
             notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
-            mocks = mock_download_and_install_deck_dependencies(
-                deck, notes_data, ankihub_basic_note_type
-            )
+            mocks = mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
 
             # Mock get_deck_by_id to return 404 if deck_exists_on_ankihub==False
             if not deck_exists_on_ankihub:
@@ -7562,9 +7180,7 @@ class TestAnkiHubAIInReviewer:
 
             aqt.mw.reviewer.show()
 
-            display_login_mock = mocker.patch(
-                "ankihub.gui.reviewer.AnkiHubLogin.display_login"
-            )
+            display_login_mock = mocker.patch("ankihub.gui.reviewer.AnkiHubLogin.display_login")
             self._click_ankihub_ai_button()
             qtbot.wait_until(lambda: display_login_mock.called)
 
@@ -7610,9 +7226,7 @@ class TestAnkiHubAIInReviewer:
                 search_context: SearchContext = browser_did_search_mock.call_args[0][0]
                 cids = cast(List[CardId], search_context.ids)
                 anki_nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
-                expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
-                    expected_ah_nids
-                ).values()
+                expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(expected_ah_nids).values()
                 assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
@@ -7647,9 +7261,7 @@ class TestAnkiHubAIInReviewer:
                 ah_nid = uuid.UUID(int=ah_note_id_int)
                 import_ah_note(ah_nid=ah_nid)
 
-            operation_mock = mocker.patch(
-                f"ankihub.gui.operations.scheduling.{operation_name}"
-            )
+            operation_mock = mocker.patch(f"ankihub.gui.operations.scheduling.{operation_name}")
 
             aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
 
@@ -7657,9 +7269,7 @@ class TestAnkiHubAIInReviewer:
 
             cids: List[CardId] = operation_mock.call_args.kwargs["card_ids"]
             anki_nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
-            expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
-                expected_ah_nids
-            ).values()
+            expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(expected_ah_nids).values()
             assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
@@ -7725,19 +7335,12 @@ class TestAnkiHubAIInReviewer:
 
             # # Call the pycmd
             original_eval(f"pycmd('{message}')")
-            qtbot.wait_until(
-                lambda: eval_mock.called
-                and "noteSuspensionStates" in eval_mock.call_args[0][0]
-            )
+            qtbot.wait_until(lambda: eval_mock.called and "noteSuspensionStates" in eval_mock.call_args[0][0])
 
             # Assert that the correct result was sent
             assert post_message_to_ankihub_js_mock.called
-            note_suspension_states = post_message_to_ankihub_js_mock.call_args.kwargs[
-                "message"
-            ]
-            assert note_suspension_states == {
-                "noteSuspensionStates": expected_note_suspension_states
-            }
+            note_suspension_states = post_message_to_ankihub_js_mock.call_args.kwargs["message"]
+            assert note_suspension_states == {"noteSuspensionStates": expected_note_suspension_states}
 
     def _suspend_notes_by_ah_nids(self, ah_nids: List[uuid.UUID]):
         """Suspend all cards of the given notes for the given AnkiHub note ids."""
@@ -7786,21 +7389,15 @@ class TestAnkiHubAIInReviewer:
         return bool(callback.args[0])
 
     def _click_ankihub_ai_button(self) -> None:
-        aqt.mw.reviewer.web.eval(
-            "document.getElementById('ankihub-chatbot-button').click()"
-        )
+        aqt.mw.reviewer.web.eval("document.getElementById('ankihub-chatbot-button').click()")
 
 
 class TestMaybeSendDailyReviewSummaries:
     @fixture
-    def initialize_review_data(
-        self, anki_session_with_addon_data: AnkiSession, add_anki_note: AddAnkiNote
-    ):
+    def initialize_review_data(self, anki_session_with_addon_data: AnkiSession, add_anki_note: AddAnkiNote):
         # Add reviews for today and the last 5 days
         with anki_session_with_addon_data.profile_loaded():
-            review_dates = [
-                date.today() - timedelta(days=delta_days) for delta_days in range(6)
-            ]
+            review_dates = [date.today() - timedelta(days=delta_days) for delta_days in range(6)]
             note = add_anki_note()
             for review_date in review_dates:
                 record_review_for_anki_nid(
@@ -7833,18 +7430,12 @@ class TestMaybeSendDailyReviewSummaries:
 
         mocker.patch("ankihub.settings.DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES", 3)  # type: ignore
 
-        send_daily_card_review_summaries_mock = mocker.patch.object(
-            AnkiHubClient, "send_daily_card_review_summaries"
-        )
+        send_daily_card_review_summaries_mock = mocker.patch.object(AnkiHubClient, "send_daily_card_review_summaries")
 
         with anki_session_with_addon_data.profile_loaded():
-            config.save_last_sent_summary_date(
-                date.today() - timedelta(days=last_sent_summary_day_delta)
-            )
+            config.save_last_sent_summary_date(date.today() - timedelta(days=last_sent_summary_day_delta))
 
-            on_send_daily_reviews_done_spy = mocker.spy(
-                ankihub_sync, "_on_send_daily_review_summaries_done"
-            )
+            on_send_daily_reviews_done_spy = mocker.spy(ankihub_sync, "_on_send_daily_review_summaries_done")
 
             # Run the function
             ankihub_sync._maybe_send_daily_review_summaries()
@@ -7872,11 +7463,8 @@ class TestMaybeSendDailyReviewSummaries:
 
             assert len(review_summaries) == len(expected_summary_day_deltas)
             assert all(
-                review_summary.review_session_date
-                == date.today() - timedelta(days=delta_days)
-                for review_summary, delta_days in zip(
-                    review_summaries, expected_summary_day_deltas
-                )
+                review_summary.review_session_date == date.today() - timedelta(days=delta_days)
+                for review_summary, delta_days in zip(review_summaries, expected_summary_day_deltas)
             )
 
     def test_reschedules_are_ignored(
@@ -7891,9 +7479,7 @@ class TestMaybeSendDailyReviewSummaries:
 
         mocker.patch("ankihub.settings.DELAY_FOR_SENDING_DAILY_REVIEW_SUMMARIES", 1)  # type: ignore
 
-        send_daily_card_review_summaries_mock = mocker.patch.object(
-            AnkiHubClient, "send_daily_card_review_summaries"
-        )
+        send_daily_card_review_summaries_mock = mocker.patch.object(AnkiHubClient, "send_daily_card_review_summaries")
 
         revlog_types = [
             REVLOG_LRN,
@@ -7909,13 +7495,8 @@ class TestMaybeSendDailyReviewSummaries:
 
             # Add revlog entry for each revlog type.
             # Each entry is for a different day so that they can be identified later on in the test.
-            dates = [
-                last_sent_summary_date + timedelta(days=i)
-                for i in range(1, len(revlog_types) + 1)
-            ]
-            revlog_type_to_date = {
-                revlog_type: date_ for revlog_type, date_ in zip(revlog_types, dates)
-            }
+            dates = [last_sent_summary_date + timedelta(days=i) for i in range(1, len(revlog_types) + 1)]
+            revlog_type_to_date = {revlog_type: date_ for revlog_type, date_ in zip(revlog_types, dates)}
             for revlog_type, date_ in revlog_type_to_date.items():
                 note = add_anki_note()
                 record_review_for_anki_nid(
@@ -7934,13 +7515,9 @@ class TestMaybeSendDailyReviewSummaries:
             review_summaries = send_daily_card_review_summaries_mock.call_args[0][0]
             assert len(review_summaries) == len(revlog_types) - 1
 
-            dates_from_summaries = [
-                summary.review_session_date for summary in review_summaries
-            ]
+            dates_from_summaries = [summary.review_session_date for summary in review_summaries]
             expected_dates = [
-                date_
-                for revlog_type, date_ in revlog_type_to_date.items()
-                if revlog_type != REVLOG_RESCHED
+                date_ for revlog_type, date_ in revlog_type_to_date.items() if revlog_type != REVLOG_RESCHED
             ]
             assert dates_from_summaries == expected_dates
 
@@ -7968,9 +7545,7 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
         ah_did = install_ah_deck(anki_did=anki_did)
         import_ah_note(ah_did=ah_did, anki_did=anki_did)
         aqt.mw.col.decks.set_current(anki_did)
-        terms_dialog_mock = mocker.patch(
-            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
-        )
+        terms_dialog_mock = mocker.patch("ankihub.gui.js_message_handling.TermsAndConditionsDialog")
         aqt.mw.reviewer.show()
         reviewer_sidebar_mock = mocker.patch("ankihub.gui.reviewer.reviewer_sidebar")
 
@@ -8005,9 +7580,7 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
         ah_did = install_ah_deck(anki_did=anki_did)
         import_ah_note(ah_did=ah_did, anki_did=anki_did)
         aqt.mw.col.decks.set_current(anki_did)
-        terms_dialog_mock = mocker.patch(
-            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
-        )
+        terms_dialog_mock = mocker.patch("ankihub.gui.js_message_handling.TermsAndConditionsDialog")
         aqt.mw.reviewer.show()
         flashcard_selector_dialog_mock = mocker.patch(
             "ankihub.gui.flashcard_selector_dialog.FlashCardSelectorDialog.dialog"
@@ -8044,9 +7617,7 @@ def test_terms_agreement_accepted(
         aqt.mw.col.decks.set_current(anki_did)
 
         aqt.mw.reviewer.show()
-        terms_dialog_mock = mocker.patch(
-            "ankihub.gui.js_message_handling.TermsAndConditionsDialog"
-        )
+        terms_dialog_mock = mocker.patch("ankihub.gui.js_message_handling.TermsAndConditionsDialog")
         reviewer_sidebar_mock = mocker.patch("ankihub.gui.reviewer.reviewer_sidebar")
 
         aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
@@ -8067,9 +7638,7 @@ def test_update_note_type_templates_and_styles(
         note_type_id = ankihub_db.note_types_for_ankihub_deck(ah_did)[0]
         note_type = aqt.mw.col.models.get(note_type_id)
         css_data = ".new_css{ }"
-        tmpls_data = tmpls_data = [
-            {"name": "template 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}
-        ]
+        tmpls_data = tmpls_data = [{"name": "template 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}]
         aqt.mw.col.models.update_dict(note_type)
         expected_data = {**note_type, "css": css_data, "tmpls": tmpls_data}
 
@@ -8082,12 +7651,8 @@ def test_update_note_type_templates_and_styles(
         db_note_type = update_note_type_templates_and_styles(
             ah_did, {**note_type, "css": css_data, "tmpls": tmpls_data}
         )
-        assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get(
-            "tmpls"
-        )
-        assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get(
-            "css"
-        )
+        assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get("tmpls")
+        assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get("css")
 
 
 @pytest.mark.qt_no_exception_capture
@@ -8125,9 +7690,7 @@ def test_robust_filter(
         qtbot.wait_until(lambda: raise_exception_spy.called)
 
         # The hook should only be present if the robust_filter decorator was used
-        assert (
-            raise_exception_spy in overview_will_render_bottom._hooks
-        ) is expected_present
+        assert (raise_exception_spy in overview_will_render_bottom._hooks) is expected_present
 
 
 @skip_test_fsrs_unsupported
@@ -8159,9 +7722,7 @@ def test_optimize_fsrs_parameters(
         if with_review_history:
             # Generate synthetic histories and record them
             review_history = make_review_histories(num_cards=1, max_days=400)[0]
-            record_review_histories(
-                NoteId(note_info.anki_nid), review_history, max_days=400
-            )
+            record_review_histories(NoteId(note_info.anki_nid), review_history, max_days=400)
 
         # Set bad FSRS parameters
         deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
@@ -8243,15 +7804,11 @@ def test_maybe_show_fsrs_optimization_reminder(
         )
 
         config.set_last_fsrs_optimization_reminder_date(
-            (date.today() - timedelta(days=days_since_last_reminder))
-            if days_since_last_reminder is not None
-            else None
+            (date.today() - timedelta(days=days_since_last_reminder)) if days_since_last_reminder is not None else None
         )
 
         # Mock the optimize_fsrs_parameters function
-        optimize_fsrs_parameters_mock = mocker.patch(
-            "ankihub.gui.optimize_fsrs_dialog._optimize_fsrs_parameters"
-        )
+        optimize_fsrs_parameters_mock = mocker.patch("ankihub.gui.optimize_fsrs_dialog._optimize_fsrs_parameters")
 
         # Track the reminder dialog
         latest_instance_tracker.track(_Dialog)
@@ -8265,9 +7822,7 @@ def test_maybe_show_fsrs_optimization_reminder(
             assert dialog is not None, "expected a reminder dialog to appear"
 
             # Click the "Optimize" button
-            optimize_button = next(
-                b for b in dialog.button_box.buttons() if b.text() == "Optimize"
-            )
+            optimize_button = next(b for b in dialog.button_box.buttons() if b.text() == "Optimize")
             optimize_button.click()
         else:
             assert dialog is None, "did not expect a dialog"
@@ -8291,12 +7846,10 @@ def test_deck_configs_for_update_exposes_fsrs_fields(anki_session_with_addon_dat
     with anki_session_with_addon_data.profile_loaded():
         deck_config = aqt.mw.col.decks.get_deck_configs_for_update(DeckId(1))
 
-        assert hasattr(
-            deck_config, "days_since_last_fsrs_optimize"
-        ), "API change: days_since_last_fsrs_optimize no longer on DeckConfigForUpdate"
-        assert hasattr(
-            deck_config, "fsrs"
-        ), "API change: fsrs flag no longer on DeckConfigForUpdate"
+        assert hasattr(deck_config, "days_since_last_fsrs_optimize"), (
+            "API change: days_since_last_fsrs_optimize no longer on DeckConfigForUpdate"
+        )
+        assert hasattr(deck_config, "fsrs"), "API change: fsrs flag no longer on DeckConfigForUpdate"
 
         assert isinstance(deck_config.days_since_last_fsrs_optimize, int)
         assert isinstance(deck_config.fsrs, bool)
@@ -8312,9 +7865,7 @@ def test_show_fsrs_optimization_reminder_skip_and_dont_show_again(
 ):
     # Start with the config flag enabled
     config.public_config["remind_to_optimize_fsrs_parameters"] = True
-    save_public_config_mock = mocker.patch(
-        "ankihub.gui.deck_options.config.save_public_config"
-    )
+    save_public_config_mock = mocker.patch("ankihub.gui.deck_options.config.save_public_config")
 
     with anki_session_with_addon_data.profile_loaded():
         install_ah_deck(ah_did=config.anking_deck_id)
@@ -8383,9 +7934,7 @@ class TestFSRSDeckOptions:
         with anki_session_with_addon_data.profile_loaded():
             aqt.mw.col.set_config("fsrs", fsrs_enabled)
 
-            ah_did = (
-                config.anking_deck_id if use_anking_deck else next_deterministic_uuid()
-            )
+            ah_did = config.anking_deck_id if use_anking_deck else next_deterministic_uuid()
             install_ah_deck(ah_did=ah_did)
             deck_config = config.deck_config(ah_did)
             anki_did = DeckId(deck_config.anki_id)
@@ -8394,14 +7943,9 @@ class TestFSRSDeckOptions:
             dialog = self._open_deck_options_dialog(anki_did, qtbot=qtbot)
 
             # Button should exist only when all conditions are met
-            button_should_exist = (
-                feature_flag_active and fsrs_enabled and use_anking_deck
-            )
+            button_should_exist = feature_flag_active and fsrs_enabled and use_anking_deck
 
-            assert (
-                self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000)
-                == button_should_exist
-            )
+            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000) == button_should_exist
 
     @pytest.mark.sequential
     def test_fsrs_parameters_backup_on_dialog_close(
@@ -8551,9 +8095,7 @@ class TestFSRSDeckOptions:
             assert _backup_fsrs_parameters(conf_id)
 
             # Verify backup exists
-            backup_version, backup_params = config.get_fsrs_parameters_from_backup(
-                conf_id
-            )
+            backup_version, backup_params = config.get_fsrs_parameters_from_backup(conf_id)
             assert backup_version == FSRS_VERSION
             assert backup_params == original_params
 
@@ -8563,9 +8105,7 @@ class TestFSRSDeckOptions:
             # Different parameters from backup - should be able to revert
             assert _can_revert_from_fsrs_parameters(conf_id, new_params)
 
-    def _open_deck_options_dialog(
-        self, anki_did: DeckId, qtbot: QtBot
-    ) -> DeckOptionsDialog:
+    def _open_deck_options_dialog(self, anki_did: DeckId, qtbot: QtBot) -> DeckOptionsDialog:
         """Open the deck options dialog for the given deck."""
         deck = aqt.mw.col.decks.get(anki_did)
 
@@ -8594,9 +8134,7 @@ class TestFSRSDeckOptions:
             """
         )
 
-    def _revert_button_exists(
-        self, dialog: DeckOptionsDialog, qtbot: QtBot, timeout: int = 500
-    ) -> bool:
+    def _revert_button_exists(self, dialog: DeckOptionsDialog, qtbot: QtBot, timeout: int = 500) -> bool:
         """Check if the revert button element exists in the DOM."""
         with qtbot.wait_callback(timeout=timeout) as callback:
             dialog.web.evalWithCallback(
@@ -8646,9 +8184,7 @@ def test_maybe_show_enable_fsrs_reminder(
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         assert dialog is not None, "expected a reminder dialog to appear"
 
-        enable_button = next(
-            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
-        )
+        enable_button = next(b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS")
         enable_button.click()
         assert aqt.mw.col.get_config("fsrs")
 
@@ -8743,9 +8279,7 @@ def test_maybe_show_enable_fsrs_reminder_anki_version_too_low(
         maybe_show_enable_fsrs_reminder()
 
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
-        assert (
-            dialog is None
-        ), "expected no reminder dialog to appear due to low Anki version"
+        assert dialog is None, "expected no reminder dialog to appear due to low Anki version"
         assert not aqt.mw.col.get_config("fsrs")
 
 
@@ -8770,9 +8304,7 @@ def test_maybe_show_enable_fsrs_reminder_show_again_flag_false(
         maybe_show_enable_fsrs_reminder()
 
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
-        assert (
-            dialog is None
-        ), "expected no reminder dialog to appear due to show_enable_fsrs_reminder=False"
+        assert dialog is None, "expected no reminder dialog to appear due to show_enable_fsrs_reminder=False"
         assert not aqt.mw.col.get_config("fsrs")
 
 
@@ -8790,22 +8322,16 @@ def test_maybe_show_enable_fsrs_reminder_interval_reached(
         install_ah_deck(ah_did=config.anking_deck_id)
 
         # Set last reminder as 30 days ago => interval reached
-        config.set_last_enable_fsrs_reminder_date(
-            (date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL_DAYS))
-        )
+        config.set_last_enable_fsrs_reminder_date((date.today() - timedelta(days=ENABLE_FSRS_REMINDER_INTERVAL_DAYS)))
 
         latest_instance_tracker.track(_Dialog)
 
         maybe_show_enable_fsrs_reminder()
 
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
-        assert (
-            dialog is not None
-        ), "expected a reminder dialog to appear after interval reached"
+        assert dialog is not None, "expected a reminder dialog to appear after interval reached"
 
-        enable_button = next(
-            b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS"
-        )
+        enable_button = next(b for b in dialog.button_box.buttons() if b.text() == "Enable FSRS")
         enable_button.click()
         assert aqt.mw.col.get_config("fsrs")
 
@@ -8831,9 +8357,7 @@ def test_maybe_show_enable_fsrs_reminder_interval_not_reached(
         maybe_show_enable_fsrs_reminder()
 
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
-        assert (
-            dialog is None
-        ), "expected no reminder dialog to appear due to recent reminder"
+        assert dialog is None, "expected no reminder dialog to appear due to recent reminder"
         assert not aqt.mw.col.get_config("fsrs")
 
 
@@ -8845,7 +8369,6 @@ def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
     latest_instance_tracker: LatestInstanceTracker,
     set_feature_flag_state: SetFeatureFlagState,
 ):
-
     set_feature_flag_state("fsrs_reminder", is_active=True)
 
     with anki_session_with_addon_data.profile_loaded():

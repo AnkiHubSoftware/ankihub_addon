@@ -67,16 +67,10 @@ def _general_tab(conf_window) -> None:
         tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
 
     if feature_flags.get("mh_integration"):
-        add_nested_checkboxes(
-            tab, key_prefix="boards_and_beyond", description="Boards and Beyond"
-        )
-        add_nested_checkboxes(
-            tab, key_prefix="first_aid_forward", description="First Aid Forward"
-        )
+        add_nested_checkboxes(tab, key_prefix="boards_and_beyond", description="Boards and Beyond")
+        add_nested_checkboxes(tab, key_prefix="first_aid_forward", description="First Aid Forward")
 
-    if feature_flags.get("fsrs_reminder") and get_deck_for_ah_did(
-        config.anking_deck_id
-    ):
+    if feature_flags.get("fsrs_reminder") and get_deck_for_ah_did(config.anking_deck_id):
         tab.checkbox(
             "remind_to_optimize_fsrs_parameters",
             "Monthly FSRS optimization reminder",
@@ -93,7 +87,6 @@ def _general_tab(conf_window) -> None:
 
 
 def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> None:
-
     from .ankiaddonconfig.window import ConfigLayout
 
     config_layout = cast(ConfigLayout, config_layout)
@@ -107,12 +100,8 @@ def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> N
     container_inner = container_outer.vcontainer()
     container_inner.setContentsMargins(30, 0, 0, 0)
 
-    step_1_checkbox = container_inner.checkbox(
-        f"{key_prefix}_step_1", description="USMLE - Step 1"
-    )
-    step_2_checkbox = container_inner.checkbox(
-        f"{key_prefix}_step_2", description="USMLE - Step 2"
-    )
+    step_1_checkbox = container_inner.checkbox(f"{key_prefix}_step_1", description="USMLE - Step 1")
+    step_2_checkbox = container_inner.checkbox(f"{key_prefix}_step_2", description="USMLE - Step 2")
 
     def update_main_checkbox() -> None:
         checkboxes = [step_1_checkbox, step_2_checkbox]

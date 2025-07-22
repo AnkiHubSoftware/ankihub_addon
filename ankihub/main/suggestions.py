@@ -46,9 +46,7 @@ from .utils import get_anki_nid_to_mid_dict, is_tag_in_list, md5_file_hash
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
-ANKIHUB_NO_CHANGE_ERROR = (
-    "Suggestion fields and tags don't have any changes to the original note"
-)
+ANKIHUB_NO_CHANGE_ERROR = "Suggestion fields and tags don't have any changes to the original note"
 
 # string that is contained in the errors returned from the AnkiHub API when
 # the note does not exist on AnkiHub
@@ -62,8 +60,7 @@ class ChangeSuggestionResult(Enum):
 
 
 class MediaUploadCallback(Protocol):
-    def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None:
-        ...
+    def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None: ...
 
 
 def suggest_note_update(
@@ -126,9 +123,7 @@ def suggest_new_note(
     )
 
     client = AnkiHubClient()
-    client.create_new_note_suggestion(
-        new_note_suggestion=suggestion, auto_accept=auto_accept
-    )
+    client.create_new_note_suggestion(new_note_suggestion=suggestion, auto_accept=auto_accept)
 
 
 @dataclass
@@ -185,9 +180,7 @@ def suggest_notes_in_bulk(
             change_note_suggestions=change_note_suggestions,
             auto_accept=auto_accept,
         )
-        errors_by_nid_from_remote = {
-            NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
-        }
+        errors_by_nid_from_remote = {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
     else:
         errors_by_nid_from_remote = {}
 
@@ -202,12 +195,8 @@ def suggest_notes_in_bulk(
 
     result = BulkNoteSuggestionsResult(
         errors_by_nid=errors_by_nid,
-        change_note_suggestions_count=len(
-            [x for x in change_note_suggestions if x.anki_nid not in errors_by_nid]
-        ),
-        new_note_suggestions_count=len(
-            [x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]
-        ),
+        change_note_suggestions_count=len([x for x in change_note_suggestions if x.anki_nid not in errors_by_nid]),
+        new_note_suggestions_count=len([x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]),
     )
     return result
 
@@ -226,13 +215,8 @@ def get_anki_nid_to_ah_dids_dict(
     # Get deck ids for notes that are not on AnkiHub yet by looking at their note type
     nids_without_ah_note = set(anki_nids) - anki_nid_to_ah_did_for_existing.keys()
     anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
-    mid_to_ah_did = {
-        mid: ankihub_db.ankihub_did_for_note_type(mid)
-        for mid in set(anki_nid_to_mid.values())
-    }
-    anki_nid_to_ah_did_for_new = {
-        nid: mid_to_ah_did[mid] for nid, mid in anki_nid_to_mid.items()
-    }
+    mid_to_ah_did = {mid: ankihub_db.ankihub_did_for_note_type(mid) for mid in set(anki_nid_to_mid.values())}
+    anki_nid_to_ah_did_for_new = {nid: mid_to_ah_did[mid] for nid, mid in anki_nid_to_mid.items()}
 
     return {
         **anki_nid_to_ah_did_for_existing,
@@ -267,9 +251,7 @@ def _suggestions_for_notes(
         lambda anki_nids: AnkiHubNote.filter(anki_note_id__in=anki_nids),
         ids=anki_nids,
     )
-    ah_db_note_by_anki_nid = {
-        NoteId(ah_db_note.anki_note_id): ah_db_note for ah_db_note in ah_db_notes
-    }
+    ah_db_note_by_anki_nid = {NoteId(ah_db_note.anki_note_id): ah_db_note for ah_db_note in ah_db_notes}
 
     notes_for_new_note_suggestions = []
     notes_for_change_note_suggestions = []
@@ -317,9 +299,7 @@ def _suggestions_for_notes(
     )
 
 
-def _new_note_suggestion(
-    note: Note, ah_did: uuid.UUID, comment: str
-) -> NewNoteSuggestion:
+def _new_note_suggestion(note: Note, ah_did: uuid.UUID, comment: str) -> NewNoteSuggestion:
     note_data = to_note_data(note, set_new_id=True)
 
     return NewNoteSuggestion(
@@ -335,9 +315,7 @@ def _new_note_suggestion(
     )
 
 
-def _change_note_suggestion(
-    note: Note, change_type: SuggestionType, comment: str
-) -> Optional[ChangeNoteSuggestion]:
+def _change_note_suggestion(note: Note, change_type: SuggestionType, comment: str) -> Optional[ChangeNoteSuggestion]:
     note_from_anki_db = to_note_data(note, include_empty_fields=True)
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
@@ -372,21 +350,15 @@ def _change_note_suggestion(
     )
 
 
-def _added_and_removed_tags(
-    prev_tags: List[str], cur_tags: List[str]
-) -> Tuple[List[str], List[str]]:
+def _added_and_removed_tags(prev_tags: List[str], cur_tags: List[str]) -> Tuple[List[str], List[str]]:
     added_tags = [tag for tag in cur_tags if not is_tag_in_list(tag, prev_tags)]
     removed_tags = [tag for tag in prev_tags if not is_tag_in_list(tag, cur_tags)]
     return added_tags, removed_tags
 
 
-def _fields_that_changed(
-    prev_fields: List[Field], cur_fields: List[Field]
-) -> List[Field]:
+def _fields_that_changed(prev_fields: List[Field], cur_fields: List[Field]) -> List[Field]:
     result = [
-        cur_field
-        for cur_field, prev_field in zip(cur_fields, prev_fields)
-        if cur_field.value != prev_field.value
+        cur_field for cur_field, prev_field in zip(cur_fields, prev_fields) if cur_field.value != prev_field.value
     ]
     return result
 
@@ -396,9 +368,7 @@ def _rename_and_upload_media_for_suggestion(
     ankihub_did: uuid.UUID,
     media_upload_cb: MediaUploadCallback,
 ) -> NoteSuggestion:
-    suggestion = _rename_and_upload_media_for_suggestions(
-        [suggestion], ankihub_did, media_upload_cb=media_upload_cb
-    )[0]
+    suggestion = _rename_and_upload_media_for_suggestions([suggestion], ankihub_did, media_upload_cb=media_upload_cb)[0]
     return suggestion
 
 
@@ -413,13 +383,9 @@ def _rename_and_upload_media_for_suggestions(
 
     client = AnkiHubClient()
     original_notes_data = [
-        note_info
-        for suggestion in suggestions
-        if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
+        note_info for suggestion in suggestions if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
     ]
-    original_media_names: Set[str] = get_media_names_from_notes_data(
-        original_notes_data
-    )
+    original_media_names: Set[str] = get_media_names_from_notes_data(original_notes_data)
     suggestion_media_names: Set[str] = get_media_names_from_suggestions(suggestions)
 
     # Filter out unchanged media file names so we don't hash and upload media files that aren't part of the suggestion
@@ -427,9 +393,7 @@ def _rename_and_upload_media_for_suggestions(
 
     # Filter out media names without media files in the Anki collection
     media_dir = Path(aqt.mw.col.media.dir())
-    media_names_added_to_note = {
-        name for name in media_names_added_to_note if (media_dir / name).exists()
-    }
+    media_names_added_to_note = {name for name in media_names_added_to_note if (media_dir / name).exists()}
 
     # Filter out media file names that already exist for the deck
     media_names_added_to_ah_deck = {
@@ -452,9 +416,7 @@ def _rename_and_upload_media_for_suggestions(
         return suggestions
 
     media_dir = Path(aqt.mw.col.media.dir())
-    added_media_paths = [
-        (media_dir / media_name) for media_name in media_names_added_to_ah_deck
-    ]
+    added_media_paths = [(media_dir / media_name) for media_name in media_names_added_to_ah_deck]
 
     media_name_map = client.generate_media_files_with_hashed_names(added_media_paths)
 
@@ -481,9 +443,7 @@ def _handle_media_with_matching_hashes(
     we create it by copying the referenced media file to prevent broken media references.
     """
     media_dir = Path(aqt.mw.col.media.dir())
-    media_to_hash_dict = {
-        media_name: md5_file_hash(media_dir / media_name) for media_name in media_names
-    }
+    media_to_hash_dict = {media_name: md5_file_hash(media_dir / media_name) for media_name in media_names}
 
     media_with_same_hash_dict = ankihub_db.media_names_with_matching_hashes(
         ah_did=ah_did, media_to_hash=media_to_hash_dict
@@ -512,36 +472,21 @@ def _handle_media_with_matching_hashes(
     return result
 
 
-def _replace_media_names_in_suggestion(
-    suggestion: NoteSuggestion, media_name_map: Dict[str, str]
-):
-    suggestion.fields = [
-        _field_with_replaced_media_names(field, media_name_map)
-        for field in suggestion.fields
-    ]
+def _replace_media_names_in_suggestion(suggestion: NoteSuggestion, media_name_map: Dict[str, str]):
+    suggestion.fields = [_field_with_replaced_media_names(field, media_name_map) for field in suggestion.fields]
 
 
-def _field_with_replaced_media_names(
-    field: Field, media_name_map: Dict[str, str]
-) -> Field:
+def _field_with_replaced_media_names(field: Field, media_name_map: Dict[str, str]) -> Field:
     result = copy.deepcopy(field)
     for old_name, new_name in media_name_map.items():
         result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
         result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
-        result.value = result.value.replace(
-            f"[sound:{old_name}]", f"[sound:{new_name}]"
-        )
+        result.value = result.value.replace(f"[sound:{old_name}]", f"[sound:{new_name}]")
     return result
 
 
 def _update_media_names_on_notes(media_name_map: Dict[str, str]):
     for original_filename, new_filename in media_name_map.items():
-        find_and_replace_text_in_fields_on_all_notes(
-            f'src="{original_filename}"', f'src="{new_filename}"'
-        )
-        find_and_replace_text_in_fields_on_all_notes(
-            f"src='{original_filename}'", f"src='{new_filename}'"
-        )
-        find_and_replace_text_in_fields_on_all_notes(
-            f"[sound:{original_filename}]", f"[sound:{new_filename}]"
-        )
+        find_and_replace_text_in_fields_on_all_notes(f'src="{original_filename}"', f'src="{new_filename}"')
+        find_and_replace_text_in_fields_on_all_notes(f"src='{original_filename}'", f"src='{new_filename}'")
+        find_and_replace_text_in_fields_on_all_notes(f"[sound:{original_filename}]", f"[sound:{new_filename}]")

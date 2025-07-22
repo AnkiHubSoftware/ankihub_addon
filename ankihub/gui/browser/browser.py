@@ -183,14 +183,10 @@ def _create_shortcut_trigger(browser: Browser, action_name: str) -> Callable[[],
     return trigger
 
 
-def _get_context_menu_actions(
-    browser: Browser, selected_nids: Sequence[NoteId]
-) -> List[ContextMenuAction]:
+def _get_context_menu_actions(browser: Browser, selected_nids: Sequence[NoteId]) -> List[ContextMenuAction]:
     """Get the list of context menu actions for the given browser and selected notes."""
     mids = mids_of_notes(selected_nids)
-    at_least_one_note_has_ah_note_type = any(
-        ankihub_db.is_ankihub_note_type(mid) for mid in mids
-    )
+    at_least_one_note_has_ah_note_type = any(ankihub_db.is_ankihub_note_type(mid) for mid in mids)
 
     exactly_one_note_selected = len(selected_nids) == 1
 
@@ -220,9 +216,7 @@ def _get_context_menu_actions(
         ),
         ContextMenuAction(
             name="Reset local changes",
-            function=lambda: _on_reset_local_changes_action(
-                browser, nids=selected_nids
-            ),
+            function=lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
             enabled=at_least_one_note_has_ah_note_type,
         ),
         ContextMenuAction(
@@ -243,10 +237,7 @@ def _get_context_menu_actions(
         ContextMenuAction(
             name="AI Chatbot",
             function=lambda: _on_open_chatbot_action(browser, selected_nids),
-            enabled=(
-                exactly_one_ah_note_selected
-                and _related_ah_deck_has_note_embeddings(selected_nids[0])
-            ),
+            enabled=(exactly_one_ah_note_selected and _related_ah_deck_has_note_embeddings(selected_nids[0])),
             shortcut="Shift+Alt+K",
         ),
     ]
@@ -358,11 +349,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         return
 
     note = aqt.mw.col.get_note(nids[0])
-    field_names: List[str] = [
-        field_name
-        for field_name in note.keys()
-        if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
-    ]
+    field_names: List[str] = [field_name for field_name in note.keys() if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME]
     if len(nids) == 1:
         old_fields_protected_by_tags: List[str] = get_fields_protected_by_tags(note)
     else:
@@ -389,27 +376,20 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         # otherwise we need to create a tag for each field.
         # spaces are not allowed in tags, so we replace them with underscores
         new_tags_for_protecting_fields = [
-            f"{TAG_FOR_PROTECTING_FIELDS}::{field.replace(' ', '_')}"
-            for field in new_fields_protected_by_tags
+            f"{TAG_FOR_PROTECTING_FIELDS}::{field.replace(' ', '_')}" for field in new_fields_protected_by_tags
         ]
 
     def update_note_tags() -> None:
         notes = [aqt.mw.col.get_note(nid) for nid in nids]
         for note in notes:
             # remove old tags for protecting fields
-            note.tags = [
-                tag
-                for tag in note.tags
-                if not tag.lower().startswith(TAG_FOR_PROTECTING_FIELDS.lower())
-            ]
+            note.tags = [tag for tag in note.tags if not tag.lower().startswith(TAG_FOR_PROTECTING_FIELDS.lower())]
 
             # add new tags for protecting fields
             note.tags += new_tags_for_protecting_fields
 
         # update the notes and add an undo entry
-        undo_entry_id = aqt.mw.col.add_custom_undo_entry(
-            "Protect fields of note(s) using tags"
-        )
+        undo_entry_id = aqt.mw.col.add_custom_undo_entry("Protect fields of note(s) using tags")
         aqt.mw.col.update_notes(notes)
         aqt.mw.col.merge_undo_entries(undo_entry_id)
 
@@ -422,11 +402,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         browser.table.reset()
         tooltip("Updated tags for protecting fields")
 
-        LOGGER.info(
-            f"Updated tags for protecting fields for notes\n"
-            f"\t{nids=}\n"
-            f"\t{new_fields_protected_by_tags=}\n"
-        )
+        LOGGER.info(f"Updated tags for protecting fields for notes\n\t{nids=}\n\t{new_fields_protected_by_tags=}\n")
 
     aqt.mw.taskman.with_progress(
         task=update_note_tags,
@@ -560,12 +536,8 @@ def _on_browser_menus_did_init(browser: Browser):
     qconnect(reset_deck_action.triggered, lambda: _on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
 
-    reset_subdecks_action = QAction(
-        "Rebuild subdecks and move cards into subdecks", browser
-    )
-    qconnect(
-        reset_subdecks_action.triggered, lambda: _on_reset_subdecks_action(browser)
-    )
+    reset_subdecks_action = QAction("Rebuild subdecks and move cards into subdecks", browser)
+    qconnect(reset_subdecks_action.triggered, lambda: _on_reset_subdecks_action(browser))
     menu.addAction(reset_subdecks_action)
 
     reset_optional_tags_action = QAction("Reset an Optional Tag Group", browser)
@@ -681,12 +653,11 @@ def _on_reset_optional_tags_action(browser: Browser):
     tag_group_names = [c.tag_group_name for c in extension_configs]
     deck_configs = [config.deck_config(c.ah_did) for c in extension_configs]
     tag_group_names_with_deck = [
-        f"{extension_name} ({deck_config.name})"
-        for extension_name, deck_config in zip(tag_group_names, deck_configs)
+        f"{extension_name} ({deck_config.name})" for extension_name, deck_config in zip(tag_group_names, deck_configs)
     ]
 
     extension_idx = choose_list(
-        "Choose the optional tag group which<br>" "you want to reset.",
+        "Choose the optional tag group which<br>you want to reset.",
         choices=tag_group_names_with_deck,
     )
     if extension_idx is None:
@@ -729,9 +700,7 @@ def _reset_optional_tag_group(extension_id: int) -> None:
     def on_done(future: Future) -> None:
         future.result()
 
-    update_decks_and_media(
-        on_done=on_done, ah_dids=[extension_config.ah_did], start_media_sync=False
-    )
+    update_decks_and_media(on_done=on_done, ah_dids=[extension_config.ah_did], start_media_sync=False)
 
 
 def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
@@ -798,9 +767,7 @@ def _on_browser_will_search(ctx: SearchContext):
         parameter_name, parameter_value = m.group(1), m.group(2)
         try:
             custom_search_nodes.append(
-                CustomSearchNode.from_parameter_type_and_value(
-                    browser, parameter_name, parameter_value
-                )
+                CustomSearchNode.from_parameter_type_and_value(browser, parameter_name, parameter_value)
             )
         except ValueError as e:
             showWarning(f"AnkiHub search error: {e}")
@@ -843,9 +810,7 @@ def _on_browser_will_build_tree(
         ankihub_tree_item = _add_ankihub_tree(tree)
         return handled
     elif stage == SidebarStage.TAGS:
-        if _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
-            tree, ankihub_tree_item, browser
-        ):
+        if _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(tree, ankihub_tree_item, browser):
             return True
         else:
             return handled
@@ -874,11 +839,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
 
     # Move the AnkiHub tag items to the AnkiHub tree
     tag_tree = next(
-        (
-            item
-            for item in root_tree_item.children
-            if item.name == tr.browsing_sidebar_tags()
-        ),
+        (item for item in root_tree_item.children if item.name == tr.browsing_sidebar_tags()),
         None,
     )
 
@@ -956,18 +917,14 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="Modified After Sync",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(
-            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"
-        ),
+        search_node=SearchNode(parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"),
     )
 
     result.add_simple(
         name="Not Modified After Sync",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(
-            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"
-        ),
+        search_node=SearchNode(parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"),
     )
 
     updated_today_item = result.add_simple(
@@ -976,9 +933,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
-                parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
-            ),
+            SearchNode(parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"),
         ),
     )
     updated_today_item.expanded = config.ui_config().updated_today_tree_expanded
@@ -990,9 +945,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         type=SidebarItemType.SAVED_SEARCH,
         search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
-                parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
-            ),
+            SearchNode(parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"),
             SearchNode(parsable_text=f"{NewNoteSearchNode.parameter_name}:"),
         ),
     )
@@ -1008,12 +961,8 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
         search_nodes.extend(
             [
-                SearchNode(
-                    parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
-                ),
-                SearchNode(
-                    parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
-                ),
+                SearchNode(parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"),
+                SearchNode(parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"),
             ]
         )
 
@@ -1030,9 +979,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
-                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
-            ),
+            SearchNode(parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"),
         ),
     )
 
@@ -1041,12 +988,8 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(
-                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
-            ),
-            SearchNode(
-                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
-            ),
+            SearchNode(parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"),
+            SearchNode(parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"),
         ),
     )
 
@@ -1055,9 +998,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(
-                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
-            ),
+            SearchNode(parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"),
         ),
     )
     return result
@@ -1108,9 +1049,7 @@ def add_smart_search_button_to_sidebar():
     smart_search_button_toolbar.setIconSize(QSize(16, 16))
     smart_search_button_toolbar.setMovable(False)
     smart_search_button_toolbar.setFloatable(False)
-    smart_search_button_toolbar.setStyleSheet(
-        "QToolBar { border: none; padding: 0px; }"
-    )
+    smart_search_button_toolbar.setStyleSheet("QToolBar { border: none; padding: 0px; }")
     if is_mac:
         smart_search_button_toolbar.setContentsMargins(0, 0, 8, 0)
 
@@ -1123,9 +1062,7 @@ def add_smart_search_button_to_sidebar():
 
     if not names_of_decks_with_note_embeddings():
         smart_search_button.setEnabled(False)
-        smart_search_button.setToolTip(
-            "No installed AnkiHub decks support Smart Search"
-        )
+        smart_search_button.setToolTip("No installed AnkiHub decks support Smart Search")
 
     smart_search_button_toolbar.addWidget(smart_search_button)
 
@@ -1133,9 +1070,7 @@ def add_smart_search_button_to_sidebar():
         if not dialog.name:
             return
         ah_did = config.get_ah_did_by_name(dialog.name)
-        aqt.mw.taskman.run_on_main(
-            lambda: show_flashcard_selector(ah_did=ah_did, parent=browser)
-        )
+        aqt.mw.taskman.run_on_main(lambda: show_flashcard_selector(ah_did=ah_did, parent=browser))
 
     def on_smart_search_button_clicked() -> None:
         SearchableSelectionDialog(

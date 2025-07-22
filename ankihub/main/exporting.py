@@ -19,9 +19,7 @@ from .note_conversion import (
 )
 
 
-def to_note_data(
-    note: Note, set_new_id: bool = False, include_empty_fields: bool = False
-) -> NoteInfo:
+def to_note_data(note: Note, set_new_id: bool = False, include_empty_fields: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
@@ -81,13 +79,8 @@ def _prepared_field_html(html: str) -> str:
 
 
 def _prepare_tags(note: Note) -> Optional[List[str]]:
-
     # Removing empty tags is necessary because notes have empty tags in the editor sometimes.
     # Stripping tags is necessary because Anki leaves whitespace at the end of tags sometimes.
-    result = [
-        tag.strip()
-        for tag in note.tags
-        if tag.strip() and not (is_internal_tag(tag) or is_optional_tag(tag))
-    ]
+    result = [tag.strip() for tag in note.tags if tag.strip() and not (is_internal_tag(tag) or is_optional_tag(tag))]
 
     return result

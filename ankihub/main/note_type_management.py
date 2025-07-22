@@ -36,9 +36,7 @@ def add_note_type(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
     return new_note_type
 
 
-def add_note_type_fields(
-    ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]
-) -> NotetypeDict:
+def add_note_type_fields(ah_did: uuid.UUID, note_type: NotetypeDict, new_field_names: List[str]) -> NotetypeDict:
     note_type = copy.deepcopy(note_type)
     ah_note_type = ankihub_db.note_type_dict(note_type["id"])
 
@@ -46,11 +44,7 @@ def add_note_type_fields(
     combined_ah_field_names = existing_ah_field_names | set(new_field_names)
 
     # Create ordered list of field names based on Anki note type ordering
-    ordered_field_names = [
-        field["name"]
-        for field in note_type["flds"]
-        if field["name"] in combined_ah_field_names
-    ]
+    ordered_field_names = [field["name"] for field in note_type["flds"] if field["name"] in combined_ah_field_names]
 
     # ... Add fields missing from the Anki note type to the end
     missing_fields_names = combined_ah_field_names - set(ordered_field_names)
@@ -65,14 +59,8 @@ def add_note_type_fields(
     # and existing fields from the AnkiHub note type
     updated_fields = []
     for field_name in ordered_field_names:
-        source_fields = (
-            ah_note_type["flds"]
-            if field_name in existing_ah_field_names
-            else note_type["flds"]
-        )
-        updated_fields.append(
-            next(field for field in source_fields if field["name"] == field_name)
-        )
+        source_fields = ah_note_type["flds"] if field_name in existing_ah_field_names else note_type["flds"]
+        updated_fields.append(next(field for field in source_fields if field["name"] == field_name))
 
     # Update field ordinals
     for idx, field in enumerate(updated_fields):
@@ -93,20 +81,14 @@ def note_types_with_template_changes_for_deck(ah_did: uuid.UUID) -> List[Notetyp
     ids = []
     for mid in ankihub_db.note_types_for_ankihub_deck(ah_did):
         changed = False
-        ah_note_type = note_type_without_ankihub_modifications(
-            ankihub_db.note_type_dict(mid)
-        )
-        anki_note_type = note_type_without_ankihub_modifications(
-            aqt.mw.col.models.get(mid)
-        )
+        ah_note_type = note_type_without_ankihub_modifications(ankihub_db.note_type_dict(mid))
+        anki_note_type = note_type_without_ankihub_modifications(aqt.mw.col.models.get(mid))
         if anki_note_type["css"] != ah_note_type["css"]:
             changed = True
         elif len(anki_note_type["tmpls"]) != len(ah_note_type["tmpls"]):
             changed = True
         else:
-            for anki_tmpl, ah_tmpl in zip(
-                anki_note_type["tmpls"], ah_note_type["tmpls"]
-            ):
+            for anki_tmpl, ah_tmpl in zip(anki_note_type["tmpls"], ah_note_type["tmpls"]):
                 if anki_tmpl != ah_tmpl:
                     changed = True
                     break
@@ -133,19 +115,13 @@ def note_type_had_templates_added_or_removed(note_type: NotetypeDict) -> bool:
             return True
 
         # Ids were added in a recent Anki version, so we need to check if they exist
-        if (
-            anki_tmpl.get("id")
-            and ah_tmpl.get("id")
-            and anki_tmpl["id"] != ah_tmpl["id"]
-        ):
+        if anki_tmpl.get("id") and ah_tmpl.get("id") and anki_tmpl["id"] != ah_tmpl["id"]:
             return True
 
     return False
 
 
-def update_note_type_templates_and_styles(
-    ah_did: uuid.UUID, note_type: NotetypeDict
-) -> NotetypeDict:
+def update_note_type_templates_and_styles(ah_did: uuid.UUID, note_type: NotetypeDict) -> NotetypeDict:
     client = AddonAnkiHubClient()
     note_type = note_type_without_ankihub_modifications(note_type)
     ah_note_type = ankihub_db.note_type_dict(note_type["id"])

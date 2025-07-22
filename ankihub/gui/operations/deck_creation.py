@@ -61,9 +61,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
     owned_decks = client.get_owned_decks()
     owned_deck_names = {deck.name for deck in owned_decks}
     if deck_name in owned_deck_names:
-        showInfo(
-            "Select another deck or rename it. You already have a deck with this name on AnkiHub."
-        )
+        showInfo("Select another deck or rename it. You already have a deck with this name on AnkiHub.")
         return
 
     if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
@@ -118,9 +116,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         # Upload all existing local media for this deck
         # (media files that are referenced on Deck's notes)
         if should_upload_media:
-            media_names = get_media_names_from_notes_data(
-                deck_creation_result.notes_data
-            )
+            media_names = get_media_names_from_notes_data(deck_creation_result.notes_data)
             media_sync.start_media_upload(media_names, deck_creation_result.ankihub_did)
 
         # Add the deck to the list of decks the user owns
@@ -137,11 +133,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
 
         # Show a message to the user with a link to the deck on AnkiHub
         deck_url = f"{url_view_deck()}{deck_creation_result.ankihub_did}"
-        showInfo(
-            "🎉 Deck upload successful!<br><br>"
-            "Link to the deck on AnkiHub:<br>"
-            f"<a href={deck_url}>{deck_url}</a>"
-        )
+        showInfo(f"🎉 Deck upload successful!<br><br>Link to the deck on AnkiHub:<br><a href={deck_url}>{deck_url}</a>")
 
         LOGGER.info("Deck creation successful.", deck_name=deck_name)
         config.log_private_config()

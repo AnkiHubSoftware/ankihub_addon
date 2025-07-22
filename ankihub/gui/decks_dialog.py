@@ -149,9 +149,7 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_bottom_left(self) -> QVBoxLayout:
         self.decks_list_label = QLabel("<b>Subscribed AnkiHub Decks</b>")
-        self.decks_list_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
+        self.decks_list_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self.decks_list = QListWidget()
         qconnect(self.decks_list.itemSelectionChanged, self._refresh_box_bottom_right)
@@ -170,9 +168,7 @@ class DeckManagementDialog(QDialog):
         selected_ah_did = self._selected_ah_did()
         if selected_ah_did is None:
             self.no_deck_selected_label = QLabel("Choose deck to adjust options.")
-            self.no_deck_selected_label.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-            )
+            self.no_deck_selected_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
             self.box_no_deck_selected = QHBoxLayout()
             self.box_no_deck_selected.addSpacing(5)
@@ -197,9 +193,7 @@ class DeckManagementDialog(QDialog):
             return
 
         # Destination for new cards
-        self.box_new_cards_destination = self._setup_box_new_cards_destination(
-            selected_ah_did
-        )
+        self.box_new_cards_destination = self._setup_box_new_cards_destination(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
         self.box_bottom_right.addStretch()
 
@@ -211,13 +205,9 @@ class DeckManagementDialog(QDialog):
     def _setup_box_deck_actions(self) -> QVBoxLayout:
         # Initialize and setup the deck name label
         deck_name = self._selected_ah_deck_name()
-        self.deck_name_label = QLabel(
-            f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
-        )
+        self.deck_name_label = QLabel(f"<h3>{truncate_string(deck_name, limit=70)}</h3>")
         self.deck_name_label.setWordWrap(True)
-        self.deck_name_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
+        self.deck_name_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         # Initialize and setup the open web button
         self.open_web_btn = QPushButton("Open on AnkiHub")
@@ -250,37 +240,27 @@ class DeckManagementDialog(QDialog):
             return self._setup_box_deck_not_installed()
 
         # Setup "Suspend new cards of existing notes"
-        self.box_suspend_new_cards_of_existing_notes = (
-            self._setup_box_suspend_new_cards_of_existing_notes(selected_ah_did)
+        self.box_suspend_new_cards_of_existing_notes = self._setup_box_suspend_new_cards_of_existing_notes(
+            selected_ah_did
         )
 
         # Setup "Suspend new cards of new notes"
-        self.box_suspend_new_cards_of_new_notes = (
-            self._setup_box_suspend_new_cards_of_new_notes(selected_ah_did)
-        )
+        self.box_suspend_new_cards_of_new_notes = self._setup_box_suspend_new_cards_of_new_notes(selected_ah_did)
 
         # Setup "Subdecks enabled"
         self.box_subdecks_enabled = self._setup_box_subdecks_enabled()
 
         # Setup "Remove AnkiHub deleted notes from deck"
-        self.box_ankihub_deleted_notes_behavior = (
-            self._setup_box_ankihub_deleted_notes_behavior(selected_ah_did)
-        )
+        self.box_ankihub_deleted_notes_behavior = self._setup_box_ankihub_deleted_notes_behavior(selected_ah_did)
 
         # Add individual elements to the deck options elements box
         self.box_deck_options_elements = QVBoxLayout()
-        self.box_deck_options_elements.addLayout(
-            self.box_suspend_new_cards_of_existing_notes
-        )
-        self.box_deck_options_elements.addLayout(
-            self.box_suspend_new_cards_of_new_notes
-        )
+        self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_existing_notes)
+        self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_new_notes)
         self.box_deck_options_elements.addSpacing(10)
         self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
         self.box_deck_options_elements.addSpacing(10)
-        self.box_deck_options_elements.addLayout(
-            self.box_ankihub_deleted_notes_behavior
-        )
+        self.box_deck_options_elements.addLayout(self.box_ankihub_deleted_notes_behavior)
 
         # Add everything to the result layout
         box = QVBoxLayout()
@@ -319,9 +299,7 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_suspend_new_cards_of_existing_notes(
-        self, selected_ah_did: uuid.UUID
-    ) -> QBoxLayout:
+    def _setup_box_suspend_new_cards_of_existing_notes(self, selected_ah_did: uuid.UUID) -> QBoxLayout:
         deck_config = config.deck_config(selected_ah_did)
 
         # Setup label
@@ -331,22 +309,16 @@ class DeckManagementDialog(QDialog):
             "the deck in future updates <br>"
             "based on your preference."
         )
-        self.suspend_new_cards_of_existing_notes_label = QLabel(
-            "Suspend new cards of existing notes"
-        )
+        self.suspend_new_cards_of_existing_notes_label = QLabel("Suspend new cards of existing notes")
         set_styled_tooltip(
             self.suspend_new_cards_of_existing_notes_label,
             suspend_cards_of_existing_notes_tooltip_message,
         )
-        self.suspend_new_cards_of_existing_notes_label.setStyleSheet(
-            tooltip_stylesheet()
-        )
+        self.suspend_new_cards_of_existing_notes_label.setStyleSheet(tooltip_stylesheet())
 
         # Setup tooltip icon
         self.suspend_new_cards_of_existing_notes_cb_icon_label = QLabel()
-        self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
-            tooltip_icon().pixmap(16, 16)
-        )
+        self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
         set_styled_tooltip(
             self.suspend_new_cards_of_existing_notes_cb_icon_label,
             suspend_cards_of_existing_notes_tooltip_message,
@@ -354,12 +326,8 @@ class DeckManagementDialog(QDialog):
 
         # Add the label and tooltip icon to the row layout
         self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_label
-        )
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_cb_icon_label
-        )
+        self.suspend_new_cards_of_existing_notes_row.addWidget(self.suspend_new_cards_of_existing_notes_label)
+        self.suspend_new_cards_of_existing_notes_row.addWidget(self.suspend_new_cards_of_existing_notes_cb_icon_label)
         self.suspend_new_cards_of_existing_notes_row.addStretch()
 
         # Setup and configure the combo box for "Suspend new cards of existing notes"
@@ -367,16 +335,12 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_existing_notes.insertItems(
             0, [option.value for option in SuspendNewCardsOfExistingNotes]
         )
-        self.suspend_new_cards_of_existing_notes.setCurrentText(
-            deck_config.suspend_new_cards_of_existing_notes.value
-        )
+        self.suspend_new_cards_of_existing_notes.setCurrentText(deck_config.suspend_new_cards_of_existing_notes.value)
         qconnect(
             self.suspend_new_cards_of_existing_notes.currentTextChanged,
             lambda: config.set_suspend_new_cards_of_existing_notes(
                 selected_ah_did,
-                SuspendNewCardsOfExistingNotes(
-                    self.suspend_new_cards_of_existing_notes.currentText()
-                ),
+                SuspendNewCardsOfExistingNotes(self.suspend_new_cards_of_existing_notes.currentText()),
             ),
         )
 
@@ -395,20 +359,14 @@ class DeckManagementDialog(QDialog):
 
         # Setup checkbox
         suspend_new_cards_of_new_notes_tooltip_message = (
-            "Will automatically suspend all <br>"
-            "the cards of new notes added to <br>"
-            "the deck in future updates."
+            "Will automatically suspend all <br>the cards of new notes added to <br>the deck in future updates."
         )
-        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
-            "Suspend new cards of new notes"
-        )
+        self.suspend_new_cards_of_new_notes_cb = QCheckBox("Suspend new cards of new notes")
         set_styled_tooltip(
             self.suspend_new_cards_of_new_notes_cb,
             suspend_new_cards_of_new_notes_tooltip_message,
         )
-        self.suspend_new_cards_of_new_notes_cb.setChecked(
-            deck_config.suspend_new_cards_of_new_notes
-        )
+        self.suspend_new_cards_of_new_notes_cb.setChecked(deck_config.suspend_new_cards_of_new_notes)
         qconnect(
             self.suspend_new_cards_of_new_notes_cb.toggled,
             lambda: config.set_suspend_new_cards_of_new_notes(
@@ -418,9 +376,7 @@ class DeckManagementDialog(QDialog):
 
         # Setup tooltip icon
         self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
-        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
-            tooltip_icon().pixmap(16, 16)
-        )
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
         set_styled_tooltip(
             self.suspend_new_cards_of_new_notes_cb_icon_label,
             suspend_new_cards_of_new_notes_tooltip_message,
@@ -436,8 +392,7 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
         self.subdecks_tooltip_message = (
-            "Use subdecks to organize this deck.<br>"
-            f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
+            f"Use subdecks to organize this deck.<br>Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
 
         # Set up the subdecks checkbox
@@ -473,15 +428,11 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_ankihub_deleted_notes_behavior(
-        self, selected_ah_did: uuid.UUID
-    ) -> QBoxLayout:
+    def _setup_box_ankihub_deleted_notes_behavior(self, selected_ah_did: uuid.UUID) -> QBoxLayout:
         deck_config = config.deck_config(selected_ah_did)
 
         self.deleted_notes_behavior_tooltip_message = (
-            "Will automatically delete notes<br>"
-            "that you haven't reviewed when<br>"
-            "they are deleted from AnkiHub."
+            "Will automatically delete notes<br>that you haven't reviewed when<br>they are deleted from AnkiHub."
         )
 
         # Setup and configure the check box
@@ -493,15 +444,12 @@ class DeckManagementDialog(QDialog):
             self.deleted_notes_behavior_tooltip_message,
         )
         self.ankihub_deleted_notes_behavior_cb.setChecked(
-            deck_config.behavior_on_remote_note_deleted
-            == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+            deck_config.behavior_on_remote_note_deleted == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
         )
 
         # Initialize and set up the icon label
         self.ankihub_deleted_notes_behavior_icon_label = QLabel()
-        self.ankihub_deleted_notes_behavior_icon_label.setPixmap(
-            tooltip_icon().pixmap(16, 16)
-        )
+        self.ankihub_deleted_notes_behavior_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
         set_styled_tooltip(
             self.ankihub_deleted_notes_behavior_icon_label,
             self.deleted_notes_behavior_tooltip_message,
@@ -526,17 +474,11 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_new_cards_destination(
-        self, selected_ah_did: uuid.UUID
-    ) -> QVBoxLayout:
+    def _setup_box_new_cards_destination(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Set up the destination tooltip message
-        new_cards_destination_tooltip_message = (
-            "Select the deck you want new cards to be saved to."
-        )
+        new_cards_destination_tooltip_message = "Select the deck you want new cards to be saved to."
         self.new_cards_destination_label = QLabel("<b>Destination for New Cards</b>")
-        set_styled_tooltip(
-            self.new_cards_destination_label, new_cards_destination_tooltip_message
-        )
+        set_styled_tooltip(self.new_cards_destination_label, new_cards_destination_tooltip_message)
 
         # Set up the destination icon label
         self.new_cards_destination_icon_label = QLabel()
@@ -549,23 +491,17 @@ class DeckManagementDialog(QDialog):
         # Add the destination label and icon to the destination label row layout
         self.new_cards_destination_label_row = QHBoxLayout()
         self.new_cards_destination_label_row.addWidget(self.new_cards_destination_label)
-        self.new_cards_destination_label_row.addWidget(
-            self.new_cards_destination_icon_label
-        )
+        self.new_cards_destination_label_row.addWidget(self.new_cards_destination_icon_label)
         self.new_cards_destination_label_row.addStretch()
 
         # Set up the destination details label
         self.new_cards_destination_details_label = QLabel()
         self.new_cards_destination_details_label.setWordWrap(True)
-        self.new_cards_destination_details_label.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
-        )
+        self.new_cards_destination_details_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self._refresh_new_cards_destination_details_label(selected_ah_did)
 
         # Set up the change destination button
-        self.set_new_cards_destination_btn = QPushButton(
-            "Change Destination for New Cards"
-        )
+        self.set_new_cards_destination_btn = QPushButton("Change Destination for New Cards")
         qconnect(
             self.set_new_cards_destination_btn.clicked,
             self._on_new_cards_destination_btn_clicked,
@@ -591,9 +527,7 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_note_types(
-        self, selected_ah_did: uuid.UUID
-    ) -> Optional[QVBoxLayout]:
+    def _setup_box_note_types(self, selected_ah_did: uuid.UUID) -> Optional[QVBoxLayout]:
         box = QVBoxLayout()
         deck_config = config.deck_config(selected_ah_did)
         if deck_config.user_relation != UserDeckRelation.OWNER:
@@ -607,9 +541,7 @@ class DeckManagementDialog(QDialog):
         qconnect(self.add_field_btn.clicked, self._on_add_field_btn_clicked)
         self._update_add_field_btn_state()
         self.update_templates_btn = QPushButton("Publish style/template updates")
-        qconnect(
-            self.update_templates_btn.clicked, self._on_update_templates_btn_clicked
-        )
+        qconnect(self.update_templates_btn.clicked, self._on_update_templates_btn_clicked)
         self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
         box.addWidget(self.add_note_type_btn)
@@ -626,15 +558,10 @@ class DeckManagementDialog(QDialog):
             button.setToolTip("Nothing to update to AnkiHub")
 
     def _get_note_type_names_for_add_note_type_btn(self) -> List[str]:
-        note_type_names_for_deck = self._get_note_type_names_for_deck(
-            self._selected_ah_did(), assigned_to_deck=True
-        )
-        other_note_type_names = self._get_note_type_names_for_deck(
-            self._selected_ah_did(), assigned_to_deck=False
-        )
+        note_type_names_for_deck = self._get_note_type_names_for_deck(self._selected_ah_did(), assigned_to_deck=True)
+        other_note_type_names = self._get_note_type_names_for_deck(self._selected_ah_did(), assigned_to_deck=False)
         note_type_names_for_deck_without_ah_modifcations = {
-            note_type_name_without_ankihub_modifications(name)
-            for name in note_type_names_for_deck
+            note_type_name_without_ankihub_modifications(name) for name in note_type_names_for_deck
         }
         names = [
             name
@@ -651,9 +578,7 @@ class DeckManagementDialog(QDialog):
         self._update_note_type_btn_state(self.add_note_type_btn, enabled)
 
     def _get_note_type_names_for_add_field_type_btn(self) -> List[str]:
-        names_and_ids = self._get_note_type_names_and_ids_for_deck(
-            self._selected_ah_did(), assigned_to_deck=True
-        )
+        names_and_ids = self._get_note_type_names_and_ids_for_deck(self._selected_ah_did(), assigned_to_deck=True)
         filtered_names = []
         for name_and_id in names_and_ids:
             note_type = aqt.mw.col.models.get(NotetypeId(name_and_id.id))
@@ -667,14 +592,10 @@ class DeckManagementDialog(QDialog):
         self._update_note_type_btn_state(self.add_field_btn, enabled)
 
     def _get_note_type_names_for_update_templates_btn(self) -> List[str]:
-        mids_with_updates = note_types_with_template_changes_for_deck(
-            self._selected_ah_did()
-        )
+        mids_with_updates = note_types_with_template_changes_for_deck(self._selected_ah_did())
         return [
             n.name
-            for n in self._get_note_type_names_and_ids_for_deck(
-                self._selected_ah_did(), assigned_to_deck=True
-            )
+            for n in self._get_note_type_names_and_ids_for_deck(self._selected_ah_did(), assigned_to_deck=True)
             if n.id in mids_with_updates
         ]
 
@@ -682,9 +603,7 @@ class DeckManagementDialog(QDialog):
         enabled = bool(self._get_note_type_names_for_update_templates_btn())
         self._update_note_type_btn_state(self.update_templates_btn, enabled)
 
-    def _get_note_type_names_and_ids_for_deck(
-        self, deck_id: UUID, assigned_to_deck: bool
-    ) -> List[NotetypeNameId]:
+    def _get_note_type_names_and_ids_for_deck(self, deck_id: UUID, assigned_to_deck: bool) -> List[NotetypeNameId]:
         """
         Returns a sorted list of note type names and IDs filtered by whether they are assigned to the deck.
         For AnkiHub note types, the name from the AnkiHub DB is returned, even if it's different in Anki.
@@ -697,29 +616,18 @@ class DeckManagementDialog(QDialog):
         if assigned_to_deck:
             names_and_ids = [
                 NotetypeNameId(name=name, id=id)
-                for name, id in ankihub_db.note_type_names_and_ids_for_ankihub_deck(
-                    deck_id
-                )
+                for name, id in ankihub_db.note_type_names_and_ids_for_ankihub_deck(deck_id)
             ]
         else:
             mids = set(ankihub_db.note_types_for_ankihub_deck(deck_id))
-            names_and_ids = [
-                n for n in aqt.mw.col.models.all_names_and_ids() if n.id not in mids
-            ]
+            names_and_ids = [n for n in aqt.mw.col.models.all_names_and_ids() if n.id not in mids]
         return sorted(
             names_and_ids,
             key=lambda n: n.name,
         )
 
-    def _get_note_type_names_for_deck(
-        self, deck_id: UUID, assigned_to_deck: bool
-    ) -> List[str]:
-        return [
-            n.name
-            for n in self._get_note_type_names_and_ids_for_deck(
-                deck_id, assigned_to_deck
-            )
-        ]
+    def _get_note_type_names_for_deck(self, deck_id: UUID, assigned_to_deck: bool) -> List[str]:
+        return [n.name for n in self._get_note_type_names_and_ids_for_deck(deck_id, assigned_to_deck)]
 
     def _on_add_note_type_btn_clicked(self):
         def on_note_type_selected(
@@ -728,8 +636,7 @@ class DeckManagementDialog(QDialog):
             if not note_type_selector.name:
                 return
             confirm = ask_user(
-                "<b>Proceed?</b><br><br>"
-                "Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
+                "<b>Proceed?</b><br><br>Confirm to publish this note type to all AnkiHub users of your deck.<br><br>",
                 title="Publish note type",
                 no_button_label="Cancel",
             )
@@ -798,9 +705,7 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_update_templates_btn_clicked(self) -> None:
-        def on_note_type_selected(
-            note_type_selector: SearchableSelectionDialog, MODEL_NAME="en_core_sci_lg"
-        ) -> None:
+        def on_note_type_selected(note_type_selector: SearchableSelectionDialog, MODEL_NAME="en_core_sci_lg") -> None:
             if not note_type_selector.name:
                 return
 
@@ -927,9 +832,7 @@ class DeckManagementDialog(QDialog):
 
             should_move_cards = False
             anki_nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-            if not all_notes_in_deck(
-                nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)
-            ):
+            if not all_notes_in_deck(nids=anki_nids, anki_did=aqt.mw.col.decks.id(new_deck_name)):
                 should_move_cards = self._show_move_cards_dialog(new_deck_name)
 
             if should_move_cards is None:
@@ -945,9 +848,7 @@ class DeckManagementDialog(QDialog):
             # Move cards if user chose to do so
             if should_move_cards:
                 AddonQueryOp(
-                    op=lambda _: move_ankihub_cards_to_deck(
-                        ah_did=ah_did, anki_did=new_destination_anki_did
-                    ),
+                    op=lambda _: move_ankihub_cards_to_deck(ah_did=ah_did, anki_did=new_destination_anki_did),
                     success=lambda _: on_cards_moved(anki_did=new_destination_anki_did),
                     parent=aqt.mw,
                 ).with_progress("Moving cards...").run_in_background()
@@ -1040,9 +941,7 @@ class DeckManagementDialog(QDialog):
 
         has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
         self.subdecks_cb.setEnabled(has_subdeck_tags)
-        self.subdecks_cb.setStyleSheet(
-            "QCheckBox { color: grey }" if not has_subdeck_tags else ""
-        )
+        self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }" if not has_subdeck_tags else "")
         set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
 
         deck_config = config.deck_config(ah_did)

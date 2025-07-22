@@ -62,9 +62,7 @@ os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 
 OUTDATED_CLIENT_RESPONSE_DETAIL = "Outdated client"
-TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL = (
-    "You need to accept the terms and conditions to perform this action."
-)
+TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL = "You need to accept the terms and conditions to perform this action."
 
 
 def setup_error_handler():
@@ -80,9 +78,7 @@ def setup_error_handler():
         LOGGER.info("Error reporting is disabled.")
 
 
-def report_exception_and_upload_logs(
-    exception: BaseException, context: Dict[str, Any] = {}
-) -> Optional[str]:
+def report_exception_and_upload_logs(exception: BaseException, context: Dict[str, Any] = {}) -> Optional[str]:
     """Report the exception to Sentry and upload the logs.
     Returns the Sentry event ID."""
     if not _error_reporting_enabled():
@@ -90,15 +86,11 @@ def report_exception_and_upload_logs(
         return None
 
     logs_key = upload_logs_in_background()
-    sentry_id = _report_exception(
-        exception=exception, context={**context, "logs": {"filename": logs_key}}
-    )
+    sentry_id = _report_exception(exception=exception, context={**context, "logs": {"filename": logs_key}})
     return sentry_id
 
 
-def upload_logs_in_background(
-    on_done: Optional[Callable[[str], None]] = None, hide_username=False
-) -> str:
+def upload_logs_in_background(on_done: Optional[Callable[[str], None]] = None, hide_username=False) -> str:
     """Upload the logs to S3 in the background.
     Returns the S3 key of the uploaded logs."""
 
@@ -201,9 +193,7 @@ def _setup_excepthook():
     are reported to Sentry and the user is prompted to provide feedback (in addition to Anki's error dialog opening).
     """
 
-    def excepthook(
-        etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
-    ) -> Any:
+    def excepthook(etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]) -> Any:
         LOGGER.info(
             "Excepthook",
             addon_mentioned_in_traceback=_this_addon_mentioned_in_tb(tb),
@@ -234,9 +224,7 @@ def _setup_excepthook():
     sys.excepthook = excepthook
 
 
-def _show_feedback_dialog(
-    exception: BaseException, sentry_event_id: Optional[str] = None
-) -> None:
+def _show_feedback_dialog(exception: BaseException, sentry_event_id: Optional[str] = None) -> None:
     ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
 
 
@@ -248,9 +236,7 @@ def _show_feedback_dialog_and_maybe_report_exception(exception: BaseException) -
     _show_feedback_dialog(exception=exception, sentry_event_id=sentry_event_id)
 
 
-def _try_handle_exception(
-    exc_value: BaseException, tb: Optional[TracebackType]
-) -> bool:
+def _try_handle_exception(exc_value: BaseException, tb: Optional[TracebackType]) -> bool:
     """Try to handle the exception. Return True if the exception was handled, False otherwise."""
     LOGGER.info("Trying to handle exception...", exc_info=exc_value)
 
@@ -281,9 +267,7 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-    if isinstance(
-        exc_value, (exceptions.ConnectionError, ConnectionError, ReadTimeout)
-    ):
+    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError, ReadTimeout)):
         if not _is_internet_available():
             show_tooltip(
                 "🔌 No Internet Connection detected. Please check your internet connection and try again.",
@@ -332,15 +316,12 @@ def _try_handle_exception(
             ankihub_did=exc_value.ah_did,
         )
         show_error_dialog(
-            "There is an issue with the AnkiHub deck.<br>"
-            "Please sync with AnkiHub to resolve it.",
+            "There is an issue with the AnkiHub deck.<br>Please sync with AnkiHub to resolve it.",
             title="AnkiHub",
         )
         return True
 
-    if isinstance(
-        exc_value, OSError
-    ) and "Could not find a suitable TLS CA certificate bundle" in str(exc_value):
+    if isinstance(exc_value, OSError) and "Could not find a suitable TLS CA certificate bundle" in str(exc_value):
         showInfo("Please restart Anki.", title="AnkiHub")
         LOGGER.warning("TLS CA certificate bundle error was handled")
         return True
@@ -373,9 +354,7 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
             return False
 
         if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
-            run_with_delay_when_progress_dialog_is_open(
-                TermsAndConditionsDialog.display, parent=aqt.mw
-            )
+            run_with_delay_when_progress_dialog_is_open(TermsAndConditionsDialog.display, parent=aqt.mw)
             return True
 
     elif response.status_code == 406:
@@ -416,29 +395,12 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
 def _is_memory_full_error(exc_value: BaseException) -> bool:
     result = (
         (isinstance(exc_value, DBError) and "is full" in str(exc_value).lower())
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "not enough space" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "not enough memory" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "no space left" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, OSError) and "no space left" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, SyncError)
-            and "no space left" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, OperationalError)
-            and "database or disk is full" in str(exc_value).lower()
-        )
+        or (isinstance(exc_value, BackendIOError) and "not enough space" in str(exc_value).lower())
+        or (isinstance(exc_value, BackendIOError) and "not enough memory" in str(exc_value).lower())
+        or (isinstance(exc_value, BackendIOError) and "no space left" in str(exc_value).lower())
+        or (isinstance(exc_value, OSError) and "no space left" in str(exc_value).lower())
+        or (isinstance(exc_value, SyncError) and "no space left" in str(exc_value).lower())
+        or (isinstance(exc_value, OperationalError) and "database or disk is full" in str(exc_value).lower())
     )
     return result
 
@@ -450,10 +412,9 @@ def _this_addon_mentioned_in_tb(tb: TracebackType) -> bool:
 
 
 def _contains_path_to_this_addon(tb_str: str) -> bool:
-    result = (
-        ANKIWEB_ID is not None
-        and re.search(rf"(/|\\)addons21(/|\\)(ankihub|{ANKIWEB_ID})(/|\\)", tb_str)
-    ) or (ANKIWEB_ID is None and re.search(r"(/|\\)addons21(/|\\)ankihub", tb_str))
+    result = (ANKIWEB_ID is not None and re.search(rf"(/|\\)addons21(/|\\)(ankihub|{ANKIWEB_ID})(/|\\)", tb_str)) or (
+        ANKIWEB_ID is None and re.search(r"(/|\\)addons21(/|\\)ankihub", tb_str)
+    )
     return bool(result)
 
 
@@ -479,9 +440,7 @@ def _initialize_sentry():
     )
 
 
-def _before_send(
-    event: Dict[str, Any], hint: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+def _before_send(event: Dict[str, Any], hint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Filter out events created by the LoggingIntegration that are not related to this add-on."""
     if "log_record" in hint:
         logger_name = hint["log_record"].name
@@ -490,9 +449,7 @@ def _before_send(
     return event
 
 
-def _report_exception(
-    exception: BaseException, context: Dict[str, Dict[str, Any]] = {}
-) -> Optional[str]:
+def _report_exception(exception: BaseException, context: Dict[str, Dict[str, Any]] = {}) -> Optional[str]:
     """Report an exception to Sentry."""
     if not _error_reporting_enabled():
         return None
@@ -560,9 +517,7 @@ def _ankihub_base_path_context_dict() -> Dict[str, Any]:
     ]
     problematic_file_paths = []
     if is_win:
-        problematic_file_paths = [
-            file for file in all_file_paths if not _file_is_accessible(file)
-        ]
+        problematic_file_paths = [file for file in all_file_paths if not _file_is_accessible(file)]
 
     result = {
         "all files": [str(file) for file in all_file_paths],
@@ -601,15 +556,10 @@ def _error_reporting_enabled() -> bool:
     # using sentry_sdk. We therefore check the version here and disable error reporting if the
     # version is too old to avoid problems.
     if obsolete_version_of_sentry_sdk():
-        LOGGER.info(
-            "Obsolete version of sentry-sdk detected. Error reporting disabled."
-        )
+        LOGGER.info("Obsolete version of sentry-sdk detected. Error reporting disabled.")
         return False
 
-    result = (
-        config.public_config.get("report_errors")
-        and not os.getenv("REPORT_ERRORS", None) == "0"
-    )
+    result = config.public_config.get("report_errors") and not os.getenv("REPORT_ERRORS", None) == "0"
     return result
 
 

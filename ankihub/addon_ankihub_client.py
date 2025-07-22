@@ -71,9 +71,7 @@ class AddonAnkiHubClient(AnkiHubClient):
             s3_bucket_url=config.s3_bucket_url,
             response_hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             get_token=lambda: config.token(),
-            local_media_dir_path_cb=lambda: (
-                Path(aqt.mw.col.media.dir()) if aqt.mw.col else None
-            ),
+            local_media_dir_path_cb=lambda: (Path(aqt.mw.col.media.dir()) if aqt.mw.col else None),
         )
 
     def upload_logs(self, file: Path, key: str) -> None:
@@ -81,8 +79,6 @@ class AddonAnkiHubClient(AnkiHubClient):
             log_data = f.read()
 
         s3_url_suffix = self._presigned_url_suffix_from_key(key=key, action="upload")
-        s3_response = self._send_request(
-            "PUT", API.S3, s3_url_suffix, data=log_data, is_long_running=True
-        )
+        s3_response = self._send_request("PUT", API.S3, s3_url_suffix, data=log_data, is_long_running=True)
         if s3_response.status_code != 200:
             raise AnkiHubHTTPError(s3_response)

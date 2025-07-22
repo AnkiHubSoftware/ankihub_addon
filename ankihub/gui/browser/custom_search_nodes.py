@@ -21,9 +21,7 @@ class CustomSearchNode(ABC):
     browser: Browser = None
 
     @classmethod
-    def from_parameter_type_and_value(
-        cls, browser: Browser, parameter_name: str, value: str
-    ) -> "CustomSearchNode":
+    def from_parameter_type_and_value(cls, browser: Browser, parameter_name: str, value: str) -> "CustomSearchNode":
         custom_search_node_types = (
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
@@ -52,9 +50,7 @@ class CustomSearchNode(ABC):
         if self.browser.table.is_notes_mode():
             result = cast(Sequence[NoteId], ids)
         else:
-            result = aqt.mw.col.db.list(
-                f"SELECT DISTINCT nid FROM cards WHERE id IN {ids2str(ids)}"
-            )
+            result = aqt.mw.col.db.list(f"SELECT DISTINCT nid FROM cards WHERE id IN {ids2str(ids)}")
         return list(result)
 
     def _output_ids(self, note_ids: Sequence[NoteId]) -> Sequence[ItemId]:
@@ -64,9 +60,7 @@ class CustomSearchNode(ABC):
         if self.browser.table.is_notes_mode():
             return note_ids
 
-        result = aqt.mw.col.db.list(
-            f"SELECT id from cards WHERE nid in {ids2str(note_ids)}"
-        )
+        result = aqt.mw.col.db.list(f"SELECT id from cards WHERE nid in {ids2str(note_ids)}")
         return result
 
 
@@ -82,9 +76,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
     def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
         if self.value not in ("yes", "no"):
-            raise ValueError(
-                f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'."
-            )
+            raise ValueError(f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'.")
 
         nids = self._note_ids(ids)
 
@@ -136,15 +128,10 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
             if days <= 0:
                 raise ValueError
         except ValueError:
-            raise ValueError(
-                f"Invalid value for {self.parameter_name}: {self.value}. Must be a positive integer."
-            )
+            raise ValueError(f"Invalid value for {self.parameter_name}: {self.value}. Must be a positive integer.")
 
         threshold_timestamp = int(
-            (
-                datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                - timedelta(days=days - 1)
-            ).timestamp()
+            (datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)).timestamp()
         )
 
         nids = self._note_ids(ids)
@@ -208,9 +195,7 @@ class SuggestionTypeSearchNode(CustomSearchNode):
         try:
             suggestion_type_from_str(value)
         except ValueError:
-            raise ValueError(
-                f"Invalid value for {self.parameter_name}: {value}. Must be a suggestion type."
-            )
+            raise ValueError(f"Invalid value for {self.parameter_name}: {value}. Must be a suggestion type.")
 
         nids = self._note_ids(ids)
 
@@ -248,9 +233,7 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
         nid_to_ah_mod: Dict[NoteId, int] = dict(
             execute_list_query_in_chunks(
                 lambda nids: (
-                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-                    .filter(anki_note_id__in=nids)
-                    .tuples()
+                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod).filter(anki_note_id__in=nids).tuples()
                 ),
                 ids=nids,
             )
@@ -273,8 +256,7 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
         retained_nids = [
             nid
             for nid, ah_mod in nid_to_ah_mod.items()
-            if nid in nid_to_last_review_timestamp_ms
-            and ah_mod >= nid_to_last_review_timestamp_ms[nid] / 1000
+            if nid in nid_to_last_review_timestamp_ms and ah_mod >= nid_to_last_review_timestamp_ms[nid] / 1000
         ]
 
         result = self._output_ids(retained_nids)
@@ -293,18 +275,12 @@ class AnkiHubNoteSearchNode(CustomSearchNode):
 
     def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
         if self.value not in ("yes", "no"):
-            raise ValueError(
-                f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'."
-            )
+            raise ValueError(f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'.")
 
         nids = self._note_ids(ids)
 
         nids_in_ah_db = execute_list_query_in_chunks(
-            lambda nids: (
-                AnkiHubNote.select(AnkiHubNote.anki_note_id)
-                .filter(anki_note_id__in=nids)
-                .objects(flat)
-            ),
+            lambda nids: (AnkiHubNote.select(AnkiHubNote.anki_note_id).filter(anki_note_id__in=nids).objects(flat)),
             ids=nids,
         )
         if self.value == "yes":

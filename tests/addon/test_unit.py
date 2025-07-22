@@ -183,9 +183,7 @@ def ankihub_db() -> Generator[_AnkiHubDB, None, None]:
 
 
 class TestUploadMediaForSuggestion:
-    def test_update_media_names_on_notes(
-        self, anki_session_with_addon_data: AnkiSession
-    ):
+    def test_update_media_names_on_notes(self, anki_session_with_addon_data: AnkiSession):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -214,13 +212,8 @@ class TestUploadMediaForSuggestion:
             notes[1].load()
             notes[2].load()
 
-            assert f'<img src="{hashed_name_map["test.png"]}">' in " ".join(
-                notes[0].fields
-            )
-            assert (
-                f"<img src='{hashed_name_map['other_test.gif']}' width='250'>"
-                in " ".join(notes[1].fields)
-            )
+            assert f'<img src="{hashed_name_map["test.png"]}">' in " ".join(notes[0].fields)
+            assert f"<img src='{hashed_name_map['other_test.gif']}' width='250'>" in " ".join(notes[1].fields)
             assert '<img src="will_not_replace.jpeg">' in " ".join(notes[2].fields)
 
 
@@ -405,14 +398,10 @@ class TestExcludeDescendantDecks:
         with anki_session.profile_loaded():
             parent = aqt.mw.col.decks.add_normal_deck_with_name("Parent")
             child = aqt.mw.col.decks.add_normal_deck_with_name("Parent::Child")
-            grandchild = aqt.mw.col.decks.add_normal_deck_with_name(
-                "Parent::Child::Grandchild"
-            )
+            grandchild = aqt.mw.col.decks.add_normal_deck_with_name("Parent::Child::Grandchild")
 
             # Only parent should remain when all are in list
-            result = exclude_descendant_decks(
-                [DeckId(parent.id), DeckId(child.id), DeckId(grandchild.id)]
-            )
+            result = exclude_descendant_decks([DeckId(parent.id), DeckId(child.id), DeckId(grandchild.id)])
             assert result == [DeckId(parent.id)]
 
             # Child should remain when parent not in list
@@ -438,36 +427,26 @@ class TestExcludeDescendantDecks:
 
 
 class TestGetOriginalDidsForNids:
-    def test_notes_in_regular_decks(
-        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
-    ):
+    def test_notes_in_regular_decks(self, anki_session: AnkiSession, add_anki_note: AddAnkiNote):
         with anki_session.profile_loaded():
             # Create notes
             note1 = add_anki_note()
             note2 = add_anki_note()
 
             # Set did values (odid should be 0 for regular decks)
-            aqt.mw.col.db.execute(
-                f"UPDATE cards SET did = 100, odid = 0 WHERE nid = {note1.id}"
-            )
-            aqt.mw.col.db.execute(
-                f"UPDATE cards SET did = 200, odid = 0 WHERE nid = {note2.id}"
-            )
+            aqt.mw.col.db.execute(f"UPDATE cards SET did = 100, odid = 0 WHERE nid = {note1.id}")
+            aqt.mw.col.db.execute(f"UPDATE cards SET did = 200, odid = 0 WHERE nid = {note2.id}")
 
             result = get_original_dids_for_nids([note1.id, note2.id])
             assert result == {DeckId(100), DeckId(200)}
 
-    def test_notes_in_filtered_deck(
-        self, anki_session: AnkiSession, add_anki_note: AddAnkiNote
-    ):
+    def test_notes_in_filtered_deck(self, anki_session: AnkiSession, add_anki_note: AddAnkiNote):
         with anki_session.profile_loaded():
             # Create a note
             note = add_anki_note()
 
             # Simulate card being in a filtered deck (odid = original deck, did = filtered deck)
-            aqt.mw.col.db.execute(
-                f"UPDATE cards SET did = 999, odid = 123 WHERE nid = {note.id}"
-            )
+            aqt.mw.col.db.execute(f"UPDATE cards SET did = 999, odid = 123 WHERE nid = {note.id}")
 
             # Should return the original deck ID (odid), not the filtered deck ID (did)
             result = get_original_dids_for_nids([note.id])
@@ -554,10 +533,7 @@ def test_normalize_url():
 def test_prepared_field_html():
     assert _prepared_field_html('<img src="foo.jpg">') == '<img src="foo.jpg">'
 
-    assert (
-        _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">')
-        == '<img src="foo.jpg">'
-    )
+    assert _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">') == '<img src="foo.jpg">'
 
 
 def test_remove_note_type_name_modifications():
@@ -608,9 +584,7 @@ class TestDeckContainsSubdeckTags:
 
             import_ah_note(ah_did=ah_did)
 
-            note_info = NoteInfoFactory.create(
-                tags=["some_other_tag", f"{SUBDECK_TAG}::A::B"]
-            )
+            note_info = NoteInfoFactory.create(tags=["some_other_tag", f"{SUBDECK_TAG}::A::B"])
             import_ah_note(ah_did=ah_did, note_data=note_info)
 
             assert deck_contains_subdeck_tags(ah_did)
@@ -679,9 +653,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 
 class TestAnkiHubSignOut:
-    @pytest.mark.parametrize(
-        "confirmed_sign_out,expected_logged_in_state", [(True, False), (False, True)]
-    )
+    @pytest.mark.parametrize("confirmed_sign_out,expected_logged_in_state", [(True, False), (False, True)])
     def test_sign_out(
         self,
         monkeypatch: MonkeyPatch,
@@ -704,9 +676,7 @@ class TestAnkiHubSignOut:
             refresh_ankihub_menu()
 
             sign_out_action = [
-                action
-                for action in menu_state.ankihub_menu.actions()
-                if action.text() == "🔑 Sign out"
+                action for action in menu_state.ankihub_menu.actions() if action.text() == "🔑 Sign out"
             ][0]
 
             assert sign_out_action is not None
@@ -743,9 +713,7 @@ class TestAnkiHubLoginDialog:
         password = "test_password"
         token = "test_token"
 
-        login_mock = mocker.patch(
-            "ankihub.gui.menu.AnkiHubClient.login", return_value=token
-        )
+        login_mock = mocker.patch("ankihub.gui.menu.AnkiHubClient.login", return_value=token)
 
         AnkiHubLogin.display_login()
 
@@ -757,9 +725,7 @@ class TestAnkiHubLoginDialog:
 
         qtbot.wait_until(lambda: not window.isVisible())
 
-        login_mock.assert_called_once_with(
-            credentials={"username": username, "password": password}
-        )
+        login_mock.assert_called_once_with(credentials={"username": username, "password": password})
 
         assert config.user() == username
         assert config.token() == token
@@ -778,25 +744,19 @@ class TestAnkiHubLoginDialog:
         assert window.toggle_button.isChecked() is False
 
         window.toggle_button.click()
-        qtbot.wait_until(
-            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
-        )
+        qtbot.wait_until(lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal)
 
         assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
         assert window.toggle_button.isChecked() is True
 
         window.toggle_button.click()
-        qtbot.wait_until(
-            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
-        )
+        qtbot.wait_until(lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Password)
 
         assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
         assert window.toggle_button.isChecked() is False
 
     @patch("ankihub.gui.menu.AnkiHubClient.login")
-    def test_forgot_password_and_sign_up_links_are_present(
-        self, login_mock, qtbot: QtBot
-    ):
+    def test_forgot_password_and_sign_up_links_are_present(self, login_mock, qtbot: QtBot):
         AnkiHubLogin.display_login()
 
         window: AnkiHubLogin = AnkiHubLogin._window
@@ -855,11 +815,7 @@ class TestSuggestionDialog:
         # Fill in the form
         change_type_needed = not is_new_note_suggestion
         source_needed = not is_new_note_suggestion and (
-            (
-                suggestion_type
-                in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
-                and is_for_anking_deck
-            )
+            (suggestion_type in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT] and is_for_anking_deck)
             or suggestion_type == SuggestionType.DELETE
         )
 
@@ -871,9 +827,7 @@ class TestSuggestionDialog:
             dialog.source_widget.source_type_select.setCurrentText(source_type.value)
             if source_type == SourceType.UWORLD:
                 expected_uworld_step = "Step 1"
-                dialog.source_widget.uworld_step_select.setCurrentText(
-                    expected_uworld_step
-                )
+                dialog.source_widget.uworld_step_select.setCurrentText(expected_uworld_step)
 
             expected_source_text = "https://test_url.com"
             dialog.source_widget.source_edit.setText(expected_source_text)
@@ -884,9 +838,7 @@ class TestSuggestionDialog:
         assert dialog.isVisible()
         assert dialog.change_type_select.isVisible() == change_type_needed
         assert dialog.source_widget_group_box.isVisible() == source_needed
-        assert dialog.hint_for_note_deletions.isVisible() == (
-            suggestion_type == SuggestionType.DELETE
-        )
+        assert dialog.hint_for_note_deletions.isVisible() == (suggestion_type == SuggestionType.DELETE)
 
         # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
         assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
@@ -898,9 +850,7 @@ class TestSuggestionDialog:
             else expected_source_text
         )
         expected_source = (
-            SuggestionSource(source_type=source_type, source_text=expected_source_text)
-            if source_needed
-            else None
+            SuggestionSource(source_type=source_type, source_text=expected_source_text) if source_needed else None
         )
 
         dialog.accept()
@@ -922,9 +872,7 @@ class TestSuggestionDialog:
             False,
         ],
     )
-    def test_submit_without_review_checkbox(
-        self, can_submit_without_review: bool, mocker: MockerFixture
-    ):
+    def test_submit_without_review_checkbox(self, can_submit_without_review: bool, mocker: MockerFixture):
         callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=False,
@@ -967,8 +915,7 @@ class TestSuggestionDialogGetAnkiNidToAHDidsDict:
 
 
 class MockDependenciesForSuggestionDialog(Protocol):
-    def __call__(self, user_cancels: bool) -> Tuple[Mock, Mock]:
-        ...
+    def __call__(self, user_cancels: bool) -> Tuple[Mock, Mock]: ...
 
 
 @pytest.fixture
@@ -986,12 +933,8 @@ def mock_dependiencies_for_suggestion_dialog(
     ) -> Tuple[Mock, Mock]:
         mock_suggestion_dialog(user_cancels=user_cancels)
 
-        suggest_note_update_mock = mocker.patch(
-            "ankihub.gui.suggestion_dialog.suggest_note_update"
-        )
-        suggest_new_note_mock = mocker.patch(
-            "ankihub.gui.suggestion_dialog.suggest_new_note"
-        )
+        suggest_note_update_mock = mocker.patch("ankihub.gui.suggestion_dialog.suggest_note_update")
+        suggest_new_note_mock = mocker.patch("ankihub.gui.suggestion_dialog.suggest_new_note")
 
         return suggest_note_update_mock, suggest_new_note_mock
 
@@ -1028,9 +971,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
 
             suggest_note_update_mock.return_value = (
-                ChangeSuggestionResult.SUCCESS
-                if suggest_note_update_succeeds
-                else ChangeSuggestionResult.NO_CHANGES
+                ChangeSuggestionResult.SUCCESS if suggest_note_update_succeeds else ChangeSuggestionResult.NO_CHANGES
             )
 
             open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
@@ -1072,8 +1013,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
 
 
 class MockDependenciesForBulkSuggestionDialog(Protocol):
-    def __call__(self, user_cancels: bool) -> Mock:
-        ...
+    def __call__(self, user_cancels: bool) -> Mock: ...
 
 
 @pytest.fixture
@@ -1121,9 +1061,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
 
-            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
-                user_cancels=user_cancels
-            )
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(user_cancels=user_cancels)
 
             open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
 
@@ -1156,9 +1094,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 
             nids = [note_1.id, note_2.id]
 
-            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
-                user_cancels=False
-            )
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(user_cancels=False)
 
             open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
             qtbot.wait(500)
@@ -1353,11 +1289,7 @@ class TestAnkiHubDBRemoveDeck:
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
         assert ankihub_db.note_types_for_ankihub_deck(ankihub_did=ah_did) == []
         assert ankihub_db.note_type_dict(ankihub_basic_note_type["id"]) is None
-        assert not (
-            ankihub_db.ankihub_did_for_note_type(
-                anki_note_type_id=ankihub_basic_note_type["id"]
-            )
-        )
+        assert not (ankihub_db.ankihub_did_for_note_type(anki_note_type_id=ankihub_basic_note_type["id"]))
 
         assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == set()
 
@@ -1395,9 +1327,7 @@ class TestAnkiHubDBMissingValueError:
         # Add a note to the DB and set fields to None
         anki_nid = 1
         ankihub_db.upsert_note_type(ah_did, ankihub_basic_note_type)
-        note = NoteInfoFactory.create(
-            anki_nid=anki_nid, mid=ankihub_basic_note_type["id"]
-        )
+        note = NoteInfoFactory.create(anki_nid=anki_nid, mid=ankihub_basic_note_type["id"])
         ankihub_db.upsert_notes_data(
             ankihub_did=ah_did,
             notes_data=[note],
@@ -1430,9 +1360,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             ],
         )
         self.ah_did = next_deterministic_uuid()
-        ankihub_db.upsert_note_type(
-            ankihub_did=self.ah_did, note_type=ankihub_basic_note_type
-        )
+        ankihub_db.upsert_note_type(ankihub_did=self.ah_did, note_type=ankihub_basic_note_type)
         ankihub_db.upsert_notes_data(self.ah_did, [note_info])
 
     def test_basic(
@@ -1488,20 +1416,13 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
             )
 
             expected_result = (
-                {"test1.jpg"}
-                if referenced_on_accepted_note and exists_on_s3 and download_enabled
-                else set()
+                {"test1.jpg"} if referenced_on_accepted_note and exists_on_s3 and download_enabled else set()
             )
-            assert (
-                ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did=ah_did)
-                == expected_result
-            )
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did=ah_did) == expected_result
 
 
 class TestAnkiHubDBMediaNamesWithMatchingHashes:
-    def test_get_matching_media(
-        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
-    ):
+    def test_get_matching_media(self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]):
         ah_did = next_deterministic_uuid()
         ankihub_db.upsert_deck_media_infos(
             ankihub_did=ah_did,
@@ -1562,9 +1483,7 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             "test3_copy.jpg": "test3.jpg",
         }
 
-    def test_with_none_in_media_to_hash(
-        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
-    ):
+    def test_with_none_in_media_to_hash(self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]):
         ah_did = next_deterministic_uuid()
         ankihub_db.upsert_deck_media_infos(
             ankihub_did=ah_did,
@@ -1573,16 +1492,9 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             ],
         )
 
-        assert (
-            ankihub_db.media_names_with_matching_hashes(
-                ah_did=ah_did, media_to_hash={"test1_copy.jpg": None}
-            )
-            == {}
-        )
+        assert ankihub_db.media_names_with_matching_hashes(ah_did=ah_did, media_to_hash={"test1_copy.jpg": None}) == {}
 
-    def test_with_none_in_db(
-        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
-    ):
+    def test_with_none_in_db(self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]):
         ah_did = next_deterministic_uuid()
         ankihub_db.upsert_deck_media_infos(
             ankihub_did=ah_did,
@@ -1592,23 +1504,16 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
         )
 
         assert (
-            ankihub_db.media_names_with_matching_hashes(
-                ah_did=ah_did, media_to_hash={"test1_copy.jpg": "hash1"}
-            )
-            == {}
+            ankihub_db.media_names_with_matching_hashes(ah_did=ah_did, media_to_hash={"test1_copy.jpg": "hash1"}) == {}
         )
 
 
 class TestAnkiHubDBDeckMedia:
-    def test_modified_field_is_stored_in_correct_format_in_db(
-        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid
-    ):
+    def test_modified_field_is_stored_in_correct_format_in_db(self, ankihub_db: _AnkiHubDB, next_deterministic_uuid):
         ah_did = next_deterministic_uuid()
         deck_media_from_client = DeckMediaFactory.create()
 
-        ankihub_db.upsert_deck_media_infos(
-            ankihub_did=ah_did, media_list=[deck_media_from_client]
-        )
+        ankihub_db.upsert_deck_media_infos(ankihub_did=ah_did, media_list=[deck_media_from_client])
 
         # Assert that the retrieved value is the same as the one that was stored.
         deck_media_from_db = DeckMedia.get()
@@ -1625,34 +1530,20 @@ class TestErrorHandling:
         # Assert that the function returns True when the input string contains the
         # path to this addon.
         assert _contains_path_to_this_addon("/addons21/ankihub/src/ankihub/errors.py")
-        assert _contains_path_to_this_addon(
-            f"/addons21/{ANKIWEB_ID}/src/ankihub/errors.py"
-        )
+        assert _contains_path_to_this_addon(f"/addons21/{ANKIWEB_ID}/src/ankihub/errors.py")
 
         # Same as above, but with Windows path separators.
-        assert _contains_path_to_this_addon(
-            "\\addons21\\ankihub\\src\\ankihub\\errors.py"
-        )
-        assert _contains_path_to_this_addon(
-            f"\\addons21\\{ANKIWEB_ID}\\src\\ankihub\\errors.py"
-        )
+        assert _contains_path_to_this_addon("\\addons21\\ankihub\\src\\ankihub\\errors.py")
+        assert _contains_path_to_this_addon(f"\\addons21\\{ANKIWEB_ID}\\src\\ankihub\\errors.py")
 
         # Assert that the function returns False when the input string does not contain
         # the path to this addon.
-        assert not _contains_path_to_this_addon(
-            "/addons21/other_addon/src/ankihub/errors.py"
-        )
-        assert not _contains_path_to_this_addon(
-            "/addons21/12345789/src/ankihub/errors.py"
-        )
+        assert not _contains_path_to_this_addon("/addons21/other_addon/src/ankihub/errors.py")
+        assert not _contains_path_to_this_addon("/addons21/12345789/src/ankihub/errors.py")
 
         # Same as above, but with Windows path separators.
-        assert not _contains_path_to_this_addon(
-            "\\addons21\\other_addon\\src\\ankihub\\errors.py"
-        )
-        assert not _contains_path_to_this_addon(
-            "\\addons21\\12345789\\src\\ankihub\\errors.py"
-        )
+        assert not _contains_path_to_this_addon("\\addons21\\other_addon\\src\\ankihub\\errors.py")
+        assert not _contains_path_to_this_addon("\\addons21\\12345789\\src\\ankihub\\errors.py")
 
     def test_handle_ankihub_401(self, mocker: MockerFixture):
         # Set up mock for AnkiHub login dialog.
@@ -1685,9 +1576,7 @@ class TestErrorHandling:
         expected_handled: bool,
     ):
         show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
-        terms_and_conditions_dialog = mocker.patch(
-            "ankihub.gui.errors.TermsAndConditionsDialog"
-        )
+        terms_and_conditions_dialog = mocker.patch("ankihub.gui.errors.TermsAndConditionsDialog")
 
         response_mock = mocker.Mock()
         response_mock.status_code = 403
@@ -1700,11 +1589,7 @@ class TestErrorHandling:
                 tb=None,
             )
             assert handled == expected_handled
-            if (
-                response_content
-                and json.loads(response_content).get("detail")
-                == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL
-            ):
+            if response_content and json.loads(response_content).get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
                 qtbot.wait_until(lambda: terms_and_conditions_dialog.display.called)
             else:
                 assert show_error_dialog_mock.called == expected_handled
@@ -1730,9 +1615,7 @@ class TestErrorHandling:
             requests.exceptions.ConnectionError(),
             # wrapped connection erros should be handled as well
             AnkiHubRequestException(original_exception=ConnectionError()),
-            DeckDownloadAndInstallError(
-                original_exception=ConnectionError(), ankihub_did=uuid.uuid4()
-            ),
+            DeckDownloadAndInstallError(original_exception=ConnectionError(), ankihub_did=uuid.uuid4()),
         ],
     )
     def test_handle_connection_error(self, exception: Exception, mocker: MockerFixture):
@@ -1755,18 +1638,14 @@ class TestErrorHandling:
             behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
 
-        handled = _try_handle_exception(
-            exc_value=MissingValueError(ah_did=ah_did), tb=None
-        )
+        handled = _try_handle_exception(exc_value=MissingValueError(ah_did=ah_did), tb=None)
 
         # The exception should be handled, and the deck should be marked for full download.
         assert handled
         assert config.deck_config(ah_did).download_full_deck_on_next_sync
 
 
-def test_show_error_dialog(
-    anki_session_with_addon_data: AnkiSession, mocker: MockerFixture, qtbot: QtBot
-):
+def test_show_error_dialog(anki_session_with_addon_data: AnkiSession, mocker: MockerFixture, qtbot: QtBot):
     with anki_session_with_addon_data.profile_loaded():
         show_dialog_mock = mocker.patch("ankihub.gui.utils.show_dialog")
         show_error_dialog("some message", title="some title", parent=aqt.mw)
@@ -1804,9 +1683,7 @@ class TestUploadLogs:
         exception: Exception,
     ):
         on_done_mock = mocker.stub()
-        upload_logs_mock = mocker.patch.object(
-            AddonAnkiHubClient, "upload_logs", side_effect=exception
-        )
+        upload_logs_mock = mocker.patch.object(AddonAnkiHubClient, "upload_logs", side_effect=exception)
         mocker.patch("ankihub.gui.errors._show_feedback_dialog")
         report_exception_mock = mocker.patch("ankihub.gui.errors._report_exception")
         upload_logs_in_background(on_done=on_done_mock)
@@ -1884,9 +1761,7 @@ class TestFeatureFlags:
     def setup(self):
         _feature_flags_update_callbacks.clear()
 
-    def test_update_feature_flags_in_background(
-        self, mocker: MockerFixture, qtbot: QtBot
-    ):
+    def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
         MockAnkiHubClient = mocker.patch("ankihub.feature_flags.AnkiHubClient")
         mock_logger = mocker.patch("ankihub.feature_flags.LOGGER")
         mock_config = mocker.patch("ankihub.feature_flags.config")
@@ -1968,8 +1843,7 @@ class TestRetainNidsWithAHNoteType:
 
 
 class MockUIForCreateCollaborativeDeck(Protocol):
-    def __call__(self, deck_name: str) -> None:
-        ...
+    def __call__(self, deck_name: str) -> None: ...
 
 
 @pytest.fixture
@@ -1981,9 +1855,7 @@ def mock_ui_for_create_collaborative_deck(
     The deck_name determines which deck will be chosen for the upload."""
 
     def mock_ui_interaction_inner(deck_name) -> None:
-        mock_study_deck_dialog_with_cb(
-            "ankihub.gui.operations.deck_creation.StudyDeck", deck_name
-        )
+        mock_study_deck_dialog_with_cb("ankihub.gui.operations.deck_creation.StudyDeck", deck_name)
         mocker.patch("ankihub.gui.operations.deck_creation.ask_user", return_value=True)
         mocker.patch("ankihub.gui.operations.deck_creation.showInfo")
         mocker.patch.object(DeckCreationConfirmationDialog, "run", return_value=True)
@@ -2031,12 +1903,8 @@ class TestCreateCollaborativeDeck:
                 "ankihub.gui.operations.deck_creation.get_media_names_from_notes_data",
                 return_value=[],
             )
-            start_media_upload_mock = mocker.patch.object(
-                media_sync, "start_media_upload"
-            )
-            showInfo_mock = mocker.patch(
-                "ankihub.gui.operations.deck_creation.showInfo"
-            )
+            start_media_upload_mock = mocker.patch.object(media_sync, "start_media_upload")
+            showInfo_mock = mocker.patch("ankihub.gui.operations.deck_creation.showInfo")
 
             # Create the AnkiHub deck.
             if creating_deck_fails:
@@ -2049,9 +1917,7 @@ class TestCreateCollaborativeDeck:
                 qtbot.wait_until(lambda: showInfo_mock.called)
 
                 # Assert that the correct functions were called.
-                create_ankihub_deck_mock.assert_called_once_with(
-                    deck_name, private=False, add_subdeck_tags=False
-                )
+                create_ankihub_deck_mock.assert_called_once_with(deck_name, private=False, add_subdeck_tags=False)
 
                 get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
                 start_media_upload_mock.assert_called_once()
@@ -2082,12 +1948,8 @@ class TestCreateCollaborativeDeck:
                 ],
             )
 
-            showInfo_mock = mocker.patch(
-                "ankihub.gui.operations.deck_creation.showInfo"
-            )
-            create_ankihub_deck_mock = mocker.patch(
-                "ankihub.gui.operations.deck_creation.create_ankihub_deck"
-            )
+            showInfo_mock = mocker.patch("ankihub.gui.operations.deck_creation.showInfo")
+            create_ankihub_deck_mock = mocker.patch("ankihub.gui.operations.deck_creation.create_ankihub_deck")
 
             create_collaborative_deck()
 
@@ -2125,16 +1987,9 @@ class TestGetReviewCountForAHDeckSince:
 
             now = datetime.now()
             for review_delta in review_deltas:
-                record_review_for_anki_nid(
-                    NoteId(note_info.anki_nid), now + review_delta
-                )
+                record_review_for_anki_nid(NoteId(note_info.anki_nid), now + review_delta)
 
-            assert (
-                _get_review_count_for_ah_deck_since(
-                    ah_did=ah_did, since=now + since_time
-                )
-                == expected_count
-            )
+            assert _get_review_count_for_ah_deck_since(ah_did=ah_did, since=now + since_time) == expected_count
 
     def test_with_multiple_notes(
         self,
@@ -2149,15 +2004,10 @@ class TestGetReviewCountForAHDeckSince:
 
             now = datetime.now()
             record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
-            record_review_for_anki_nid(
-                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
-            )
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), now + timedelta(seconds=1))
 
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
-                == 2
-            )
+            assert _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time) == 2
 
     def test_with_review_for_other_deck(
         self,
@@ -2174,16 +2024,11 @@ class TestGetReviewCountForAHDeckSince:
 
             now = datetime.now()
             record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
-            record_review_for_anki_nid(
-                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
-            )
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), now + timedelta(seconds=1))
 
             # Only the review for the first deck should be counted.
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
-                == 1
-            )
+            assert _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time) == 1
 
 
 class TestGetLastReviewTimeForAHDeck:
@@ -2215,13 +2060,9 @@ class TestGetLastReviewTimeForAHDeck:
 
             now = datetime.now()
             for review_delta in review_deltas:
-                record_review_for_anki_nid(
-                    NoteId(note_info.anki_nid), now + review_delta
-                )
+                record_review_for_anki_nid(NoteId(note_info.anki_nid), now + review_delta)
 
-            first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
-                ah_did=ah_did
-            )
+            first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
 
             if expected_last_review_delta is not None:
                 first_review_time, last_review_time = first_and_last_time
@@ -2233,9 +2074,7 @@ class TestGetLastReviewTimeForAHDeck:
                 )
 
                 expected_last_review_time = now + expected_last_review_delta
-                assert_datetime_equal_ignore_milliseconds(
-                    last_review_time, expected_last_review_time
-                )
+                assert_datetime_equal_ignore_milliseconds(last_review_time, expected_last_review_time)
             else:
                 assert first_and_last_time is None
 
@@ -2251,14 +2090,10 @@ class TestGetLastReviewTimeForAHDeck:
             note_info_2 = import_ah_note(ah_did=ah_did)
 
             expected_first_review_time = datetime.now()
-            record_review_for_anki_nid(
-                NoteId(note_info_1.anki_nid), expected_first_review_time
-            )
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), expected_first_review_time)
 
             expected_last_review_time = expected_first_review_time + timedelta(days=1)
-            record_review_for_anki_nid(
-                NoteId(note_info_2.anki_nid), expected_last_review_time
-            )
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), expected_last_review_time)
 
             (
                 first_review_time,
@@ -2269,9 +2104,7 @@ class TestGetLastReviewTimeForAHDeck:
                 first_review_time,
                 expected_first_review_time,
             )
-            assert_datetime_equal_ignore_milliseconds(
-                last_review_time, expected_last_review_time
-            )
+            assert_datetime_equal_ignore_milliseconds(last_review_time, expected_last_review_time)
 
     def test_with_review_for_other_deck(
         self,
@@ -2287,9 +2120,7 @@ class TestGetLastReviewTimeForAHDeck:
             note_info_2 = import_ah_note(ah_did=ah_did_2)
 
             expected_review_time = datetime.now()
-            record_review_for_anki_nid(
-                NoteId(note_info_1.anki_nid), expected_review_time
-            )
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), expected_review_time)
             record_review_for_anki_nid(
                 NoteId(note_info_2.anki_nid),
                 expected_review_time + timedelta(seconds=1),
@@ -2327,27 +2158,19 @@ class TestSendReviewData:
             second_review_time = first_review_time + timedelta(days=1)
             record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
 
-            send_card_review_data_mock = mocker.patch.object(
-                AnkiHubClient, "send_card_review_data"
-            )
+            send_card_review_data_mock = mocker.patch.object(AnkiHubClient, "send_card_review_data")
 
             send_review_data()
 
             # Assert that the correct data was passed to the client method.
             send_card_review_data_mock.assert_called_once()
 
-            card_review_data: CardReviewData = send_card_review_data_mock.call_args[0][
-                0
-            ][0]
+            card_review_data: CardReviewData = send_card_review_data_mock.call_args[0][0][0]
             assert card_review_data.ah_did == ah_did
             assert card_review_data.total_card_reviews_last_7_days == 2
             assert card_review_data.total_card_reviews_last_30_days == 2
-            assert_datetime_equal_ignore_milliseconds(
-                card_review_data.first_card_review_at, first_review_time
-            )
-            assert_datetime_equal_ignore_milliseconds(
-                card_review_data.last_card_review_at, second_review_time
-            )
+            assert_datetime_equal_ignore_milliseconds(card_review_data.first_card_review_at, first_review_time)
+            assert_datetime_equal_ignore_milliseconds(card_review_data.last_card_review_at, second_review_time)
 
     def test_without_reviews(
         self,
@@ -2360,9 +2183,7 @@ class TestSendReviewData:
             # has no reviews.
             install_ah_deck()
 
-            send_card_review_data_mock = mocker.patch.object(
-                AnkiHubClient, "send_card_review_data"
-            )
+            send_card_review_data_mock = mocker.patch.object(AnkiHubClient, "send_card_review_data")
 
             send_review_data()
 
@@ -2442,9 +2263,7 @@ class TestShowDialog:
         # different values of the scrollable argument.
         dialog = QDialog()
         qtbot.addWidget(dialog)
-        show_dialog(
-            text="some text", title="some title", parent=dialog, scrollable=scrollable
-        )
+        show_dialog(text="some text", title="some title", parent=dialog, scrollable=scrollable)
 
     @pytest.mark.parametrize(
         "default_button_idx",
@@ -2483,9 +2302,7 @@ class TestShowDialog:
 
 
 class TestPrivateConfigMigrations:
-    def test_oprphaned_deck_extensions_are_removed(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID]
-    ):
+    def test_oprphaned_deck_extensions_are_removed(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
         # Add a deck extension without a corressponding deck to the private config.
         ah_did = next_deterministic_uuid()
         deck_extension = DeckExtensionFactory.create(ah_did=ah_did)
@@ -2556,14 +2373,10 @@ class TestOptionalTagSuggestionDialog:
 
             widget = QWidget()
             qtbot.addWidget(widget)
-            dialog = OptionalTagsSuggestionDialog(
-                parent=widget, nids=[NoteId(note_info.anki_nid)]
-            )
+            dialog = OptionalTagsSuggestionDialog(parent=widget, nids=[NoteId(note_info.anki_nid)])
 
             # Mock the suggest_tags_for_groups method which is called when the submit button is clicked
-            suggest_tags_for_groups_mock = mocker.patch.object(
-                dialog._optional_tags_helper, "suggest_tags_for_groups"
-            )
+            suggest_tags_for_groups_mock = mocker.patch.object(dialog._optional_tags_helper, "suggest_tags_for_groups")
 
             dialog.show()
 
@@ -2629,9 +2442,7 @@ class TestOptionalTagSuggestionDialog:
 
             widget = QWidget()
             qtbot.addWidget(widget)
-            dialog = OptionalTagsSuggestionDialog(
-                parent=widget, nids=[NoteId(note_info.anki_nid)]
-            )
+            dialog = OptionalTagsSuggestionDialog(parent=widget, nids=[NoteId(note_info.anki_nid)])
 
             dialog.show()
             qtbot.wait(500)
@@ -2697,11 +2508,7 @@ def test_ask_user(
     # Click a button on the dialog after it is shown
     def click_button():
         dialog = latest_instance_tracker.get_latest_instance(_Dialog)
-        button = next(
-            button
-            for button in dialog.button_box.buttons()
-            if text_of_button_to_click in button.text()
-        )
+        button = next(button for button in dialog.button_box.buttons() if text_of_button_to_click in button.text())
         qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
     QTimer.singleShot(0, click_button)
@@ -2805,9 +2612,7 @@ class TestAnkiHubDBMigrations:
 
 class TestDatadogLogHandler:
     @pytest.mark.parametrize("send_logs_to_datadog_feature_flag", [True, False])
-    def test_emit_and_flush(
-        self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool
-    ):
+    def test_emit_and_flush(self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool):
         feature_flags = config.get_feature_flags()
         feature_flags["send_addon_logs_to_datadog"] = send_logs_to_datadog_feature_flag
 
@@ -2840,9 +2645,7 @@ class TestDatadogLogHandler:
             assert len(handler.buffer) == 0
 
             post_mock.assert_called_once()
-            assert post_mock.call_args[0] == (
-                "https://http-intake.logs.datadoghq.com/api/v2/logs",
-            )
+            assert post_mock.call_args[0] == ("https://http-intake.logs.datadoghq.com/api/v2/logs",)
         else:
             handler.emit(record)
             assert len(handler.buffer) == 1
@@ -2878,9 +2681,7 @@ class TestDatadogLogHandler:
         # Check that the buffer is empty and that requests.post was called once
         assert len(handler.buffer) == 0
         post_mock.assert_called_once()
-        assert post_mock.call_args[0] == (
-            "https://http-intake.logs.datadoghq.com/api/v2/logs",
-        )
+        assert post_mock.call_args[0] == ("https://http-intake.logs.datadoghq.com/api/v2/logs",)
 
     def test_capacity_flush(self, mocker):
         feature_flags = config.get_feature_flags()
@@ -2910,9 +2711,7 @@ class TestDatadogLogHandler:
         flush_mock.assert_called_once()
 
     @pytest.mark.parametrize("addon_version", ["dev", "test_version"])
-    def test_handler_setup(
-        self, anki_session_with_addon_data: AnkiSession, addon_version: str
-    ):
+    def test_handler_setup(self, anki_session_with_addon_data: AnkiSession, addon_version: str):
         from ankihub import settings
 
         settings.ADDON_VERSION = addon_version
@@ -2920,11 +2719,7 @@ class TestDatadogLogHandler:
         with anki_session_with_addon_data.profile_loaded():
             std_logger = logging.getLogger("ankihub")
             datadog_log_handler = next(
-                (
-                    handler
-                    for handler in std_logger.handlers
-                    if isinstance(handler, DatadogLogHandler)
-                ),
+                (handler for handler in std_logger.handlers if isinstance(handler, DatadogLogHandler)),
                 None,
             )
             if addon_version == "dev":
@@ -2971,16 +2766,10 @@ class TestNoteTypeWithUpdatedTemplates:
     @pytest.mark.parametrize("use_new_templates", [True, False])
     def test_with_migrating_content_from_old_note_type(self, use_new_templates: bool):
         content_to_migrate = "content to migrate"
-        old_note_type_html_content = (
-            f"old content\n{ANKIHUB_HTML_END_COMMENT}\n{content_to_migrate}"
-        )
-        old_note_type_css_content = (
-            f"old css\n{ANKIHUB_CSS_END_COMMENT}\n{content_to_migrate}"
-        )
+        old_note_type_html_content = f"old content\n{ANKIHUB_HTML_END_COMMENT}\n{content_to_migrate}"
+        old_note_type_css_content = f"old css\n{ANKIHUB_CSS_END_COMMENT}\n{content_to_migrate}"
         old_note_type = {
-            "tmpls": [
-                {"qfmt": old_note_type_html_content, "afmt": old_note_type_html_content}
-            ],
+            "tmpls": [{"qfmt": old_note_type_html_content, "afmt": old_note_type_html_content}],
             "css": old_note_type_css_content,
         }
 
@@ -3084,9 +2873,7 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
             (int(datetime.timestamp(yesterday) * 1000) - 500, 4, 60),
         ]
 
-        mocker.patch(
-            "ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows
-        )
+        mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows)
 
         result = get_daily_review_summaries_since_last_sync(last_sync)
 
@@ -3147,9 +2934,7 @@ def test_send_daily_review_summaries_with_data(mocker):
     send_daily_review_summaries(last_summary_sent_date)
 
     mock_get_daily_review_summaries.assert_called_once_with(last_summary_sent_date)
-    mock_anki_hub_client.send_daily_card_review_summaries.assert_called_once_with(
-        [mock_summary]
-    )
+    mock_anki_hub_client.send_daily_card_review_summaries.assert_called_once_with([mock_summary])
 
 
 def test_send_daily_review_summaries_without_data(mocker):
@@ -3246,9 +3031,7 @@ def url_mh_integrations_preview(slug: str) -> str:
         ),
     ],
 )
-def test_mh_tag_to_resource_title_and_slug(
-    tag: str, expected_resource: Optional[Resource]
-):
+def test_mh_tag_to_resource_title_and_slug(tag: str, expected_resource: Optional[Resource]):
     assert mh_tag_to_resource(tag) == expected_resource
 
 
@@ -3320,9 +3103,7 @@ class TestAddNoteTypeFields:
             ah_did = next_deterministic_uuid()
 
             ah_note_type = note_type_with_field_names(ah_field_names)
-            ah_note_type = import_ah_note_type(
-                ah_did=ah_did, note_type=ah_note_type, force_new=True
-            )
+            ah_note_type = import_ah_note_type(ah_did=ah_did, note_type=ah_note_type, force_new=True)
 
             anki_note_type = note_type_with_field_names(anki_field_names)
             anki_note_type["id"] = ah_note_type["id"]
@@ -3343,14 +3124,10 @@ class TestAddNoteTypeFields:
             ah_db_note_type = ankihub_db.note_type_dict(ah_note_type["id"])
 
             # Assert field names are correct
-            assert [
-                field["name"] for field in ah_db_note_type["flds"]
-            ] == expected_field_names
+            assert [field["name"] for field in ah_db_note_type["flds"]] == expected_field_names
 
             # Assert field ord values go from 0 to n-1
-            assert [field["ord"] for field in ah_db_note_type["flds"]] == list(
-                range(len(ah_db_note_type["flds"]))
-            )
+            assert [field["ord"] for field in ah_db_note_type["flds"]] == list(range(len(ah_db_note_type["flds"])))
 
             # Assert client method was called with the same note type as the one in the db
             note_type_passed_to_client = update_note_type_mock.call_args[0][1]
@@ -3371,15 +3148,11 @@ class TestDeckImportSummaryDialog:
             "ankihub.gui.operations.deck_installation.logged_into_ankiweb",
             return_value=True,
         )
-        mock_show_dialog = mocker.spy(
-            ankihub.gui.operations.deck_installation, "show_dialog"
-        )
+        mock_show_dialog = mocker.spy(ankihub.gui.operations.deck_installation, "show_dialog")
 
         # Mock DeckManagementDialog
         mock_deck_management = Mock()
-        mocker.patch(
-            "ankihub.gui.decks_dialog.DeckManagementDialog", mock_deck_management
-        )
+        mocker.patch("ankihub.gui.decks_dialog.DeckManagementDialog", mock_deck_management)
 
         return {
             "logged_into_ankiweb": mock_logged_into_ankiweb,
@@ -3404,9 +3177,7 @@ class TestDeckImportSummaryDialog:
         ankihub_deck_names = ["Cardiology Deck"]
         anki_deck_names = ankihub_deck_names.copy()
 
-        import_result = AnkiHubImportResultFactory.create(
-            merged_with_existing_deck=False
-        )
+        import_result = AnkiHubImportResultFactory.create(merged_with_existing_deck=False)
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3425,16 +3196,12 @@ class TestDeckImportSummaryDialog:
         else:
             assert "Download from AnkiWeb" not in message
 
-    def test_single_deck_merged_same_name(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_single_deck_merged_same_name(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Single deck was merged into existing deck with same name."""
         ankihub_deck_names = ["Internal Medicine"]
         anki_deck_names = ankihub_deck_names.copy()
 
-        import_result = AnkiHubImportResultFactory.create(
-            merged_with_existing_deck=True
-        )
+        import_result = AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3449,16 +3216,12 @@ class TestDeckImportSummaryDialog:
         assert "You already have the deck <b>Internal Medicine</b>!" in message
         assert "We've merged the new deck into the existing one." in message
 
-    def test_single_deck_merged_different_name(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_single_deck_merged_different_name(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Single deck was merged into existing deck with different name."""
         ankihub_deck_names = ["MCAT Biology"]
         anki_deck_names = ["My Custom Biology Deck"]
 
-        import_result = AnkiHubImportResultFactory.create(
-            merged_with_existing_deck=True
-        )
+        import_result = AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3470,23 +3233,15 @@ class TestDeckImportSummaryDialog:
             qtbot.wait(self.wait)
 
         message = self.get_dialog_message(mock_dependencies)
-        assert (
-            "<b>MCAT Biology</b> was merged into <b>My Custom Biology Deck</b>"
-            in message
-        )
+        assert "<b>MCAT Biology</b> was merged into <b>My Custom Biology Deck</b>" in message
         assert "due to overlapping content" in message
 
-    def test_multiple_decks_all_created(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_multiple_decks_all_created(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Multiple decks all created separately."""
         ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
         anki_deck_names = ankihub_deck_names.copy()
 
-        import_results = [
-            AnkiHubImportResultFactory.create(merged_with_existing_deck=False)
-            for _ in range(3)
-        ]
+        import_results = [AnkiHubImportResultFactory.create(merged_with_existing_deck=False) for _ in range(3)]
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3503,17 +3258,12 @@ class TestDeckImportSummaryDialog:
         assert "<b>Deck name B</b>" in message
         assert "<b>Deck name C</b>" in message
 
-    def test_multiple_decks_all_merged_same_name(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_multiple_decks_all_merged_same_name(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Multiple decks all merged with same name."""
         ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
         anki_deck_names = ankihub_deck_names.copy()
 
-        import_results = [
-            AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
-            for _ in range(3)
-        ]
+        import_results = [AnkiHubImportResultFactory.create(merged_with_existing_deck=True) for _ in range(3)]
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3525,16 +3275,12 @@ class TestDeckImportSummaryDialog:
             qtbot.wait(self.wait)
 
         message = self.get_dialog_message(mock_dependencies)
-        assert (
-            "New decks were merged into existing decks with matching names:" in message
-        )
+        assert "New decks were merged into existing decks with matching names:" in message
         assert "<b>Deck name A</b>" in message
         assert "<b>Deck name B</b>" in message
         assert "<b>Deck name C</b>" in message
 
-    def test_multiple_decks_all_merged_different_name(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_multiple_decks_all_merged_different_name(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Multiple decks all merged with different name."""
         ankihub_deck_names = ["Deck name A", "Deck name B", "Deck name C"]
         anki_deck_names = [
@@ -3543,10 +3289,7 @@ class TestDeckImportSummaryDialog:
             "Existing Deck Name C",
         ]
 
-        import_results = [
-            AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
-            for _ in range(3)
-        ]
+        import_results = [AnkiHubImportResultFactory.create(merged_with_existing_deck=True) for _ in range(3)]
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3558,18 +3301,13 @@ class TestDeckImportSummaryDialog:
             qtbot.wait(self.wait)
 
         message = self.get_dialog_message(mock_dependencies)
-        assert (
-            "Some of the decks you subscribed to matched ones you already had."
-            in message
-        )
+        assert "Some of the decks you subscribed to matched ones you already had." in message
         assert "We've merged them to avoid duplicates:" in message
         assert "<b>Deck name A</b> → <b>Existing Deck Name A</b>" in message
         assert "<b>Deck name B</b> → <b>Existing Deck Name B</b>" in message
         assert "<b>Deck name C</b> → <b>Existing Deck Name C</b>" in message
 
-    def test_multiple_subscribed_decks_mixed(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_multiple_subscribed_decks_mixed(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Multiple subscribed decks with mixed scenarios."""
         # Setup deck names for mixed scenario
         ankihub_deck_names = [
@@ -3607,14 +3345,10 @@ class TestDeckImportSummaryDialog:
         import_results = []
         # First 4 are new
         for _ in range(4):
-            import_results.append(
-                AnkiHubImportResultFactory.create(merged_with_existing_deck=False)
-            )
+            import_results.append(AnkiHubImportResultFactory.create(merged_with_existing_deck=False))
         # Next 6 are merged
         for _ in range(6):
-            import_results.append(
-                AnkiHubImportResultFactory.create(merged_with_existing_deck=True)
-            )
+            import_results.append(AnkiHubImportResultFactory.create(merged_with_existing_deck=True))
 
         _show_deck_import_summary_dialog_inner(
             ankihub_deck_names=ankihub_deck_names,
@@ -3641,17 +3375,12 @@ class TestDeckImportSummaryDialog:
             assert f"<b>Deck name {letter}</b>" in message
 
         # Check merged different name section
-        assert (
-            "Merged into existing deck(s) due to overlapping content (3 decks):"
-            in message
-        )
+        assert "Merged into existing deck(s) due to overlapping content (3 decks):" in message
         assert "<b>Deck name H</b> → <b>Existing Deck Name A</b>" in message
         assert "<b>Deck name I</b> → <b>Existing Deck Name B</b>" in message
         assert "<b>Deck name J</b> → <b>Existing Deck Name C</b>" in message
 
-    def test_deck_with_skipped_notes(
-        self, mock_dependencies: Dict[str, Any], qtbot: QtBot
-    ):
+    def test_deck_with_skipped_notes(self, mock_dependencies: Dict[str, Any], qtbot: QtBot):
         """Test scenario: Deck with skipped notes warning."""
         ankihub_deck_names = ["Pathology Deck"]
         anki_deck_names = ["Pathology Deck"]

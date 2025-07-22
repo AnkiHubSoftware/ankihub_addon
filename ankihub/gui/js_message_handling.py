@@ -36,9 +36,7 @@ TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
 
 OPEN_CONFIG_PYCMD = "ankihub_open_config"
 
-POST_MESSAGE_TO_ANKIHUB_JS_PATH = (
-    Path(__file__).parent / "web/post_message_to_ankihub_js.js"
-)
+POST_MESSAGE_TO_ANKIHUB_JS_PATH = Path(__file__).parent / "web/post_message_to_ankihub_js.js"
 
 
 def setup():
@@ -61,7 +59,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         TermsAndConditionsDialog.display(parent=aqt.mw)
         if reviewer_sidebar:
-
             reviewer_sidebar.set_needs_to_accept_terms(True)
             reviewer_sidebar.close_sidebar()
 
@@ -90,9 +87,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         if ah_nids:
             ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
-            anki_nids = [
-                anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid
-            ]
+            anki_nids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
             search_string = f"nid:{','.join(map(str, anki_nids))}"
 
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
@@ -123,9 +118,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
 
-        _post_message_to_ankihub_js(
-            message={"noteSuspensionStates": note_suspension_states}, web=context.web
-        )
+        _post_message_to_ankihub_js(message={"noteSuspensionStates": note_suspension_states}, web=context.web)
         return (True, None)
     elif message.startswith(COPY_TO_CLIPBOARD_PYCMD):
         kwargs = parse_js_message_kwargs(message)
@@ -169,14 +162,8 @@ def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
     """Returns a mapping of AnkiHub note IDs (as strings) to whether they are suspended or not.
     A note is considered unsuspended if at least one of its cards is unsuspended.
     If the note is not found in Anki, it will be missing from the returned mapping."""
-    ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
-        [uuid.UUID(ah_nid) for ah_nid in ah_nids]
-    )
-    ah_nids_to_anki_nids = {
-        ah_nid: anki_nid
-        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
-        if anki_nid
-    }
+    ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids([uuid.UUID(ah_nid) for ah_nid in ah_nids])
+    ah_nids_to_anki_nids = {ah_nid: anki_nid for ah_nid, anki_nid in ah_nids_to_anki_nids.items() if anki_nid}
     if not ah_nids_to_anki_nids:
         return {}
 
@@ -188,7 +175,4 @@ def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
             """
         )
     )
-    return {
-        str(ah_nid): anki_nid not in unsuspended_anki_nids
-        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
-    }
+    return {str(ah_nid): anki_nid not in unsuspended_anki_nids for ah_nid, anki_nid in ah_nids_to_anki_nids.items()}

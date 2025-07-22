@@ -105,9 +105,7 @@ def _setup_on_profile_did_open() -> None:
                 def raise_exception() -> None:
                     raise exception
 
-                aqt.mw.taskman.run_in_background(
-                    raise_exception, on_done=lambda future: future.result()
-                )
+                aqt.mw.taskman.run_in_background(raise_exception, on_done=lambda future: future.result())
 
         profile_is_opening = not profile_is_opening
 
@@ -143,9 +141,7 @@ def _profile_setup() -> bool:
     """
     if not setup_profile_data_folder():
         return False
-    LOGGER.info(
-        "Set up profile data folder for the current profile.", profile=aqt.mw.pm.name
-    )
+    LOGGER.info("Set up profile data folder for the current profile.", profile=aqt.mw.pm.name)
 
     config.setup_private_config()
     LOGGER.info("Set up config for the current profile.")
@@ -263,9 +259,7 @@ def _general_setup() -> None:
     config.token_change_hook.append(update_feature_flags_in_background)
     config.token_change_hook.append(fetch_username_in_background)
 
-    LOGGER.info(
-        "Set up feature flag fetching (flags will be fetched in the background)."
-    )
+    LOGGER.info("Set up feature flag fetching (flags will be fetched in the background).")
 
 
 def _copy_web_media_to_media_folder() -> None:

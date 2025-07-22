@@ -1,5 +1,6 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
+
 from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Callable
@@ -101,14 +102,10 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
             new_after_sync()
             raise
         except Exception:
-            original_sync_collection_and_media(
-                *args, **kwargs, after_sync=new_after_sync
-            )
+            original_sync_collection_and_media(*args, **kwargs, after_sync=new_after_sync)
             raise
         else:
-            original_sync_collection_and_media(
-                *args, **kwargs, after_sync=new_after_sync
-            )
+            original_sync_collection_and_media(*args, **kwargs, after_sync=new_after_sync)
 
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
@@ -136,7 +133,6 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
 def _should_auto_sync_with_ankihub() -> bool:
     result = (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
-        config.public_config["auto_sync"] == "on_startup"
-        and not auto_sync_state.attempted_startup_sync
+        config.public_config["auto_sync"] == "on_startup" and not auto_sync_state.attempted_startup_sync
     )
     return result

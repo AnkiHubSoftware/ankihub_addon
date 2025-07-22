@@ -61,24 +61,16 @@ from ankihub.ankihub_client.models import (
 )
 from ankihub.gui.utils import deck_download_progress_cb
 
-WEBAPP_COMPOSE_FILE = (
-    Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
-)
+WEBAPP_COMPOSE_FILE = Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
-DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE = (
-    TEST_DATA_PATH / "deck_with_one_deleted_basic_note.csv"
-)
+DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE = TEST_DATA_PATH / "deck_with_one_deleted_basic_note.csv"
 
-DECK_CSV_WITHOUT_DELETED_COLUMN = (
-    TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv"
-)
-DECK_CSV_GZ_WITHOUT_DELETED_COLUMN = (
-    TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv.gz"
-)
+DECK_CSV_WITHOUT_DELETED_COLUMN = TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv"
+DECK_CSV_GZ_WITHOUT_DELETED_COLUMN = TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv.gz"
 
 TEST_MEDIA_PATH = TEST_DATA_PATH / "media"
 
@@ -97,9 +89,7 @@ ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1 = 1
 
 ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
 
-DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
-    year=2023, month=1, day=2, tzinfo=timezone.utc
-)
+DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(year=2023, month=1, day=2, tzinfo=timezone.utc)
 
 ID_OF_DECK_WITH_NOTES_ACTION = uuid.UUID("3d124f2e-a15c-4cf9-a470-b2ab8015debe")
 
@@ -159,9 +149,7 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             interval=0.5,
         )
 
-    client = AnkiHubClient(
-        api_url=LOCAL_API_URL, local_media_dir_path_cb=lambda: TEST_MEDIA_PATH
-    )
+    client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
     yield client
 
 
@@ -285,24 +273,18 @@ def remove_db_dump() -> Generator:
         pass
         # docker is not installed, nothing to do
     else:
-        assert (
-            False
-        ), f"Command rm failed with error code {result.returncode} {result.stderr}"
+        assert False, f"Command rm failed with error code {result.returncode} {result.stderr}"
 
     yield
 
 
-def report_command_result(
-    command_name: str, result: subprocess.CompletedProcess, raise_on_error: bool
-) -> None:
+def report_command_result(command_name: str, result: subprocess.CompletedProcess, raise_on_error: bool) -> None:
     if result.returncode != 0:
         print(f"Command {command_name} failed with error code {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
         if raise_on_error:
-            assert (
-                False
-            ), f"Command {command_name} failed with error code {result.returncode}"
+            assert False, f"Command {command_name} failed with error code {result.returncode}"
     else:
         print(f"Command {command_name} executed successfully.")
         print(f"Stdout: {result.stdout}")
@@ -321,9 +303,7 @@ def marks(request):
 def vcr_enabled(vcr: VCR):
     # See https://github.com/ktosiek/pytest-vcr/blob/master/pytest_vcr.py#L59-L62
     return not (
-        vcr.record_mode == "new_episodes"
-        and vcr.before_record_response
-        and vcr.before_record_response() is None
+        vcr.record_mode == "new_episodes" and vcr.before_record_response and vcr.before_record_response() is None
     )
 
 
@@ -466,9 +446,7 @@ class TestDownloadDeck:
     ):
         client = authorized_client_for_user_test1
         presigned_url_suffix = f"/{deck_file.name}"
-        mocker.patch.object(
-            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
-        )
+        mocker.patch.object(client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix)
 
         original_get_deck_by_id = client.get_deck_by_id
 
@@ -495,15 +473,11 @@ class TestDownloadDeck:
             assert notes_data[0].last_update_type is None
 
     @pytest.mark.vcr()
-    def test_download_deck_with_progress(
-        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
-    ):
+    def test_download_deck_with_progress(self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture):
         client = authorized_client_for_user_test1
 
         presigned_url_suffix = "/fake_key"
-        mocker.patch.object(
-            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
-        )
+        mocker.patch.object(client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix)
 
         original_get_deck_by_id = client.get_deck_by_id
 
@@ -548,9 +522,7 @@ class TestDownloadDeck:
         assert notes_data[0].tags == ["asdf"]
 
 
-def create_note_on_ankihub_and_assert(
-    client, new_note_suggestion, uuid_of_deck: uuid.UUID
-):
+def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck: uuid.UUID):
     # utility function meant to be used in tests for creating a note with known values on ankihub
     # asserts that the note was created correctly
     assert isinstance(client, AnkiHubClient)
@@ -558,9 +530,7 @@ def create_note_on_ankihub_and_assert(
 
     # create an auto-accepted new note suggestion
     new_note_suggestion.ah_did = uuid_of_deck
-    errors_by_nid = client.create_suggestions_in_bulk(
-        new_note_suggestions=[new_note_suggestion], auto_accept=True
-    )
+    errors_by_nid = client.create_suggestions_in_bulk(new_note_suggestions=[new_note_suggestion], auto_accept=True)
     assert errors_by_nid == {}
 
     # assert that note was created
@@ -582,9 +552,7 @@ def test_upload_deck(
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
-    mocker.patch.object(
-        client, "_presigned_url_suffix_from_key", return_value="fake_key"
-    )
+    mocker.patch.object(client, "_presigned_url_suffix_from_key", return_value="fake_key")
 
     response_mock_1 = Mock()
     response_mock_1.status_code = 200
@@ -594,9 +562,7 @@ def test_upload_deck(
     deck_id = uuid.uuid4()
     response_mock_2.json = lambda: {"deck_id": str(deck_id)}
 
-    send_request_mock = mocker.patch.object(
-        client, "_send_request", side_effect=[response_mock_1, response_mock_2]
-    )
+    send_request_mock = mocker.patch.object(client, "_send_request", side_effect=[response_mock_1, response_mock_2])
 
     client.upload_deck(
         deck_name="test deck",
@@ -607,11 +573,7 @@ def test_upload_deck(
     )
 
     # Check that the deck would be uploaded to s3
-    payload = json.loads(
-        gzip.decompress(send_request_mock.call_args_list[0].kwargs["data"]).decode(
-            "utf-8"
-        )
-    )
+    payload = json.loads(gzip.decompress(send_request_mock.call_args_list[0].kwargs["data"]).decode("utf-8"))
     assert len(payload["notes"]) == 1
     note_from_payload = payload["notes"][0]
     note_from_payload["note_id"] = note_from_payload["id"]
@@ -748,20 +710,14 @@ class TestCreateSuggestionsInBulk:
 
         # create a new note suggestion
         new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            new_note_suggestions=[new_note_suggestion], auto_accept=False
-        )
+        errors_by_nid = client.create_suggestions_in_bulk(new_note_suggestions=[new_note_suggestion], auto_accept=False)
         assert errors_by_nid == {}
 
         # try creating a new note suggestion with the same ah_nid as the first one
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.anki_nid = 2
-        errors_by_nid = client.create_suggestions_in_bulk(
-            new_note_suggestions=[new_note_suggestion], auto_accept=False
-        )
-        assert len(
-            errors_by_nid
-        ) == 1 and "Suggestion with this id already exists" in str(errors_by_nid)
+        errors_by_nid = client.create_suggestions_in_bulk(new_note_suggestions=[new_note_suggestion], auto_accept=False)
+        assert len(errors_by_nid) == 1 and "Suggestion with this id already exists" in str(errors_by_nid)
 
     @pytest.mark.vcr()
     def test_create_auto_accepted_new_note_suggestion(
@@ -821,9 +777,7 @@ class TestCreateSuggestionsInBulk:
         note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
         assert errors_by_nid == {}
         assert note.fields == change_note_suggestion.fields
-        assert set(note.tags) == set(change_note_suggestion.added_tags) | set(
-            new_note_suggestion.tags
-        )
+        assert set(note.tags) == set(change_note_suggestion.added_tags) | set(new_note_suggestion.tags)
 
         # create a change note suggestion without any changes
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -831,9 +785,7 @@ class TestCreateSuggestionsInBulk:
         )
         assert len(
             errors_by_nid
-        ) == 1 and "Suggestion fields and tags don't have any changes to the original note" in str(
-            errors_by_nid
-        )
+        ) == 1 and "Suggestion fields and tags don't have any changes to the original note" in str(errors_by_nid)
 
 
 class TestDeckSubscriptions:
@@ -950,9 +902,7 @@ class TestDecksWithUserRelation:
                 ID_OF_DECK_OF_USER_TEST2,
             ]
         )
-        deck_of_user_test2 = next(
-            deck for deck in decks if deck.ah_did == ID_OF_DECK_OF_USER_TEST2
-        )
+        deck_of_user_test2 = next(deck for deck in decks if deck.ah_did == ID_OF_DECK_OF_USER_TEST2)
         assert deck_of_user_test2.user_relation == UserDeckRelation.SUBSCRIBER
 
 
@@ -992,9 +942,7 @@ class TestGetDeckUpdates:
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
-        deck_updates = client.get_deck_updates(
-            ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time
-        )
+        deck_updates = client.get_deck_updates(ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time)
 
         note_info: NoteInfo = new_note_suggestion_note_info
         note_info.ah_nid = new_note_suggestion.ah_nid
@@ -1046,9 +994,7 @@ class TestGetDeckUpdates:
         assert deck_updates.latest_update == latest_update
 
     @pytest.mark.vcr()
-    def test_get_empty_deck_updates(
-        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
-    ):
+    def test_get_empty_deck_updates(self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture):
         client = authorized_client_for_user_test1
 
         # Mock responses from deck updates endpoint
@@ -1078,11 +1024,7 @@ class TestGetDeckUpdates:
             "external_notes_url": None,
             "next": None,
             "notes": notes_encoded,
-            "latest_update": (
-                datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR)
-                if latest_update
-                else None
-            ),
+            "latest_update": (datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR) if latest_update else None),
             "protected_fields": {},
             "protected_tags": [],
         }
@@ -1100,11 +1042,7 @@ class TestGetDeckUpdates:
             "external_notes_url": "test_url",
             "next": None,
             "notes": None,
-            "latest_update": (
-                datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR)
-                if latest_update
-                else None
-            ),
+            "latest_update": (datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR) if latest_update else None),
             "protected_fields": {},
             "protected_tags": [],
         }
@@ -1134,9 +1072,7 @@ class TestGetDeckMediaUpdates:
             for i in reversed(range(3))
         ]
 
-    def _assert_media_as_expected(
-        self, actual: List[DeckMedia], expected: List[DeckMedia]
-    ):
+    def _assert_media_as_expected(self, actual: List[DeckMedia], expected: List[DeckMedia]):
         # Convert DeckMedia objects to dicts
         actual_dicts = [dataclasses.asdict(media) for media in actual]
         expected_dicts = [dataclasses.asdict(media) for media in expected]
@@ -1162,9 +1098,7 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 1
         assert len(update_chunks[0].media) == 3
         deck_media_objects = update_chunks[0].media
-        self._assert_media_as_expected(
-            actual=deck_media_objects, expected=self.deck_media_on_server
-        )
+        self._assert_media_as_expected(actual=deck_media_objects, expected=self.deck_media_on_server)
 
     @pytest.mark.vcr()
     def test_get_media_since(
@@ -1190,9 +1124,7 @@ class TestGetDeckMediaUpdates:
         )
 
     @pytest.mark.vcr()
-    def test_pagination(
-        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
-    ):
+    def test_pagination(self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture):
         client = authorized_client_for_user_test1
 
         # Set page size to 1 so that we can test pagination
@@ -1202,16 +1134,12 @@ class TestGetDeckMediaUpdates:
             page_size,
         )
 
-        update_chunks = list(
-            client.get_deck_media_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
-        )
+        update_chunks = list(client.get_deck_media_updates(ID_OF_DECK_OF_USER_TEST1, since=None))
 
         assert len(update_chunks) == 3
 
         deck_media_objects = [media for chunk in update_chunks for media in chunk.media]
-        self._assert_media_as_expected(
-            actual=deck_media_objects, expected=self.deck_media_on_server
-        )
+        self._assert_media_as_expected(actual=deck_media_objects, expected=self.deck_media_on_server)
 
 
 @pytest.mark.vcr()
@@ -1281,11 +1209,7 @@ def test_get_note_customizations_by_deck_extension_id(
         ],
     )
 
-    chunks = list(
-        client.get_deck_extension_updates(
-            deck_extension_id=deck_extension_id, since=None
-        )
-    )
+    chunks = list(client.get_deck_extension_updates(deck_extension_id=deck_extension_id, since=None))
     assert len(chunks) == 1
     chunk = chunks[0]
 
@@ -1368,11 +1292,7 @@ def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
         ]
     )
 
-    chunks = list(
-        client.get_deck_extension_updates(
-            deck_extension_id=deck_extension_id, since=None
-        )
-    )
+    chunks = list(client.get_deck_extension_updates(deck_extension_id=deck_extension_id, since=None))
     assert len(chunks) == 2
     chunk_1, chunk_2 = chunks
 
@@ -1401,9 +1321,7 @@ def test_prevalidate_tag_groups(authorized_client_for_user_test2: AnkiHubClient)
             tag_group_name="invalid",
             deck_extension_id=None,
             success=False,
-            errors=[
-                "This Deck Extension does not exist. Please create one for this Deck on AnkiHub."
-            ],
+            errors=["This Deck Extension does not exist. Please create one for this Deck on AnkiHub."],
         ),
     ]
 
@@ -1470,11 +1388,7 @@ def test_suggest_auto_accepted_optional_tags(
         ]
     )
 
-    chunks = list(
-        client.get_deck_extension_updates(
-            deck_extension_id=DECK_EXTENSION_ID, since=None
-        )
-    )
+    chunks = list(client.get_deck_extension_updates(deck_extension_id=DECK_EXTENSION_ID, since=None))
 
     assert len(chunks) == 1
     chunk = chunks[0]
@@ -1509,9 +1423,7 @@ def test_download_media(
 
 
 class TestUploadMediaForSuggestion:
-    @pytest.mark.parametrize(
-        "suggestion_type", ["new_note_suggestion", "change_note_suggestion"]
-    )
+    @pytest.mark.parametrize("suggestion_type", ["new_note_suggestion", "change_note_suggestion"])
     def test_upload_media_for_suggestion(
         self,
         suggestion_type: str,
@@ -1530,9 +1442,7 @@ class TestUploadMediaForSuggestion:
         )
 
         fake_presigned_url = f"{client.s3_bucket_url}/fake_key"
-        s3_upload_request_mock = requests_mock.post(
-            fake_presigned_url, json={"success": True}, status_code=204
-        )
+        s3_upload_request_mock = requests_mock.post(fake_presigned_url, json={"success": True}, status_code=204)
 
         expected_media_name_map = {
             "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
@@ -1573,16 +1483,10 @@ class TestUploadMediaForSuggestion:
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
         original_media_names = get_media_names_from_suggestion(suggestion)
-        original_media_paths = [
-            TEST_MEDIA_PATH / original_media_name
-            for original_media_name in original_media_names
-        ]
-        media_name_map = client.generate_media_files_with_hashed_names(
-            original_media_paths
-        )
+        original_media_paths = [TEST_MEDIA_PATH / original_media_name for original_media_name in original_media_names]
+        media_name_map = client.generate_media_files_with_hashed_names(original_media_paths)
         new_media_paths = {
-            TEST_MEDIA_PATH / media_name_map[original_media_path.name]
-            for original_media_path in original_media_paths
+            TEST_MEDIA_PATH / media_name_map[original_media_path.name] for original_media_path in original_media_paths
         }
 
         client.upload_media(new_media_paths, ah_did=next_deterministic_uuid())
@@ -1630,9 +1534,7 @@ class TestUploadMediaForDeck:
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
             '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
         )
-        notes_data[1].fields[
-            0
-        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+        notes_data[1].fields[0].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
 
         notes_data[2].fields[1].value = (
             '<img src="testfile_1.jpeg" width="100" alt="test file 1">'
@@ -1674,9 +1576,7 @@ class TestUploadMediaForDeck:
         self._upload_media_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
-        path_to_created_zip_file = Path(
-            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
-        )
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip")
 
         all_media_names_in_notes = get_media_names_from_notes_data(notes_data)
         assert path_to_created_zip_file.is_file()
@@ -1696,9 +1596,7 @@ class TestUploadMediaForDeck:
 
         notes_data = self.notes_data_with_many_media_files()
         deck_id = next_deterministic_uuid()
-        path_to_created_zip_file = Path(
-            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
-        )
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip")
 
         s3_info_mocked_value = {
             "url": "https://fake_s3.com",
@@ -1747,9 +1645,7 @@ class TestUploadMediaForDeck:
 
         assert not path_to_created_zip_file.is_file()
 
-    def _upload_media_for_notes_data(
-        self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
-    ):
+    def _upload_media_for_notes_data(self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID):
         media_names = get_media_names_from_notes_data(notes_data)
         media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
         client.upload_media(media_paths, ah_did)
@@ -1757,15 +1653,11 @@ class TestUploadMediaForDeck:
 
 @pytest.mark.vcr()
 class TestOwnedDeckIds:
-    def test_owned_deck_ids_for_user_test1(
-        self, authorized_client_for_user_test1: AnkiHubClient
-    ):
+    def test_owned_deck_ids_for_user_test1(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
         assert [ID_OF_DECK_OF_USER_TEST1] == client.owned_deck_ids()
 
-    def test_owned_deck_ids_for_user_test2(
-        self, authorized_client_for_user_test2: AnkiHubClient
-    ):
+    def test_owned_deck_ids_for_user_test2(self, authorized_client_for_user_test2: AnkiHubClient):
         client = authorized_client_for_user_test2
         assert [ID_OF_DECK_OF_USER_TEST2] == client.owned_deck_ids()
 
@@ -1774,15 +1666,11 @@ class TestOwnedDeckIds:
 class TestGetNoteType:
     def test_get_note_type(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
-        note_type = client.get_note_type(
-            anki_note_type_id=ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
-        )
+        note_type = client.get_note_type(anki_note_type_id=ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1)
         assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
         assert note_type["name"] == "Cloze (test1)"
 
-    def test_get_not_existing_note_type(
-        self, authorized_client_for_user_test1: AnkiHubClient
-    ):
+    def test_get_not_existing_note_type(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
         with pytest.raises(AnkiHubHTTPError) as excinfo:
             client.get_note_type(anki_note_type_id=-1)
@@ -1794,9 +1682,7 @@ class TestGetNoteType:
 class TestGetNoteTypesDictForDeck:
     def test_get_note_types_dict(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
-        note_types_by_id = client.get_note_types_dict_for_deck(
-            ah_did=ID_OF_DECK_OF_USER_TEST1
-        )
+        note_types_by_id = client.get_note_types_dict_for_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
         assert len(note_types_by_id) == 1
 
         note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
@@ -1816,9 +1702,7 @@ class TestCreateNoteType:
         }
         new_note_type = client.create_note_type(ID_OF_DECK_OF_USER_TEST1, note_type)
         deck = client.get_deck_by_id(ID_OF_DECK_OF_USER_TEST1)
-        note_types_by_id = client.get_note_types_dict_for_deck(
-            ah_did=ID_OF_DECK_OF_USER_TEST1
-        )
+        note_types_by_id = client.get_note_types_dict_for_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
         assert new_note_type["name"] == f"New Type ({deck.name} / test1)"
         assert len(note_types_by_id) == 2
         new_note_type = note_types_by_id[cast(int, note_type["id"])]
@@ -1828,13 +1712,9 @@ class TestCreateNoteType:
 
 @pytest.mark.vcr()
 class TestAddNoteTypeFields:
-    def test_add_note_type_fields(
-        self, authorized_client_for_user_test1: AnkiHubClient
-    ):
+    def test_add_note_type_fields(self, authorized_client_for_user_test1: AnkiHubClient):
         client = authorized_client_for_user_test1
-        note_types_by_id = client.get_note_types_dict_for_deck(
-            ah_did=ID_OF_DECK_OF_USER_TEST1
-        )
+        note_types_by_id = client.get_note_types_dict_for_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
         note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
         field_names = ["New1", "New2"]
         for name in field_names:
@@ -1842,20 +1722,13 @@ class TestAddNoteTypeFields:
             field["name"] = name
             field["ord"] = None
             note_type["flds"].append(field)
-        note_type = client.update_note_type(
-            ID_OF_DECK_OF_USER_TEST1, note_type, ["flds"]
-        )
-        assert all(
-            field_name in [field["name"] for field in note_type["flds"]]
-            for field_name in field_names
-        )
+        note_type = client.update_note_type(ID_OF_DECK_OF_USER_TEST1, note_type, ["flds"])
+        assert all(field_name in [field["name"] for field in note_type["flds"]] for field_name in field_names)
 
 
 @pytest.mark.vcr()
 class TestUpdateNoteTypeTemplatesAndStyles:
-    def test_update_note_type_templates_and_styles(
-        self, authorized_client_for_user_test1: AnkiHubClient
-    ):
+    def test_update_note_type_templates_and_styles(self, authorized_client_for_user_test1: AnkiHubClient):
         css = ".home {background: red}"
         templates = [
             {
@@ -1870,16 +1743,12 @@ class TestUpdateNoteTypeTemplatesAndStyles:
         ]
 
         client = authorized_client_for_user_test1
-        note_types_by_id = client.get_note_types_dict_for_deck(
-            ah_did=ID_OF_DECK_OF_USER_TEST1
-        )
+        note_types_by_id = client.get_note_types_dict_for_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
         note_type = note_types_by_id[ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1]
         note_type["tmpls"] = templates
         note_type["css"] = css
 
-        data = client.update_note_type(
-            ID_OF_DECK_OF_USER_TEST1, note_type, ["tmpls", "css"]
-        )
+        data = client.update_note_type(ID_OF_DECK_OF_USER_TEST1, note_type, ["tmpls", "css"])
 
         assert data["css"] == css
         assert data["tmpls"] == templates
@@ -1942,9 +1811,7 @@ class TestSendDailyCardReviewSummaries:
             ),
         ]
 
-        authorized_client_for_user_test1.send_daily_card_review_summaries(
-            daily_card_review_summaries
-        )
+        authorized_client_for_user_test1.send_daily_card_review_summaries(daily_card_review_summaries)
 
 
 @pytest.mark.vcr
@@ -1955,9 +1822,7 @@ class TestGetPendingNotesActionsForDeck:
     ):
         client = authorized_client_for_user_test1
         client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
-        notes_actions = client.get_pending_notes_actions_for_deck(
-            ID_OF_DECK_WITH_NOTES_ACTION
-        )
+        notes_actions = client.get_pending_notes_actions_for_deck(ID_OF_DECK_WITH_NOTES_ACTION)
         assert len(notes_actions) == 1
         assert notes_actions[0].action == NotesActionChoices.UNSUSPEND
         assert len(notes_actions[0].note_ids) == 1
@@ -1968,14 +1833,10 @@ class TestGetPendingNotesActionsForDeck:
     ):
         client = authorized_client_for_user_test1
         client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
-        notes_actions = client.get_pending_notes_actions_for_deck(
-            ID_OF_DECK_WITH_NOTES_ACTION
-        )
+        notes_actions = client.get_pending_notes_actions_for_deck(ID_OF_DECK_WITH_NOTES_ACTION)
         assert len(notes_actions) == 1
 
-        notes_actions = client.get_pending_notes_actions_for_deck(
-            ID_OF_DECK_WITH_NOTES_ACTION
-        )
+        notes_actions = client.get_pending_notes_actions_for_deck(ID_OF_DECK_WITH_NOTES_ACTION)
         assert len(notes_actions) == 0
 
     def test_when_not_authorized(

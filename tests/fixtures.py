@@ -69,15 +69,11 @@ def next_deterministic_id() -> Callable[[], int]:
 def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
-        result = create_or_get_ah_version_of_note_type(
-            mw, mw.col.models.by_name("Basic")
-        )
+        result = create_or_get_ah_version_of_note_type(mw, mw.col.models.by_name("Basic"))
         return result
 
 
-def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
+def create_or_get_ah_version_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDict:
     note_type = copy.deepcopy(note_type)
     note_type["id"] = 0
     note_type["name"] = note_type["name"] + " (AnkiHub)"
@@ -91,8 +87,7 @@ def create_or_get_ah_version_of_note_type(
 
 
 class SetFeatureFlagState(Protocol):
-    def __call__(self, feature_flag_name: str, is_active: bool = True) -> None:
-        ...
+    def __call__(self, feature_flag_name: str, is_active: bool = True) -> None: ...
 
 
 @pytest.fixture
@@ -127,8 +122,7 @@ class ImportAHNote(Protocol):
         mid: Optional[NotetypeId] = None,
         ah_did: Optional[uuid.UUID] = None,
         anki_did: Optional[DeckId] = None,
-    ) -> NoteInfo:
-        ...
+    ) -> NoteInfo: ...
 
 
 @fixture
@@ -160,9 +154,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         anki_did: Optional[DeckId] = None,
     ) -> NoteInfo:
         if mid is None:
-            ah_basic_note_type = create_or_get_ah_version_of_note_type(
-                aqt.mw, aqt.mw.col.models.by_name("Basic")
-            )
+            ah_basic_note_type = create_or_get_ah_version_of_note_type(aqt.mw, aqt.mw.col.models.by_name("Basic"))
             mid = ah_basic_note_type["id"]
 
         if note_data is None:
@@ -177,9 +169,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         # For each field in note_data, check if there is a field in the note type with the same name.
         note_type = aqt.mw.col.models.get(mid)
         field_names_of_note_type = set(field["name"] for field in note_type["flds"])
-        fields_are_compatible = all(
-            field.name in field_names_of_note_type for field in note_data.fields
-        )
+        fields_are_compatible = all(field.name in field_names_of_note_type for field in note_data.fields)
         assert fields_are_compatible, (
             f"Note data is not compatible with the note type.\n"
             f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
@@ -187,16 +177,10 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
 
         if deck_config := config.deck_config(ah_did):
             suspend_new_cards_of_new_notes = deck_config.suspend_new_cards_of_new_notes
-            suspend_new_cards_of_existing_notes = (
-                deck_config.suspend_new_cards_of_existing_notes
-            )
+            suspend_new_cards_of_existing_notes = deck_config.suspend_new_cards_of_existing_notes
         else:
-            suspend_new_cards_of_new_notes = (
-                DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
-            )
-            suspend_new_cards_of_existing_notes = (
-                DeckConfig.suspend_new_cards_of_existing_notes_default()
-            )
+            suspend_new_cards_of_new_notes = DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
+            suspend_new_cards_of_existing_notes = DeckConfig.suspend_new_cards_of_existing_notes_default()
 
         AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
@@ -222,8 +206,7 @@ class ImportAHNotes(Protocol):
         note_infos: List[NoteInfo],
         ah_did: Optional[uuid.UUID] = None,
         anki_did: Optional[DeckId] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @fixture
@@ -241,9 +224,9 @@ def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportA
         anki_did: Optional[DeckId] = None,
     ) -> None:
         assert len(note_infos) > 0, "note_infos must not be empty"
-        assert (
-            note_info.mid == note_infos[0].mid for note_info in note_infos
-        ), "All notes must have the same note type"
+        assert (note_info.mid == note_infos[0].mid for note_info in note_infos), (
+            "All notes must have the same note type"
+        )
 
         # Check if the note_infos are compatible with the note type.
         # For each field in note_data, check if there is a field in the note type with the same name.
@@ -253,9 +236,7 @@ def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportA
 
         field_names_of_note_type = set(field["name"] for field in note_type["flds"])
         for note_info in note_infos:
-            fields_are_compatible = all(
-                field.name in field_names_of_note_type for field in note_info.fields
-            )
+            fields_are_compatible = all(field.name in field_names_of_note_type for field in note_info.fields)
             assert fields_are_compatible, (
                 f"Note data is not compatible with the note type.\n"
                 f"\tNote data: {note_info.fields}, note type: {field_names_of_note_type}"
@@ -263,16 +244,10 @@ def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportA
 
         if deck_config := config.deck_config(ah_did):
             suspend_new_cards_of_new_notes = deck_config.suspend_new_cards_of_new_notes
-            suspend_new_cards_of_existing_notes = (
-                deck_config.suspend_new_cards_of_existing_notes
-            )
+            suspend_new_cards_of_existing_notes = deck_config.suspend_new_cards_of_existing_notes
         else:
-            suspend_new_cards_of_new_notes = (
-                DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
-            )
-            suspend_new_cards_of_existing_notes = (
-                DeckConfig.suspend_new_cards_of_existing_notes_default()
-            )
+            suspend_new_cards_of_new_notes = DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
+            suspend_new_cards_of_existing_notes = DeckConfig.suspend_new_cards_of_existing_notes_default()
 
         AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
@@ -297,8 +272,7 @@ class ImportAHNoteType(Protocol):
         note_type: Optional[NotetypeDict] = None,
         ah_did: Optional[uuid.UUID] = None,
         force_new: bool = False,
-    ) -> NotetypeDict:
-        ...
+    ) -> NotetypeDict: ...
 
 
 @pytest.fixture
@@ -340,9 +314,7 @@ def import_ah_note_type(
             protected_tags=[],
             is_first_import_of_deck=False,
             behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                ah_did
-            ),
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
             suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             raise_if_full_sync_required=raise_if_full_sync_required,
         )
@@ -357,8 +329,7 @@ class AddAnkiNote(Protocol):
         note_type: Optional[NotetypeDict] = None,
         anki_did: Optional[DeckId] = None,
         anki_nid: Optional[NoteId] = None,
-    ) -> Note:
-        ...
+    ) -> Note: ...
 
 
 @pytest.fixture
@@ -384,12 +355,8 @@ def add_anki_note() -> AddAnkiNote:
         aqt.mw.col.add_note(note, DeckId(anki_did))
 
         if anki_nid:
-            aqt.mw.col.db.execute(
-                f"UPDATE notes SET id = {anki_nid} WHERE id = {note.id};"
-            )
-            aqt.mw.col.db.execute(
-                f"UPDATE cards SET nid = {anki_nid} WHERE nid = {note.id};"
-            )
+            aqt.mw.col.db.execute(f"UPDATE notes SET id = {anki_nid} WHERE id = {note.id};")
+            aqt.mw.col.db.execute(f"UPDATE cards SET nid = {anki_nid} WHERE nid = {note.id};")
             note = aqt.mw.col.get_note(NoteId(anki_nid))
 
         return note
@@ -405,8 +372,7 @@ class InstallAHDeck(Protocol):
         anki_did: Optional[DeckId] = None,
         anki_deck_name: Optional[str] = None,
         has_note_embeddings: bool = False,
-    ) -> uuid.UUID:
-        ...
+    ) -> uuid.UUID: ...
 
 
 @pytest.fixture
@@ -458,8 +424,7 @@ class MockShowDialogWithCB(Protocol):
         self,
         target_object: Any,
         button_index: Optional[int],
-    ) -> MagicMock:
-        ...
+    ) -> MagicMock: ...
 
 
 @pytest.fixture
@@ -472,7 +437,7 @@ def mock_show_dialog_with_cb(monkeypatch: MonkeyPatch) -> MockShowDialogWithCB:
         button_index: Optional[int],
     ) -> None:
         def show_dialog_mock(*args, **kwargs) -> MagicMock:
-            kwargs["callback"](button_index),
+            (kwargs["callback"](button_index),)
             return MagicMock()
 
         monkeypatch.setattr(target_object, show_dialog_mock)
@@ -486,8 +451,7 @@ class MockDownloadAndInstallDeckDependencies(Protocol):
         deck: Deck,
         notes_data: List[NoteInfo],
         note_type: NotetypeDict,
-    ) -> Dict[str, Mock]:
-        ...
+    ) -> Dict[str, Mock]: ...
 
 
 @pytest.fixture
@@ -518,9 +482,7 @@ def mock_download_and_install_deck_dependencies(
         # Mock client functions
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
-        add_mock(
-            AnkiHubClient, "get_note_types_dict_for_deck", {note_type["id"]: note_type}
-        )
+        add_mock(AnkiHubClient, "get_note_types_dict_for_deck", {note_type["id"]: note_type})
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
@@ -528,9 +490,7 @@ def mock_download_and_install_deck_dependencies(
         add_mock(_AnkiHubMediaSync, "start_media_download")
 
         # Mock UI interactions
-        mock_show_dialog_with_cb(
-            "ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1
-        )
+        mock_show_dialog_with_cb("ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1)
 
         return mocks
 
@@ -542,8 +502,7 @@ class MockMessageBoxWithCB(Protocol):
         self,
         target_object: Any,
         button_index: int,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 class MessageBoxMock:
@@ -567,7 +526,9 @@ def mock_message_box_with_cb(monkeypatch: MonkeyPatch) -> MockMessageBoxWithCB:
         monkeypatch.setattr(
             target_object,
             lambda *args, **kwargs: MessageBoxMock(
-                button_index=button_index, *args, **kwargs  # type: ignore
+                button_index=button_index,
+                *args,
+                **kwargs,  # type: ignore
             ),
         )
 
@@ -594,8 +555,7 @@ class MockStudyDeckDialogWithCB(Protocol):
         self,
         target_object: Any,
         deck_name: str,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @fixture
@@ -631,8 +591,7 @@ class MockSuggestionDialog(Protocol):
         self,
         user_cancels: bool,
         suggestion_type: SuggestionType = SuggestionType.UPDATED_CONTENT,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @pytest.fixture
@@ -662,9 +621,7 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
             return suggestion_dialog_mock
 
         suggestion_dialog_mock.side_effect = side_effect
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog", suggestion_dialog_mock
-        )
+        monkeypatch.setattr("ankihub.gui.suggestion_dialog.SuggestionDialog", suggestion_dialog_mock)
 
     return mock_suggestion_dialog_inner
 
@@ -763,9 +720,7 @@ def make_review_histories(num_cards: int, max_days: int) -> List[List[Tuple[int,
     return histories
 
 
-def record_review_histories(
-    anki_nid: NoteId, history: List[Tuple[int, int]], max_days: int
-) -> None:
+def record_review_histories(anki_nid: NoteId, history: List[Tuple[int, int]], max_days: int) -> None:
     # First, add an initial learning step:
     start_day = datetime.now() - timedelta(days=max_days)
     record_review_for_anki_nid(
@@ -805,9 +760,7 @@ def note_type_with_field_names(field_names: List[str]) -> NotetypeDict:
     return note_type
 
 
-def add_field_to_local_note_type(
-    note_type: NotetypeDict, field_name: str, position: int
-) -> None:
+def add_field_to_local_note_type(note_type: NotetypeDict, field_name: str, position: int) -> None:
     new_field = aqt.mw.col.models.new_field(field_name)
     note_type["flds"].insert(position, new_field)
     aqt.mw.col.models.update_dict(note_type)

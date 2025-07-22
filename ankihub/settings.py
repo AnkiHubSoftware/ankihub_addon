@@ -89,9 +89,7 @@ SHARED_LOG_PROCESSORS: List[Processor] = [
 FSRS_PARAMETERS_BACKUP_KEY = "ankihub_fsrs_parameters_backup"
 
 
-FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY = (
-    "ankihub_fsrs_last_optimization_reminder_date"
-)
+FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY = "ankihub_fsrs_last_optimization_reminder_date"
 
 
 def _serialize_datetime(x: datetime) -> str:
@@ -136,9 +134,7 @@ class DeckConfig(DataClassJSONMixin):
         default=None,
     )
     download_full_deck_on_next_sync: bool = False
-    subdecks_enabled: bool = (
-        False  # whether deck is organized into subdecks by the add-on
-    )
+    subdecks_enabled: bool = False  # whether deck is organized into subdecks by the add-on
     suspend_new_cards_of_new_notes: bool = False
     suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes = (
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
@@ -182,9 +178,7 @@ class UIConfig(DataClassJSONMixin):
 class PrivateConfig(DataClassJSONMixin):
     username: Optional[str] = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
-    deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(
-        default_factory=dict
-    )
+    deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(default_factory=dict)
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
     # used to determine which migrations to apply
     api_version_on_last_sync: Optional[float] = None
@@ -216,9 +210,7 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
-            if staging_anking_deck_id := self.public_config.get(
-                "staging_anking_deck_id"
-            ):
+            if staging_anking_deck_id := self.public_config.get("staging_anking_deck_id"):
                 self.anking_deck_id = staging_anking_deck_id
             else:
                 self.anking_deck_id = uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
@@ -299,24 +291,16 @@ class _Config:
         self._private_config.username = username
         self._update_private_config()
 
-    def save_latest_deck_update(
-        self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
-    ):
+    def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
         self.deck_config(ankihub_did).latest_update = latest_update
         self._update_private_config()
 
-    def save_latest_deck_media_update(
-        self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]
-    ):
+    def save_latest_deck_media_update(self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]):
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
-    def set_download_full_deck_on_next_sync(
-        self, ankihub_did: uuid.UUID, download_full_deck: bool
-    ):
-        self.deck_config(
-            ankihub_did
-        ).download_full_deck_on_next_sync = download_full_deck
+    def set_download_full_deck_on_next_sync(self, ankihub_did: uuid.UUID, download_full_deck: bool):
+        self.deck_config(ankihub_did).download_full_deck_on_next_sync = download_full_deck
         self._update_private_config()
 
     def save_last_sent_summary_date(self, last_summary_sent_date: Optional[date]):
@@ -331,18 +315,14 @@ class _Config:
         self.deck_config(ankihub_did).suspend_new_cards_of_new_notes = suspend
         self._update_private_config()
 
-    def set_suspend_new_cards_of_existing_notes(
-        self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes
-    ):
+    def set_suspend_new_cards_of_existing_notes(self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes):
         self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
         self._update_private_config()
 
     def set_ankihub_deleted_notes_behavior(
         self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted
     ):
-        self.deck_config(
-            ankihub_did
-        ).behavior_on_remote_note_deleted = note_delete_behavior
+        self.deck_config(ankihub_did).behavior_on_remote_note_deleted = note_delete_behavior
         self._update_private_config()
 
     def set_feature_flags(self, feature_flags: Optional[dict]):
@@ -373,9 +353,7 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
-            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                ankihub_did
-            ),
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ankihub_did),
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
             has_note_embeddings=has_note_embeddings,
         )
@@ -463,9 +441,7 @@ class _Config:
 
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
         latest_update = (
-            extension_config.latest_update
-            if (extension_config := self.deck_extension_config(extension.id))
-            else None
+            extension_config.latest_update if (extension_config := self.deck_extension_config(extension.id)) else None
         )
 
         self._private_config.deck_extensions[extension.id] = DeckExtensionConfig(
@@ -478,9 +454,7 @@ class _Config:
         )
         self._update_private_config()
 
-    def save_latest_extension_update(
-        self, extension_id: int, latest_update: datetime
-    ) -> None:
+    def save_latest_extension_update(self, extension_id: int, latest_update: datetime) -> None:
         self.deck_extension_config(extension_id).latest_update = latest_update
         self._update_private_config()
 
@@ -519,16 +493,10 @@ class _Config:
         return next((key for key in decks.keys() if decks[key].name == name), None)
 
     def get_fsrs_parameters_from_backup(self, conf_id: int) -> Tuple[int, List[float]]:
-        backup_entry = (
-            self._get_fsrs_parameteters_backup_dict()
-            .get(str(conf_id), {})
-            .get("previous", {})
-        )
+        backup_entry = self._get_fsrs_parameteters_backup_dict().get(str(conf_id), {}).get("previous", {})
         return (backup_entry.get("version", None), backup_entry.get("parameters", []))
 
-    def backup_fsrs_parameters(
-        self, conf_id: int, version: int, parameters: List[float]
-    ) -> bool:
+    def backup_fsrs_parameters(self, conf_id: int, version: int, parameters: List[float]) -> bool:
         """
         Rotate current->previous for the given preset and store the provided
         parameters as the new “current” snapshot.
@@ -553,16 +521,12 @@ class _Config:
     def _get_fsrs_parameteters_backup_dict(self) -> Dict[str, Any]:
         return aqt.mw.col.get_config(FSRS_PARAMETERS_BACKUP_KEY, {})
 
-    def _update_fsrs_parameters_backup_dict(
-        self, fsrs_parameters_backup_dict: Dict[str, Any]
-    ) -> None:
+    def _update_fsrs_parameters_backup_dict(self, fsrs_parameters_backup_dict: Dict[str, Any]) -> None:
         aqt.mw.col.set_config(FSRS_PARAMETERS_BACKUP_KEY, fsrs_parameters_backup_dict)
 
     def get_days_since_last_enable_fsrs_reminder(self) -> Optional[int]:
         """Get the number of days since the last Enable FSRS reminder."""
-        last_reminder_date_str = aqt.mw.col.get_config(
-            ENABLE_FSRS_LAST_REMINDER_DATE_KEY
-        )
+        last_reminder_date_str = aqt.mw.col.get_config(ENABLE_FSRS_LAST_REMINDER_DATE_KEY)
 
         if not last_reminder_date_str:
             return None
@@ -586,20 +550,14 @@ class _Config:
 
     def get_days_since_last_fsrs_optimize_reminder(self) -> Optional[int]:
         """Get the number of days since the last FSRS optimization reminder."""
-        last_optimization_reminder_date_str = aqt.mw.col.get_config(
-            FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY
-        )
+        last_optimization_reminder_date_str = aqt.mw.col.get_config(FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY)
 
         if not last_optimization_reminder_date_str:
             return None
 
         try:
-            last_optimization_reminder_date = datetime.fromisoformat(
-                last_optimization_reminder_date_str
-            )
-            days_since_last_reminder = (
-                datetime.now() - last_optimization_reminder_date
-            ).days
+            last_optimization_reminder_date = datetime.fromisoformat(last_optimization_reminder_date_str)
+            days_since_last_reminder = (datetime.now() - last_optimization_reminder_date).days
             return days_since_last_reminder
         except (ValueError, TypeError):  # pragma: no cover
             return None
@@ -726,9 +684,7 @@ def _maybe_migrate_profile_data_from_old_location() -> bool:
 
             copyfile(file, profile_files_path() / file.name)
     except Exception as e:
-        LOGGER.exception(
-            "Failed to migrate profile data from user_files to profile folder."
-        )
+        LOGGER.exception("Failed to migrate profile data from user_files to profile folder.")
         # remove the profile folder to avoid a partial migration
         rmtree(profile_files_path())
         raise e
@@ -767,9 +723,7 @@ def _maybe_migrate_addon_data_from_old_location() -> None:
         else:
             # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
             move(file, ankihub_base_path() / file.name)
-            LOGGER.info(
-                "Migrated add-on data for profile.", profile_folder_name=file.name
-            )
+            LOGGER.info("Migrated add-on data for profile.", profile_folder_name=file.name)
 
 
 def ankihub_base_path() -> Path:
@@ -794,9 +748,7 @@ def _stdout_handler() -> logging.Handler:
 
 
 def _file_handler() -> logging.Handler:
-    return RotatingFileHandler(
-        log_file_path(), maxBytes=3000000, backupCount=5, encoding="utf-8"
-    )
+    return RotatingFileHandler(log_file_path(), maxBytes=3000000, backupCount=5, encoding="utf-8")
 
 
 def _structlog_formatter(renderer) -> logging.Formatter:
@@ -862,11 +814,7 @@ def _setup_stdout_handler() -> None:
 def _setup_file_handler() -> None:
     log_file_path().parent.mkdir(parents=True, exist_ok=True)
     file_handler_ = _file_handler()
-    file_handler_.setLevel(
-        logging.DEBUG
-        if config.public_config.get("debug_level_logs", False)
-        else logging.INFO
-    )
+    file_handler_.setLevel(logging.DEBUG if config.public_config.get("debug_level_logs", False) else logging.INFO)
     file_handler_.setFormatter(
         _structlog_formatter(
             structlog.dev.ConsoleRenderer(colors=False),
@@ -878,9 +826,7 @@ def _setup_file_handler() -> None:
 def _setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
-    datadog_handler.setFormatter(
-        _structlog_formatter(structlog.processors.JSONRenderer())
-    )
+    datadog_handler.setFormatter(_structlog_formatter(structlog.processors.JSONRenderer()))
     STD_LOGGER.addHandler(datadog_handler)
 
 
@@ -899,9 +845,7 @@ class DatadogLogHandler(logging.Handler):
         self.send_interval: int = send_interval
         self.last_send_time: float = time.time()
         self.createLock()
-        self.flush_thread: threading.Thread = threading.Thread(
-            target=self._periodic_flush
-        )
+        self.flush_thread: threading.Thread = threading.Thread(target=self._periodic_flush)
         # Make the thread a daemon so that it doesn't prevent Anki from closing
         self.flush_thread.daemon = True
         self.flush_thread.start()
@@ -931,9 +875,7 @@ class DatadogLogHandler(logging.Handler):
             self.buffer = []
             self.last_send_time = time.time()
             if in_background:
-                threading.Thread(
-                    target=self._send_logs_to_datadog, args=(records_to_send,)
-                ).start()
+                threading.Thread(target=self._send_logs_to_datadog, args=(records_to_send,)).start()
             else:
                 self._send_logs_to_datadog(records_to_send)
 
@@ -975,14 +917,10 @@ class DatadogLogHandler(logging.Handler):
             requests.exceptions.ConnectionError,
             requests.exceptions.Timeout,
         ) as e:  # pragma: no cover
-            LOGGER.warning(
-                "Connection error or timeout when sending logs to Datadog.", exc_info=e
-            )
+            LOGGER.warning("Connection error or timeout when sending logs to Datadog.", exc_info=e)
             return
         except requests.exceptions.RequestException:  # pragma: no cover
-            LOGGER.exception(
-                "An unexpected error occurred when sending logs to Datadog"
-            )
+            LOGGER.exception("An unexpected error occurred when sending logs to Datadog")
             return
 
         if response.status_code != 202:  # pragma: no cover
@@ -1012,16 +950,10 @@ url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
 url_help = lambda: f"{config.app_url}/help"  # noqa: E731
 url_decks = lambda: f"{config.app_url}/explore"  # noqa: E731
 url_deck_base = lambda: f"{config.app_url}/decks"  # noqa: E731
-url_flashcard_selector = (
-    lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector"
-)  # noqa: E731
-url_flashcard_selector_embed = (
-    lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed?is_on_anki=true"
-)  # noqa: E731
+url_flashcard_selector = lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector"  # noqa: E731
+url_flashcard_selector_embed = lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed?is_on_anki=true"  # noqa: E731
 url_plans_page = lambda: f"{config.app_url}/memberships/plans/"  # noqa: E731
-url_mh_integrations_preview = (
-    lambda resource_slug: f"{config.app_url}/integrations/mcgraw-hill/preview/{resource_slug}"
-)  # noqa: E731
+url_mh_integrations_preview = lambda resource_slug: f"{config.app_url}/integrations/mcgraw-hill/preview/{resource_slug}"  # noqa: E731
 url_login = lambda: f"{config.app_url}/accounts/login"  # noqa: E731
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
