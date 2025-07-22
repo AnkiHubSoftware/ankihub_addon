@@ -93,3 +93,19 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 ignore = ["E722", "E731", "E203", "E402"]
+
+[tool.coverage.run]
+source = ["ankihub"]
+omit = ["ankihub/lib/**", "ankihub/media_export/**", "ankihub/media_import/**"]
+dynamic_context = "test_function"
+
+[tool.coverage.paths]
+source = ["./ankihub", "*/addons21/ankihub"]
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+show_contexts = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
