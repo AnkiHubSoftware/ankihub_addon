@@ -20,7 +20,6 @@ dev = [
   "pyqt5==5.15.5; platform_system != 'Windows'",
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "ruff",
-  "black==22.6.0",
   "mypy==0.971",
   "coverage==6.5.0",
   "pre-commit==2.20.0",
@@ -48,15 +47,6 @@ dev = [
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
 
-[tool.isort]
-profile = 'black'
-
-[tool.black]
-extend-exclude = '''
-(
-  lib/
-)
-'''
 
 [tool.mypy]
 files = ['ankihub', 'tests/addon', 'tests/client']
