@@ -46,6 +46,7 @@ source = { virtual = "." }
 [package.dev-dependencies]
 bundle = [
     { name = "mashumaro" },
+    { name = "peewee" },
     { name = "sentry-sdk" },
     { name = "structlog" },
     { name = "tenacity" },
@@ -89,6 +90,7 @@ tests = [
 [package.metadata.requires-dev]
 bundle = [
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
+    { name = "peewee", specifier = "==3.18.2" },
     { name = "sentry-sdk", specifier = "==1.6.0" },
     { name = "structlog", specifier = "==24.1.0" },
     { name = "tenacity", specifier = "==8.2.2" },
@@ -961,6 +963,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
 ]
+
+[[package]]
+name = "peewee"
+version = "3.18.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/89/76f6f1b744c8608e0d416b588b9d63c2a500ff800065ae610f7c80f532d6/peewee-3.18.2.tar.gz", hash = "sha256:77a54263eb61aff2ea72f63d2eeb91b140c25c1884148e28e4c0f7c4f64996a0", size = 949220, upload-time = "2025-07-08T12:52:03.941Z" }
 
 [[package]]
 name = "pip"

@@ -48,6 +48,7 @@ bundle = [
   "sentry_sdk==1.6.0",
   "tenacity==8.2.2",
   "structlog==24.1.0",
+  "peewee==3.18.2",
   "mashumaro",
 ]
 
