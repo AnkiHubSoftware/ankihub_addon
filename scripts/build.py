@@ -9,6 +9,7 @@ from generate_manifest import generate_manifest
 from google_api_obfuscate import obfuscate_google_api_key
 
 PROJECT_ROOT = Path(__file__).parent.parent
+ANKIHUB_LIB_TARGET = PROJECT_ROOT / "ankihub/lib"
 MEDIA_IMPORT_SRC = PROJECT_ROOT / "media_import/src/media_import"
 MEDIA_IMPORT_LIBS = MEDIA_IMPORT_SRC / "libs"
 MEDIA_IMPORT_TARGET = PROJECT_ROOT / "ankihub/media_import"
@@ -34,7 +35,19 @@ subprocess.run(
     ],
     check=True,
 )
-
+subprocess.run(
+    [
+        "uv",
+        "pip",
+        "install",
+        "--target",
+        str(ANKIHUB_LIB_TARGET),
+        "--group",
+        "bundle",
+    ],
+    check=True,
+)
+shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
 generate_manifest()
 
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)

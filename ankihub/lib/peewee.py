@@ -58,6 +58,10 @@ try:
     pg_register_uuid()
 except Exception:
     pass
+try:
+    from psycopg import errors as pg3_errors
+except ImportError:
+    pg3_errors = None
 
 mysql_passwd = False
 try:
@@ -70,7 +74,7 @@ except ImportError:
         mysql = None
 
 
-__version__ = '3.17.0'
+__version__ = '3.18.2'
 __all__ = [
     'AnyField',
     'AsIs',
@@ -219,12 +223,12 @@ if sqlite3:
             date, time = t.split(b' ')
             y, m, d = map(int, date.split(b'-'))
             t_full = time.split(b'.')
-            h, m, s = map(int, t_full[0].split(b':'))
+            hour, minute, second = map(int, t_full[0].split(b':'))
             if len(t_full) == 2:
                 usec = int('{:0<6.6}'.format(t_full[1].decode()))
             else:
                 usec = 0
-            return datetime.datetime(y, m, d, h, m, s, usec)
+            return datetime.datetime(y, m, d, hour, minute, second, usec)
         sqlite3.register_adapter(datetime.datetime, datetime_adapter)
         sqlite3.register_converter('date', convert_date)
         sqlite3.register_converter('timestamp', convert_timestamp)
@@ -1574,11 +1578,14 @@ class Expression(ColumnBase):
             op_in = self.op == OP.IN or self.op == OP.NOT_IN
             if op_in and ctx.as_new().parse(self.rhs)[0] == '()':
                 return ctx.literal('0 = 1' if self.op == OP.IN else '1 = 1')
+            rhs = self.rhs
+            if rhs is None and (self.op == OP.IS or self.op == OP.IS_NOT):
+                rhs = SQL('NULL')
 
             return (ctx
                     .sql(self.lhs)
                     .literal(' %s ' % op_sql)
-                    .sql(self.rhs))
+                    .sql(rhs))
 
 
 class StringExpression(Expression):
@@ -1820,6 +1827,36 @@ class WindowAlias(Node):
         return ctx.literal(self.window._alias or 'w')
 
 
+class _InFunction(Node):
+    def __init__(self, node, in_function=True):
+        self.node = node
+        self.in_function = in_function
+
+    def __sql__(self, ctx):
+        with ctx(in_function=self.in_function):
+            return ctx.sql(self.node)
+
+
+class Case(ColumnBase):
+    def __init__(self, predicate, expression_tuples, default=None):
+        self.predicate = predicate
+        self.expression_tuples = expression_tuples
+        self.default = default
+
+    def __sql__(self, ctx):
+        clauses = [SQL('CASE')]
+        if self.predicate is not None:
+            clauses.append(self.predicate)
+        for expr, value in self.expression_tuples:
+            clauses.extend((SQL('WHEN'), expr,
+                            SQL('THEN'), _InFunction(value)))
+        if self.default is not None:
+            clauses.extend((SQL('ELSE'), _InFunction(self.default)))
+        clauses.append(SQL('END'))
+        with ctx(in_function=False):
+            return ctx.sql(NodeList(clauses))
+
+
 class ForUpdate(Node):
     def __init__(self, expr, of=None, nowait=None):
         expr = 'FOR UPDATE' if expr is True else expr
@@ -1840,18 +1877,6 @@ class ForUpdate(Node):
         if self._nowait:
             ctx.literal(' NOWAIT')
         return ctx
-
-
-def Case(predicate, expression_tuples, default=None):
-    clauses = [SQL('CASE')]
-    if predicate is not None:
-        clauses.append(predicate)
-    for expr, value in expression_tuples:
-        clauses.extend((SQL('WHEN'), expr, SQL('THEN'), value))
-    if default is not None:
-        clauses.extend((SQL('ELSE'), default))
-    clauses.append(SQL('END'))
-    return NodeList(clauses)
 
 
 class NodeList(ColumnBase):
@@ -2088,7 +2113,7 @@ class BaseQuery(Node):
         return iter(self.execute(database).iterator())
 
     def _ensure_execution(self):
-        if not self._cursor_wrapper:
+        if self._cursor_wrapper is None:
             if not self._database:
                 raise ValueError('Query has not been executed.')
             self.execute()
@@ -3049,9 +3074,13 @@ class ExceptionWrapper(object):
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             return
-        # psycopg2.8 shits out a million cute error types. Try to catch em all.
+        # psycopg shits out a million cute error types. Try to catch em all.
         if pg_errors is not None and exc_type.__name__ not in self.exceptions \
            and issubclass(exc_type, pg_errors.Error):
+            exc_type = exc_type.__bases__[0]
+        elif pg3_errors is not None and \
+           exc_type.__name__ not in self.exceptions \
+           and issubclass(exc_type, pg3_errors.Error):
             exc_type = exc_type.__bases__[0]
         if exc_type.__name__ in self.exceptions:
             new_type = self.exceptions[exc_type.__name__]
@@ -3069,7 +3098,9 @@ EXCEPTIONS = {
     'NotSupportedError': NotSupportedError,
     'OperationalError': OperationalError,
     'ProgrammingError': ProgrammingError,
-    'TransactionRollbackError': OperationalError}
+    'TransactionRollbackError': OperationalError,
+    'UndefinedFunction': ProgrammingError,
+    'UniqueViolation': IntegrityError}
 
 __exception_wrapper__ = ExceptionWrapper(EXCEPTIONS)
 
@@ -3164,7 +3195,7 @@ class Database(_callable_context_manager):
         self.thread_safe = thread_safe
         if thread_safe:
             self._state = _ConnectionLocal()
-            self._lock = threading.RLock()
+            self._lock = threading.Lock()
         else:
             self._state = _ConnectionState()
             self._lock = _NoopLock()
@@ -3381,26 +3412,23 @@ class Database(_callable_context_manager):
         return ctx.literal('DEFAULT VALUES')
 
     def session_start(self):
-        with self._lock:
-            return self.transaction().__enter__()
+        return self.transaction().__enter__()
 
     def session_commit(self):
-        with self._lock:
-            try:
-                txn = self.pop_transaction()
-            except IndexError:
-                return False
-            txn.commit(begin=self.in_transaction())
-            return True
+        try:
+            txn = self.pop_transaction()
+        except IndexError:
+            return False
+        txn.commit(begin=self.in_transaction())
+        return True
 
     def session_rollback(self):
-        with self._lock:
-            try:
-                txn = self.pop_transaction()
-            except IndexError:
-                return False
-            txn.rollback(begin=self.in_transaction())
-            return True
+        try:
+            txn = self.pop_transaction()
+        except IndexError:
+            return False
+        txn.rollback(begin=self.in_transaction())
+        return True
 
     def in_transaction(self):
         return bool(self._state.transactions)
@@ -4210,6 +4238,8 @@ class MySQLDatabase(Database):
         self.server_version = self._extract_server_version(version_raw)
 
     def _extract_server_version(self, version):
+        if isinstance(version, tuple):
+            return version
         version = version.lower()
         if 'maria' in version:
             match_obj = re.search(r'(1\d\.\d+\.\d+)', version)
@@ -4227,8 +4257,12 @@ class MySQLDatabase(Database):
 
         conn = self._state.conn
         if hasattr(conn, 'ping'):
+            if self.server_version[0] == 8:
+                args = ()
+            else:
+                args = (False,)
             try:
-                conn.ping(False)
+                conn.ping(*args)
             except Exception:
                 return False
         return True
@@ -5532,6 +5566,12 @@ class ForeignKeyField(Field):
             return self.rel_field.get_modifiers()
         return super(ForeignKeyField, self).get_modifiers()
 
+    def get_constraint_name(self):
+        return self.constraint_name or 'fk_%s_%s_refs_%s' % (
+            self.model._meta.table_name,
+            self.column_name,
+            self.rel_model._meta.table_name)
+
     def adapt(self, value):
         return self.rel_field.adapt(value)
 
@@ -5581,10 +5621,14 @@ class ForeignKeyField(Field):
                 setattr(self.rel_model, self.backref,
                         self.backref_accessor_class(self))
 
-    def foreign_key_constraint(self):
+    def foreign_key_constraint(self, explicit_name=False):
         parts = []
-        if self.constraint_name:
-            parts.extend((SQL('CONSTRAINT'), Entity(self.constraint_name)))
+        if self.constraint_name or explicit_name:
+            name = self.get_constraint_name()
+            parts.extend([
+                SQL('CONSTRAINT'),
+                Entity(_truncate_constraint_name(name))])
+
         parts.extend([
             SQL('FOREIGN KEY'),
             EnclosedNodeList((self,)),
@@ -6113,17 +6157,12 @@ class SchemaManager(object):
             self.database.execute(seq_ctx)
 
     def _create_foreign_key(self, field):
-        name = 'fk_%s_%s_refs_%s' % (field.model._meta.table_name,
-                                     field.column_name,
-                                     field.rel_model._meta.table_name)
         return (self
                 ._create_context()
                 .literal('ALTER TABLE ')
                 .sql(field.model)
-                .literal(' ADD CONSTRAINT ')
-                .sql(Entity(_truncate_constraint_name(name)))
-                .literal(' ')
-                .sql(field.foreign_key_constraint()))
+                .literal(' ADD ')
+                .sql(field.foreign_key_constraint(True)))
 
     def create_foreign_key(self, field):
         self.database.execute(self._create_foreign_key(field))
@@ -6935,9 +6974,10 @@ class Model(with_metaclass(ModelBase, Node)):
     def dirty_fields(self):
         return [f for f in self._meta.sorted_fields if f.name in self._dirty]
 
-    def dependencies(self, search_nullable=False):
+    def dependencies(self, search_nullable=True, exclude_null_children=False):
         model_class = type(self)
         stack = [(type(self), None)]
+        queries = {}
         seen = set()
 
         while stack:
@@ -6953,13 +6993,21 @@ class Model(with_metaclass(ModelBase, Node)):
                 subquery = (rel_model.select(rel_model._meta.primary_key)
                             .where(node))
                 if not fk.null or search_nullable:
-                    stack.append((rel_model, subquery))
-                yield (node, fk)
+                    queries.setdefault(rel_model, []).append((node, fk))
+                    if fk.null and exclude_null_children:
+                        # Do not process additional children of this node, but
+                        # include it in the list of dependencies.
+                        seen.add(rel_model)
+                    else:
+                        stack.append((rel_model, subquery))
+
+        for m in reversed(sort_models(seen)):
+            for sq, q in queries.get(m, ()):
+                yield sq, q
 
     def delete_instance(self, recursive=False, delete_nullable=False):
         if recursive:
-            dependencies = self.dependencies(delete_nullable)
-            for query, fk in reversed(list(dependencies)):
+            for query, fk in self.dependencies(exclude_null_children=not delete_nullable):
                 model = fk.model
                 if fk.null and not delete_nullable:
                     model.update(**{fk.name: None}).where(query).execute()
@@ -7072,13 +7120,13 @@ class ModelAlias(Node):
         # implementing the descriptor protocol (on the model being aliased),
         # will not work correctly when we use getattr(). So we explicitly pass
         # the model alias to the descriptor's getter.
-        try:
-            obj = self.model.__dict__[attr]
-        except KeyError:
-            pass
-        else:
-            if isinstance(obj, ModelDescriptor):
-                return obj.__get__(None, self)
+        for b in (self.model,) + self.model.__bases__:
+            try:
+                obj = b.__dict__[attr]
+                if isinstance(obj, ModelDescriptor):
+                    return obj.__get__(None, self)
+            except KeyError:
+                continue
 
         model_attr = getattr(self.model, attr)
         if isinstance(model_attr, Field):
@@ -7310,8 +7358,7 @@ class ModelSelect(BaseModelSelect, Select):
 
     def clone(self):
         clone = super(ModelSelect, self).clone()
-        if clone._joins:
-            clone._joins = dict(clone._joins)
+        clone._joins = dict(clone._joins)
         return clone
 
     def select(self, *fields_or_models):
