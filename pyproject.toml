@@ -53,7 +53,7 @@ bundle = [
 
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
-mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "main" }
+mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
 
 [tool.mypy]
 files = ['ankihub', 'tests/addon', 'tests/client']
