@@ -63,12 +63,7 @@ exclude = [
   'ankihub/media_import',
   'ankihub/media_export',
   'ankihub/gui/ankiaddonconfig',
-  'ankihub/lib/sentry_sd',
-  'ankihub/lib/urllib',
-  'ankihub/lib/other/typing_extension',
-  'ankihub/lib/tenacity',
-  'ankihub/lib/peewee',
-  'ankihub/lib/structlog',
+  'ankihub/lib'
 ]
 
 no_strict_optional = true
@@ -90,6 +85,7 @@ module = [
   'peewee.*',
 ]
 ignore_errors = true
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = 'anki._vendor.*'
