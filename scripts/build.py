@@ -47,7 +47,7 @@ subprocess.run(
     ],
     check=True,
 )
-
+shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
 generate_manifest()
 
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)
