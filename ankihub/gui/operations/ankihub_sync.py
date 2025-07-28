@@ -73,7 +73,8 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
         _sync_with_ankihub_inner(on_done=on_done)
 
-    get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
+    # Delay call to ensure server status is updated.
+    aqt.mw.progress.single_shot(1000, lambda: get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done)))
 
 
 @pass_exceptions_to_on_done
