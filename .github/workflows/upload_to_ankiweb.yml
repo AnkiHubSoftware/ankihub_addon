@@ -32,7 +32,7 @@ jobs:
 
       - name: Install deps
         run: |
-          uv sync --locked --dev --group production --group bundle
+          uv sync --locked --dev --group production
 
       - name: Create ankiaddon file
         run: |
