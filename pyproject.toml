@@ -43,10 +43,17 @@ dev = [
   "faker==19.12.0",
   "approvaltests==12.2.0"
 ]
+bundle = [
+  "sentry_sdk==1.6.0",
+  "tenacity==8.2.2",
+  "structlog==24.1.0",
+  "peewee==3.18.2",
+  "mashumaro",
+]
 
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
-
+mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
 
 [tool.mypy]
 files = ['ankihub', 'tests/addon', 'tests/client']
@@ -55,12 +62,7 @@ exclude = [
   'ankihub/media_import',
   'ankihub/media_export',
   'ankihub/gui/ankiaddonconfig',
-  'ankihub/lib/sentry_sd',
-  'ankihub/lib/urllib',
-  'ankihub/lib/other/typing_extension',
-  'ankihub/lib/tenacity',
-  'ankihub/lib/peewee',
-  'ankihub/lib/structlog',
+  'ankihub/lib'
 ]
 
 no_strict_optional = true
@@ -82,6 +84,7 @@ module = [
   'peewee.*',
 ]
 ignore_errors = true
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = 'anki._vendor.*'

@@ -44,6 +44,13 @@ version = "2025.7.21.2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
+bundle = [
+    { name = "mashumaro" },
+    { name = "peewee" },
+    { name = "sentry-sdk" },
+    { name = "structlog" },
+    { name = "tenacity" },
+]
 dev = [
     { name = "approvaltests" },
     { name = "coverage" },
@@ -81,6 +88,13 @@ tests = [
 [package.metadata]
 
 [package.metadata.requires-dev]
+bundle = [
+    { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
+    { name = "peewee", specifier = "==3.18.2" },
+    { name = "sentry-sdk", specifier = "==1.6.0" },
+    { name = "structlog", specifier = "==24.1.0" },
+    { name = "tenacity", specifier = "==8.2.2" },
+]
 dev = [
     { name = "approvaltests", specifier = "==12.2.0" },
     { name = "coverage", specifier = "==6.5.0" },
@@ -672,6 +686,14 @@ wheels = [
 ]
 
 [[package]]
+name = "mashumaro"
+version = "3.16"
+source = { git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master#0cdcf9596d52f13ca34e855859742121bff8bb2e" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+
+[[package]]
 name = "mock"
 version = "5.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -941,6 +963,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
 ]
+
+[[package]]
+name = "peewee"
+version = "3.18.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/89/76f6f1b744c8608e0d416b588b9d63c2a500ff800065ae610f7c80f532d6/peewee-3.18.2.tar.gz", hash = "sha256:77a54263eb61aff2ea72f63d2eeb91b140c25c1884148e28e4c0f7c4f64996a0", size = 949220, upload-time = "2025-07-08T12:52:03.941Z" }
 
 [[package]]
 name = "pip"
@@ -1839,6 +1867,19 @@ wheels = [
 ]
 
 [[package]]
+name = "sentry-sdk"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a0/ff/bcbcea86a61228572fb04b678bbf656470d72363936288a9cfe0a92c9890/sentry-sdk-1.6.0.tar.gz", hash = "sha256:b82ad57306d5546713f15d5d70daea0408cf7f998c7566db16e0e6257e51e561", size = 112506, upload-time = "2022-06-22T08:27:10.453Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/34/59/91f5ee638652691cd548fce9bced47e1fcbfe214c43ffa147ab407c73c41/sentry_sdk-1.6.0-py2.py3-none-any.whl", hash = "sha256:ddbd191b6f4e696b7845b4d87389898ae1207981faf114f968a57363aa6be03c", size = 145435, upload-time = "2022-06-22T08:27:10.418Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1854,6 +1895,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/3f/f4/4a80cd6ef364b2e8b65b15816a843c0980f7a5a2b4dc701fc574952aa19f/soupsieve-2.7.tar.gz", hash = "sha256:ad282f9b6926286d2ead4750552c8a6142bc4c783fd66b0293547c8fe6ae126a", size = 103418, upload-time = "2025-04-20T18:50:08.518Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/9c/0e6afc12c269578be5c0c1c9f4b49a8d32770a080260c333ac04cc1c832d/soupsieve-2.7-py3-none-any.whl", hash = "sha256:6e60cc5c1ffaf1cebcc12e8188320b72071e922c2e897f737cadce79ad5d30c4", size = 36677, upload-time = "2025-04-20T18:50:07.196Z" },
+]
+
+[[package]]
+name = "structlog"
+version = "24.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/ac/87aedb7a9ba52f645b9d29a7f48bb12a5c6b7e204b8137549fbe4754b563/structlog-24.1.0.tar.gz", hash = "sha256:41a09886e4d55df25bdcb9b5c9674bccfab723ff43e0a86a1b7b236be8e57b16", size = 1340948, upload-time = "2024-01-08T09:52:54.24Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ae/5c/c22ca8b8715dd625bbdd6bc7ec87395e29940642d8dff213fad1aa8ce84d/structlog-24.1.0-py3-none-any.whl", hash = "sha256:3f6efe7d25fab6e86f277713c218044669906537bb717c1807a09d46bca0714d", size = 65692, upload-time = "2024-01-08T09:52:50.99Z" },
+]
+
+[[package]]
+name = "tenacity"
+version = "8.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d3/f0/6ccd8854f4421ce1f227caf3421d9be2979aa046939268c9300030c0d250/tenacity-8.2.2.tar.gz", hash = "sha256:43af037822bd0029025877f3b2d97cc4d7bb0c2991000a3d59d71517c5c969e0", size = 40186, upload-time = "2023-02-28T14:22:08.249Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/b0/c23bd61e1b32c9b96fbca996c87784e196a812da8d621d8d04851f6c8181/tenacity-8.2.2-py3-none-any.whl", hash = "sha256:2f277afb21b851637e8f52e6a613ff08734c347dc19ade928e519d7d2d8569b0", size = 24390, upload-time = "2023-02-28T14:22:06.432Z" },
 ]
 
 [[package]]

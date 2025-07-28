@@ -7,6 +7,9 @@ anki_base
 # AnkiHub base directory
 ankihub_base
 
+# AnkiHub lib folder
+ankihub/lib/
+
 # Ignore everything except the README.
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
