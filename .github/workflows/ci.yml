@@ -44,9 +44,10 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          uv sync --dev --group ${{ matrix.tests_group }}
+          uv run -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -107,6 +108,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
+          uv sync --dev --group tests
           uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
