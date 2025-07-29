@@ -77,7 +77,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
+          install_qt: true
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
