@@ -4927,6 +4927,7 @@ class TestFlattenDeck:
                 assert card.odid == root_deck_id, "Card's original deck ID should now point to root deck"
 
 
+@pytest.mark.sequential
 def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
