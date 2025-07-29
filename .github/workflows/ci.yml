@@ -22,7 +22,7 @@ jobs:
       matrix:
         include:
           - tests_group: tests
-          - test_groups: old_anki_tests
+          - tests_group: old_anki_tests
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
