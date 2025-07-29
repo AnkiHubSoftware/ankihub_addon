@@ -18,7 +18,7 @@ runs:
 
     - name: Install deps
       run: |
-        uv sync --locked --no-default-groups --dev --group tests
+        uv sync --locked --dev
       shell: bash
 
     - name: Build

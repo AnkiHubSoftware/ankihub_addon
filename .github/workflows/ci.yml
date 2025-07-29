@@ -21,9 +21,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - replace_anki_version: false
-          - replace_anki_version: true
-            anki_package_version: 'aqt[qt5]==2.1.56'
+          - tests_group: tests
+          - test_groups: old_anki_tests
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -43,20 +42,16 @@ jobs:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
 
-      - name: Replace Anki version
-        if: ${{ matrix.replace_anki_version }}
-        run: uv pip install "${{ matrix.anki_package_version }}"
-
       - name: Run pytest with coverage
         run: |
-          uv run pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          uv run pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          uv run pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run --group ${{ matrix.tests_group }} -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_addon_${{ matrix.anki_package_version }}
+          name: coverage_addon_${{ matrix.tests_group }}
           path: .coverage
           include-hidden-files: true
 

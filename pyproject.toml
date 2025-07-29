@@ -16,6 +16,9 @@ production = [
 tests = [
   "aqt[qt5]==24.11",
 ]
+old_anki_tests = [
+  "aqt[qt5]==2.1.56",
+]
 dev = [
   "pyqt5==5.15.5; platform_system != 'Windows'",
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
@@ -56,6 +59,14 @@ conflicts = [
     [
         { group = "production" },
         { group = "tests" },
+    ],
+    [
+        { group = "production" },
+        { group = "old_anki_tests" },
+    ],
+    [
+        { group = "tests" },
+        { group = "old_anki_tests" },
     ]
 ]
 

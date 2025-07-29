@@ -9,6 +9,12 @@ resolution-markers = [
 conflicts = [[
     { package = "ankihub-addon", group = "production" },
     { package = "ankihub-addon", group = "tests" },
+], [
+    { package = "ankihub-addon", group = "old-anki-tests" },
+    { package = "ankihub-addon", group = "production" },
+], [
+    { package = "ankihub-addon", group = "old-anki-tests" },
+    { package = "ankihub-addon", group = "tests" },
 ]]
 
 [[package]]
@@ -22,6 +28,33 @@ wheels = [
 
 [[package]]
 name = "anki"
+version = "2.1.56"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version == '3.10.*'",
+    "python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "decorator", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "markdown", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "orjson", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "protobuf", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/f7/ca5c6ecc78b3a43aab414fc28991879eb311f2a4c01fee78c96ed6ca0a76/anki-2.1.56-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:c6e9c5bfd64d326221a3190f9626b29557657374a41416a3aeb39e5894899d14", size = 9389971, upload-time = "2023-01-09T01:01:56.656Z" },
+    { url = "https://files.pythonhosted.org/packages/03/30/6fb292fc45d50af780893146ddc073d3f3d848e1cb92d07e7af7ca9da81c/anki-2.1.56-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a7e194098bc15bcc27a49853726cdecbea5da248d851df70052b76b773304462", size = 9120451, upload-time = "2023-01-09T01:02:05.206Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/ec/2128d36bda7b8fe1d0d6ad78faad4dbe0bfdda68bc008cc224dce935bb3b/anki-2.1.56-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:6bfe483611e99d471e1ba44d25b02668836d70d5eaca2837ef6d9f10ca449cc2", size = 11902907, upload-time = "2023-01-09T01:02:15.219Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/99/a36d6ea2c0defa316f4fcb04fe4e185a5341f1986987e0617c3b3dbcfe38/anki-2.1.56-cp39-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:9de030ce8d523e5292c999f9ab2f19b564a007af90d1f4d4299c5f887a33cfa0", size = 11903331, upload-time = "2023-01-09T01:02:25.113Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/53/90af2f95e1f20d1cceb89343a3c58e885d44b9a86352d6452e239c1d062f/anki-2.1.56-cp39-abi3-win_amd64.whl", hash = "sha256:5f5e683f0ddefa169061bfa30f42bad196e0c571943c560fe697a85ee4fa5ef4", size = 8414843, upload-time = "2023-01-09T01:02:32.731Z" },
+]
+
+[[package]]
+name = "anki"
 version = "24.11"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
@@ -30,14 +63,14 @@ resolution-markers = [
     "python_full_version < '3.10'",
 ]
 dependencies = [
-    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "decorator", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-tests') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "markdown", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "orjson", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "protobuf", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-tests'" },
+    { name = "beautifulsoup4", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "decorator", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-tests') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "markdown", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "orjson", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "protobuf", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "requests", extra = ["socks"], marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/26/ec/8ae4cf3df71e8a34a4858cd3d859fb8b47808b52cf623973000acaed59e4/anki-24.11-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:b602d2eb1f5b852f314d87dfac65694f7d780f3419dee7904bfa8588aa29cd71", size = 9027715, upload-time = "2024-11-29T11:03:06.783Z" },
@@ -62,7 +95,7 @@ dependencies = [
     { name = "markdown" },
     { name = "orjson" },
     { name = "protobuf" },
-    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-production' or extra != 'group-13-ankihub-addon-tests'" },
+    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-production' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra != 'group-13-ankihub-addon-tests')" },
     { name = "typing-extensions" },
 ]
 wheels = [
@@ -101,8 +134,8 @@ dev = [
     { name = "faker" },
     { name = "mypy" },
     { name = "pre-commit" },
-    { name = "pyqt5", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "pyqtwebengine", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pyqt5", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pyqtwebengine", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "pytest" },
     { name = "pytest-anki" },
     { name = "pytest-cov" },
@@ -121,11 +154,14 @@ dev = [
     { name = "urllib3" },
     { name = "vcrpy" },
 ]
+old-anki-tests = [
+    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, extra = ["qt5"], marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+]
 production = [
     { name = "aqt", version = "25.7.5", source = { registry = "https://pypi.org/simple" } },
 ]
 tests = [
-    { name = "aqt", version = "24.11", source = { registry = "https://pypi.org/simple" }, extra = ["qt5"], marker = "extra == 'group-13-ankihub-addon-tests'" },
+    { name = "aqt", version = "24.11", source = { registry = "https://pypi.org/simple" }, extra = ["qt5"], marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 
 [package.metadata]
@@ -165,6 +201,7 @@ dev = [
     { name = "urllib3", specifier = "==1.26.14" },
     { name = "vcrpy", specifier = "==4.2.0" },
 ]
+old-anki-tests = [{ name = "aqt", extras = ["qt5"], specifier = "==2.1.56" }]
 production = [{ name = "aqt", specifier = "==25.7.5" }]
 tests = [{ name = "aqt", extras = ["qt5"], specifier = "==24.11" }]
 
@@ -189,13 +226,45 @@ dependencies = [
     { name = "mock" },
     { name = "pyperclip" },
     { name = "pytest" },
-    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cc/60/a93ea271b4a984cbc2b824160eb144a52ea0b58c76d6070a4d5cfac336ea/approvaltests-15.0.0.tar.gz", hash = "sha256:8ac15bad2b63c0b645207672046c3f7e71ed552b87c736d5cfa18d1ed85f76ba", size = 60515, upload-time = "2025-07-13T17:25:57.476Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/d6/5f94c053140d6a78ccaeeb58071d569d0b78bf1ff50bc0187ca529d56970/approvaltests-15.0.0-py3-none-any.whl", hash = "sha256:f1967255f18541cd60a6ce3e0aa630e8eff74107a22e9e29786945428a386ae7", size = 78476, upload-time = "2025-07-13T17:25:56.176Z" },
+]
+
+[[package]]
+name = "aqt"
+version = "2.1.56"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version == '3.10.*'",
+    "python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "flask", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "flask-cors", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "jsonschema", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "requests", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "send2trash", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "waitress", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "winrt", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-old-anki-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/af/1a6f2d461f04bd965bd5e791448e1ca12cbb7cf96e7c92dacecb0373bd14/aqt-2.1.56-py3-none-any.whl", hash = "sha256:0bf9d7bfedea4c9b566439c4526e88213596644d017407f9de391dd7de3fabf1", size = 6252046, upload-time = "2023-01-09T01:02:38.891Z" },
+]
+
+[package.optional-dependencies]
+qt5 = [
+    { name = "pyqt5" },
+    { name = "pyqtwebengine" },
 ]
 
 [[package]]
@@ -208,18 +277,18 @@ resolution-markers = [
     "python_full_version < '3.10'",
 ]
 dependencies = [
-    { name = "anki", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "flask", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "flask-cors", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "jsonschema", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "requests", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "send2trash", marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "waitress", marker = "extra == 'group-13-ankihub-addon-tests'" },
+    { name = "anki", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "beautifulsoup4", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "flask", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "flask-cors", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "jsonschema", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "requests", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "send2trash", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "waitress", marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/40/3c/b70ef91f1dad8248332971c0cbb2922277512789cadc33cb16233e360a56/aqt-24.11-py3-none-any.whl", hash = "sha256:43c86d4fd7248333decfdb99d77547a9ecf1db2d86cf1f09e077342f96bb3c13", size = 10898028, upload-time = "2024-11-29T11:04:15.654Z" },
@@ -247,8 +316,8 @@ dependencies = [
     { name = "flask" },
     { name = "flask-cors" },
     { name = "jsonschema" },
-    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-production') or (python_full_version < '3.10' and extra != 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-production') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-production') or (python_full_version < '3.10' and extra != 'group-13-ankihub-addon-old-anki-tests' and extra != 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-production') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-old-anki-tests' and extra != 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "pyqt6" },
     { name = "pyqt6-webengine" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
@@ -520,7 +589,7 @@ wheels = [
 
 [package.optional-dependencies]
 toml = [
-    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 
 [[package]]
@@ -567,7 +636,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -622,8 +691,8 @@ version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blinker" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "click", version = "8.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "click", version = "8.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "itsdangerous" },
     { name = "jinja2" },
@@ -837,7 +906,7 @@ name = "multidict"
 version = "6.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/2c/5dad12e82fbdf7470f29bff2171484bf07cb3b16ada60a6589af8f376440/multidict-6.6.3.tar.gz", hash = "sha256:798a9eb12dab0a6c2e29c1de6f3468af5cb2da6053a20dfa3344907eed0937cc", size = 101006, upload-time = "2025-06-30T15:53:46.929Z" }
 wheels = [
@@ -959,7 +1028,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mypy-extensions" },
     { name = "pathspec" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1e/e3/034322d5a779685218ed69286c32faa505247f1f096251ef66c8fd203b08/mypy-1.17.0.tar.gz", hash = "sha256:e5d7ccc08ba089c06e2f5629c660388ef1fee708444f1dee0b9203fa031dee03", size = 3352114, upload-time = "2025-07-14T20:34:30.181Z" }
@@ -1539,13 +1608,13 @@ name = "pytest"
 version = "8.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/08/ba/45911d754e8eba3d5a841a5ce61a65a685ff1798421ac054f85aa8747dfb/pytest-8.4.1.tar.gz", hash = "sha256:7c67fd69174877359ed9371ec3af8a3d2b04741818c51e5e99cc1742251fa93c", size = 1517714, upload-time = "2025-06-18T05:48:06.109Z" }
 wheels = [
@@ -1557,10 +1626,12 @@ name = "pytest-anki"
 version = "1.0.0b3.post1"
 source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=main#835e060420fc71f36635b1480ac7ea0f4fa70ba3" }
 dependencies = [
-    { name = "anki", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "anki", version = "25.7.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-production' or extra != 'group-13-ankihub-addon-tests'" },
-    { name = "aqt", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-tests'" },
-    { name = "aqt", version = "25.7.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-production' or extra != 'group-13-ankihub-addon-tests'" },
+    { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "anki", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "anki", version = "25.7.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-production' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra != 'group-13-ankihub-addon-tests')" },
+    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "aqt", version = "24.11", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra != 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "aqt", version = "25.7.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-production' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra != 'group-13-ankihub-addon-old-anki-tests' and extra != 'group-13-ankihub-addon-tests')" },
     { name = "pytest" },
     { name = "pytest-forked" },
     { name = "pytest-qt" },
@@ -1589,7 +1660,7 @@ version = "1.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1f/31/27f28431a16b83cab7a636dce59cf397517807d247caa38ee67d65e71ef8/pytest_env-1.1.5.tar.gz", hash = "sha256:91209840aa0e43385073ac464a554ad2947cc2fd663a9debf88d03b01e0cc1cf", size = 8911, upload-time = "2024-09-17T22:39:18.566Z" }
 wheels = [
@@ -2266,6 +2337,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9f/69/83029f1f6300c5fb2471d621ab06f6ec6b3324685a2ce0f9777fd4a8b71e/werkzeug-3.1.3.tar.gz", hash = "sha256:60723ce945c19328679790e3282cc758aa4a6040e4bb330f53d30fa546d44746", size = 806925, upload-time = "2024-11-08T15:52:18.093Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/24/ab44c871b0f07f491e5d2ad12c9bd7358e527510618cb1b803a88e986db1/werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e", size = 224498, upload-time = "2024-11-08T15:52:16.132Z" },
+]
+
+[[package]]
+name = "winrt"
+version = "1.0.21033.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/7b/0599e61103c2eb10cde633e93917f481026a551595a6d193a4a9448008c9/winrt-1.0.21033.1-cp39-none-win32.whl", hash = "sha256:9d7b7d2e48c301855afd3280aaf51ea0d3c683450f46de2db813f71ee1cd5937", size = 4671176, upload-time = "2021-02-03T00:19:00.182Z" },
+    { url = "https://files.pythonhosted.org/packages/78/e7/179a6599dfd47132ef7cf29d9deee5212bb5d7c38345740b981c96bbbef5/winrt-1.0.21033.1-cp39-none-win_amd64.whl", hash = "sha256:ad4afd1c7b041a6b770256d70e07093920fa83eecd80e42cac2704cd03902243", size = 4221795, upload-time = "2021-02-03T00:19:07.055Z" },
 ]
 
 [[package]]
