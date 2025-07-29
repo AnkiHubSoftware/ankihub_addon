@@ -11,7 +11,7 @@ package-dir = { "ankihub_addon" = "ankihub" }
 
 [dependency-groups]
 production = [
-  "aqt[qt6]==24.11",
+  "aqt==25.7.5",
 ]
 tests = [
   "aqt[qt5]==24.11",
@@ -49,6 +49,14 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
+]
+
+[tool.uv]
+conflicts = [
+    [
+        { group = "production" },
+        { group = "tests" },
+    ]
 ]
 
 [tool.uv.sources]
