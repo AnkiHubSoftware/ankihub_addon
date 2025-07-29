@@ -5793,6 +5793,7 @@ class TestAutoSync:
         )
 
 
+@pytest.mark.sequential
 class TestAutoSyncRateLimit:
     @pytest.mark.parametrize(
         "delay_between_syncs_in_seconds, expected_call_count",
