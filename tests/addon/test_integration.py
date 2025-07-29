@@ -5945,6 +5945,7 @@ def test_optional_tag_suggestion_dialog(
 
 
 @pytest.mark.qt_no_exception_capture
+@pytest.mark.sequential
 def test_reset_optional_tags_action(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
