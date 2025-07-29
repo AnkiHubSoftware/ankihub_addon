@@ -20,7 +20,7 @@ dev = [
   "pyqt5==5.15.5; platform_system != 'Windows'",
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "ruff",
-  "mypy==0.971",
+  "mypy==1.17.0",
   "coverage==6.5.0",
   "pre-commit==2.20.0",
   "requests-mock==1.9.3",
@@ -65,7 +65,7 @@ exclude = [
   'ankihub/lib'
 ]
 
-no_strict_optional = true
+strict_optional = false
 
 [[tool.mypy.overrides]]
 module = 'ankihub.*'
