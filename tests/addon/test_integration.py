@@ -6251,7 +6251,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6278,7 +6278,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6335,7 +6335,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created.
-            assert create_change_suggestion_mock.called_once  # type: ignore
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3.
             assert mock_client_media_upload.call_count == 0
