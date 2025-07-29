@@ -6395,6 +6395,7 @@ class TestSuggestionsWithMedia:
         assert name_of_uploaded_media == expected_media_name
 
 
+@pytest.mark.sequential
 class TestAddonInstallAndUpdate:
     def test_install_and_update_addon(
         self,
