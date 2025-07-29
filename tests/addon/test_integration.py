@@ -6027,6 +6027,7 @@ def test_reset_optional_tags_action(
         assert mw.col.get_note(other_note.id).tags == [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"]
 
 
+@pytest.mark.sequential
 class TestMediaSyncMediaDownload:
     def test_download_media(
         self,
