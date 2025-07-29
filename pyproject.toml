@@ -20,8 +20,6 @@ old_anki_tests = [
   "aqt[qt5]==2.1.56",
 ]
 dev = [
-  "pyqt5==5.15.5; platform_system != 'Windows'",
-  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "ruff",
   "mypy==1.17.0",
   "coverage==7.10.1",
@@ -41,6 +39,7 @@ dev = [
   "pytest-xvfb==2.0.0",
   "pytest-retry==1.7.0",
   "pytest-anki",
+  "aqt[qt5]>=2.1.56",
   "factory-boy==3.3.3",
   "types-factory-boy==0.4.1",
   "faker==37.4.2",
