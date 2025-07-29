@@ -5828,6 +5828,7 @@ class TestAutoSyncRateLimit:
             assert sync_with_ankihub_mock.call_count == expected_call_count
 
 
+@pytest.mark.sequential
 def test_optional_tag_suggestion_dialog(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
