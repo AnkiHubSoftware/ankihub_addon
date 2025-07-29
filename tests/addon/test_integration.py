@@ -6140,6 +6140,7 @@ def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
         yield upload_file_to_s3_with_reusable_presigned_url_mock
 
 
+@pytest.mark.sequential
 class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
