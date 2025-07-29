@@ -4829,6 +4829,7 @@ def test_create_copy_browser_action_does_not_copy_ah_nid(
         assert note.fields == ["front", "back", ""]
 
 
+@pytest.mark.sequential
 class TestFlattenDeck:
     def test_cards_get_moved_to_root_deck_and_subdecks_are_deleted(
         self,
