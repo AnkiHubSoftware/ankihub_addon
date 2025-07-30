@@ -40,6 +40,8 @@ dev = [
   "pytest-retry==1.6.3",
   "pytest-anki",
   "aqt[qt5]>=2.1.56",
+  "pyqt5==5.15.5; platform_system != 'Windows'",
+  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "factory-boy==3.2.1",
   "types-factory-boy==0.3.1",
   "faker==19.12.0",

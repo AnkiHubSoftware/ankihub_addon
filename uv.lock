@@ -137,6 +137,8 @@ dev = [
     { name = "faker" },
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "pyqt5", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "pyqtwebengine", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
     { name = "pytest" },
     { name = "pytest-anki" },
     { name = "pytest-cov" },
@@ -184,6 +186,8 @@ dev = [
     { name = "faker", specifier = "==19.12.0" },
     { name = "mypy", specifier = "==1.17.0" },
     { name = "pre-commit", specifier = "==2.20.0" },
+    { name = "pyqt5", marker = "sys_platform != 'win32'", specifier = "==5.15.5" },
+    { name = "pyqtwebengine", marker = "sys_platform != 'win32'", specifier = "==5.15.6" },
     { name = "pytest", specifier = "==8.2.2" },
     { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=main" },
     { name = "pytest-cov", specifier = "==4.0.0" },
@@ -581,7 +585,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-production') or (extra == 'group-13-ankihub-addon-old-anki-tests' and extra == 'group-13-ankihub-addon-tests') or (extra == 'group-13-ankihub-addon-production' and extra == 'group-13-ankihub-addon-tests')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -685,7 +689,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.11'" },
+    { name = "zipp", marker = "python_full_version < '3.10'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -1383,19 +1387,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/30/23/2f0a3efc4d6a32f3b
 
 [[package]]
 name = "pyqt5"
-version = "5.15.11"
+version = "5.15.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt5-qt5", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or extra == 'group-13-ankihub-addon-tests'" },
-    { name = "pyqt5-sip", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or extra == 'group-13-ankihub-addon-tests'" },
+    { name = "pyqt5-qt5" },
+    { name = "pyqt5-sip" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0e/07/c9ed0bd428df6f87183fca565a79fee19fa7c88c7f00a7f011ab4379e77a/PyQt5-5.15.11.tar.gz", hash = "sha256:fda45743ebb4a27b4b1a51c6d8ef455c4c1b5d610c90d2934c7802b5c1557c52", size = 3216775, upload-time = "2024-07-19T08:39:57.756Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/bf/4e7c66eefa9ede1ec01d065d220373667f4ca3285a83a6430eefc254904c/PyQt5-5.15.5.tar.gz", hash = "sha256:b411b7a8fa03901c9feb1dcbac7ea1fc3ce20b9ae682762b777cd5398749ca2b", size = 3239628, upload-time = "2021-10-18T09:13:43.724Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/64/42ec1b0bd72d87f87bde6ceb6869f444d91a2d601f2e67cd05febc0346a1/PyQt5-5.15.11-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:c8b03dd9380bb13c804f0bdb0f4956067f281785b5e12303d529f0462f9afdc2", size = 6579776, upload-time = "2024-07-19T08:39:19.775Z" },
-    { url = "https://files.pythonhosted.org/packages/49/f5/3fb696f4683ea45d68b7e77302eff173493ac81e43d63adb60fa760b9f91/PyQt5-5.15.11-cp38-abi3-macosx_11_0_x86_64.whl", hash = "sha256:6cd75628f6e732b1ffcfe709ab833a0716c0445d7aec8046a48d5843352becb6", size = 7016415, upload-time = "2024-07-19T08:39:32.977Z" },
-    { url = "https://files.pythonhosted.org/packages/b4/8c/4065950f9d013c4b2e588fe33cf04e564c2322842d84dbcbce5ba1dc28b0/PyQt5-5.15.11-cp38-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:cd672a6738d1ae33ef7d9efa8e6cb0a1525ecf53ec86da80a9e1b6ec38c8d0f1", size = 8188103, upload-time = "2024-07-19T08:39:40.561Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/f0/ae5a5b4f9b826b29ea4be841b2f2d951bcf5ae1d802f3732b145b57c5355/PyQt5-5.15.11-cp38-abi3-win32.whl", hash = "sha256:76be0322ceda5deecd1708a8d628e698089a1cea80d1a49d242a6d579a40babd", size = 5433308, upload-time = "2024-07-19T08:39:46.932Z" },
-    { url = "https://files.pythonhosted.org/packages/56/d5/68eb9f3d19ce65df01b6c7b7a577ad3bbc9ab3a5dd3491a4756e71838ec9/PyQt5-5.15.11-cp38-abi3-win_amd64.whl", hash = "sha256:bdde598a3bb95022131a5c9ea62e0a96bd6fb28932cc1619fd7ba211531b7517", size = 6865864, upload-time = "2024-07-19T08:39:53.572Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/66/5907422187ccf92dd6f070c278b1c4ad9363eea56cb7068e3d2942bf4f8f/PyQt5-5.15.5-cp36-abi3-macosx_10_13_x86_64.whl", hash = "sha256:521130eea1eaac55cc6867b1dc627d292b6468fb8e525ce2a015cdf39028d6e8", size = 6974078, upload-time = "2021-10-18T09:12:13.685Z" },
+    { url = "https://files.pythonhosted.org/packages/67/44/a106d9570fa66de1d1f72d2b678369af8128d072797a2b8b986c0b39c89a/PyQt5-5.15.5-cp36-abi3-manylinux1_x86_64.whl", hash = "sha256:5966fb291f316f8e35bc8775dda63acf1bb9855baeb5af3e33d3e7c4f1cd98d4", size = 8305612, upload-time = "2021-10-18T09:12:43.942Z" },
+    { url = "https://files.pythonhosted.org/packages/00/c6/193aaf2ec157e5886333a0aaa78fa77d8e8e9590088df3dea3341cbeccd6/PyQt5-5.15.5-cp36-abi3-win32.whl", hash = "sha256:b8e23c1a3fe1b7749c9106f36fba0bd4676dc77bcacca95304c6b840b782e24d", size = 5345864, upload-time = "2021-10-18T09:13:05.543Z" },
+    { url = "https://files.pythonhosted.org/packages/91/81/e3aa694b42f62ad380096e49f2b717af662ca5443e9453893fa052ab3874/PyQt5-5.15.5-cp36-abi3-win_amd64.whl", hash = "sha256:85e76b7a96995b9da12083850bf2a9f4f0aeba2b0b99461b3337ad7e44f428c3", size = 6749383, upload-time = "2021-10-18T09:13:30.942Z" },
 ]
 
 [[package]]
@@ -1528,20 +1531,20 @@ wheels = [
 
 [[package]]
 name = "pyqtwebengine"
-version = "5.15.7"
+version = "5.15.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt5", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or extra == 'group-13-ankihub-addon-tests'" },
-    { name = "pyqt5-sip", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or extra == 'group-13-ankihub-addon-tests'" },
-    { name = "pyqtwebengine-qt5", marker = "extra == 'group-13-ankihub-addon-old-anki-tests' or extra == 'group-13-ankihub-addon-tests'" },
+    { name = "pyqt5" },
+    { name = "pyqt5-sip" },
+    { name = "pyqtwebengine-qt5" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/e8/19a00646866e950307f8cd73841575cdb92800ae14837d5821bcbb91392c/PyQtWebEngine-5.15.7.tar.gz", hash = "sha256:f121ac6e4a2f96ac289619bcfc37f64e68362f24a346553f5d6c42efa4228a4d", size = 32223, upload-time = "2024-07-19T08:44:48.6Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/4b/ca01d875eff114ba5221ce9311912fbbc142b7bb4cbc4435e04f4f1f73cb/PyQtWebEngine-5.15.6.tar.gz", hash = "sha256:ae241ef2a61c782939c58b52c2aea53ad99b30f3934c8358d5e0a6ebb3fd0721", size = 48871, upload-time = "2022-06-18T16:53:51.113Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/3d/8961b3bb00c0979280a1a160c745e1d543b4d5823f8a71dfa370898b5699/PyQtWebEngine-5.15.7-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:e17187d9a3db3bab041f31385ed72832312557fefc5bd63ae4692df306dc1572", size = 181029, upload-time = "2024-07-19T08:44:31.266Z" },
-    { url = "https://files.pythonhosted.org/packages/8e/c7/82bdc50b44f505a87e6a9d7f4a4d017c8e2f06b9f3ab8f661adff00b95c6/PyQtWebEngine-5.15.7-cp38-abi3-macosx_11_0_x86_64.whl", hash = "sha256:021814af1ff7d8be447c5314891cd4ddc931deae393dc2d38a816569aa0eb8cd", size = 187313, upload-time = "2024-07-19T08:44:43.002Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/a0/b36e7d6f0cd69b7dd58f0d733188e100115c5fce1c0606ad84bf35ef7ceb/PyQtWebEngine-5.15.7-cp38-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:965461ca0cf414e03bd510a9a0e2ea36dc21deaa7fc4a631be4a1f2aa0327179", size = 227640, upload-time = "2024-07-19T08:44:44.236Z" },
-    { url = "https://files.pythonhosted.org/packages/54/b9/0e68e30cec6a02d8d27c7663de77460156c5342848e2f72424e577c66eaf/PyQtWebEngine-5.15.7-cp38-abi3-win32.whl", hash = "sha256:c0680527b1af3e0145ce5e0f2ba2156ff0b4b38844392cf0ddd37ede6a9edeab", size = 160980, upload-time = "2024-07-19T08:44:45.482Z" },
-    { url = "https://files.pythonhosted.org/packages/39/67/0dead50889d905fc99f40e61e5ab7f73746605ce8f74c4fa7fb3fc1d6c5e/PyQtWebEngine-5.15.7-cp38-abi3-win_amd64.whl", hash = "sha256:bd5e8c426d6f6b352cd15800d64a89b2a4a11e098460b818c7bdcf5e5612e44f", size = 184657, upload-time = "2024-07-19T08:44:47.066Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/57/b5276d92800b4c1ee6f214c98610fe8909006b58ba9b213ee58a1bf6a095/PyQtWebEngine-5.15.6-cp37-abi3-macosx_10_13_x86_64.whl", hash = "sha256:8c2fce2458e7b781d2cc3070b336f67d39a717c5eef2f823cae501d5d9f200de", size = 187561, upload-time = "2022-06-18T16:53:40.946Z" },
+    { url = "https://files.pythonhosted.org/packages/27/92/a8c45d97fbfb202638670e02c251430e4f1528b4de9911ae0f68d043cc3d/PyQtWebEngine-5.15.6-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:61d0ceb20025ba4d2d1ce3c2b3a7a43e240069c4203dfc4a8dddfb00923b1d3c", size = 181637, upload-time = "2023-10-20T15:01:13.303Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/90/fcc59d99ed597ac3d1aa465f8c7711cb33e02cc867940db6c62dcdaa2689/PyQtWebEngine-5.15.6-cp37-abi3-manylinux1_x86_64.whl", hash = "sha256:67110bc9d5b7e633dcc242b8228cc54b1532abc039fdf534b383ac40a60b7ba3", size = 230380, upload-time = "2022-06-18T16:53:43.784Z" },
+    { url = "https://files.pythonhosted.org/packages/81/67/041d81bd0a16ac62e7663f170afe0c1cf9e47ddeb1cd35decc8ad0546f05/PyQtWebEngine-5.15.6-cp37-abi3-win32.whl", hash = "sha256:a90c945606683a53c9b264a7509943fd835d50366d535c22ddde952f23d35748", size = 159404, upload-time = "2022-06-18T16:53:46.223Z" },
+    { url = "https://files.pythonhosted.org/packages/65/d9/4b480349ac6d05cb5e82a37582479696beb6717bb717ad64c7d543d1a56a/PyQtWebEngine-5.15.6-cp37-abi3-win_amd64.whl", hash = "sha256:dbd1a768877040050d3159270f5ab95758af4954c4cb4e54195bd3cad519d5b6", size = 182674, upload-time = "2022-06-18T16:53:48.616Z" },
 ]
 
 [[package]]
