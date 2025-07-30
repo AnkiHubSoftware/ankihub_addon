@@ -5006,6 +5006,7 @@ def test_migrate_profile_data_from_old_location(
     }
 
 
+@pytest.mark.sequential
 def test_profile_swap(
     anki_session_with_addon_data: AnkiSession,
     mocker: MockerFixture,
