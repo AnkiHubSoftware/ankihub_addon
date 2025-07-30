@@ -7533,7 +7533,6 @@ class TestMaybeSendDailyReviewSummaries:
             assert dates_from_summaries == expected_dates
 
 
-@pytest.mark.sequential
 def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
