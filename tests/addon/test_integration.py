@@ -5065,6 +5065,7 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
+@pytest.mark.sequential
 def test_migrate_addon_data_from_old_location(
     anki_session_with_addon_data: AnkiSession,
 ):
