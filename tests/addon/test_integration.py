@@ -4721,7 +4721,6 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # Verify it's the same deck (same ID)
             assert filtered_did == new_filtered_did
 
-    @pytest.mark.sequential
     def test_notes_not_moved_out_filtered_decks(
         self,
         anki_session_with_addon_data: AnkiSession,
