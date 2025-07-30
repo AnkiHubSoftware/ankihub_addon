@@ -8,7 +8,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 import pytest
 from coverage.exceptions import DataError  # type: ignore
-from pytest import Config, FixtureRequest, Item, MonkeyPatch, Session
+from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_anki.plugin import anki_running
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -165,9 +165,3 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 def pytest_set_filtered_exceptions() -> List[Exception]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
-
-
-def pytest_collection_modifyitems(session: Session, config: Config, items: List[Item]) -> None:
-    for item in items:
-        if item.path.name == "test_integration.py":
-            item.add_marker(pytest.mark.sequential)

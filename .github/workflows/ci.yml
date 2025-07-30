@@ -17,7 +17,6 @@ jobs:
   test-addon:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1
       matrix:
         include:
           - tests_group: tests
@@ -44,10 +43,9 @@ jobs:
       - name: Run pytest with coverage
         run: |
           uv sync --dev --group ${{ matrix.tests_group }}
-          uv run --no-sync -- pytest ./tests/addon -n 0 --cov --cov-report=xml --retries 2
-          # uv run --no-sync -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          # uv run --no-sync -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          # uv run --no-sync -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          uv run --no-sync -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          uv run --no-sync -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run --no-sync -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
