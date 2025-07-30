@@ -4977,6 +4977,7 @@ def test_reset_local_changes_to_notes(
             assert mw.col.decks.name(card.did) == "Testdeck"
 
 
+@pytest.mark.sequential
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     mocker: MockerFixture,
