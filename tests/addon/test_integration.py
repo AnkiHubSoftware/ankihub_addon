@@ -7304,6 +7304,7 @@ class TestAnkiHubAIInReviewer:
             ),
         ],
     )
+    @pytest.mark.sequential
     def test_get_note_suspension_states_pycmd(
         self,
         anki_session_with_addon_data: AnkiSession,
