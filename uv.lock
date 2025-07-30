@@ -147,6 +147,7 @@ dev = [
     { name = "pytest-qt" },
     { name = "pytest-retry" },
     { name = "pytest-split" },
+    { name = "pytest-timeout" },
     { name = "pytest-vcr" },
     { name = "pytest-xvfb" },
     { name = "requests-mock" },
@@ -196,6 +197,7 @@ dev = [
     { name = "pytest-qt", specifier = "==4.2.0" },
     { name = "pytest-retry", specifier = "==1.6.3" },
     { name = "pytest-split", specifier = "==0.9" },
+    { name = "pytest-timeout", specifier = "==2.4.0" },
     { name = "pytest-vcr", specifier = "==1.0.2" },
     { name = "pytest-xvfb", specifier = "==2.0.0" },
     { name = "requests-mock", specifier = "==1.9.3" },
@@ -1683,6 +1685,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/a9/7b8327a605a48d5094b331de10e01f1f1aec0cb8c5790b5e4d98ac327f05/pytest_split-0.9.0.tar.gz", hash = "sha256:ca52527e4d9024f6ec3aba723527bd276d12096024999b1f5b8445a38da1e81c", size = 13599, upload-time = "2024-06-19T12:17:53.969Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/67/8cff7bf04d78ac7fbb88b0985061347943dc3cbeafada27b4accb4527579/pytest_split-0.9.0-py3-none-any.whl", hash = "sha256:9e197df601828d76a1ab615158d9c6253ec9f96e46c1d3ea27187aa5ac0ef9de", size = 11790, upload-time = "2024-06-19T12:17:48.888Z" },
+]
+
+[[package]]
+name = "pytest-timeout"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/82/4c9ecabab13363e72d880f2fb504c5f750433b2b6f16e99f4ec21ada284c/pytest_timeout-2.4.0.tar.gz", hash = "sha256:7e68e90b01f9eff71332b25001f85c75495fc4e3a836701876183c4bcfd0540a", size = 17973, upload-time = "2025-05-05T19:44:34.99Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/b6/3127540ecdf1464a00e5a01ee60a1b09175f6913f0644ac748494d9c4b21/pytest_timeout-2.4.0-py3-none-any.whl", hash = "sha256:c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2", size = 14382, upload-time = "2025-05-05T19:44:33.502Z" },
 ]
 
 [[package]]
