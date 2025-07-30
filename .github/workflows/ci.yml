@@ -17,6 +17,7 @@ jobs:
   test-addon:
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 1
       matrix:
         include:
           - tests_group: tests
