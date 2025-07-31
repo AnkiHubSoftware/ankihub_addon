@@ -20,7 +20,11 @@ jobs:
       matrix:
         include:
           - anki_package_version: 'aqt[qt5]==24.11'
+            pyqt_package_version: 'pyqt5==5.15.5'
+            pyqtwebengine_package_version: 'pyqtwebengine==5.15.6'
           - anki_package_version: 'aqt[qt5]==2.1.56'
+            pyqt_package_version: 'pyqt5==5.15.5'
+            pyqtwebengine_package_version: 'pyqtwebengine==5.15.6'
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -42,7 +46,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv add --group tests "${{ matrix.anki_package_version }}"
+          uv add --group tests "${{ matrix.anki_package_version }}" "${{ matrix.pyqt_package_version }}" "${{ matrix.pyqtwebengine_package_version }}"
           uv sync --group tests
           uv run -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
           uv run -- pytest ./tests/addon -n 0 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
