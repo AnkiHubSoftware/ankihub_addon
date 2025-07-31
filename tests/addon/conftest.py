@@ -208,10 +208,8 @@ def pytest_exception_interact(node, call, report):
 
     This includes timeouts from pytest-timeout.
     """
-    # Check if this is a timeout exception
-    if (
-        call.excinfo
-        and hasattr(call.excinfo.value, "__class__")
-        and "timeout" in call.excinfo.value.__class__.__name__.lower()
-    ):
-        _capture_screenshot_on_timeout(node.nodeid)
+    # Check if this is a timeout exception from pytest-timeout
+    if call.excinfo and call.excinfo.value and hasattr(call.excinfo.value, "args") and call.excinfo.value.args:
+        error_message = str(call.excinfo.value.args[0]) if call.excinfo.value.args else ""
+        if "pytest-timeout" in error_message.lower():
+            _capture_screenshot_on_timeout(node.nodeid)
