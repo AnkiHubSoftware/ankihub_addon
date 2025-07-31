@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - anki_package_version: '$AQT_VERSION'
+          - anki_package_version: ${{ env.AQT_VERSION }}
           - anki_package_version: 'aqt[qt5]==2.1.56'
     timeout-minutes: 30
     steps:
