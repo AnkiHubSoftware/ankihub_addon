@@ -13,21 +13,16 @@ package-dir = { "ankihub_addon" = "ankihub" }
 production = [
   "aqt==25.7.5",
 ]
-tests = [
-  "aqt[qt5]==24.11",
-]
-old_anki_tests = [
-  "aqt[qt5]==2.1.56",
-]
 dev = [
   "ruff",
   "mypy==1.17.0",
   "coverage==6.5.0",
   "pre-commit==2.20.0",
   "requests-mock==1.9.3",
-  "types-requests==2.28.9",
-  "urllib3==1.26.14",
-  "typeguard==2.13.3",
+  "types-requests==2.28.9"
+]
+
+tests = [
   "vcrpy==4.2.0",
   "pytest==8.2.2",
   "pytest-vcr==1.0.2",
@@ -40,14 +35,17 @@ dev = [
   "pytest-retry==1.6.3",
   "pytest-timeout==2.4.0",
   "pytest-anki",
-  "aqt[qt5]>=2.1.56",
-  "pyqt5==5.15.5; platform_system != 'Windows'",
-  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "factory-boy==3.2.1",
   "types-factory-boy==0.3.1",
   "faker==19.12.0",
   "approvaltests==12.2.0",
   "setuptools>=80.9.0",
+]
+ankiweb = [
+  "webbot",
+  "webdriver_manager==4.0.2",
+  "selenium==3.141.0",
+  "urllib3==1.26.14",
 ]
 bundle = [
   "sentry_sdk==1.6.0",
@@ -60,22 +58,20 @@ bundle = [
 [tool.uv]
 conflicts = [
     [
+        { group = "dev" },
         { group = "production" },
-        { group = "tests" },
     ],
     [
         { group = "production" },
-        { group = "old_anki_tests" },
-    ],
-    [
         { group = "tests" },
-        { group = "old_anki_tests" },
-    ]
+    ],
+
 ]
 
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
 mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
+webbot = { git = "https://github.com/nateshmbhat/webbot", rev = "333f51840cd5a1fcde0b014bd6ab401d51e62860" }
 
 [tool.mypy]
 files = ['ankihub', 'tests/addon', 'tests/client']
