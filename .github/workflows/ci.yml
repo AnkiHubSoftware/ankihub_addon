@@ -49,7 +49,7 @@ jobs:
           uv add --group tests "${{ matrix.anki_package_version }}" "${{ matrix.pyqt_package_version }}" "${{ matrix.pyqtwebengine_package_version }}"
           uv sync --group tests
           uv run -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          uv run -- pytest ./tests/addon -n 0 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
           uv run -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
