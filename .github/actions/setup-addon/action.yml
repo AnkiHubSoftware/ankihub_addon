@@ -12,6 +12,7 @@ runs:
       uses: jurplel/install-qt-action@v4
       with:
         version: "5.15.5"
+        modules: "qtwebengine"
         setup-python: false
         cache: true
       continue-on-error: true
