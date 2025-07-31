@@ -15,13 +15,14 @@ runs:
         modules: "qtwebengine"
         setup-python: false
         cache: true
+        dir: ${{ env.RUNNER_WORKSPACE || github.workspace }}
       continue-on-error: true
 
     - name: Install additional Qt dependencies
       if: ${{ inputs.install_qt == 'true' }}
       run: |
         sudo apt-get update
-        sudo apt-get -y install xvfb x11-utils libgl1 libegl1 libdbus-1-3
+        sudo apt-get -y install xvfb x11-utils libgl1 libegl1 libdbus-1-3 libnss3 libxdamage1 libxkbcommon0 libasound2
       shell: bash
 
     - name: Build
