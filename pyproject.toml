@@ -31,7 +31,7 @@ tests = [
   "pytest-mock==3.12.0",
   "pytest-cov==4.0.0",
   "pytest-env==0.6.2",
-  "pytest-xvfb==2.0.0",
+  "pytest-xvfb==3.1.1",
   "pytest-retry==1.6.3",
   "pytest-timeout==2.4.0",
   "pillow>=11.3.0",
@@ -68,6 +68,7 @@ conflicts = [
     ],
 
 ]
+override-dependencies = ["pytest-xvfb==3.1.1"]
 
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }

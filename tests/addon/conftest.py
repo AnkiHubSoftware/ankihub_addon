@@ -1,7 +1,9 @@
 import json
 import os
 import shutil
+import signal
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -12,6 +14,7 @@ from coverage.exceptions import DataError  # type: ignore
 from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_anki.plugin import anki_running
+from pytest_timeout import timeout_sigalrm
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
@@ -168,48 +171,42 @@ def pytest_set_filtered_exceptions() -> List[Exception]:
     return [DataError]
 
 
-def _capture_screenshot_on_timeout(nodeid: str) -> Optional[Path]:
-    """Capture a screenshot when a test times out.
-
-    Args:
-        nodeid: The pytest node ID of the test that timed out
-
-    Returns:
-        Path to the saved screenshot file, or None if screenshot capture failed
-    """
-
+def _capture_screenshot_on_timeout(item: pytest.Item) -> Optional[Path]:
     try:
-        from PIL import ImageGrab
+        from PIL.ImageGrab import grab
+        from pytest_xvfb import xvfb_instance
 
-        # Create screenshots directory
+        img = grab(xdisplay=xvfb_instance._virtual_display.new_display_var)
         screenshots_dir = Path("test-screenshots")
         screenshots_dir.mkdir(exist_ok=True)
-
-        # Generate screenshot filename with timestamp and test name
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        # Clean up the node ID to make it filesystem-safe
-        safe_nodeid = nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
+        safe_nodeid = item.nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
         screenshot_path = screenshots_dir / f"timeout_{timestamp}_{safe_nodeid}.png"
-
-        # Capture screenshot
-        screenshot = ImageGrab.grab()
-        screenshot.save(str(screenshot_path))
-
-        print(f"\n📸 Screenshot saved to {screenshot_path} for timed-out test: {nodeid}")
-        return screenshot_path
-
+        img.save(screenshot_path)
     except Exception as e:
-        print(f"\n❌ Failed to capture screenshot for {nodeid}: {e}")
+        print(f"\n❌ Failed to capture screenshot for {item.nodeid}: {e}")
         return None
 
 
-def pytest_exception_interact(node, call, report):
-    """Hook called when an exception occurs during test execution.
+@pytest.hookspec(firstresult=True)
+def pytest_timeout_set_timer(item, settings):
+    timeout_method = settings.method
+    if timeout_method == "signal" and threading.current_thread() is not threading.main_thread():
+        timeout_method = "thread"
 
-    This includes timeouts from pytest-timeout.
-    """
-    # Check if this is a timeout exception from pytest-timeout
-    if call.excinfo and call.excinfo.value and hasattr(call.excinfo.value, "args") and call.excinfo.value.args:
-        error_message = str(call.excinfo.value.args[0]) if call.excinfo.value.args else ""
-        if "pytest-timeout" in error_message.lower():
-            _capture_screenshot_on_timeout(node.nodeid)
+    if timeout_method == "signal":
+
+        def handler(signum, frame):
+            __tracebackhide__ = True
+            _capture_screenshot_on_timeout(item)
+            timeout_sigalrm(item, settings)
+
+        def cancel():
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+
+        item.cancel_timeout = cancel
+        signal.signal(signal.SIGALRM, handler)
+        signal.setitimer(signal.ITIMER_REAL, settings.timeout)
+
+        return True
