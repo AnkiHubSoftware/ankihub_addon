@@ -6,7 +6,9 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   DEPLOYMENT_ENVIRONMENT: local
-
+  AQT_VERSION: aqt[qt5]==24.11
+  PYQT_VERSION: pyqt5==5.15.5
+  PYQTWEBENGINE_VERSION: pyqtwebengine==5.15.6
 on:
   push:
     branches:
@@ -19,12 +21,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - anki_package_version: 'aqt[qt5]==24.11'
-            pyqt_package_version: 'pyqt5==5.15.5'
-            pyqtwebengine_package_version: 'pyqtwebengine==5.15.6'
+          - anki_package_version: '$AQT_VERSION'
           - anki_package_version: 'aqt[qt5]==2.1.56'
-            pyqt_package_version: 'pyqt5==5.15.5'
-            pyqtwebengine_package_version: 'pyqtwebengine==5.15.6'
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -46,7 +44,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv add --group tests "${{ matrix.anki_package_version }}" "${{ matrix.pyqt_package_version }}" "${{ matrix.pyqtwebengine_package_version }}"
+          uv add --group tests "${{ matrix.anki_package_version }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
           uv sync --group tests
           uv run -- pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
           uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
@@ -111,7 +109,8 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv sync --dev --group tests
+          uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
+          uv sync --group tests
           uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
