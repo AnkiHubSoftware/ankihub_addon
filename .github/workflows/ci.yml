@@ -56,6 +56,14 @@ jobs:
           path: .coverage
           include-hidden-files: true
 
+      - name: Upload timeout screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timeout-screenshots-addon-${{ matrix.anki_package_version }}
+          path: test-screenshots/
+          if-no-files-found: ignore
+
 
   test-client:
     runs-on: ubuntu-latest
@@ -119,6 +127,14 @@ jobs:
           name: coverage_client_${{ matrix.group }}
           path: .coverage
           include-hidden-files: true
+
+      - name: Upload timeout screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timeout-screenshots-client-${{ matrix.group }}
+          path: test-screenshots/
+          if-no-files-found: ignore
 
 
   coverage-and-static-checks:

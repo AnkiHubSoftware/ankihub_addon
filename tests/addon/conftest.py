@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
@@ -165,3 +166,52 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 def pytest_set_filtered_exceptions() -> List[Exception]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
+
+
+def _capture_screenshot_on_timeout(nodeid: str) -> Optional[Path]:
+    """Capture a screenshot when a test times out.
+
+    Args:
+        nodeid: The pytest node ID of the test that timed out
+
+    Returns:
+        Path to the saved screenshot file, or None if screenshot capture failed
+    """
+
+    try:
+        from PIL import ImageGrab
+
+        # Create screenshots directory
+        screenshots_dir = Path("test-screenshots")
+        screenshots_dir.mkdir(exist_ok=True)
+
+        # Generate screenshot filename with timestamp and test name
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        # Clean up the node ID to make it filesystem-safe
+        safe_nodeid = nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
+        screenshot_path = screenshots_dir / f"timeout_{timestamp}_{safe_nodeid}.png"
+
+        # Capture screenshot
+        screenshot = ImageGrab.grab()
+        screenshot.save(str(screenshot_path))
+
+        print(f"\n📸 Screenshot saved to {screenshot_path} for timed-out test: {nodeid}")
+        return screenshot_path
+
+    except Exception as e:
+        print(f"\n❌ Failed to capture screenshot for {nodeid}: {e}")
+        return None
+
+
+def pytest_exception_interact(node, call, report):
+    """Hook called when an exception occurs during test execution.
+
+    This includes timeouts from pytest-timeout.
+    """
+    # Check if this is a timeout exception
+    if (
+        call.excinfo
+        and hasattr(call.excinfo.value, "__class__")
+        and "timeout" in call.excinfo.value.__class__.__name__.lower()
+    ):
+        _capture_screenshot_on_timeout(node.nodeid)
