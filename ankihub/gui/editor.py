@@ -9,6 +9,7 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
+from aqt.qt import sip
 from aqt.utils import openLink, tooltip
 
 from .. import settings
@@ -68,8 +69,9 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     def on_did_add_note(note: anki.notes.Note) -> None:
-        open_suggestion_dialog_for_single_suggestion(note, parent=editor.widget)
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
+        if not sip.isdeleted(editor.widget):
+            open_suggestion_dialog_for_single_suggestion(note, parent=editor.widget)
 
     # If the note is not yet in the database, we need to add it first.
     # We call add_current_note() to add the note to the database,
