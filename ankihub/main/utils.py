@@ -488,14 +488,13 @@ def _template_side_with_ankihub_modifications(
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}"""
         if add_view_on_ankihub_snippet
         else ""
-    ).strip("\n")
+    ).strip("\n") + ("\n" if add_view_on_ankihub_snippet and add_metadata else "")
     metadata_snippet = (
         f"""
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
             <div id="ankihub-note-id" hidden>{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}</div>
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <div id="ankihub-user-id" hidden>{config.user_id() or ""}</div>
-    """
+        <div id="ankihub-user-id" hidden>{config.user_id() or ""}</div>"""
         if add_metadata
         else ""
     ).strip("\n")
@@ -503,7 +502,7 @@ def _template_side_with_ankihub_modifications(
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
-        {view_on_ankihub_snippet}{metadata_snippet}
+{view_on_ankihub_snippet + metadata_snippet}
         <!-- END {ANKIHUB_SNIPPET_MARKER} -->
         """
     ).strip("\n")
