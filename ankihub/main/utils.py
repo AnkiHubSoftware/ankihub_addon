@@ -430,7 +430,8 @@ def _template_side_with_ankihub_modifications(
     if not add_view_on_ankihub_snippet and not add_metadata:
         return template_side
 
-    view_on_ankihub_snippet = f"""
+    view_on_ankihub_snippet = (
+        f"""
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <a class='ankihub-view-note'
             href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
@@ -485,18 +486,24 @@ def _template_side_with_ankihub_modifications(
         </script>
 
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}"""
-    metadata_snippet = f"""
+        if add_view_on_ankihub_snippet
+        else ""
+    )
+    metadata_snippet = (
+        f"""
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
             <div id="ankihub-note-id" hidden>{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}</div>
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <div id="ankihub-user-id" hidden>{config.user_id() or ""}</div>
     """
+        if add_metadata
+        else ""
+    )
 
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
-        {view_on_ankihub_snippet}
-        {metadata_snippet}
+        {view_on_ankihub_snippet}{metadata_snippet}
         <!-- END {ANKIHUB_SNIPPET_MARKER} -->
         """
     ).strip("\n")
