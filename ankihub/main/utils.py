@@ -489,7 +489,7 @@ def _template_side_with_ankihub_modifications(
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
             <div id="ankihub-note-id" hidden>{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}</div>
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <div id="ankihub-user-id" hidden>123</div>
+        <div id="ankihub-user-id" hidden>{config.user_id() or ""}</div>
     """
 
     snippet = dedent(
