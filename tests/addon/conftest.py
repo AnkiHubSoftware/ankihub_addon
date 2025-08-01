@@ -122,6 +122,7 @@ def _mock_user_details(request_mock: Mocker) -> None:
         json={
             "has_flashcard_selector_access": False,
             "has_reviewer_extension_access": False,
+            "id": 123,
             "username": "test_user",
         },
     )

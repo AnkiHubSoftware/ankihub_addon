@@ -1,5 +1,12 @@
 new content
 
+<!-- BEGIN ANKIHUB MODFICATIONS -->
+{{#ankihub_id}}
+    <div id="ankihub-note-id" hidden>{{ankihub_id}}</div>
+{{/ankihub_id}}
+<div id="ankihub-user-id" hidden>123</div>
+<!-- END ANKIHUB MODFICATIONS -->
+
 <!--
 ANKIHUB_END
 Text below this comment will not be modified by AnkiHub or AnKing add-ons.
