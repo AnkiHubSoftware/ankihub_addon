@@ -7095,19 +7095,9 @@ def mock_using_qt5_to_return_false(mocker: MockerFixture):
     mocker.patch("ankihub.gui.reviewer.using_qt5", return_value=False)
 
 
-@pytest.fixture
-def mock_user_details(mocker: MockerFixture):
-    user_details = {
-        "has_flashcard_selector_access": True,
-        "has_reviewer_extension_access": True,
-        "username": "test_user",
-    }
-    mocker.patch.object(AnkiHubClient, "get_user_details", return_value=user_details)
-
-
 # The mock_using_qt5_to_return_false fixture is used to test the AnkiHub AI feature on Qt5,
 # even though the feature is disabled on Qt5. (In CI we are only running test on Qt5.)
-@pytest.mark.usefixtures("mock_using_qt5_to_return_false", "mock_user_details")
+@pytest.mark.usefixtures("mock_using_qt5_to_return_false")
 class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
