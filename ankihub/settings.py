@@ -292,7 +292,7 @@ class _Config:
         self._private_config.username = username
         self._update_private_config()
 
-    def save_user_id(self, user_id: int):
+    def save_user_id(self, user_id: Optional[int]):
         self._private_config.user_id = user_id
         self._update_private_config()
 
