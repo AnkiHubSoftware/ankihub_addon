@@ -488,7 +488,7 @@ def _template_side_with_ankihub_modifications(
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}"""
         if add_view_on_ankihub_snippet
         else ""
-    )
+    ).strip("\n")
     metadata_snippet = (
         f"""
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
@@ -498,7 +498,7 @@ def _template_side_with_ankihub_modifications(
     """
         if add_metadata
         else ""
-    )
+    ).strip("\n")
 
     snippet = dedent(
         f"""
