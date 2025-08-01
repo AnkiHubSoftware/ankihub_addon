@@ -420,11 +420,17 @@ def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
         aqt.mw.col.models.update_dict(note_type)
 
 
-def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
+def _template_side_with_ankihub_modifications(
+    template_side: str,
+    add_view_on_ankihub_snippet: bool,
+    add_metadata: bool,
+) -> str:
     """Return template html with the AnkiHub view note snippet added to it."""
-    snippet = dedent(
-        f"""
-        <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
+
+    if not add_view_on_ankihub_snippet and not add_metadata:
+        return template_side
+
+    view_on_ankihub_snippet = f"""
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <a class='ankihub-view-note'
             href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
@@ -478,7 +484,19 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
             }}
         </script>
 
+        {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}"""
+    metadata_snippet = f"""
+        {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
+            <div id="ankihub-note-id" hidden>{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}</div>
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
+        <div id="ankihub-user-id" hidden>123</div>
+    """
+
+    snippet = dedent(
+        f"""
+        <!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->
+        {view_on_ankihub_snippet}
+        {metadata_snippet}
         <!-- END {ANKIHUB_SNIPPET_MARKER} -->
         """
     ).strip("\n")
@@ -540,6 +558,7 @@ def note_type_with_updated_templates_and_css(
                 old_content=old_template[template_side_name] if old_template else None,
                 new_content=new_template[template_side_name] if new_template else None,
                 add_view_on_ankihub_snippet=template_side_name == "afmt",
+                add_metadata=template_side_name == "qfmt",
                 content_type="html",
             )
         updated_templates.append(updated_template)
@@ -551,6 +570,7 @@ def note_type_with_updated_templates_and_css(
         old_content=old_note_type["css"],
         new_content=new_note_type["css"] if new_note_type is not None else None,
         add_view_on_ankihub_snippet=False,
+        add_metadata=False,
         content_type="css",
     )
 
@@ -561,6 +581,7 @@ def _updated_note_type_content(
     old_content: Optional[str],
     new_content: Optional[str],
     add_view_on_ankihub_snippet: bool,
+    add_metadata: bool,
     content_type: str,
 ) -> str:
     """Returns updated content with preserved content below ankihub end comment.
@@ -569,6 +590,7 @@ def _updated_note_type_content(
       old_content: Original content to preserve custom additions from
       new_content: New base content to use, or None to use old_content
       add_view_on_ankihub_snippet: Whether to add AnkiHub view button
+      add_metadata: Whether to write metdata such as the AnkiHub note ID and user ID to the card template.
       content_type: Either "html" or "css" to determine comment style
     """
     assert old_content is not None or new_content is not None
@@ -593,8 +615,9 @@ def _updated_note_type_content(
     # It will be added back below.
     result = re.sub(end_comment_pattern, "", result)
 
-    if add_view_on_ankihub_snippet:
-        result = _template_side_with_view_on_ankihub_snippet(result)
+    result = _template_side_with_ankihub_modifications(
+        result, add_view_on_ankihub_snippet=add_view_on_ankihub_snippet, add_metadata=add_metadata
+    )
 
     # Add the AnkiHub end comment and the content below it back.
     return result.rstrip("\n ") + "\n\n" + end_comment + "\n" + text_to_migrate.strip("\n ")
