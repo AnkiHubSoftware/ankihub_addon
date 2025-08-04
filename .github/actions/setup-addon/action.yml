@@ -12,7 +12,7 @@ runs:
       uses: jurplel/install-qt-action@v4
       with:
         version: "6.9.1"
-        modules: "qtwebengine"
+        modules: "qtwebengine qtpositioning qtwebchannel"
         setup-python: false
         cache: true
         dir: ${{ env.RUNNER_WORKSPACE || github.workspace }}
