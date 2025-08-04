@@ -326,10 +326,6 @@ def _try_handle_exception(exc_value: BaseException, tb: Optional[TracebackType])
         LOGGER.warning("TLS CA certificate bundle error was handled")
         return True
 
-    if "CollectionNotOpen" in str(exc_value):
-        LOGGER.warning("CollectionNotOpen raised")
-        return True
-
     return False
 
 
