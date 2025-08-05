@@ -176,6 +176,7 @@ class UIConfig(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class PrivateConfig(DataClassJSONMixin):
+    user_id: Optional[int] = None
     username: Optional[str] = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
     deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(default_factory=dict)
@@ -289,6 +290,10 @@ class _Config:
 
     def save_username(self, username: str):
         self._private_config.username = username
+        self._update_private_config()
+
+    def save_user_id(self, user_id: Optional[int]):
+        self._private_config.user_id = user_id
         self._update_private_config()
 
     def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
@@ -425,6 +430,9 @@ class _Config:
 
     def username_or_email(self) -> Optional[str]:
         return self.username() or self.user()
+
+    def user_id(self) -> Optional[int]:
+        return self._private_config.user_id
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
