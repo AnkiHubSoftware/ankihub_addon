@@ -41,7 +41,7 @@ jobs:
         run: |
           uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
           uv sync --group tests
-          uv run -- pytest ./tests/addon -n 4 -m sequential --cov --cov-report=xml --retries 2
+          uv run -- pytest ./tests/addon -n 1 -m sequential --cov --cov-report=xml --retries 2
           uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
           uv run -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
