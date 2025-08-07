@@ -12,16 +12,18 @@ class AnkiHubRevertFSRS {
 
     initializeFsrsRevertUI() {
         const headers = Array.from(document.querySelectorAll(".setting-title"));
-        const fsrsHeader = headers.find(el =>
-            el.textContent.includes("FSRS") && el.textContent.trim() !== "FSRS"
+        const fsrsHeader = headers.find(
+            (el) => el.textContent.includes("FSRS") && el.textContent.trim() !== "FSRS"
         );
         if (!fsrsHeader) {
             console.warn("deckOptionsFsrsRevert: FSRS section not found");
             return;
         }
 
-        const section = fsrsHeader.parentElement;
-        const buttons = section.querySelectorAll("button.btn.btn-primary");
+        const section = fsrsHeader.closest(".container");
+        const buttons = Array.from(section.querySelectorAll("button.btn.btn-primary"))
+            .filter(btn => !btn.closest(".modal"));
+
         const textarea = section.querySelector("textarea");
         if (buttons.length < 2 || !textarea) {
             console.warn("deckOptionsFsrsRevert: FSRS buttons or textarea not found");
@@ -30,8 +32,8 @@ class AnkiHubRevertFSRS {
 
         this.fsrsSection = section;
 
-        const evaluateBtn = buttons[1];
-        this.setupRevertButton(evaluateBtn);
+        const optimizeBtn = buttons[0];
+        this.setupRevertButton(optimizeBtn);
         this.setupTextAreaListener(textarea);
     }
 
@@ -56,8 +58,10 @@ class AnkiHubRevertFSRS {
 
     addRevertButtonStyles() {
         // Theme-aware styling for disabled state
-        const lightBg = "#E6E6E6", lightText = "#6B7280";
-        const darkBg = "#414141", darkText = "#7B7A7A";
+        const lightBg = "#E6E6E6",
+            lightText = "#6B7280";
+        const darkBg = "#414141",
+            darkText = "#7B7A7A";
         const bg = this.theme === "dark" ? darkBg : lightBg;
         const text = this.theme === "dark" ? darkText : lightText;
 
@@ -88,7 +92,7 @@ class AnkiHubRevertFSRS {
                     set(v) {
                         desc.set.call(this, v);
                         this.dispatchEvent(new CustomEvent("fsrsParamsUpdated", { bubbles: true }));
-                    }
+                    },
                 };
                 Object.defineProperty(textarea, "value", newDesc);
                 textarea._fsrsRevertPatched = true;
@@ -97,10 +101,12 @@ class AnkiHubRevertFSRS {
 
         this.lastValue = textarea.value;
 
-
         const onChange = () => {
             if (this.debounceId) clearTimeout(this.debounceId);
-            this.debounceId = setTimeout(() => this.processTextAreaChange(textarea), this.DEBOUNCE_MS);
+            this.debounceId = setTimeout(
+                () => this.processTextAreaChange(textarea),
+                this.DEBOUNCE_MS
+            );
         };
 
         textarea.addEventListener("fsrsParamsUpdated", onChange);
@@ -117,9 +123,9 @@ class AnkiHubRevertFSRS {
 
         const numericList = current
             .split(/[,\s]+/)
-            .filter(str => str.length)
+            .filter((str) => str.length)
             .map(Number)
-            .filter(n => !isNaN(n));
+            .filter((n) => !isNaN(n));
 
         const payload = JSON.stringify({ fsrs_parameters: numericList });
         pycmd(`{{ FSRS_PARAMETERS_CHANGED_PYCMD }} ${payload}`);
@@ -136,17 +142,16 @@ class AnkiHubRevertFSRS {
             return;
         }
 
-        const newValue = Array.isArray(params) ? params.join(", ") : (params || "");
+        const newValue = Array.isArray(params) ? params.join(", ") : params || "";
         textarea.value = newValue;
 
         // Notify Anki that the value has changed
-        ['input', 'change', 'blur'].forEach(eventType => {
+        ["input", "change", "blur"].forEach((eventType) => {
             const event = new Event(eventType, { bubbles: true });
-            Object.defineProperty(event, 'target', { value: textarea });
+            Object.defineProperty(event, "target", { value: textarea });
             textarea.dispatchEvent(event);
         });
     }
-
 }
 
 window.ankihubRevertFSRS = new AnkiHubRevertFSRS();
