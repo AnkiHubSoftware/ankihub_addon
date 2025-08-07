@@ -32,8 +32,8 @@ class AnkiHubRevertFSRS {
 
         this.fsrsSection = section;
 
-        const evaluateBtn = buttons[1];
-        this.setupRevertButton(evaluateBtn);
+        const optimizeBtn = buttons[0];
+        this.setupRevertButton(optimizeBtn);
         this.setupTextAreaListener(textarea);
     }
 
