@@ -59,10 +59,6 @@ bundle = [
 [tool.uv]
 conflicts = [
     [
-        { group = "dev" },
-        { group = "production" },
-    ],
-    [
         { group = "production" },
         { group = "tests" },
     ],
