@@ -4610,6 +4610,7 @@ class TestDeckManagementDialog:
         mocker.patch("ankihub.gui.operations.subdecks.ask_user", return_value=True)
 
 
+@pytest.mark.sequential
 class TestBuildSubdecksAndMoveCardsToThem:
     @pytest.mark.parametrize(
         # The tag comparison is case-insensitive
@@ -4828,6 +4829,7 @@ def test_create_copy_browser_action_does_not_copy_ah_nid(
         assert note.fields == ["front", "back", ""]
 
 
+@pytest.mark.sequential
 class TestFlattenDeck:
     def test_cards_get_moved_to_root_deck_and_subdecks_are_deleted(
         self,
@@ -4925,6 +4927,7 @@ class TestFlattenDeck:
                 assert card.odid == root_deck_id, "Card's original deck ID should now point to root deck"
 
 
+@pytest.mark.sequential
 def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
@@ -4974,6 +4977,7 @@ def test_reset_local_changes_to_notes(
             assert mw.col.decks.name(card.did) == "Testdeck"
 
 
+@pytest.mark.sequential
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     mocker: MockerFixture,
@@ -5002,6 +5006,7 @@ def test_migrate_profile_data_from_old_location(
     }
 
 
+@pytest.mark.sequential
 def test_profile_swap(
     anki_session_with_addon_data: AnkiSession,
     mocker: MockerFixture,
@@ -5060,6 +5065,7 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
+@pytest.mark.sequential
 def test_migrate_addon_data_from_old_location(
     anki_session_with_addon_data: AnkiSession,
 ):
@@ -5792,6 +5798,7 @@ class TestAutoSync:
         )
 
 
+@pytest.mark.sequential
 class TestAutoSyncRateLimit:
     @pytest.mark.parametrize(
         "delay_between_syncs_in_seconds, expected_call_count",
@@ -5827,6 +5834,7 @@ class TestAutoSyncRateLimit:
             assert sync_with_ankihub_mock.call_count == expected_call_count
 
 
+@pytest.mark.sequential
 def test_optional_tag_suggestion_dialog(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
@@ -5944,6 +5952,7 @@ def test_optional_tag_suggestion_dialog(
 
 
 @pytest.mark.qt_no_exception_capture
+@pytest.mark.sequential
 def test_reset_optional_tags_action(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
@@ -6026,6 +6035,7 @@ def test_reset_optional_tags_action(
         assert mw.col.get_note(other_note.id).tags == [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"]
 
 
+@pytest.mark.sequential
 class TestMediaSyncMediaDownload:
     def test_download_media(
         self,
@@ -6137,6 +6147,7 @@ def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
         yield upload_file_to_s3_with_reusable_presigned_url_mock
 
 
+@pytest.mark.sequential
 class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
@@ -6251,7 +6262,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6278,7 +6289,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6335,7 +6346,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created.
-            assert create_change_suggestion_mock.called_once  # type: ignore
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3.
             assert mock_client_media_upload.call_count == 0
@@ -6390,6 +6401,7 @@ class TestSuggestionsWithMedia:
         assert name_of_uploaded_media == expected_media_name
 
 
+@pytest.mark.sequential
 class TestAddonInstallAndUpdate:
     def test_install_and_update_addon(
         self,
@@ -7282,6 +7294,7 @@ class TestAnkiHubAIInReviewer:
             ),
         ],
     )
+    @pytest.mark.sequential
     def test_get_note_suspension_states_pycmd(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -7512,7 +7525,6 @@ class TestMaybeSendDailyReviewSummaries:
             assert dates_from_summaries == expected_dates
 
 
-@pytest.mark.sequential
 def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,

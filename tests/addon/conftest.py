@@ -1,7 +1,10 @@
 import json
 import os
 import shutil
+import signal
 import tempfile
+import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
@@ -11,6 +14,7 @@ from coverage.exceptions import DataError  # type: ignore
 from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_anki.plugin import anki_running
+from pytest_timeout import timeout_sigalrm
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
@@ -166,3 +170,44 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 def pytest_set_filtered_exceptions() -> List[Exception]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
+
+
+def _capture_screenshot_on_timeout(item: pytest.Item) -> Optional[Path]:
+    try:
+        from PIL.ImageGrab import grab
+        from pytest_xvfb import xvfb_instance
+
+        img = grab(xdisplay=xvfb_instance._virtual_display.new_display_var)
+        screenshots_dir = Path("test-screenshots")
+        screenshots_dir.mkdir(exist_ok=True)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        safe_nodeid = item.nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
+        screenshot_path = screenshots_dir / f"timeout_{timestamp}_{safe_nodeid}.png"
+        img.save(screenshot_path)
+    except Exception as e:
+        print(f"\n❌ Failed to capture screenshot for {item.nodeid}: {e}")
+        return None
+
+
+@pytest.hookspec(firstresult=True)
+def pytest_timeout_set_timer(item, settings):
+    timeout_method = settings.method
+    if timeout_method == "signal" and threading.current_thread() is not threading.main_thread():
+        timeout_method = "thread"
+
+    if timeout_method == "signal":
+
+        def handler(signum, frame):
+            __tracebackhide__ = True
+            _capture_screenshot_on_timeout(item)
+            timeout_sigalrm(item, settings)
+
+        def cancel():
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+
+        item.cancel_timeout = cancel
+        signal.signal(signal.SIGALRM, handler)
+        signal.setitimer(signal.ITIMER_REAL, settings.timeout)
+
+        return True

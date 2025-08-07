@@ -5,10 +5,10 @@ env:
   AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  QTWEBENGINE_CHROMIUM_FLAGS: --no-sandbox
-  DISABLE_QT5_COMPAT: 1
   DEPLOYMENT_ENVIRONMENT: local
-
+  PYQT_VERSION: pyqt6==6.8.0
+  PYQTWEBENGINE_VERSION: pyqt6-webengine==6.8.0
+  AQT_VERSION: aqt==25.7.5
 on:
   push:
     branches:
@@ -17,13 +17,7 @@ on:
 
 jobs:
   test-addon:
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        include:
-          - replace_anki_version: false
-          - replace_anki_version: true
-            anki_package_version: 'aqt[qt5]==2.1.56'
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -43,22 +37,28 @@ jobs:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
 
-      - name: Replace Anki version
-        if: ${{ matrix.replace_anki_version }}
-        run: uv pip install "${{ matrix.anki_package_version }}"
-
       - name: Run pytest with coverage
         run: |
-          uv run pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          uv run pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          uv run pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
+          uv sync --group tests
+          uv run -- pytest ./tests/addon -n 4 -m sequential --cov --cov-report=xml --retries 2
+          uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_addon_${{ matrix.anki_package_version }}
+          name: coverage_addon_${{ env.AQT_VERSION }}
           path: .coverage
           include-hidden-files: true
+
+      - name: Upload timeout screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timeout-screenshots-addon-${{ env.AQT_VERSION }}
+          path: test-screenshots/
+          if-no-files-found: ignore
 
 
   test-client:
@@ -83,7 +83,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
+          install_qt: true
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -112,6 +112,8 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
+          uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
+          uv sync --group tests
           uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
@@ -121,6 +123,14 @@ jobs:
           name: coverage_client_${{ matrix.group }}
           path: .coverage
           include-hidden-files: true
+
+      - name: Upload timeout screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timeout-screenshots-client-${{ matrix.group }}
+          path: test-screenshots/
+          if-no-files-found: ignore
 
 
   coverage-and-static-checks:
