@@ -67,7 +67,7 @@ conflicts = [
 override-dependencies = ["pytest-xvfb==3.1.1"]
 
 [tool.uv.sources]
-pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
+pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "anki-25" }
 mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
 webbot = { git = "https://github.com/nateshmbhat/webbot", rev = "333f51840cd5a1fcde0b014bd6ab401d51e62860" }
 
