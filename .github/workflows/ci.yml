@@ -6,7 +6,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   DEPLOYMENT_ENVIRONMENT: local
-  PYQT_VERSION: pyqt6==6.9.1
+  PYQT_VERSION: pyqt6==6.8.0
   PYQTWEBENGINE_VERSION: pyqt6-webengine==6.8.0
   AQT_VERSION: aqt==25.7.5
 on:
