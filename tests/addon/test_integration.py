@@ -4796,6 +4796,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
                 assert card.did == 1
 
 
+@pytest.mark.sequential
 def test_create_copy_browser_action_does_not_copy_ah_nid(
     anki_session_with_addon_data: AnkiSession,
     ankihub_basic_note_type: Dict[str, Any],
