@@ -66,6 +66,8 @@ conflicts = [
 
 ]
 
+override-dependencies = ["pytest-xdist==3.8.0"]
+
 [tool.uv.sources]
 pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "anki-25" }
 mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
