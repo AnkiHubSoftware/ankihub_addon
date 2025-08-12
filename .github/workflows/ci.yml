@@ -38,7 +38,7 @@ jobs:
         run: |
           uv sync --group tests
           uv run -- pytest ./tests/addon -n auto -m sequential --cov --cov-report=xml --retries 2
-          uv run -- pytest ./tests/addon -n auto -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          uv run -- pytest ./tests/addon -n 0 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
           uv run -- pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
