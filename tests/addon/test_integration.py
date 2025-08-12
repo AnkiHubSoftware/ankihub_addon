@@ -8114,6 +8114,8 @@ class TestFSRSDeckOptions:
         with qtbot.wait_callback() as callback:
             deck_options_did_load.append(callback)
             dialog = DeckOptionsDialog(aqt.mw, deck)
+            # Ignore save prompt as it can cause crashes/hangs
+            dialog._close_event_has_cleaned_up = True
 
         deck_options_did_load.remove(callback)
 
