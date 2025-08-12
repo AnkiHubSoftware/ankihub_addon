@@ -44,7 +44,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_addon_${{ env.AQT_VERSION }}
+          name: coverage_addon
           path: .coverage
           include-hidden-files: true
 
