@@ -4,7 +4,6 @@ import shutil
 import signal
 import tempfile
 import threading
-import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
@@ -172,23 +171,6 @@ def pytest_set_filtered_exceptions() -> List[Exception]:
     return [DataError]
 
 
-def _capture_screenshot_on_timeout(item: pytest.Item) -> Optional[Path]:
-    try:
-        from PIL.ImageGrab import grab
-        from pytest_xvfb import xvfb_instance
-
-        img = grab(xdisplay=xvfb_instance._virtual_display.new_display_var)
-        screenshots_dir = Path("test-screenshots")
-        screenshots_dir.mkdir(exist_ok=True)
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        safe_nodeid = item.nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
-        screenshot_path = screenshots_dir / f"timeout_{timestamp}_{safe_nodeid}.png"
-        img.save(screenshot_path)
-    except Exception as e:
-        print(f"\n❌ Failed to capture screenshot for {item.nodeid}: {e}")
-        return None
-
-
 @pytest.hookspec(firstresult=True)
 def pytest_timeout_set_timer(item, settings):
     timeout_method = settings.method
@@ -199,7 +181,6 @@ def pytest_timeout_set_timer(item, settings):
 
         def handler(signum, frame):
             __tracebackhide__ = True
-            _capture_screenshot_on_timeout(item)
             timeout_sigalrm(item, settings)
 
         def cancel():
