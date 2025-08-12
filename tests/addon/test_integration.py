@@ -7589,11 +7589,11 @@ def test_terms_agreement_not_accepted_with_flashcard_selector_dialog_instance(
             "ankihub.gui.flashcard_selector_dialog.FlashCardSelectorDialog.dialog"
         )
 
-        # aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+        aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
 
-        # qtbot.wait_until(lambda: terms_dialog_mock.display.called)
-        # terms_dialog_mock.display.assert_called_once_with(parent=aqt.mw)
-        # flashcard_selector_dialog_mock.close.assert_called_once()
+        qtbot.wait_until(lambda: terms_dialog_mock.display.called)
+        terms_dialog_mock.display.assert_called_once_with(parent=aqt.mw)
+        flashcard_selector_dialog_mock.close.assert_called_once()
 
 
 def test_terms_agreement_accepted(
