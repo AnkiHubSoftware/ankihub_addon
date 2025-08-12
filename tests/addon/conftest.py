@@ -180,7 +180,8 @@ def pytest_timeout_set_timer(item, settings):
 
         def handler(signum, frame):
             __tracebackhide__ = True
-            print("skipped due to timeout")
+            # timeout_sigalrm(item, settings)
+            pytest.skip("skipped due to timeout")
 
         def cancel():
             signal.setitimer(signal.ITIMER_REAL, 0)
