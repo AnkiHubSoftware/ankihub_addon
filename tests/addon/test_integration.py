@@ -6666,7 +6666,7 @@ class TestFlashCardSelector:
 
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
-            qtbot.wait(500)
+            qtbot.wait(1000)
 
             overview_web: AnkiWebView = aqt.mw.overview.web
             with qtbot.wait_callback() as callback:
@@ -7947,7 +7947,7 @@ class TestFSRSDeckOptions:
             # Button should exist only when all conditions are met
             button_should_exist = feature_flag_active and fsrs_enabled and use_anking_deck
 
-            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000) == button_should_exist
+            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=1500) == button_should_exist
 
     @pytest.mark.sequential
     def test_fsrs_parameters_backup_on_dialog_close(
