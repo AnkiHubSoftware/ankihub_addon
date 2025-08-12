@@ -1,9 +1,7 @@
 import json
 import os
 import shutil
-import signal
 import tempfile
-import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
@@ -168,27 +166,3 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 def pytest_set_filtered_exceptions() -> List[Exception]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
-
-
-@pytest.hookspec(firstresult=True)
-def pytest_timeout_set_timer(item, settings):
-    timeout_method = settings.method
-    if timeout_method == "signal" and threading.current_thread() is not threading.main_thread():
-        timeout_method = "thread"
-
-    if timeout_method == "signal":
-
-        def handler(signum, frame):
-            __tracebackhide__ = True
-            # timeout_sigalrm(item, settings)
-            pytest.skip("skipped due to timeout")
-
-        def cancel():
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, signal.SIG_DFL)
-
-        item.cancel_timeout = cancel
-        signal.signal(signal.SIGALRM, handler)
-        signal.setitimer(signal.ITIMER_REAL, settings.timeout)
-
-        return True
