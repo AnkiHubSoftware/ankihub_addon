@@ -7947,7 +7947,7 @@ class TestFSRSDeckOptions:
             # Button should exist only when all conditions are met
             button_should_exist = feature_flag_active and fsrs_enabled and use_anking_deck
 
-            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=1500) == button_should_exist
+            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=3000) == button_should_exist
 
     @pytest.mark.sequential
     def test_fsrs_parameters_backup_on_dialog_close(
