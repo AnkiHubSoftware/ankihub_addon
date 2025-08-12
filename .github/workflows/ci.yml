@@ -6,9 +6,6 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   DEPLOYMENT_ENVIRONMENT: local
-  PYQT_VERSION: pyqt6==6.8.0
-  PYQTWEBENGINE_VERSION: pyqt6-webengine==6.8.0
-  AQT_VERSION: aqt==25.7.5
 on:
   push:
     branches:
@@ -39,7 +36,6 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
           uv sync --group tests
           uv run -- pytest ./tests/addon -n 4 -m sequential --cov --cov-report=xml --retries 2
           uv run -- pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
@@ -103,7 +99,6 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv add --group tests "${{ env.AQT_VERSION }}" "${{ env.PYQT_VERSION }}" "${{ env.PYQTWEBENGINE_VERSION }}"
           uv sync --group tests
           uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
