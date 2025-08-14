@@ -7,6 +7,7 @@ import gzip
 import json
 import logging
 import os
+import platform
 import re
 import socket
 import sys
@@ -898,7 +899,7 @@ class DatadogLogHandler(logging.Handler):
         body = [
             {
                 "ddsource": "anki_addon",
-                "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
+                "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION},platform:{platform.platform()}",
                 "hostname": socket.gethostname(),
                 "service": "ankihub_addon",
                 "username": config.username_or_email(),
