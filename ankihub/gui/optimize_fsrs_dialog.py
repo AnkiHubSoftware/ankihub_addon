@@ -133,6 +133,8 @@ def _optimize_fsrs_parameters(conf_id: DeckConfigId, on_done: Optional[Callable[
             extra_kwargs["num_of_relearning_steps"] = _get_amount_relearning_steps_in_day(
                 deck_config,
             )
+        if ANKI_INT_VERSION >= 250700:
+            extra_kwargs["health_check"] = False
 
         return aqt.mw.col.backend.compute_fsrs_params(
             search=deck_config.get("paramSearch", deck_config.get("weightSearch", default_search)),
