@@ -40,16 +40,9 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
-      - name: Install dependencies
-        run: |
-          uv pip install git+https://github.com/nateshmbhat/webbot.git@333f51840cd5a1fcde0b014bd6ab401d51e62860
-          uv pip install webdriver_manager==4.0.2
-          uv pip install --reinstall selenium==3.141.0
-          uv pip install --reinstall urllib3==1.26.14
-
       - name: Run upload script
         run: |
-          uv run scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net/support
+          uv run --group ankiweb scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net/support
         env:
           ANKI_USERNAME: ${{ secrets.ANKIWEB_USERNAME }}
           ANKI_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}

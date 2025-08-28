@@ -13,7 +13,7 @@ VERSION_SCRIPT = Path(__file__).parent / "calver.sh"
 
 def generate_manifest():
     addon_properties = json.load(ADDON_INFO_FILE.open("r"))
-    addon_version = subprocess.run([str(VERSION_SCRIPT)], capture_output=True, text=True).stdout.strip()
+    addon_version = subprocess.run(["bash", str(VERSION_SCRIPT)], capture_output=True, text=True).stdout.strip()
     manifest = {
         "package": addon_properties["ankiweb_id"],
         "name": addon_properties["display_name"],

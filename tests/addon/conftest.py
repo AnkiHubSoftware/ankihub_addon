@@ -108,6 +108,7 @@ def anki_session_with_addon_data(
 
         _mock_all_feature_flags_to_default_values(monkeypatch)
         _mock_user_details(requests_mock)
+        _patch_taskman_for_tests(anki_session, monkeypatch)
 
         yield anki_session
 
@@ -126,6 +127,52 @@ def _mock_user_details(request_mock: Mocker) -> None:
             "username": "test_user",
         },
     )
+
+
+def _patch_taskman_for_tests(anki_session: AnkiSession, monkeypatch: MonkeyPatch) -> None:
+    """Patch taskman.with_progress and run_in_background to run synchronously in tests."""
+
+    from concurrent.futures import Future
+
+    def with_progress(task, on_done, **kwargs):
+        try:
+            result = task()
+            future = Future()
+            future.set_result(result)
+        except Exception as e:
+            future = Future()
+            future.set_exception(e)
+
+        on_done(future)
+
+    def with_backend_progress(task, progress_update, on_done=None, **kwargs):
+        try:
+            result = task()
+            future = Future()
+            future.set_result(result)
+        except Exception as e:
+            future = Future()
+            future.set_exception(e)
+
+        on_done(future)
+
+    def run_in_background(task, on_done=None, **kwargs):
+        try:
+            result = task()
+            if on_done:
+                future = Future()
+                future.set_result(result)
+                on_done(future)
+        except Exception as e:
+            if on_done:
+                future = Future()
+                future.set_exception(e)
+                on_done(future)
+
+    if hasattr(anki_session, "mw") and anki_session.mw and hasattr(anki_session.mw, "taskman"):
+        monkeypatch.setattr(anki_session.mw.taskman, "with_progress", with_progress)
+        monkeypatch.setattr(anki_session.mw.taskman, "with_backend_progress", with_backend_progress)
+        monkeypatch.setattr(anki_session.mw.taskman, "run_in_background", run_in_background)
 
 
 @pytest.fixture
