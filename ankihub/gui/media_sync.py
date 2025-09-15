@@ -1,3 +1,4 @@
+import hashlib
 import os
 import uuid
 from datetime import datetime
@@ -180,10 +181,15 @@ class _AnkiHubMediaSync:
             LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
-        media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)
+        media_list = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
-        result = [media_name for media_name in media_names if not (media_dir_path / media_name).exists()]
+        result = [
+            media.name
+            for media in media_list
+            if not (media_dir_path / media.name).exists()
+            or media.file_content_hash != hashlib.md5((media_dir_path / media.name).read_bytes()).hexdigest()
+        ]
         return result
 
     def _on_download_finished(self, _: None) -> None:
