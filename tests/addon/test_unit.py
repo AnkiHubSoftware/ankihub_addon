@@ -1291,7 +1291,7 @@ class TestAnkiHubDBRemoveDeck:
         assert ankihub_db.note_type_dict(ankihub_basic_note_type["id"]) is None
         assert not (ankihub_db.ankihub_did_for_note_type(anki_note_type_id=ankihub_basic_note_type["id"]))
 
-        assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == set()
+        assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == []
 
 
 class TestAnkiHubDBIntegrityError:
@@ -1416,9 +1416,7 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
                 media_list=media_list,
             )
 
-            expected_result = (
-                {media_list} if referenced_on_accepted_note and exists_on_s3 and download_enabled else set()
-            )
+            expected_result = [media_list] if referenced_on_accepted_note and exists_on_s3 and download_enabled else []
             assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did=ah_did) == expected_result
 
 
