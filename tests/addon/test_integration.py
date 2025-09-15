@@ -6069,7 +6069,7 @@ class TestMediaSyncMediaDownload:
             download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
             # Assert that the deck media was added to the database
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == {deck_media.name}
+            assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == {deck_media}
             assert ankihub_db.media_names_exist_for_ankihub_deck(ah_did=ah_did, media_names={deck_media.name}) == {
                 deck_media.name: True
             }

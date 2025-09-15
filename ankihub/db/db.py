@@ -437,19 +437,6 @@ class _AnkiHubDB:
             for chunk in chunks(deck_media_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
                 DeckMedia.insert_many(chunk).on_conflict_replace().execute()
 
-    def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
-        """Returns the names of all media files which can be downloaded for the given deck."""
-        return set(
-            DeckMedia.select(DeckMedia.name)
-            .filter(
-                ankihub_deck_id=ah_did,
-                referenced_on_accepted_note__is=True,
-                exists_on_s3__is=True,
-                download_enabled__is=True,
-            )
-            .objects(flat)
-        )
-
     def downloadable_media_for_ankihub_deck(self, ah_did: uuid.UUID) -> List[DeckMedia]:
         """Returns all DeckMedia objects which can be downloaded for the given deck."""
         return DeckMedia.select().filter(

@@ -1280,7 +1280,7 @@ class TestAnkiHubDBRemoveDeck:
         )
         ankihub_db.upsert_deck_media_infos(ankihub_did=ah_did, media_list=[deck_media])
         # sanity check
-        assert len(ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)) == 1
+        assert len(ankihub_db.downloadable_media_for_ankihub_deck(ah_did)) == 1
 
         # Remove the deck
         ankihub_db.remove_deck(ankihub_did=ah_did)
@@ -1291,7 +1291,7 @@ class TestAnkiHubDBRemoveDeck:
         assert ankihub_db.note_type_dict(ankihub_basic_note_type["id"]) is None
         assert not (ankihub_db.ankihub_did_for_note_type(anki_note_type_id=ankihub_basic_note_type["id"]))
 
-        assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == set()
+        assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == set()
 
 
 class TestAnkiHubDBIntegrityError:
@@ -1401,24 +1401,25 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
         exists_on_s3: bool,
         download_enabled: bool,
     ):
+        media_list = [
+            DeckMediaFactory.create(
+                name="test1.jpg",
+                referenced_on_accepted_note=referenced_on_accepted_note,
+                exists_on_s3=exists_on_s3,
+                download_enabled=download_enabled,
+            )
+        ]
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
                 ankihub_did=ah_did,
-                media_list=[
-                    DeckMediaFactory.create(
-                        name="test1.jpg",
-                        referenced_on_accepted_note=referenced_on_accepted_note,
-                        exists_on_s3=exists_on_s3,
-                        download_enabled=download_enabled,
-                    )
-                ],
+                media_list=media_list,
             )
 
             expected_result = (
-                {"test1.jpg"} if referenced_on_accepted_note and exists_on_s3 and download_enabled else set()
+                {media_list} if referenced_on_accepted_note and exists_on_s3 and download_enabled else set()
             )
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did=ah_did) == expected_result
+            assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did=ah_did) == expected_result
 
 
 class TestAnkiHubDBMediaNamesWithMatchingHashes:
