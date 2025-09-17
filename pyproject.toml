@@ -11,27 +11,26 @@ package-dir = { "ankihub_addon" = "ankihub" }
 
 [dependency-groups]
 production = [
-  "aqt[qt6]==24.11",
-]
-tests = [
-  "aqt[qt5]==24.11",
+  "aqt==25.7.5",
 ]
 dev = [
-  "pyqt5==5.15.5; platform_system != 'Windows'",
-  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "ruff",
-  "mypy==0.971",
+  "mypy==1.17.0",
   "coverage==6.5.0",
   "pre-commit==2.20.0",
   "requests-mock==1.9.3",
-  "types-requests==2.28.9",
-  "urllib3==1.26.14",
-  "typeguard==2.13.3",
+  "types-requests==2.28.9"
+]
+
+tests = [
+  "aqt==25.7.5",
+  "pyqt6==6.8.0",
+  "pyqt6-webengine==6.8.0",
   "vcrpy==4.2.0",
   "pytest==8.2.2",
   "pytest-vcr==1.0.2",
   "pytest-qt==4.2.0",
-  "pytest-split==0.9",
+  "pytest-split==0.10.0",
   "pytest-mock==3.12.0",
   "pytest-cov==4.0.0",
   "pytest-env==0.6.2",
@@ -41,7 +40,14 @@ dev = [
   "factory-boy==3.2.1",
   "types-factory-boy==0.3.1",
   "faker==19.12.0",
-  "approvaltests==12.2.0"
+  "approvaltests==12.2.0",
+  "setuptools>=80.9.0",
+]
+ankiweb = [
+  "webbot",
+  "webdriver_manager==4.0.2",
+  "selenium==3.141.0",
+  "urllib3==1.26.14",
 ]
 bundle = [
   "sentry_sdk==1.6.0",
@@ -51,9 +57,21 @@ bundle = [
   "mashumaro",
 ]
 
+[tool.uv]
+conflicts = [
+    [
+        { group = "production" },
+        { group = "tests" },
+    ],
+
+]
+
+override-dependencies = ["pytest-xdist==3.8.0"]
+
 [tool.uv.sources]
-pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
+pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "anki-25" }
 mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
+webbot = { git = "https://github.com/nateshmbhat/webbot", rev = "333f51840cd5a1fcde0b014bd6ab401d51e62860" }
 
 [tool.mypy]
 files = ['ankihub', 'tests/addon', 'tests/client']
@@ -65,7 +83,7 @@ exclude = [
   'ankihub/lib'
 ]
 
-no_strict_optional = true
+strict_optional = false
 
 [[tool.mypy.overrides]]
 module = 'ankihub.*'
@@ -100,7 +118,6 @@ ignore = ["E722", "E731", "E203", "E402"]
 [tool.coverage.run]
 source = ["ankihub"]
 omit = ["ankihub/lib/**", "ankihub/media_export/**", "ankihub/media_import/**"]
-dynamic_context = "test_function"
 
 [tool.coverage.paths]
 source = ["./ankihub", "*/addons21/ankihub"]

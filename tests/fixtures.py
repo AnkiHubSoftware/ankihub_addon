@@ -491,6 +491,7 @@ def mock_download_and_install_deck_dependencies(
 
         # Mock UI interactions
         mock_show_dialog_with_cb("ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1)
+        monkeypatch.setattr("ankihub.gui.operations.deck_installation._show_deck_import_summary_dialog", Mock())
 
         return mocks
 
