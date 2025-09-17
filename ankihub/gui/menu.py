@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from ankihub.gui.block_exam_dialog import BlockExamSubdeckDialog
 import aqt
 from aqt import (
     AnkiApp,
@@ -328,8 +329,12 @@ def _sync_with_ankihub_setup(parent: QMenu):
 
     def on_done(future: Future):
         future.result()
+        
+    def trigger_dialog(on_done):
+        from uuid import UUID
+        BlockExamSubdeckDialog(UUID("b3b9aeda-750f-48d4-897d-5a7f773f0a26"), [1368292036212], aqt.mw).show()
 
-    qconnect(q_action.triggered, lambda: sync_with_ankihub(on_done=on_done))
+    qconnect(q_action.triggered, lambda: trigger_dialog(on_done=on_done))
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
             q_action.setShortcut(QKeySequence(sync_hotkey))
