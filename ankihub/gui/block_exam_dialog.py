@@ -44,11 +44,19 @@ class BlockExamSubdeckDialog(QDialog):
         
         self.setWindowTitle("Add to Block Exam Subdeck")
         self.setModal(True)
-        self.resize(450, 350)
+        self.resize(500, 400)
         
         # Check if user has existing subdecks to determine entry point
-        existing_subdecks = get_existing_block_exam_subdecks(ankihub_deck_id)
-        if existing_subdecks:
+        deck_config = config.deck_config(ankihub_deck_id)
+        has_subdecks = False
+        
+        if deck_config:
+            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            if anki_deck_name:
+                # Check if there are any subdecks under the parent deck
+                has_subdecks = len(list(aqt.mw.col.decks.children(deck_config.anki_id))) > 0
+        
+        if has_subdecks:
             self._show_choose_subdeck_screen()
         else:
             self._show_create_subdeck_screen()
@@ -58,11 +66,10 @@ class BlockExamSubdeckDialog(QDialog):
         self._clear_layout()
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
         
-        # Title
-        title = QLabel("Choose Block Exam Subdeck")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
-        layout.addWidget(title)
+        self.setWindowTitle("Choose Subdeck")
         
         # Filter input
         filter_layout = QHBoxLayout()
@@ -72,33 +79,31 @@ class BlockExamSubdeckDialog(QDialog):
         self.filter_input.setPlaceholderText("Search subdecks...")
         filter_layout.addWidget(self.filter_input)
         layout.addLayout(filter_layout)
+        layout.addSpacing(10)
         
         # Subdeck list
         self.subdeck_list = QListWidget()
         self._populate_subdeck_list()
         self.subdeck_list.itemDoubleClicked.connect(self._on_subdeck_selected)
         layout.addWidget(self.subdeck_list)
-        
-        # Info label
-        info_label = QLabel(f"Adding {len(self.note_ids)} note(s)")
-        info_label.setStyleSheet("color: gray; font-size: 11px;")
-        layout.addWidget(info_label)
+        layout.addSpacing(10)
         
         # Buttons
         button_layout = QHBoxLayout()
-        
-        select_button = QPushButton("Select")
-        select_button.clicked.connect(self._on_subdeck_selected)
-        select_button.setDefault(True)
-        button_layout.addWidget(select_button)
-        
-        create_button = QPushButton("Create New")
-        create_button.clicked.connect(self._show_create_subdeck_screen)
-        button_layout.addWidget(create_button)
+        button_layout.addStretch()
         
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
+        
+        create_button = QPushButton("Create new subdeck")
+        create_button.clicked.connect(self._show_create_subdeck_screen)
+        button_layout.addWidget(create_button)
+        
+        select_button = QPushButton("Choose")
+        select_button.clicked.connect(self._on_subdeck_selected)
+        select_button.setDefault(True)
+        button_layout.addWidget(select_button)
         
         layout.addLayout(button_layout)
     
@@ -107,49 +112,69 @@ class BlockExamSubdeckDialog(QDialog):
         self._clear_layout()
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        self.setWindowTitle("")
         
         # Title
-        title = QLabel("Create Block Exam Subdeck")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        title = QLabel("Create a subdeck")
+        title_font = title.font()
+        title_font.setBold(True)
+        title_font.setPointSize(title_font.pointSize() + 2)
+        title.setFont(title_font)
         layout.addWidget(title)
+        layout.addSpacing(12)
         
         # Info label
-        info_label = QLabel(f"Creating subdeck for {len(self.note_ids)} note(s)")
-        info_label.setStyleSheet("color: gray; font-size: 11px; margin-bottom: 15px;")
+        info_label = QLabel(f"Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck.")
+        info_font = info_label.font()
+        info_label.setFont(info_font)
+        info_label.setWordWrap(True)
         layout.addWidget(info_label)
+        layout.addSpacing(20)
         
         # Subdeck name input
-        name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("Subdeck Name:"))
+        name_layout = QVBoxLayout()
+        name_label = QLabel("Subdeck Name:")
+        name_label_font = name_label.font()
+        name_label_font.setBold(True)
+        name_label.setFont(name_label_font)
+        name_layout.addWidget(name_label)
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Enter subdeck name")
+        self.name_input.setPlaceholderText("e.g. Cardio Block Exam")
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         
         # Due date input
-        date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Due Date:"))
+        date_layout = QVBoxLayout()
+        date_label = QLabel("Due date:")
+        date_label_font = date_label.font()
+        date_label_font.setBold(True)
+        date_label.setFont(date_label_font)
+        date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
-        self.date_input.setDate(date.today())
+        self.date_input.setDate(date.today().replace(day=date.today().day + 1))
         self.date_input.setCalendarPopup(True)
         self.date_input.setMinimumDate(date.today())
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
         
-        # Add some spacing
+        # Add stretch to push buttons to bottom
         layout.addStretch()
         
         # Buttons
         button_layout = QHBoxLayout()
-        
-        create_button = QPushButton("Create Subdeck")
-        create_button.clicked.connect(self._on_create_subdeck)
-        create_button.setDefault(True)
-        button_layout.addWidget(create_button)
+        button_layout.addStretch()
         
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
+        
+        create_button = QPushButton("Create subdeck")
+        create_button.clicked.connect(self._on_create_subdeck)
+        create_button.setDefault(True)
+        button_layout.addWidget(create_button)
         
         layout.addLayout(button_layout)
         
@@ -160,21 +185,49 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for adding notes to selected subdeck."""
         self._clear_layout()
         
+        self.setWindowTitle("")
+        
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
         
         # Title
-        title = QLabel(f"Add Notes to '{self.selected_subdeck_name}'")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        title = QLabel("Add notes to the subdeck")
+        title_font = title.font()
+        title_font.setBold(True)
+        title_font.setPointSize(title_font.pointSize() + 2)
+        title.setFont(title_font)
         layout.addWidget(title)
+        layout.addSpacing(12)
         
-        # Pre-filled info
-        info_label = QLabel(f"Adding {len(self.note_ids)} note(s) to subdeck")
-        info_label.setStyleSheet("color: gray; font-size: 11px; margin-bottom: 15px;")
+        # Info label
+        info_label = QLabel(f"Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck.")
+        info_font = info_label.font()
+        info_label.setFont(info_font)
+        info_label.setWordWrap(True)
         layout.addWidget(info_label)
+        layout.addSpacing(20)
+        
+        # Subdeck name input (editable)
+        name_layout = QVBoxLayout()
+        name_label = QLabel("Subdeck Name:")
+        name_label_font = name_label.font()
+        name_label_font.setBold(True)
+        name_label.setFont(name_label_font)
+        name_layout.addWidget(name_label)
+        self.name_input = QLineEdit()
+        self.name_input.setText(self.selected_subdeck_name)
+        self.name_input.setPlaceholderText("Enter subdeck name")
+        name_layout.addWidget(self.name_input)
+        layout.addLayout(name_layout)
         
         # Due date input (pre-filled if exists)
-        date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Due Date:"))
+        date_layout = QVBoxLayout()
+        date_label = QLabel("Due date:")
+        date_label_font = date_label.font()
+        date_label_font.setBold(True)
+        date_label.setFont(date_label_font)
+        date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
         
         # Try to get existing due date
@@ -184,38 +237,39 @@ class BlockExamSubdeckDialog(QDialog):
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
-            self.date_input.setDate(date.today())
+            self.date_input.setDate(date.today().replace(day=date.today().day + 1))
         
         self.date_input.setCalendarPopup(True)
         self.date_input.setMinimumDate(date.today())
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
         
-        # Add some spacing
+        # Add stretch to push buttons to bottom
         layout.addStretch()
         
         # Buttons
         button_layout = QHBoxLayout()
-        
-        add_button = QPushButton("Add Notes")
-        add_button.clicked.connect(self._on_add_notes)
-        add_button.setDefault(True)
-        button_layout.addWidget(add_button)
+        button_layout.addStretch()
         
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
+        
+        add_button = QPushButton("Add notes")
+        add_button.clicked.connect(self._on_add_notes)
+        add_button.setDefault(True)
+        button_layout.addWidget(add_button)
         
         layout.addLayout(button_layout)
     
     def _show_subdeck_conflict_screen(self, conflicting_name: str):
         """Show screen for handling subdeck name conflicts."""
         msg = QMessageBox(self)
-        msg.setWindowTitle("Subdeck Name Conflict")
-        msg.setText(f"Subdeck name already exists with the name '{conflicting_name}'.")
-        msg.setInformativeText("What would you like to do?")
+        msg.setWindowTitle("Subdeck name already exists")
+        msg.setText(f"A subdeck already exists with the name '{conflicting_name}'.")
+        msg.setInformativeText("You can either create a new one called '{subdeck name} (1)' or merge these notes into the existing subdeck.")
         
-        create_new_btn = msg.addButton("Create New", QMessageBox.ButtonRole.ActionRole)
+        create_new_btn = msg.addButton("Create new", QMessageBox.ButtonRole.ActionRole)
         merge_btn = msg.addButton("Merge", QMessageBox.ButtonRole.ActionRole)
         cancel_btn = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         
@@ -251,12 +305,43 @@ class BlockExamSubdeckDialog(QDialog):
     def _populate_subdeck_list(self):
         """Populate the subdeck list widget."""
         self.subdeck_list.clear()
-        existing_subdecks = get_existing_block_exam_subdecks(self.ankihub_deck_id)
         
-        for subdeck_name, subdeck_id in existing_subdecks:
+        # Get the parent deck configuration
+        deck_config = config.deck_config(self.ankihub_deck_id)
+        if not deck_config:
+            return
+        
+        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+        if not anki_deck_name:
+            return
+        
+        # Get all subdecks under the parent deck
+        all_subdecks = []
+        for child_name, child_id in aqt.mw.col.decks.children(deck_config.anki_id):
+            subdeck_name = child_name.split("::")[-1]  # Get just the subdeck part
+            all_subdecks.append((subdeck_name, str(child_id)))
+        
+        # Sort subdecks alphabetically by name
+        all_subdecks.sort(key=lambda x: x[0].lower())
+        
+        # Add all subdecks to the list
+        for subdeck_name, subdeck_id in all_subdecks:
             item = QListWidgetItem(subdeck_name)
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
+            
+            # Mark block exam subdecks differently (optional visual indication)
+            if config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), subdeck_id):
+                # This subdeck is already configured as a block exam subdeck
+                item.setToolTip("Block exam subdeck")
+            
             self.subdeck_list.addItem(item)
+        
+        # If no subdecks found, show a message
+        if not all_subdecks:
+            no_subdecks_item = QListWidgetItem("No subdecks found")
+            no_subdecks_item.setFlags(Qt.ItemFlag.NoItemFlags)
+            no_subdecks_item.setData(Qt.ItemDataRole.UserRole, None)
+            self.subdeck_list.addItem(no_subdecks_item)
     
     def _filter_subdecks(self):
         """Filter subdeck list based on input."""
@@ -272,8 +357,14 @@ class BlockExamSubdeckDialog(QDialog):
             showInfo("Please select a subdeck first.")
             return
         
+        # Check if this is a valid subdeck (not the "No subdecks found" placeholder)
+        subdeck_id = current_item.data(Qt.ItemDataRole.UserRole)
+        if subdeck_id is None:
+            showInfo("Please select a valid subdeck.")
+            return
+        
         self.selected_subdeck_name = current_item.text()
-        self.selected_subdeck_id = current_item.data(Qt.ItemDataRole.UserRole)
+        self.selected_subdeck_id = subdeck_id
         self._show_add_notes_screen()
     
     def _on_create_subdeck(self):
@@ -299,7 +390,7 @@ class BlockExamSubdeckDialog(QDialog):
             showInfo("Error: Parent deck not found.")
             return
             
-        full_name = f"test::{name}"
+        full_name = f"{anki_deck_name}::{name}"
         
         if aqt.mw.col.decks.by_name(full_name):
             self._show_subdeck_conflict_screen(name)
@@ -326,12 +417,32 @@ class BlockExamSubdeckDialog(QDialog):
     
     def _on_add_notes(self):
         """Handle adding notes to selected subdeck."""
+        new_name = self.name_input.text().strip()
+        if not validate_subdeck_name(new_name):
+            showInfo("Please enter a valid subdeck name.")
+            return
+            
         due_date = self.date_input.date().toString("yyyy-MM-dd")
         if not validate_due_date(due_date):
             showInfo("Due date must be in the future.")
             return
         
         try:
+            # Check if subdeck name needs to be updated
+            if new_name != self.selected_subdeck_name:
+                # Check if new name conflicts with existing subdeck
+                deck_config = config.deck_config(self.ankihub_deck_id)
+                if deck_config:
+                    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+                    if anki_deck_name:
+                        new_full_name = f"{anki_deck_name}::{new_name}"
+                        if aqt.mw.col.decks.by_name(new_full_name):
+                            showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
+                            return
+                
+                self._rename_subdeck(self.selected_subdeck_name, new_name)
+                self.selected_subdeck_name = new_name
+            
             add_notes_to_block_exam_subdeck(
                 self.ankihub_deck_id, 
                 self.selected_subdeck_name, 
@@ -364,6 +475,30 @@ class BlockExamSubdeckDialog(QDialog):
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
             showInfo(f"Failed to create subdeck: {e}")
+    
+    def _rename_subdeck(self, old_name: str, new_name: str):
+        """Rename an existing subdeck."""
+        deck_config = config.deck_config(self.ankihub_deck_id)
+        if not deck_config:
+            raise ValueError("Deck configuration not found")
+        
+        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+        if not anki_deck_name:
+            raise ValueError("Parent deck not found")
+        
+        old_full_name = f"{anki_deck_name}::{old_name}"
+        new_full_name = f"{anki_deck_name}::{new_name}"
+        
+        # Get the subdeck to rename
+        subdeck = aqt.mw.col.decks.by_name(old_full_name)
+        if not subdeck:
+            raise ValueError(f"Subdeck '{old_name}' not found")
+        
+        # Rename the subdeck
+        subdeck["name"] = new_full_name
+        aqt.mw.col.decks.save(subdeck)
+        
+        LOGGER.info("Renamed subdeck", old_name=old_name, new_name=new_name)
     
     def _clear_layout(self):
         """Clear the current layout."""

@@ -67,7 +67,7 @@ def create_block_exam_subdeck(
         counter += 1
     
     # Create the subdeck
-    subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name)
+    subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id
     
     # Save configuration if due date provided
     if due_date:
