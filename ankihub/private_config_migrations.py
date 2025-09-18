@@ -27,6 +27,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     _remove_orphaned_deck_extensions(private_config_dict)
     _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
     _move_credentials_to_profile_config(private_config_dict)
+    _remove_orphaned_block_exams_subdecks_config(private_config_dict)
 
 
 def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -125,3 +126,14 @@ def _move_credentials_to_profile_config(
     if username:
         # aqt.mw.pm.set_ankihub_username(username)
         aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = username
+
+def _remove_orphaned_block_exams_subdecks_config(private_config_dict: Dict) -> None:
+    block_exams_subdecks = private_config_dict.get("block_exams_subdecks", [])
+    subdeck_ids = {subdeck["subdeck_id"] for subdeck in block_exams_subdecks}
+    
+    all_deck_ids = set(aqt.mw.col.decks.all_ids())
+    
+    orphaned_subdeck_ids = subdeck_ids - all_deck_ids
+    
+    block_exams_subdecks = [subdeck for subdeck in block_exams_subdecks if subdeck["subdeck_id"] not in orphaned_subdeck_ids]
+    private_config_dict["block_exams_subdecks"] = block_exams_subdecks
