@@ -143,6 +143,7 @@ class BlockExamSubdeckDialog(QDialog):
         name_layout.addWidget(name_label)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g. Cardio Block Exam")
+        self.name_input.textChanged.connect(self._update_create_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         
@@ -174,6 +175,8 @@ class BlockExamSubdeckDialog(QDialog):
         create_button = QPushButton("Create subdeck")
         create_button.clicked.connect(self._on_create_subdeck)
         create_button.setDefault(True)
+        create_button.setEnabled(False)  # Initially disabled
+        self.create_button = create_button  # Store reference for enabling/disabling
         button_layout.addWidget(create_button)
         
         layout.addLayout(button_layout)
@@ -218,6 +221,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setText(self.selected_subdeck_name)
         self.name_input.setPlaceholderText("Enter subdeck name")
+        self.name_input.textChanged.connect(self._update_add_notes_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         
@@ -258,6 +262,9 @@ class BlockExamSubdeckDialog(QDialog):
         add_button = QPushButton("Add notes")
         add_button.clicked.connect(self._on_add_notes)
         add_button.setDefault(True)
+        # Enable initially if there's already a name, disable if empty
+        add_button.setEnabled(bool(self.selected_subdeck_name and self.selected_subdeck_name.strip()))
+        self.add_notes_button = add_button  # Store reference for enabling/disabling
         button_layout.addWidget(add_button)
         
         layout.addLayout(button_layout)
@@ -371,6 +378,16 @@ class BlockExamSubdeckDialog(QDialog):
         for i in range(self.subdeck_list.count()):
             item = self.subdeck_list.item(i)
             item.setHidden(filter_text not in item.text().lower())
+    
+    def _update_create_button_state(self):
+        """Enable/disable the Create subdeck button based on name input."""
+        if hasattr(self, 'create_button'):
+            self.create_button.setEnabled(bool(self.name_input.text().strip()))
+    
+    def _update_add_notes_button_state(self):
+        """Enable/disable the Add notes button based on name input."""
+        if hasattr(self, 'add_notes_button'):
+            self.add_notes_button.setEnabled(bool(self.name_input.text().strip()))
     
     def _on_subdeck_selected(self):
         """Handle subdeck selection."""
