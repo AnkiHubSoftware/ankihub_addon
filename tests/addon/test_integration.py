@@ -81,11 +81,11 @@ from ankihub.gui.optimize_fsrs_dialog import (
 )
 from ankihub.main.block_exam_subdecks import (
     BlockExamSubdeckConfig,
+    add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
+    validate_due_date,
     validate_subdeck_name,
-    add_notes_to_block_exam_subdeck,
-    validate_due_date
 )
 
 from ..factories import (
@@ -8952,7 +8952,7 @@ class TestBlockExamSubdeckDialog:
             qtbot.addWidget(dialog)
             dialog.show()
             qtbot.wait(100)
-            
+
             # Dialog should be visible initially
             assert dialog.isVisible()
 
