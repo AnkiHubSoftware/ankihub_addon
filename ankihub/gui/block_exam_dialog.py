@@ -42,9 +42,8 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_name: Optional[str] = None
         self.selected_subdeck_id: Optional[str] = None
         
-        self.setWindowTitle("Add to Block Exam Subdeck")
         self.setModal(True)
-        self.resize(500, 400)
+        self.resize(440, 340)
         
         # Check if user has existing subdecks to determine entry point
         deck_config = config.deck_config(ankihub_deck_id)
@@ -66,8 +65,8 @@ class BlockExamSubdeckDialog(QDialog):
         self._clear_layout()
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(10)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(16)
         
         self.setWindowTitle("Choose Subdeck")
         
@@ -79,14 +78,12 @@ class BlockExamSubdeckDialog(QDialog):
         self.filter_input.setPlaceholderText("Search subdecks...")
         filter_layout.addWidget(self.filter_input)
         layout.addLayout(filter_layout)
-        layout.addSpacing(10)
         
         # Subdeck list
         self.subdeck_list = QListWidget()
         self._populate_subdeck_list()
         self.subdeck_list.itemDoubleClicked.connect(self._on_subdeck_selected)
         layout.addWidget(self.subdeck_list)
-        layout.addSpacing(10)
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -112,8 +109,8 @@ class BlockExamSubdeckDialog(QDialog):
         self._clear_layout()
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(12) # default spacing between elements is 12
         
         self.setWindowTitle("")
         
@@ -124,7 +121,6 @@ class BlockExamSubdeckDialog(QDialog):
         title_font.setPointSize(title_font.pointSize() + 2)
         title.setFont(title_font)
         layout.addWidget(title)
-        layout.addSpacing(12)
         
         # Info label
         info_label = QLabel(f"Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck.")
@@ -132,7 +128,7 @@ class BlockExamSubdeckDialog(QDialog):
         info_label.setFont(info_font)
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
-        layout.addSpacing(20)
+        layout.addSpacing(8) # 12 (default) + 8 = 20 px after info label
         
         # Subdeck name input
         name_layout = QVBoxLayout()
@@ -146,6 +142,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.name_input.textChanged.connect(self._update_create_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
+        layout.addSpacing(8)
         
         # Due date input
         date_layout = QVBoxLayout()
@@ -191,8 +188,8 @@ class BlockExamSubdeckDialog(QDialog):
         self.setWindowTitle("")
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(12)
         
         # Title
         title = QLabel("Add notes to the subdeck")
@@ -201,7 +198,6 @@ class BlockExamSubdeckDialog(QDialog):
         title_font.setPointSize(title_font.pointSize() + 2)
         title.setFont(title_font)
         layout.addWidget(title)
-        layout.addSpacing(12)
         
         # Info label
         info_label = QLabel(f"Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck.")
@@ -209,7 +205,7 @@ class BlockExamSubdeckDialog(QDialog):
         info_label.setFont(info_font)
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
-        layout.addSpacing(20)
+        layout.addSpacing(8) # 12 (default) + 8 = 20 px after info label
         
         # Subdeck name input (editable)
         name_layout = QVBoxLayout()
@@ -224,6 +220,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.name_input.textChanged.connect(self._update_add_notes_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
+        layout.addSpacing(8)
         
         # Due date input (pre-filled if exists)
         date_layout = QVBoxLayout()
@@ -282,8 +279,8 @@ class BlockExamSubdeckDialog(QDialog):
         self.setWindowTitle("")
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(0)
         
         # Title
         title = QLabel("Subdeck name already exists")
@@ -300,7 +297,7 @@ class BlockExamSubdeckDialog(QDialog):
         message_label.setFont(message_font)
         message_label.setWordWrap(True)
         layout.addWidget(message_label)
-        layout.addSpacing(10)
+        layout.addSpacing(1)
         
         # Info label
         info_label = QLabel(f"You can either create a new one called '{conflicting_name} (1)' or merge these notes into the existing subdeck.")
@@ -315,6 +312,7 @@ class BlockExamSubdeckDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
+        button_layout.setSpacing(12)
         
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
