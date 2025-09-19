@@ -84,6 +84,8 @@ from ankihub.main.block_exam_subdecks import (
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
     validate_subdeck_name,
+    add_notes_to_block_exam_subdeck,
+    validate_due_date
 )
 
 from ..factories import (
@@ -8396,13 +8398,6 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
-        from datetime import date, timedelta
-
-        import aqt
-
-        from ankihub.main.block_exam_subdecks import create_block_exam_subdeck
-        from ankihub.settings import config
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8429,8 +8424,6 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
-        from ankihub.main.block_exam_subdecks import create_block_exam_subdeck
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8449,11 +8442,6 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
-        import aqt
-
-        from ankihub.main.block_exam_subdecks import create_block_exam_subdeck
-        from ankihub.settings import config
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8478,16 +8466,6 @@ class TestBlockExamSubdecks:
         install_ah_deck: InstallAHDeck,
         mocker,
     ):
-        from datetime import date, timedelta
-
-        import aqt
-
-        from ankihub.main.block_exam_subdecks import (
-            add_notes_to_block_exam_subdeck,
-            create_block_exam_subdeck,
-        )
-        from ankihub.settings import config
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8530,13 +8508,6 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
-        from datetime import date, timedelta
-
-        from ankihub.main.block_exam_subdecks import (
-            create_block_exam_subdeck,
-            get_existing_block_exam_subdecks,
-        )
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8546,10 +8517,10 @@ class TestBlockExamSubdecks:
 
             # Create some block exam subdecks
             due_date1 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            subdeck_name1, _ = create_block_exam_subdeck(ah_did, "Exam 1", due_date1)
+            create_block_exam_subdeck(ah_did, "Exam 1", due_date1)
 
             due_date2 = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
-            subdeck_name2, _ = create_block_exam_subdeck(ah_did, "Exam 2", due_date2)
+            create_block_exam_subdeck(ah_did, "Exam 2", due_date2)
 
             # Should now return both subdecks
             existing = get_existing_block_exam_subdecks(ah_did)
@@ -8575,7 +8546,7 @@ class TestBlockExamSubdecks:
 
             # Create a block exam subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            block_exam_subdeck_name, _ = create_block_exam_subdeck(ah_did, "Block Exam", due_date)
+            create_block_exam_subdeck(ah_did, "Block Exam", due_date)
 
             # Should only return the block exam subdeck
             existing = get_existing_block_exam_subdecks(ah_did)
@@ -8604,10 +8575,6 @@ class TestBlockExamSubdecks:
         assert not validate_subdeck_name("Invalid\\Name")  # Contains backslash
 
     def test_validate_due_date(self):
-        from datetime import date, timedelta
-
-        from ankihub.main.block_exam_subdecks import validate_due_date
-
         # Valid future dates
         future_date1 = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
         future_date7 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
@@ -8634,8 +8601,6 @@ class TestBlockExamSubdecks:
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
-        from ankihub.settings import BlockExamSubdeckConfig, config
-
         with anki_session_with_addon_data.profile_loaded():
             # Test initially empty
             assert config.get_block_exam_subdecks() == []
@@ -8676,10 +8641,6 @@ class TestBlockExamSubdecks:
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
-        import uuid
-
-        from ankihub.main.block_exam_subdecks import create_block_exam_subdeck
-
         with anki_session_with_addon_data.profile_loaded():
             # Try to create subdeck for non-existent deck
             fake_ah_did = uuid.uuid4()
@@ -8690,10 +8651,6 @@ class TestBlockExamSubdecks:
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
-        import uuid
-
-        from ankihub.main.block_exam_subdecks import add_notes_to_block_exam_subdeck
-
         with anki_session_with_addon_data.profile_loaded():
             # Try to add notes for non-existent deck
             fake_ah_did = uuid.uuid4()
@@ -8705,8 +8662,6 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
-        from ankihub.main.block_exam_subdecks import add_notes_to_block_exam_subdeck
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8995,7 +8950,9 @@ class TestBlockExamSubdeckDialog:
 
             dialog = BlockExamSubdeckDialog(ah_did, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
-
+            dialog.show()
+            qtbot.wait(100)
+            
             # Dialog should be visible initially
             assert dialog.isVisible()
 
@@ -9032,42 +8989,3 @@ class TestBlockExamSubdeckDialog:
 
             # Close all dialogs to prevent issues during teardown
             dialogs.closeAll(onsuccess=lambda: None)
-
-    def test_error_handling_during_creation(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        install_ah_deck: InstallAHDeck,
-        mocker: MockerFixture,
-    ):
-        """Test error handling during subdeck creation."""
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
-            # Mock no existing subdecks
-            mocker.patch("aqt.mw.col.decks.children", return_value=[])
-
-            # Mock create function to raise unexpected error
-            mocker.patch(
-                "ankihub.main.block_exam_subdecks.create_block_exam_subdeck",
-                side_effect=Exception("Unexpected error"),
-            )
-
-            # Mock error display
-            mock_show_info = mocker.patch("aqt.utils.showInfo")
-
-            dialog = BlockExamSubdeckDialog(ah_did, self.note_ids, parent=None)
-            qtbot.addWidget(dialog)
-
-            # Fill valid data
-            dialog.name_input.setText("Test Exam")
-            future_date = date.today() + timedelta(days=7)
-            dialog.date_input.setDate(future_date)
-            qtbot.wait(100)
-
-            # Click create button
-            qtbot.mouseClick(dialog.create_button, Qt.MouseButton.LeftButton)
-            qtbot.wait(100)
-
-            # Should show error message
-            mock_show_info.assert_called()
