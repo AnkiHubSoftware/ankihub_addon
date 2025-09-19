@@ -499,10 +499,11 @@ class _Config:
         """Add or update a block exam subdeck configuration."""
         current = self.get_block_exam_subdecks()
         # Remove existing entry with same ankihub_deck_id and subdeck_id
-        current = [c for c in current if not (
-            c.ankihub_deck_id == config_item.ankihub_deck_id and 
-            c.subdeck_id == config_item.subdeck_id
-        )]
+        current = [
+            c
+            for c in current
+            if not (c.ankihub_deck_id == config_item.ankihub_deck_id and c.subdeck_id == config_item.subdeck_id)
+        ]
         current.append(config_item)
         self._private_config.block_exams_subdecks = current
         self._update_private_config()
@@ -510,8 +511,7 @@ class _Config:
     def get_block_exam_subdeck_due_date(self, ankihub_deck_id: str, subdeck_id: str) -> Optional[str]:
         """Get due date for a specific block exam subdeck."""
         for config_item in self.get_block_exam_subdecks():
-            if (config_item.ankihub_deck_id == ankihub_deck_id and 
-                config_item.subdeck_id == subdeck_id):
+            if config_item.ankihub_deck_id == ankihub_deck_id and config_item.subdeck_id == subdeck_id:
                 return config_item.due_date
         return None
 
