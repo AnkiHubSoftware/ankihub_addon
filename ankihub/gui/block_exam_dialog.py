@@ -154,9 +154,10 @@ class BlockExamSubdeckDialog(QDialog):
         date_label.setFont(date_label_font)
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
-        self.date_input.setDate(date.today().replace(day=date.today().day + 1))
+        tomorrow = date.today().replace(day=date.today().day + 1)
+        self.date_input.setDate(tomorrow)
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(date.today())
+        self.date_input.setMinimumDate(tomorrow)
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
@@ -236,15 +237,17 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
 
+        tomorrow = date.today().replace(day=date.today().day + 1)
+
         # Try to get existing due date
         existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
-            self.date_input.setDate(date.today().replace(day=date.today().day + 1))
+            self.date_input.setDate(tomorrow)
 
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(date.today())
+        self.date_input.setMinimumDate(tomorrow)
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
