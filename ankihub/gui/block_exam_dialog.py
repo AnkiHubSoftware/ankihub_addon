@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 import aqt
+from anki.notes import NoteId
 from aqt.qt import (
     QDateEdit,
     QDialog,
@@ -33,7 +34,7 @@ from ..settings import config
 class BlockExamSubdeckDialog(QDialog):
     """Main dialog for block exam subdeck management."""
 
-    def __init__(self, ankihub_deck_id: uuid.UUID, note_ids: List[int], parent=None):
+    def __init__(self, ankihub_deck_id: uuid.UUID, note_ids: List[NoteId], parent=None):
         super().__init__(parent)
         self.ankihub_deck_id = ankihub_deck_id
         self.note_ids = note_ids
@@ -72,7 +73,7 @@ class BlockExamSubdeckDialog(QDialog):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Filter:"))
         self.filter_input = QLineEdit()
-        self.filter_input.textChanged.connect(self._filter_subdecks)
+        self.filter_input.textChanged.connect(self._filter_subdecks)  # type: ignore[attr-defined]
         self.filter_input.setPlaceholderText("Search subdecks...")
         filter_layout.addWidget(self.filter_input)
         layout.addLayout(filter_layout)
@@ -80,7 +81,7 @@ class BlockExamSubdeckDialog(QDialog):
         # Subdeck list
         self.subdeck_list = QListWidget()
         self._populate_subdeck_list()
-        self.subdeck_list.itemDoubleClicked.connect(self._on_subdeck_selected)
+        self.subdeck_list.itemDoubleClicked.connect(self._on_subdeck_selected)  # type: ignore[attr-defined]
         layout.addWidget(self.subdeck_list)
 
         # Buttons
@@ -88,15 +89,15 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
         button_layout.addWidget(cancel_button)
 
         create_button = QPushButton("Create new subdeck")
-        create_button.clicked.connect(self._show_create_subdeck_screen)
+        create_button.clicked.connect(self._show_create_subdeck_screen)  # type: ignore[attr-defined]
         button_layout.addWidget(create_button)
 
         select_button = QPushButton("Choose")
-        select_button.clicked.connect(self._on_subdeck_selected)
+        select_button.clicked.connect(self._on_subdeck_selected)  # type: ignore[attr-defined]
         select_button.setDefault(True)
         button_layout.addWidget(select_button)
 
@@ -122,8 +123,8 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Info label
         info_label = QLabel(
-            """Selected notes will be moved into this subdeck.
-            Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck."""
+            "Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like "
+            "to return all notes back into the parent deck."
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
@@ -140,7 +141,7 @@ class BlockExamSubdeckDialog(QDialog):
         name_layout.addWidget(name_label)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g. Cardio Block Exam")
-        self.name_input.textChanged.connect(self._update_create_button_state)
+        self.name_input.textChanged.connect(self._update_create_button_state)  # type: ignore[attr-defined]
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         layout.addSpacing(8)
@@ -167,11 +168,11 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
         button_layout.addWidget(cancel_button)
 
         create_button = QPushButton("Create subdeck")
-        create_button.clicked.connect(self._on_create_subdeck)
+        create_button.clicked.connect(self._on_create_subdeck)  # type: ignore[attr-defined]
         create_button.setDefault(True)
         create_button.setEnabled(False)  # Initially disabled
         self.create_button = create_button  # Store reference for enabling/disabling
@@ -202,8 +203,8 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Info label
         info_label = QLabel(
-            """Selected notes will be moved into this subdeck.
-            Once the due date is reached, we'll ask you if you'd like to return all notes back into the parent deck."""
+            "Selected notes will be moved into this subdeck. Once the due date is reached, we'll ask you if you'd like "
+            "to return all notes back into the parent deck."
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
@@ -221,7 +222,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setText(self.selected_subdeck_name)
         self.name_input.setPlaceholderText("Enter subdeck name")
-        self.name_input.textChanged.connect(self._update_add_notes_button_state)
+        self.name_input.textChanged.connect(self._update_add_notes_button_state)  # type: ignore[attr-defined]
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         layout.addSpacing(8)
@@ -255,11 +256,11 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
         button_layout.addWidget(cancel_button)
 
         add_button = QPushButton("Add notes")
-        add_button.clicked.connect(self._on_add_notes)
+        add_button.clicked.connect(self._on_add_notes)  # type: ignore[attr-defined]
         add_button.setDefault(True)
         # Enable initially if there's already a name, disable if empty
         add_button.setEnabled(bool(self.selected_subdeck_name and self.selected_subdeck_name.strip()))
@@ -303,8 +304,8 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Info label
         info_label = QLabel(
-            f"""You can either create a new one called '{conflicting_name} (1)'
-            or merge these notes into the existing subdeck."""
+            "You can either create a new one called "
+            f"'{conflicting_name} (1)' or merge these notes into the existing subdeck."
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
@@ -320,15 +321,15 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.setSpacing(12)
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
         button_layout.addWidget(cancel_button)
 
         create_new_button = QPushButton("Create new")
-        create_new_button.clicked.connect(lambda: self._handle_conflict_create_new(conflicting_name))
+        create_new_button.clicked.connect(lambda: self._handle_conflict_create_new(conflicting_name))  # type: ignore[attr-defined]
         button_layout.addWidget(create_new_button)
 
         merge_button = QPushButton("Merge")
-        merge_button.clicked.connect(lambda: self._handle_conflict_merge(conflicting_name))
+        merge_button.clicked.connect(lambda: self._handle_conflict_merge(conflicting_name))  # type: ignore[attr-defined]
         merge_button.setDefault(True)
         button_layout.addWidget(merge_button)
 

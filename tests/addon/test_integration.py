@@ -8653,7 +8653,7 @@ class TestBlockExamSubdecks:
             # Try to add notes for non-existent deck
             fake_ah_did = uuid.uuid4()
             with pytest.raises(ValueError, match="Deck config not found"):
-                add_notes_to_block_exam_subdeck(fake_ah_did, "Non-existent", [1, 2, 3])
+                add_notes_to_block_exam_subdeck(fake_ah_did, "Non-existent", [NoteId(1), NoteId(2), NoteId(3)])
 
     def test_add_notes_subdeck_not_found(
         self,
@@ -8665,7 +8665,7 @@ class TestBlockExamSubdecks:
 
             # Try to add notes to non-existent subdeck
             with pytest.raises(ValueError, match="Subdeck .* not found"):
-                add_notes_to_block_exam_subdeck(ah_did, "Non-existent Subdeck", [1, 2, 3])
+                add_notes_to_block_exam_subdeck(ah_did, "Non-existent Subdeck", [NoteId(1), NoteId(2), NoteId(3)])
 
 
 @pytest.mark.sequential
