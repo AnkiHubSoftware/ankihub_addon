@@ -8672,7 +8672,7 @@ class TestBlockExamSubdecks:
 class TestBlockExamSubdeckDialog:
     def setup_method(self):
         """Set up test fixtures."""
-        self.note_ids = [1, 2, 3]
+        self.note_ids = [NoteId(1), NoteId(2), NoteId(3)]
         self.ankihub_deck_id = uuid.uuid4()
 
     def test_dialog_creation_and_initial_screen(
