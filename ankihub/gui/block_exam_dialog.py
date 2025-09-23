@@ -353,11 +353,19 @@ class BlockExamSubdeckDialog(QDialog):
         if not anki_deck_name:
             return
 
-        # Get all subdecks under the parent deck
+        # Get ALL subdecks under the parent deck (including nested ones)
         all_subdecks = []
-        for child_name, child_id in aqt.mw.col.decks.children(deck_config.anki_id):
-            subdeck_name = child_name.split("::")[-1]  # Get just the subdeck part
-            all_subdecks.append((subdeck_name, str(child_id)))
+        
+        # Get all deck names and IDs in the collection
+        for deck_dict in aqt.mw.col.decks.all_names_and_ids():
+            deck_name = deck_dict.name
+            deck_id = deck_dict.id
+            
+            # Check if this deck is a subdeck of our parent deck
+            if deck_name.startswith(f"{anki_deck_name}::") and deck_name != anki_deck_name:
+                # Extract the subdeck path (everything after the parent deck name)
+                subdeck_path = deck_name[len(anki_deck_name) + 2:]  # +2 for "::"
+                all_subdecks.append((subdeck_path, str(deck_id)))
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())
@@ -473,6 +481,7 @@ class BlockExamSubdeckDialog(QDialog):
                 if deck_config:
                     anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
                     if anki_deck_name:
+                        # Handle full subdeck path for multi-level subdecks
                         new_full_name = f"{anki_deck_name}::{new_name}"
                         if aqt.mw.col.decks.by_name(new_full_name):
                             showInfo(
@@ -492,11 +501,7 @@ class BlockExamSubdeckDialog(QDialog):
             LOGGER.error("Failed to add notes to subdeck", error=str(e))
             showInfo(f"Failed to add notes: {e}")
 
-        except Exception as e:
-            LOGGER.error("Failed to create subdeck with auto name", error=str(e))
-            showInfo(f"Failed to create subdeck: {e}")
-
-    def _rename_subdeck(self, old_name: str, new_name: str):
+    def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
         deck_config = config.deck_config(self.ankihub_deck_id)
         if not deck_config:
@@ -506,19 +511,19 @@ class BlockExamSubdeckDialog(QDialog):
         if not anki_deck_name:
             raise ValueError("Parent deck not found")
 
-        old_full_name = f"{anki_deck_name}::{old_name}"
-        new_full_name = f"{anki_deck_name}::{new_name}"
+        old_full_name = f"{anki_deck_name}::{old_subdeck_path}"
+        new_full_name = f"{anki_deck_name}::{new_subdeck_path}"
 
         # Get the subdeck to rename
         subdeck = aqt.mw.col.decks.by_name(old_full_name)
         if not subdeck:
-            raise ValueError(f"Subdeck '{old_name}' not found")
+            raise ValueError(f"Subdeck '{old_subdeck_path}' not found")
 
         # Rename the subdeck
         subdeck["name"] = new_full_name
         aqt.mw.col.decks.save(subdeck)
 
-        LOGGER.info("Renamed subdeck", old_name=old_name, new_name=new_name)
+        LOGGER.info("Renamed subdeck", old_name=old_subdeck_path, new_name=new_subdeck_path)
 
     def _handle_conflict_create_new(self, conflicting_name: str):
         """Handle creating a new subdeck with auto-generated name."""
