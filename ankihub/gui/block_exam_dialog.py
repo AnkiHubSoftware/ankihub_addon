@@ -452,7 +452,6 @@ class BlockExamSubdeckDialog(QDialog):
             # Show success message
             tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
             self.accept()
-            self._refresh_deck_browser()
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck", error=str(e))
@@ -492,7 +491,6 @@ class BlockExamSubdeckDialog(QDialog):
 
             tooltip(f"{len(self.note_ids)} note(s) added to '{self.selected_subdeck_name}'")
             self.accept()
-            self._refresh_deck_browser()
 
         except Exception as e:
             LOGGER.error("Failed to add notes to subdeck", error=str(e))
@@ -508,7 +506,6 @@ class BlockExamSubdeckDialog(QDialog):
 
             tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
             self.accept()
-            self._refresh_deck_browser()
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
@@ -552,7 +549,6 @@ class BlockExamSubdeckDialog(QDialog):
 
             tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
             self.accept()
-            self._refresh_deck_browser()
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
@@ -589,7 +585,6 @@ class BlockExamSubdeckDialog(QDialog):
             # Show success message and close
             tooltip(f"{len(self.note_ids)} note(s) added to '{conflicting_name}'")
             self.accept()
-            self._refresh_deck_browser()
 
         except Exception as e:
             LOGGER.error("Failed to add notes to subdeck", error=str(e))
@@ -599,7 +594,3 @@ class BlockExamSubdeckDialog(QDialog):
         """Clear the current layout."""
         if self.layout():
             QWidget().setLayout(self.layout())
-
-    def _refresh_deck_browser(self):
-        """Refresh Anki's deck browser to reflect changes."""
-        aqt.mw.deckBrowser.refresh()
