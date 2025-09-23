@@ -111,15 +111,6 @@ def add_notes_to_block_exam_subdeck(
     )
 
 
-def validate_subdeck_name(name: str) -> bool:
-    """Validate subdeck name is not empty and doesn't contain invalid characters."""
-    if not name or not name.strip():
-        return False
-    # Check for Anki deck name restrictions
-    invalid_chars = ["<", ">", ":", '"', "|", "?", "*", "/", "\\"]
-    return not any(char in name for char in invalid_chars)
-
-
 def validate_due_date(date_str: str) -> bool:
     """Validate due date is in correct format and in the future."""
     try:

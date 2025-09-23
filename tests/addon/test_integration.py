@@ -85,7 +85,6 @@ from ankihub.main.block_exam_subdecks import (
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
     validate_due_date,
-    validate_subdeck_name,
 )
 
 from ..factories import (
@@ -8550,27 +8549,6 @@ class TestBlockExamSubdecks:
             existing = get_existing_block_exam_subdecks(ah_did)
             assert len(existing) == 1
             assert existing[0][0] == "Block Exam"
-
-    def test_validate_subdeck_name(self):
-        # Valid names
-        assert validate_subdeck_name("Valid Name")
-        assert validate_subdeck_name("Test123")
-        assert validate_subdeck_name("Name with spaces")
-        assert validate_subdeck_name("Name_with_underscores")
-        assert validate_subdeck_name("Name-with-hyphens")
-
-        # Invalid names
-        assert not validate_subdeck_name("")
-        assert not validate_subdeck_name("   ")  # Only whitespace
-        assert not validate_subdeck_name("Invalid:Name")  # Contains colon
-        assert not validate_subdeck_name("Invalid<Name")  # Contains less than
-        assert not validate_subdeck_name("Invalid>Name")  # Contains greater than
-        assert not validate_subdeck_name('Invalid"Name')  # Contains quote
-        assert not validate_subdeck_name("Invalid|Name")  # Contains pipe
-        assert not validate_subdeck_name("Invalid?Name")  # Contains question mark
-        assert not validate_subdeck_name("Invalid*Name")  # Contains asterisk
-        assert not validate_subdeck_name("Invalid/Name")  # Contains forward slash
-        assert not validate_subdeck_name("Invalid\\Name")  # Contains backslash
 
     def test_validate_due_date(self):
         # Valid future dates
