@@ -1,7 +1,7 @@
 """Dialog for managing block exam subdecks."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 import aqt
@@ -17,7 +17,6 @@ from aqt.qt import (
     QPushButton,
     Qt,
     QVBoxLayout,
-    QWidget,
 )
 from aqt.utils import showInfo, tooltip
 
@@ -26,9 +25,9 @@ from ..main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
     validate_due_date,
-    validate_subdeck_name,
 )
 from ..settings import config
+from .utils import clear_layout
 
 
 class BlockExamSubdeckDialog(QDialog):
@@ -54,6 +53,9 @@ class BlockExamSubdeckDialog(QDialog):
                 # Check if there are any subdecks under the parent deck
                 has_subdecks = len(list(aqt.mw.col.decks.children(deck_config.anki_id))) > 0
 
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
         if has_subdecks:
             self._show_choose_subdeck_screen()
         else:
@@ -63,7 +65,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for choosing existing subdeck or creating new one."""
         self._clear_layout()
 
-        layout = QVBoxLayout(self)
+        layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
 
@@ -107,7 +109,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for creating new subdeck."""
         self._clear_layout()
 
-        layout = QVBoxLayout(self)
+        layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)  # default spacing between elements is 12
 
@@ -154,7 +156,7 @@ class BlockExamSubdeckDialog(QDialog):
         date_label.setFont(date_label_font)
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
-        tomorrow = date.today().replace(day=date.today().day + 1)
+        tomorrow = date.today() + timedelta(days=1)
         self.date_input.setDate(tomorrow)
         self.date_input.setCalendarPopup(True)
         self.date_input.setMinimumDate(tomorrow)
@@ -190,7 +192,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         self.setWindowTitle("")
 
-        layout = QVBoxLayout(self)
+        layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)
 
@@ -237,7 +239,7 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
 
-        tomorrow = date.today().replace(day=date.today().day + 1)
+        tomorrow = date.today() + timedelta(days=1)
 
         # Try to get existing due date
         existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
@@ -278,13 +280,13 @@ class BlockExamSubdeckDialog(QDialog):
         if hasattr(self, "date_input") and self.date_input:
             self.stored_due_date = self.date_input.date().toString("yyyy-MM-dd")
         else:
-            self.stored_due_date = date.today().replace(day=date.today().day + 1).strftime("%Y-%m-%d")
+            self.stored_due_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
         self._clear_layout()
 
         self.setWindowTitle("")
 
-        layout = QVBoxLayout(self)
+        layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(0)
 
@@ -416,9 +418,6 @@ class BlockExamSubdeckDialog(QDialog):
     def _on_create_subdeck(self):
         """Handle subdeck creation."""
         name = self.name_input.text().strip()
-        if not validate_subdeck_name(name):
-            showInfo("Please enter a valid subdeck name.")
-            return
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
         if not validate_due_date(due_date):
@@ -460,9 +459,6 @@ class BlockExamSubdeckDialog(QDialog):
     def _on_add_notes(self):
         """Handle adding notes to selected subdeck."""
         new_name = self.name_input.text().strip()
-        if not validate_subdeck_name(new_name):
-            showInfo("Please enter a valid subdeck name.")
-            return
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
         if not validate_due_date(due_date):
@@ -496,17 +492,6 @@ class BlockExamSubdeckDialog(QDialog):
             LOGGER.error("Failed to add notes to subdeck", error=str(e))
             showInfo(f"Failed to add notes: {e}")
 
-    def _create_subdeck_with_auto_name(self, base_name: str):
-        """Create subdeck with automatically generated name."""
-        try:
-            due_date = self.date_input.date().toString("yyyy-MM-dd")
-            actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, base_name, due_date)
-
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
-
-            tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
-            self.accept()
-
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
             showInfo(f"Failed to create subdeck: {e}")
@@ -539,9 +524,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Handle creating a new subdeck with auto-generated name."""
         try:
             # Use stored due date from the original screen
-            due_date = getattr(
-                self, "stored_due_date", date.today().replace(day=date.today().day + 1).strftime("%Y-%m-%d")
-            )
+            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
             actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
@@ -575,9 +558,7 @@ class BlockExamSubdeckDialog(QDialog):
                 return
 
             # Use stored due date from the original screen
-            due_date = getattr(
-                self, "stored_due_date", date.today().replace(day=date.today().day + 1).strftime("%Y-%m-%d")
-            )
+            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
             # Add notes to the existing subdeck
             add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
@@ -592,5 +573,6 @@ class BlockExamSubdeckDialog(QDialog):
 
     def _clear_layout(self):
         """Clear the current layout."""
-        if self.layout():
-            QWidget().setLayout(self.layout())
+        old_layout = self.layout()
+        if old_layout:
+            clear_layout(old_layout)
