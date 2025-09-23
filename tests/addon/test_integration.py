@@ -8695,7 +8695,8 @@ class TestBlockExamSubdeckDialog:
             deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
             subdeck1_id = aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id
-            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2").id
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2")
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
             config.add_block_exam_subdeck(
@@ -8710,7 +8711,7 @@ class TestBlockExamSubdeckDialog:
             assert hasattr(dialog, "filter_input")
 
             # Should have subdecks in the list
-            assert dialog.subdeck_list.count() == 2
+            assert dialog.subdeck_list.count() == 3
 
     def test_subdeck_selection_shows_add_notes_screen(
         self,
