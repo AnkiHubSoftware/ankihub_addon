@@ -169,6 +169,13 @@ class DeckExtensionConfig(DataClassJSONMixin):
 
 
 @dataclass
+class BlockExamSubdeckConfig(DataClassJSONMixin):
+    ankihub_deck_id: str
+    subdeck_id: str
+    due_date: str  # YYYY-MM-DD format
+
+
+@dataclass
 class UIConfig(DataClassJSONMixin):
     # whether the trees in the browser sidebar are expanded or collapsed
     ankihub_tree_expanded: bool = True
@@ -191,6 +198,7 @@ class PrivateConfig(DataClassJSONMixin):
     last_sent_summary_date: Optional[date] = None
     show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
+    block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
 class _Config:
@@ -482,6 +490,30 @@ class _Config:
         self._private_config.deck_extensions.pop(extension_id)
         self._update_private_config()
         LOGGER.info("Removed deck extension.", extension_id=extension_id)
+
+    def get_block_exam_subdecks(self) -> List[BlockExamSubdeckConfig]:
+        """Get all block exam subdeck configurations."""
+        return self._private_config.block_exams_subdecks or []
+
+    def add_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
+        """Add or update a block exam subdeck configuration."""
+        current = self.get_block_exam_subdecks()
+        # Remove existing entry with same ankihub_deck_id and subdeck_id
+        current = [
+            c
+            for c in current
+            if not (c.ankihub_deck_id == config_item.ankihub_deck_id and c.subdeck_id == config_item.subdeck_id)
+        ]
+        current.append(config_item)
+        self._private_config.block_exams_subdecks = current
+        self._update_private_config()
+
+    def get_block_exam_subdeck_due_date(self, ankihub_deck_id: str, subdeck_id: str) -> Optional[str]:
+        """Get due date for a specific block exam subdeck."""
+        for config_item in self.get_block_exam_subdecks():
+            if config_item.ankihub_deck_id == ankihub_deck_id and config_item.subdeck_id == subdeck_id:
+                return config_item.due_date
+        return None
 
     def is_logged_in(self) -> bool:
         return bool(self.token())

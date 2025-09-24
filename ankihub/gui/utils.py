@@ -651,15 +651,22 @@ def check_and_prompt_for_updates_on_main_window():
 
 
 def clear_layout(layout: QLayout) -> None:
-    """Remove all widgets from a layout and delete them."""
+    """Remove all items from a layout; delete contained widgets and child layouts"""
+    if layout is None:
+        return
     while layout.count():
-        child = layout.takeAt(0)
-        if child.widget():
-            widget = child.widget()
-            widget.setParent(None)
-            widget.deleteLater()
-        elif child.layout():
-            clear_layout(child.layout())
+        child_item = layout.takeAt(0)
+
+        child_widget = child_item.widget()
+        if child_widget is not None:
+            child_widget.setParent(None)
+            child_widget.deleteLater()
+            continue
+
+        child_layout = child_item.layout()
+        if child_layout is not None:
+            clear_layout(child_layout)
+            child_layout.deleteLater()
 
 
 def extract_argument(func: Callable, args: Tuple, kwargs: Dict, arg_name: str) -> Tuple[Tuple, Dict, Any]:
