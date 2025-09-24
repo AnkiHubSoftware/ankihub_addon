@@ -356,16 +356,9 @@ class BlockExamSubdeckDialog(QDialog):
         # Get ALL subdecks under the parent deck (including nested ones)
         all_subdecks = []
 
-        # Get all deck names and IDs in the collection
-        for deck_dict in aqt.mw.col.decks.all_names_and_ids():
-            deck_name = deck_dict.name
-            deck_id = deck_dict.id
-
-            # Check if this deck is a subdeck of our parent deck
-            if deck_name.startswith(f"{anki_deck_name}::") and deck_name != anki_deck_name:
-                # Extract the subdeck path (everything after the parent deck name)
-                subdeck_path = deck_name[len(anki_deck_name) + 2 :]  # +2 for "::"
-                all_subdecks.append((subdeck_path, str(deck_id)))
+        for deck_name, deck_id in aqt.mw.col.decks.children(deck_config.anki_id):
+            subdeck_path = deck_name[len(anki_deck_name) + 2 :]
+            all_subdecks.append((subdeck_path, str(deck_id)))
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())
