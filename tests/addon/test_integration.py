@@ -188,6 +188,7 @@ from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
+    ADD_TO_BLOCK_EXAM_SUBDECK,
     GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
     SUSPEND_NOTES_PYCMD,
@@ -7553,6 +7554,90 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
         terms_dialog_mock.display.assert_called_once_with(parent=aqt.mw)
         reviewer_sidebar_mock.set_needs_to_accept_terms.assert_called_once_with(True)
         reviewer_sidebar_mock.close_sidebar.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "use_search_string, use_note_ids, tag_name",
+    [
+        # Test with search string only
+        (True, False, "test-tag"),
+        # Test with note IDs only
+        (False, True, "exam-tag"),
+        # Test with both (noteIds should take precedence)
+        (True, True, "priority-tag"),
+    ],
+)
+def test_add_to_block_exam_subdeck_pycmd(
+    anki_session_with_addon_data: AnkiSession,
+    qtbot: QtBot,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+    use_search_string: bool,
+    use_note_ids: bool,
+    tag_name: str,
+):
+    """Test ADD_TO_BLOCK_EXAM_SUBDECK message handling with actual notes."""
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+
+        # Create notes with AnkiHub IDs and tags
+        created_notes = []
+        created_ah_nids = []
+
+        for i in range(3):
+            note_info = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+
+            # Add tag to the note
+            anki_note.tags = [tag_name, f"note-{i}"]
+            anki_note.flush()
+
+            created_notes.append(anki_note)
+            created_ah_nids.append(note_info.ah_nid)
+
+        dialog_mock = mocker.patch("ankihub.gui.js_message_handling.BlockExamSubdeckDialog")
+
+        # Build message based on test scenario
+        message_data = {"deckId": str(ah_did)}
+
+        if use_search_string:
+            search_string = f"tag:{tag_name}"
+            message_data["searchString"] = search_string
+
+        if use_note_ids:
+            # Use first two notes for note IDs test
+            note_ids_to_use = created_ah_nids[:2]
+            message_data["noteIds"] = [str(nid) for nid in note_ids_to_use]
+
+        message = f"{ADD_TO_BLOCK_EXAM_SUBDECK} {json.dumps(message_data)}"
+
+        aqt.mw.web.eval(f"pycmd('{message}')")
+
+        qtbot.wait_until(lambda: dialog_mock.call_count > 0, timeout=1000)
+
+        call_args = dialog_mock.call_args
+        assert call_args[1]["ankihub_deck_id"] == ah_did
+        assert call_args[1]["parent"] == aqt.mw
+
+        # Verify the correct notes are selected based on the scenario
+        actual_anki_note_ids = set(call_args[1]["note_ids"])
+
+        if use_note_ids:
+            # When note IDs are provided, they should take precedence
+            expected_note_ids_to_use = created_ah_nids[:2]  # First two notes
+            expected_anki_nids = set(ankihub_db.ankihub_nids_to_anki_nids(expected_note_ids_to_use).values())
+            assert actual_anki_note_ids == expected_anki_nids
+        elif use_search_string:
+            # When only search string is provided, find notes matching the search
+            search_string = f"tag:{tag_name}"
+            expected_anki_nids_from_search = set(aqt.mw.col.find_notes(search_string))
+            assert actual_anki_note_ids == expected_anki_nids_from_search
+            # Should include all 3 notes since they all have the tag
+            assert len(actual_anki_note_ids) == 3
+
+        dialog_mock.return_value.show.assert_called_once()
 
 
 @pytest.mark.sequential
