@@ -668,6 +668,7 @@ def clear_layout(layout: QLayout) -> None:
             clear_layout(child_layout)
             child_layout.deleteLater()
 
+
 def extract_argument(func: Callable, args: Tuple, kwargs: Dict, arg_name: str) -> Tuple[Tuple, Dict, Any]:
     """
     Extract and remove an argument from args or kwargs based on the function signature.
