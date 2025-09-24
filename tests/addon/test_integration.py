@@ -85,7 +85,6 @@ from ankihub.main.block_exam_subdecks import (
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
     validate_due_date,
-    validate_subdeck_name,
 )
 
 from ..factories import (
@@ -8551,27 +8550,6 @@ class TestBlockExamSubdecks:
             assert len(existing) == 1
             assert existing[0][0] == "Block Exam"
 
-    def test_validate_subdeck_name(self):
-        # Valid names
-        assert validate_subdeck_name("Valid Name")
-        assert validate_subdeck_name("Test123")
-        assert validate_subdeck_name("Name with spaces")
-        assert validate_subdeck_name("Name_with_underscores")
-        assert validate_subdeck_name("Name-with-hyphens")
-
-        # Invalid names
-        assert not validate_subdeck_name("")
-        assert not validate_subdeck_name("   ")  # Only whitespace
-        assert not validate_subdeck_name("Invalid:Name")  # Contains colon
-        assert not validate_subdeck_name("Invalid<Name")  # Contains less than
-        assert not validate_subdeck_name("Invalid>Name")  # Contains greater than
-        assert not validate_subdeck_name('Invalid"Name')  # Contains quote
-        assert not validate_subdeck_name("Invalid|Name")  # Contains pipe
-        assert not validate_subdeck_name("Invalid?Name")  # Contains question mark
-        assert not validate_subdeck_name("Invalid*Name")  # Contains asterisk
-        assert not validate_subdeck_name("Invalid/Name")  # Contains forward slash
-        assert not validate_subdeck_name("Invalid\\Name")  # Contains backslash
-
     def test_validate_due_date(self):
         # Valid future dates
         future_date1 = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -8717,7 +8695,8 @@ class TestBlockExamSubdeckDialog:
             deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
             subdeck1_id = aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id
-            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2").id
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2")
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
             config.add_block_exam_subdeck(
@@ -8732,7 +8711,7 @@ class TestBlockExamSubdeckDialog:
             assert hasattr(dialog, "filter_input")
 
             # Should have subdecks in the list
-            assert dialog.subdeck_list.count() == 2
+            assert dialog.subdeck_list.count() == 3
 
     def test_subdeck_selection_shows_add_notes_screen(
         self,

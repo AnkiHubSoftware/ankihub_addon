@@ -31,7 +31,7 @@ def get_existing_block_exam_subdecks(ankihub_deck_id: uuid.UUID) -> List[Tuple[s
     for child_name, child_id in aqt.mw.col.decks.children(deck_config.anki_id):
         # Check if this subdeck has block exam configuration
         if config.get_block_exam_subdeck_due_date(str(ankihub_deck_id), str(child_id)):
-            subdeck_name = child_name.split("::")[-1]  # Get just the subdeck part
+            subdeck_name = child_name[len(anki_deck_name) + 2 :]  # +2 for the '::' separator
             subdecks.append((subdeck_name, str(child_id)))
 
     return subdecks
@@ -109,15 +109,6 @@ def add_notes_to_block_exam_subdeck(
     LOGGER.info(
         "Added notes to block exam subdeck", subdeck_name=subdeck_name, note_count=len(note_ids), due_date=due_date
     )
-
-
-def validate_subdeck_name(name: str) -> bool:
-    """Validate subdeck name is not empty and doesn't contain invalid characters."""
-    if not name or not name.strip():
-        return False
-    # Check for Anki deck name restrictions
-    invalid_chars = ["<", ">", ":", '"', "|", "?", "*", "/", "\\"]
-    return not any(char in name for char in invalid_chars)
 
 
 def validate_due_date(date_str: str) -> bool:
