@@ -149,7 +149,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             anki_nids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
             search_string = f"nid:{','.join(map(str, anki_nids))}"
 
-        note_ids = aqt.mw.col.find_notes(search_string)
+        note_ids = list(aqt.mw.col.find_notes(search_string))
         BlockExamSubdeckDialog(ankihub_deck_id=uuid.UUID(ankihub_did), note_ids=note_ids, parent=aqt.mw).show()
         return (True, None)
 

@@ -7600,7 +7600,7 @@ def test_add_to_block_exam_subdeck_pycmd(
         dialog_mock = mocker.patch("ankihub.gui.js_message_handling.BlockExamSubdeckDialog")
 
         # Build message based on test scenario
-        message_data = {"deckId": str(ah_did)}
+        message_data: dict[str, Any] = {"deckId": str(ah_did)}
 
         if use_search_string:
             search_string = f"tag:{tag_name}"
