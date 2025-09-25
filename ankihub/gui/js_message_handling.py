@@ -16,6 +16,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from ..db import ankihub_db
+from ..gui.block_exam_dialog import BlockExamSubdeckDialog
 from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import url_view_note
 from .config_dialog import get_config_dialog_manager
@@ -33,6 +34,7 @@ COPY_TO_CLIPBOARD_PYCMD = "ankihub_copy_to_clipboard"
 OPEN_LINK_PYCMD = "ankihub_open_link"
 TERMS_AGREEMENT_NOT_ACCEPTED = "terms_agreement_not_accepted"
 TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
+ADD_TO_BLOCK_EXAM_SUBDECK = "ankihub_add_to_block_exam_subdeck"
 
 OPEN_CONFIG_PYCMD = "ankihub_open_config"
 
@@ -136,6 +138,19 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return (True, None)
     elif message == OPEN_CONFIG_PYCMD:
         get_config_dialog_manager().open_config()
+        return (True, None)
+    elif message.startswith(ADD_TO_BLOCK_EXAM_SUBDECK):
+        kwargs = parse_js_message_kwargs(message)
+        ankihub_did = kwargs.get("deckId")
+        search_string = kwargs.get("searchString", "")
+        ah_nids = kwargs.get("noteIds")
+        note_ids = []
+        if ah_nids:
+            ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
+            note_ids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
+        elif search_string.strip():
+            note_ids = list(aqt.mw.col.find_notes(search_string))
+        BlockExamSubdeckDialog(ankihub_deck_id=uuid.UUID(ankihub_did), note_ids=note_ids, parent=aqt.mw).show()
         return (True, None)
 
     return handled
