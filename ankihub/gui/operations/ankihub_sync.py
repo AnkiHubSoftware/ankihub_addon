@@ -18,11 +18,11 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...gui.operations import AddonQueryOp
+from ...main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
-from ...main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results

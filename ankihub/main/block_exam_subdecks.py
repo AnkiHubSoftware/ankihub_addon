@@ -1,7 +1,7 @@
 """Functions for managing block exam subdecks."""
 
 import uuid
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import List, Optional, Tuple
 
 import aqt
@@ -122,24 +122,24 @@ def validate_due_date(date_str: str) -> bool:
 
 def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     """Check for block exam subdecks that are past their due date.
-    
+
     Returns:
         List of expired subdeck configurations
     """
     expired_subdecks = []
     today = date.today()
-    
+
     for subdeck_config in config.get_block_exam_subdecks():
         try:
             due_date = datetime.strptime(subdeck_config.due_date, "%Y-%m-%d").date()
-            
+
             if today >= due_date:
                 expired_subdecks.append(subdeck_config)
                 LOGGER.info(
-                    "Found expired block exam subdeck", 
+                    "Found expired block exam subdeck",
                     ankihub_deck_id=subdeck_config.ankihub_deck_id,
                     subdeck_id=subdeck_config.subdeck_id,
-                    due_date=subdeck_config.due_date
+                    due_date=subdeck_config.due_date,
                 )
         except (ValueError, TypeError) as e:
             LOGGER.warning(
@@ -147,27 +147,26 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
                 ankihub_deck_id=subdeck_config.ankihub_deck_id,
                 subdeck_id=subdeck_config.subdeck_id,
                 due_date=subdeck_config.due_date,
-                error=str(e)
+                error=str(e),
             )
-    
+
     return expired_subdecks
 
 
 def trigger_due_date_dialog(expired_subdecks: List[BlockExamSubdeckConfig]) -> None:
     """Trigger the Due Date Dialog for expired subdecks.
-    
+
     This is a placeholder function that will be implemented when the
     Due Date Dialog spec is ready.
-    
+
     Args:
         expired_subdecks: List of expired subdeck configurations
     """
     if not expired_subdecks:
         return
     # TODO: Implement actual dialog triggering
-    aqt.utils.showInfo(
-        f"{len(expired_subdecks)} block exam subdeck(s) have reached their due date."
-    )
+    aqt.utils.showInfo(f"{len(expired_subdecks)} block exam subdeck(s) have reached their due date.")
+
 
 def check_and_handle_block_exam_subdeck_due_dates() -> None:
     """Check for expired block exam subdecks and trigger dialog if any are found."""
@@ -177,7 +176,4 @@ def check_and_handle_block_exam_subdeck_due_dates() -> None:
             trigger_due_date_dialog(expired_subdecks)
     except Exception as e:
         # Don't let due date checking crash the sync or startup
-        LOGGER.error(
-            "Error checking block exam subdeck due dates",
-            exc_info=e
-        )
+        LOGGER.error("Error checking block exam subdeck due dates", exc_info=e)
