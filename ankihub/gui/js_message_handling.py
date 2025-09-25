@@ -144,12 +144,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ankihub_did = kwargs.get("deckId")
         search_string = kwargs.get("searchString", "")
         ah_nids = kwargs.get("noteIds")
+        note_ids = []
         if ah_nids:
             ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
-            anki_nids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
-            search_string = f"nid:{','.join(map(str, anki_nids))}"
-
-        note_ids = list(aqt.mw.col.find_notes(search_string))
+            note_ids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
+        elif search_string.strip():
+            note_ids = list(aqt.mw.col.find_notes(search_string))
         BlockExamSubdeckDialog(ankihub_deck_id=uuid.UUID(ankihub_did), note_ids=note_ids, parent=aqt.mw).show()
         return (True, None)
 
