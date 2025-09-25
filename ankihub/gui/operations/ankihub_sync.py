@@ -22,6 +22,7 @@ from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
+from ...main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
 from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
@@ -230,6 +231,7 @@ def _schedule_post_sync_ui_refresh_and_tasks() -> None:
         aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
         aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
         _maybe_send_daily_review_summaries()
+        aqt.mw.taskman.run_on_main(check_and_handle_block_exam_subdeck_due_dates)
         gui_hooks.focus_did_change.remove(refresh_ui_and_start_after_sync_tasks_once)
 
     gui_hooks.focus_did_change.append(refresh_ui_and_start_after_sync_tasks_once)

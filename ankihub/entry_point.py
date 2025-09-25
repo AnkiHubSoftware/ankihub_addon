@@ -35,6 +35,7 @@ from .gui.operations.user_details import fetch_user_details_in_background
 from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
+from .main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
 from .settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -192,6 +193,7 @@ def _on_startup_after_ankiweb_sync() -> None:
     """Run tasks after startup AnkiWeb sync completes (or immediately if there is no auto sync)."""
     maybe_show_fsrs_optimization_reminder()
     maybe_show_enable_fsrs_reminder()
+    check_and_handle_block_exam_subdeck_due_dates()
 
 
 def _general_setup() -> None:
