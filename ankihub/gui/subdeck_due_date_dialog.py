@@ -30,7 +30,6 @@ class SubdeckDueDateDialog(QDialog):
         super().__init__(parent)
         self.subdeck_config = subdeck_config
         self.subdeck_name = subdeck_name
-        self.date_picker_dialog: Optional[QDialog] = None
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -53,7 +52,6 @@ class SubdeckDueDateDialog(QDialog):
         title_font.setPointSize(title_font.pointSize() + 2)
         title_label.setFont(title_font)
         main_layout.addWidget(title_label)
-        main_layout.addSpacing(8)
 
         # Main message
         message_text = f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. \
@@ -61,12 +59,11 @@ class SubdeckDueDateDialog(QDialog):
         message_label = QLabel(message_text)
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
-        main_layout.addSpacing(8)
 
         # Options list
         options_text = (
-            "<strong>• Move to main deck:</strong> Delete the subdeck and move all notes back into the main deck.\n"
-            "<strong>• Keep as is:</strong> Leave the subdeck and notes unchanged.\n"
+            "<strong>• Move to main deck:</strong> Delete the subdeck and move all notes back into the main deck.<br>"
+            "<strong>• Keep as is:</strong> Leave the subdeck and notes unchanged.<br>"
             "<strong>• Set new due date:</strong> Pick a new date to be reminded later."
         )
         options_label = QLabel(options_text)
@@ -122,32 +119,26 @@ class SubdeckDueDateDialog(QDialog):
 
     def _show_date_picker(self):
         """Show date picker dialog."""
-        self.date_picker_dialog = DatePickerDialog(self.subdeck_name, parent=self)
-        if self.date_picker_dialog.exec() == QDialog.DialogCode.Accepted:
-            new_due_date = self.date_picker_dialog.selected_date
-            if new_due_date:
-                success = set_subdeck_due_date(self.subdeck_config, new_due_date)
-                if success:
-                    tooltip(f"Due date updated for '{self.subdeck_name}'")
-                    self.accept()
-                else:
-                    showInfo("Failed to update due date. Please try again.")
-        self.date_picker_dialog = None
+        date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=aqt.mw)
+        self.hide()
+        if date_picker_dialog.exec() == QDialog.DialogCode.Accepted:
+            self.accept()
 
 
 class DatePickerDialog(QDialog):
     """Dialog for selecting a new due date."""
 
-    def __init__(self, subdeck_name: str, parent=None):
+    def __init__(self, subdeck_name: str, subdeck_config: BlockExamSubdeckConfig, parent=None):
         super().__init__(parent)
         self.subdeck_name = subdeck_name
+        self.subdeck_config = subdeck_config
         self.selected_date: Optional[str] = None
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("")
-        self.setMinimumWidth(350)
-        self.resize(380, 220)
+        self.setMinimumWidth(221)
+        self.resize(400, 221)
 
         self._setup_ui()
 
@@ -158,16 +149,15 @@ class DatePickerDialog(QDialog):
         main_layout.setSpacing(12)
 
         # Title
-        title_label = QLabel("Set new due date")
+        title_label = QLabel("Reschedule due date")
         title_font = title_label.font()
         title_font.setBold(True)
         title_font.setPointSize(title_font.pointSize() + 2)
         title_label.setFont(title_font)
         main_layout.addWidget(title_label)
-        main_layout.addSpacing(8)
 
         # Message
-        message_text = f"Choose a new due date for {self.subdeck_name}:"
+        message_text = f"Pick a new due date for <strong>{self.subdeck_name}</strong>."
         message_label = QLabel(message_text)
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
@@ -203,7 +193,7 @@ class DatePickerDialog(QDialog):
         button_layout.addWidget(cancel_button)
 
         # Confirm button
-        confirm_button = QPushButton("Set due date")
+        confirm_button = QPushButton("Save")
         confirm_button.clicked.connect(self._on_confirm)  # type: ignore[attr-defined]
         confirm_button.setDefault(True)
         button_layout.addWidget(confirm_button)
@@ -218,4 +208,10 @@ class DatePickerDialog(QDialog):
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
 
         self.selected_date = selected_date_str
-        self.accept()
+
+        success = set_subdeck_due_date(self.subdeck_config, selected_date_str)
+        if success:
+            tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
+            self.accept()
+        else:
+            showInfo("Failed to update due date. Please try again.", parent=aqt.mw)
