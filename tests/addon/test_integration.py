@@ -8675,6 +8675,16 @@ class TestBlockExamSubdecks:
             assert len(configs) == 1
             assert configs[0].due_date == "2025-01-15"
 
+            # Test removing configuration
+            config.remove_block_exam_subdeck("test-deck-id", "test-subdeck-id")
+            configs = config.get_block_exam_subdecks()
+            assert len(configs) == 0
+
+            # Test removing non-existent configuration (should not error)
+            config.remove_block_exam_subdeck("non-existent", "non-existent")
+            configs = config.get_block_exam_subdecks()
+            assert len(configs) == 0
+
     def test_create_subdeck_deck_not_found(
         self,
         anki_session_with_addon_data: AnkiSession,
