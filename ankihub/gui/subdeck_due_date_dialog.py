@@ -104,6 +104,7 @@ class SubdeckDueDateDialog(QDialog):
             if success:
                 tooltip(f"'{self.subdeck_name}' moved to main deck")
                 self.accept()
+                aqt.mw.deckBrowser.refresh()
             else:
                 showInfo("Failed to move subdeck to main deck. Please try again.")
         except Exception as e:
@@ -214,6 +215,10 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
+        
+        if not validate_due_date(selected_date_str):
+            showInfo("Due date must be in the future.")
+            return
 
         self.selected_date = selected_date_str
         self.accept()
