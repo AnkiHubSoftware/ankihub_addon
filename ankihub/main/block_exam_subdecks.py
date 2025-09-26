@@ -111,15 +111,6 @@ def add_notes_to_block_exam_subdeck(
     )
 
 
-def validate_due_date(date_str: str) -> bool:
-    """Validate due date is in correct format and in the future."""
-    try:
-        due_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        return due_date > datetime.now().date()
-    except ValueError:
-        return False
-
-
 def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     """Check for block exam subdecks that are past their due date.
 
