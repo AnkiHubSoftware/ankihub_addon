@@ -85,7 +85,6 @@ from ankihub.main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
-    validate_due_date,
 )
 
 from ..factories import (
@@ -8635,29 +8634,6 @@ class TestBlockExamSubdecks:
             existing = get_existing_block_exam_subdecks(ah_did)
             assert len(existing) == 1
             assert existing[0][0] == "Block Exam"
-
-    def test_validate_due_date(self):
-        # Valid future dates
-        future_date1 = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
-        future_date7 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-        assert validate_due_date(future_date1)
-        assert validate_due_date(future_date7)
-
-        # Invalid past dates
-        past_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-        assert not validate_due_date(past_date)
-
-        # Invalid today (not in future)
-        today = date.today().strftime("%Y-%m-%d")
-        assert not validate_due_date(today)
-
-        # Invalid formats
-        assert not validate_due_date("invalid-date")
-        assert not validate_due_date("2023-13-01")  # Invalid month
-        assert not validate_due_date("2023-01-32")  # Invalid day
-        assert not validate_due_date("01-01-2023")  # Wrong format
-        assert not validate_due_date("")
-        assert not validate_due_date("2023/01/01")  # Wrong separator
 
     def test_config_methods(
         self,

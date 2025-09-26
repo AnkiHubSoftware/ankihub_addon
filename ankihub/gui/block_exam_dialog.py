@@ -24,7 +24,6 @@ from .. import LOGGER
 from ..main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
-    validate_due_date,
 )
 from ..settings import config
 from .utils import clear_layout
@@ -421,9 +420,6 @@ class BlockExamSubdeckDialog(QDialog):
         name = self.name_input.text().strip()
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
-        if not validate_due_date(due_date):
-            showInfo("Due date must be in the future.")
-            return
 
         # Check if subdeck already exists
         deck_config = config.deck_config(self.ankihub_deck_id)
@@ -462,9 +458,6 @@ class BlockExamSubdeckDialog(QDialog):
         new_name = self.name_input.text().strip()
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
-        if not validate_due_date(due_date):
-            showInfo("Due date must be in the future.")
-            return
 
         try:
             # Check if subdeck name needs to be updated
