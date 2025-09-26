@@ -517,15 +517,14 @@ class _Config:
 
     def remove_block_exam_subdeck(self, ankihub_deck_id: str, subdeck_id: str) -> None:
         """Remove a block exam subdeck configuration.
-        
+
         Args:
             ankihub_deck_id: The AnkiHub deck ID
             subdeck_id: The Anki subdeck ID
         """
         current_configs = self.get_block_exam_subdecks()
         updated_configs = [
-            c for c in current_configs
-            if not (c.ankihub_deck_id == ankihub_deck_id and c.subdeck_id == subdeck_id)
+            c for c in current_configs if not (c.ankihub_deck_id == ankihub_deck_id and c.subdeck_id == subdeck_id)
         ]
         self._private_config.block_exams_subdecks = updated_configs
         self._update_private_config()

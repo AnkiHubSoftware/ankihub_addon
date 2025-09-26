@@ -146,10 +146,10 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
 
 def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
     """Move all notes from a subdeck back to the main deck and delete the subdeck.
-    
+
     Args:
         subdeck_config: Configuration of the subdeck to move
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
@@ -159,77 +159,79 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
         if not deck_config:
             LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
             return False
-            
+
         subdeck_id = int(subdeck_config.subdeck_id)
         subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
         if not subdeck:
             LOGGER.warning("Subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
             remove_block_exam_subdeck_config(subdeck_config)
             return True
-            
+
         parent_deck_id = deck_config.anki_id
-        
+
         note_ids = aqt.mw.col.find_notes(f"deck:{subdeck['name']}")
-        
+
         if note_ids:
             move_notes_to_decks_while_respecting_odid({nid: parent_deck_id for nid in note_ids})
-            LOGGER.info("Moved notes from subdeck to main deck", 
-                       subdeck_name=subdeck['name'], 
-                       note_count=len(note_ids))
-        
+            LOGGER.info("Moved notes from subdeck to main deck", subdeck_name=subdeck["name"], note_count=len(note_ids))
+
         aqt.mw.col.decks.remove([subdeck_id])
-        
+
         remove_block_exam_subdeck_config(subdeck_config)
-        
-        LOGGER.info("Successfully moved subdeck to main deck", subdeck_name=subdeck['name'])
+
+        LOGGER.info("Successfully moved subdeck to main deck", subdeck_name=subdeck["name"])
         return True
-        
+
     except Exception as e:
-        LOGGER.error("Failed to move subdeck to main deck", 
-                    ankihub_deck_id=subdeck_config.ankihub_deck_id,
-                    subdeck_id=subdeck_config.subdeck_id,
-                    error=str(e))
+        LOGGER.error(
+            "Failed to move subdeck to main deck",
+            ankihub_deck_id=subdeck_config.ankihub_deck_id,
+            subdeck_id=subdeck_config.subdeck_id,
+            error=str(e),
+        )
         return False
 
 
 def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: str) -> bool:
     """Set a new due date for a block exam subdeck.
-    
+
     Args:
         subdeck_config: Current subdeck configuration
         new_due_date: New due date in YYYY-MM-DD format
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
     try:
         updated_config = BlockExamSubdeckConfig(
+            ankihub_deck_id=subdeck_config.ankihub_deck_id, subdeck_id=subdeck_config.subdeck_id, due_date=new_due_date
+        )
+
+        config.add_block_exam_subdeck(updated_config)
+
+        LOGGER.info(
+            "Updated subdeck due date",
             ankihub_deck_id=subdeck_config.ankihub_deck_id,
             subdeck_id=subdeck_config.subdeck_id,
-            due_date=new_due_date
+            old_due_date=subdeck_config.due_date,
+            new_due_date=new_due_date,
         )
-        
-        config.add_block_exam_subdeck(updated_config)
-        
-        LOGGER.info("Updated subdeck due date",
-                   ankihub_deck_id=subdeck_config.ankihub_deck_id,
-                   subdeck_id=subdeck_config.subdeck_id,
-                   old_due_date=subdeck_config.due_date,
-                   new_due_date=new_due_date)
         return True
-        
+
     except Exception as e:
-        LOGGER.error("Failed to set subdeck due date",
-                    ankihub_deck_id=subdeck_config.ankihub_deck_id,
-                    subdeck_id=subdeck_config.subdeck_id,
-                    new_due_date=new_due_date,
-                    error=str(e))
+        LOGGER.error(
+            "Failed to set subdeck due date",
+            ankihub_deck_id=subdeck_config.ankihub_deck_id,
+            subdeck_id=subdeck_config.subdeck_id,
+            new_due_date=new_due_date,
+            error=str(e),
+        )
         return False
 
 
 def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> None:
     """Remove a block exam subdeck configuration.
-    
+
     Args:
         subdeck_config: Configuration to remove
     """
@@ -238,31 +240,32 @@ def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> 
 
 def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """Handle an expired subdeck by showing the due date dialog.
-    
+
     Args:
         subdeck_config: Configuration of the expired subdeck
     """
     from ..gui.subdeck_due_date_dialog import SubdeckDueDateDialog
-    
+
     try:
         subdeck_id = int(subdeck_config.subdeck_id)
         subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
         if not subdeck:
-            LOGGER.warning("Expired subdeck not found, removing config", 
-                         subdeck_id=subdeck_config.subdeck_id)
+            LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
             remove_block_exam_subdeck_config(subdeck_config)
             return
-            
-        subdeck_name = subdeck['name'].split('::')[-1]  # Get the last part after "::"
-        
+
+        subdeck_name = subdeck["name"].split("::")[-1]  # Get the last part after "::"
+
         dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
         dialog.exec()
-        
+
     except Exception as e:
-        LOGGER.error("Failed to handle expired subdeck", 
-                    ankihub_deck_id=subdeck_config.ankihub_deck_id,
-                    subdeck_id=subdeck_config.subdeck_id,
-                    error=str(e))
+        LOGGER.error(
+            "Failed to handle expired subdeck",
+            ankihub_deck_id=subdeck_config.ankihub_deck_id,
+            subdeck_id=subdeck_config.subdeck_id,
+            error=str(e),
+        )
 
 
 def check_and_handle_block_exam_subdeck_due_dates() -> None:

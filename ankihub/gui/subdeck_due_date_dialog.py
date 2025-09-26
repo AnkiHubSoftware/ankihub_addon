@@ -1,6 +1,6 @@
 """Dialog for handling expired block exam subdecks."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 import aqt
@@ -56,7 +56,8 @@ class SubdeckDueDateDialog(QDialog):
         main_layout.addSpacing(8)
 
         # Main message
-        message_text = f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. Please choose what you'd like to do next:"
+        message_text = f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. \
+            Please choose what you'd like to do next:"
         message_label = QLabel(message_text)
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
@@ -215,10 +216,6 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-        
-        if not validate_due_date(selected_date_str):
-            showInfo("Due date must be in the future.")
-            return
 
         self.selected_date = selected_date_str
         self.accept()
