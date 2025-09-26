@@ -18,6 +18,7 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...gui.operations import AddonQueryOp
+from ...main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
@@ -206,33 +207,34 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     else:
         on_done(future_with_result(None))
 
-    _schedule_post_sync_ui_refresh_and_tasks()
+    _refresh_ui_then_schedule_post_sync_tasks()
 
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
 
-def _schedule_post_sync_ui_refresh_and_tasks() -> None:
-    """Schedule Anki UI refresh and background tasks to run after the next focus change."""
+def _refresh_ui_then_schedule_post_sync_tasks() -> None:
+    """Refresh UI now; schedule post-sync work to begin on the next focus change."""
 
-    # Using focus_did_change hook to ensure proper UI refresh timing:
-    # 1. aqt.mw.reset() refreshes the Anki UI, but some UI elements are only
-    #    marked for refresh and won't actually update until they receive focus
-    # 2. The background tasks (clearing tags, sending review data/summaries)
-    #    involve potentially heavy database queries
-    # 3. By using this hook, we ensure the UI refresh happens before these
-    #    heavier operations, preventing the UI refresh from being blocked
-    # 4. The hook removes itself after execution to ensure it only runs once
-    def refresh_ui_and_start_after_sync_tasks_once(new: QWidget, old: QWidget) -> None:
+    # aqt.mw.reset() refreshes the Anki UI, but some UI elements are only
+    # marked for refresh and won't actually update until they receive focus.
+    aqt.mw.reset()
+
+    def _run_once_on_focus(new: QWidget, old: QWidget) -> None:
         if new is None:
             return
-        aqt.mw.reset()
+
+        # Ensure this fires only once
+        gui_hooks.focus_did_change.remove(_run_once_on_focus)
+
+        # Schedule tasks
         aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
         aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
         _maybe_send_daily_review_summaries()
-        gui_hooks.focus_did_change.remove(refresh_ui_and_start_after_sync_tasks_once)
+        aqt.mw.taskman.run_on_main(check_and_handle_block_exam_subdeck_due_dates)
 
-    gui_hooks.focus_did_change.append(refresh_ui_and_start_after_sync_tasks_once)
+    # Schedule the tasks after the next focus change, to ensure the UI is refreshed before running heavy tasks
+    gui_hooks.focus_did_change.append(_run_once_on_focus)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
