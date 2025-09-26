@@ -169,7 +169,7 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
 
         parent_deck_id = deck_config.anki_id
 
-        note_ids = aqt.mw.col.find_notes(f"deck:{subdeck['name']}")
+        note_ids = aqt.mw.col.find_notes(f"did:{subdeck_id}")
 
         if note_ids:
             move_notes_to_decks_while_respecting_odid({nid: parent_deck_id for nid in note_ids})
