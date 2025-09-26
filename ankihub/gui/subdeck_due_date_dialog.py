@@ -19,7 +19,6 @@ from .. import LOGGER
 from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
-    validate_due_date,
 )
 from ..settings import BlockExamSubdeckConfig
 
@@ -57,7 +56,7 @@ class SubdeckDueDateDialog(QDialog):
         main_layout.addSpacing(8)
 
         # Main message
-        message_text = f"The due date you set for {self.subdeck_name} has arrived. Please choose what you'd like to do next:"
+        message_text = f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. Please choose what you'd like to do next:"
         message_label = QLabel(message_text)
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
@@ -65,9 +64,9 @@ class SubdeckDueDateDialog(QDialog):
 
         # Options list
         options_text = (
-            "• Move to main deck: Delete the subdeck and move all notes back into the main deck.\n"
-            "• Keep as is: Leave the subdeck and notes unchanged.\n"
-            "• Set new due date: Pick a new date to be reminded later."
+            "<strong>• Move to main deck:</strong> Delete the subdeck and move all notes back into the main deck.\n"
+            "<strong>• Keep as is:</strong> Leave the subdeck and notes unchanged.\n"
+            "<strong>• Set new due date:</strong> Pick a new date to be reminded later."
         )
         options_label = QLabel(options_text)
         options_label.setWordWrap(True)
@@ -215,10 +214,6 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-        
-        if not validate_due_date(selected_date_str):
-            showInfo("Due date must be in the future.")
-            return
 
         self.selected_date = selected_date_str
         self.accept()
