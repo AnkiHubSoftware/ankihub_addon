@@ -28,6 +28,9 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
 
+from ankihub.main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates, trigger_due_date_dialog
+from ankihub.settings import BlockExamSubdeckConfig
+
 from ..factories import (
     AnkiHubImportResultFactory,
     DeckExtensionFactory,
@@ -3402,3 +3405,115 @@ class TestDeckImportSummaryDialog:
         assert "Some notes were skipped" in message
         assert "share the same ID as notes in another AnkiHub deck" in message
         assert "see this topic" in message
+
+
+class TestTriggerDueDateDialog:
+    """Tests for trigger_due_date_dialog function."""
+
+    def test_trigger_due_date_dialog_empty_list(self):
+        """Test function does nothing with empty expired subdecks list."""
+        # Should not raise any exception or show dialog
+        trigger_due_date_dialog([])
+        # No assertions needed - just ensuring it doesn't crash
+
+    @patch("aqt.utils.showInfo")
+    def test_trigger_due_date_dialog_with_expired_subdecks(self, mock_showinfo):
+        """Test function shows info dialog with expired subdecks count."""
+        expired_subdecks = [
+            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
+            BlockExamSubdeckConfig(ankihub_deck_id="deck2", subdeck_id="subdeck2", due_date="2023-01-02"),
+        ]
+
+        trigger_due_date_dialog(expired_subdecks)
+
+        # Should call showInfo with appropriate message
+        mock_showinfo.assert_called_once_with("2 block exam subdeck(s) have reached their due date.")
+
+    @patch("aqt.utils.showInfo")
+    def test_trigger_due_date_dialog_single_expired(self, mock_showinfo):
+        """Test function shows correct singular message for one expired subdeck."""
+        expired_subdecks = [
+            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
+        ]
+
+        trigger_due_date_dialog(expired_subdecks)
+
+        # Should call showInfo with appropriate message
+        mock_showinfo.assert_called_once_with("1 block exam subdeck(s) have reached their due date.")
+
+
+class TestCheckAndHandleBlockExamSubdeckDueDates:
+    """Tests for check_and_handle_block_exam_subdeck_due_dates function."""
+
+    @patch("ankihub.main.block_exam_subdecks.trigger_due_date_dialog")
+    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    def test_check_and_handle_no_expired_subdecks(
+        self,
+        mock_check_due_dates,
+        mock_trigger_dialog,
+    ):
+        """Test function does not trigger dialog when no subdecks are expired."""
+        mock_check_due_dates.return_value = []
+
+        check_and_handle_block_exam_subdeck_due_dates()
+
+        mock_check_due_dates.assert_called_once()
+
+        mock_trigger_dialog.assert_not_called()
+
+    @patch("ankihub.main.block_exam_subdecks.trigger_due_date_dialog")
+    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    def test_check_and_handle_with_expired_subdecks(
+        self,
+        mock_check_due_dates,
+        mock_trigger_dialog,
+    ):
+        """Test function triggers dialog when expired subdecks are found."""
+        # Mock expired subdecks
+        expired_subdecks = [
+            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
+        ]
+        mock_check_due_dates.return_value = expired_subdecks
+
+        check_and_handle_block_exam_subdeck_due_dates()
+
+        mock_check_due_dates.assert_called_once()
+
+        mock_trigger_dialog.assert_called_once_with(expired_subdecks)
+
+    @patch("ankihub.main.block_exam_subdecks.trigger_due_date_dialog")
+    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    def test_check_and_handle_with_exception(
+        self,
+        mock_check_due_dates,
+        mock_trigger_dialog,
+    ):
+        """Test function handles exceptions gracefully and logs errors."""
+        mock_check_due_dates.side_effect = Exception("Test error")
+
+        check_and_handle_block_exam_subdeck_due_dates()
+
+        mock_check_due_dates.assert_called_once()
+
+        mock_trigger_dialog.assert_not_called()
+
+    @patch("ankihub.main.block_exam_subdecks.trigger_due_date_dialog")
+    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    def test_check_and_handle_trigger_dialog_exception(
+        self,
+        mock_check_due_dates,
+        mock_trigger_dialog,
+    ):
+        """Test function handles exceptions in trigger_due_date_dialog gracefully."""
+        expired_subdecks = [
+            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
+        ]
+        mock_check_due_dates.return_value = expired_subdecks
+
+        mock_trigger_dialog.side_effect = Exception("Dialog error")
+
+        check_and_handle_block_exam_subdeck_due_dates()
+
+        mock_check_due_dates.assert_called_once()
+
+        mock_trigger_dialog.assert_called_once_with(expired_subdecks)

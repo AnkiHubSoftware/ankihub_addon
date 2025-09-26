@@ -82,6 +82,7 @@ from ankihub.gui.optimize_fsrs_dialog import (
 from ankihub.main.block_exam_subdecks import (
     BlockExamSubdeckConfig,
     add_notes_to_block_exam_subdeck,
+    check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
     get_existing_block_exam_subdecks,
     validate_due_date,
@@ -8867,3 +8868,135 @@ class TestBlockExamSubdeckDialog:
             dialog.name_input.setText("Invalid:Name")  # Contains invalid character
             qtbot.wait(100)
             assert dialog.create_button.isEnabled() is True  # Button state is only based on non-empty text
+
+
+class TestCheckBlockExamSubdeckDueDates:
+    """Tests for check_block_exam_subdeck_due_dates function."""
+
+    def test_check_block_exam_subdeck_due_dates_no_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test function returns empty list when no subdecks exist."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Ensure no existing configurations
+            config._private_config.block_exam_subdecks = []
+
+            expired = check_block_exam_subdeck_due_dates()
+            assert expired == []
+
+    def test_check_block_exam_subdeck_due_dates_none_expired(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test function returns empty list when no subdecks are expired."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create future due dates
+            future_date1 = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+            future_date2 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+
+            config_items = [
+                BlockExamSubdeckConfig(
+                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date1
+                ),
+                BlockExamSubdeckConfig(
+                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date2
+                ),
+            ]
+
+            # Add configurations
+            for config_item in config_items:
+                config.add_block_exam_subdeck(config_item)
+
+            expired = check_block_exam_subdeck_due_dates()
+            assert expired == []
+
+    def test_check_block_exam_subdeck_due_dates_with_expired(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test function identifies expired subdecks correctly."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create past, today, and future due dates
+            past_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+            today_date = date.today().strftime("%Y-%m-%d")
+            future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            config_items = [
+                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date=past_date),
+                BlockExamSubdeckConfig(
+                    ankihub_deck_id="deck2",
+                    subdeck_id="subdeck2",
+                    due_date=today_date,  # Today counts as expired (>= today)
+                ),
+                BlockExamSubdeckConfig(ankihub_deck_id="deck3", subdeck_id="subdeck3", due_date=future_date),
+            ]
+
+            # Add configurations
+            for config_item in config_items:
+                config.add_block_exam_subdeck(config_item)
+
+            expired = check_block_exam_subdeck_due_dates()
+
+            # Should return the two expired subdecks
+            assert len(expired) == 2
+            expired_deck_ids = [config.ankihub_deck_id for config in expired]
+            assert "deck1" in expired_deck_ids  # past date
+            assert "deck2" in expired_deck_ids  # today's date
+            assert "deck3" not in expired_deck_ids  # future date
+
+    def test_check_block_exam_subdeck_due_dates_with_invalid_dates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test function handles invalid date formats gracefully."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create configurations with invalid dates
+            config_items = [
+                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="invalid-date"),
+                BlockExamSubdeckConfig(
+                    ankihub_deck_id="deck2",
+                    subdeck_id="subdeck2",
+                    due_date="2023-13-01",  # Invalid month
+                ),
+                BlockExamSubdeckConfig(
+                    ankihub_deck_id="deck3",
+                    subdeck_id="subdeck3",
+                    due_date="",  # Empty string
+                ),
+            ]
+
+            # Add configurations
+            for config_item in config_items:
+                config.add_block_exam_subdeck(config_item)
+
+            expired = check_block_exam_subdeck_due_dates()
+
+            # Should return empty list since all dates are invalid
+            assert expired == []
+
+    def test_check_block_exam_subdeck_due_dates_mixed_valid_invalid(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test function handles mix of valid and invalid dates."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Mix of valid expired, valid future, and invalid dates
+            past_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+            future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            config_items = [
+                BlockExamSubdeckConfig(ankihub_deck_id="valid_expired", subdeck_id="subdeck1", due_date=past_date),
+                BlockExamSubdeckConfig(ankihub_deck_id="valid_future", subdeck_id="subdeck2", due_date=future_date),
+                BlockExamSubdeckConfig(ankihub_deck_id="invalid_date", subdeck_id="subdeck3", due_date="not-a-date"),
+            ]
+
+            # Add configurations
+            for config_item in config_items:
+                config.add_block_exam_subdeck(config_item)
+
+            expired = check_block_exam_subdeck_due_dates()
+
+            # Should return only the valid expired subdeck
+            assert len(expired) == 1
+            assert expired[0].ankihub_deck_id == "valid_expired"
