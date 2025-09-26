@@ -100,14 +100,14 @@ class SubdeckDueDateDialog(QDialog):
         try:
             success = move_subdeck_to_main_deck(self.subdeck_config)
             if success:
-                tooltip(f"'{self.subdeck_name}' moved to main deck")
+                tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
                 self.accept()
                 aqt.mw.deckBrowser.refresh()
             else:
-                showInfo("Failed to move subdeck to main deck. Please try again.")
+                showInfo("Failed to move subdeck to main deck. Please try again.", parent=aqt.mw)
         except Exception as e:
             LOGGER.error("Error moving subdeck to main deck", error=str(e))
-            showInfo(f"An error occurred: {e}")
+            showInfo(f"An error occurred: {e}", parent=aqt.mw)
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
