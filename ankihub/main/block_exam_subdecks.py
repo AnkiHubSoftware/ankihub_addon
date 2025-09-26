@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import List, Optional, Tuple
 
 import aqt
+from anki.decks import DeckId
 from anki.notes import NoteId
 
 from .. import LOGGER
@@ -160,7 +161,7 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
             LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
             return False
 
-        subdeck_id = int(subdeck_config.subdeck_id)
+        subdeck_id = DeckId(int(subdeck_config.subdeck_id))
         subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
         if not subdeck:
             LOGGER.warning("Subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
@@ -247,7 +248,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     from ..gui.subdeck_due_date_dialog import SubdeckDueDateDialog
 
     try:
-        subdeck_id = int(subdeck_config.subdeck_id)
+        subdeck_id = DeckId(int(subdeck_config.subdeck_id))
         subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
         if not subdeck:
             LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
