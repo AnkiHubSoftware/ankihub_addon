@@ -28,9 +28,11 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
 
-from ankihub.main.block_exam_subdecks import (
+from ankihub.gui.subdeck_due_date_dialog import (
     check_and_handle_block_exam_subdeck_due_dates,
     handle_expired_subdeck,
+)
+from ankihub.main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
