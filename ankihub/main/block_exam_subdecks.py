@@ -163,7 +163,6 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
     parent_deck_id = deck_config.anki_id
 
     note_ids = aqt.mw.col.db.list("SELECT DISTINCT nid FROM cards WHERE did=? OR odid=?", subdeck_id, subdeck_id)
-
     if note_ids:
         move_notes_to_decks_while_respecting_odid({nid: parent_deck_id for nid in note_ids})
         LOGGER.info("Moved notes from subdeck to main deck", subdeck_name=subdeck["name"], note_count=len(note_ids))
@@ -176,15 +175,12 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
     return True
 
 
-def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: Optional[str]) -> bool:
+def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: Optional[str]) -> None:
     """Set a new due date for a block exam subdeck.
 
     Args:
         subdeck_config: Current subdeck configuration
         new_due_date: New due date in YYYY-MM-DD format
-
-    Returns:
-        bool: True if successful, False otherwise
     """
     updated_config = BlockExamSubdeckConfig(
         ankihub_deck_id=subdeck_config.ankihub_deck_id, subdeck_id=subdeck_config.subdeck_id, due_date=new_due_date
@@ -199,7 +195,6 @@ def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: O
         old_due_date=subdeck_config.due_date,
         new_due_date=new_due_date,
     )
-    return True
 
 
 def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> None:
