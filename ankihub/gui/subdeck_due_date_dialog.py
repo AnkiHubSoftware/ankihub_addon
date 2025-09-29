@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 import aqt
+from anki.decks import DeckId
 from aqt.qt import (
     QDateEdit,
     QDialog,
@@ -17,7 +18,9 @@ from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
+    check_block_exam_subdeck_due_dates,
     move_subdeck_to_main_deck,
+    remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
 from ..settings import BlockExamSubdeckConfig
@@ -54,8 +57,10 @@ class SubdeckDueDateDialog(QDialog):
         main_layout.addWidget(title_label)
 
         # Main message
-        message_text = f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. \
-            Please choose what you'd like to do next:"
+        message_text = (
+            f"The due date you set for <strong>{self.subdeck_name}</strong> has arrived. "
+            "Please choose what you'd like to do next:"
+        )
         message_label = QLabel(message_text)
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
@@ -92,6 +97,7 @@ class SubdeckDueDateDialog(QDialog):
         self.move_to_main_button.clicked.connect(self._on_move_to_main_deck)  # type: ignore[attr-defined]
         self.move_to_main_button.setDefault(True)
         button_layout.addWidget(self.move_to_main_button)
+        self.adjustSize()
 
         main_layout.addLayout(button_layout)
 
@@ -111,6 +117,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
+        set_subdeck_due_date(self.subdeck_config, None)
         self.accept()
 
     def _on_set_new_due_date(self):
@@ -120,8 +127,8 @@ class SubdeckDueDateDialog(QDialog):
     def _show_date_picker(self):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=aqt.mw)
-        self.hide()
-        if date_picker_dialog.exec() == QDialog.DialogCode.Accepted:
+        result = date_picker_dialog.exec()
+        if result == QDialog.DialogCode.Accepted:
             self.accept()
 
 
@@ -209,9 +216,35 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        success = set_subdeck_due_date(self.subdeck_config, selected_date_str)
-        if success:
-            tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
-            self.accept()
-        else:
-            showInfo("Failed to update due date. Please try again.", parent=aqt.mw)
+        set_subdeck_due_date(self.subdeck_config, selected_date_str)
+
+        tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
+        self.accept()
+
+
+def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
+    """Handle an expired subdeck by showing the due date dialog.
+
+    Args:
+        subdeck_config: Configuration of the expired subdeck
+    """
+    from ..gui.subdeck_due_date_dialog import SubdeckDueDateDialog
+
+    subdeck_id = DeckId(int(subdeck_config.subdeck_id))
+    subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
+    if not subdeck:
+        LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
+        remove_block_exam_subdeck_config(subdeck_config)
+        return
+
+    subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
+
+    dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
+    dialog.exec()
+
+
+def check_and_handle_block_exam_subdeck_due_dates() -> None:
+    """Check for expired block exam subdecks and handle each one."""
+    expired_subdecks = check_block_exam_subdeck_due_dates()
+    for subdeck_config in expired_subdecks:
+        handle_expired_subdeck(subdeck_config)

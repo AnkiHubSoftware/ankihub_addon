@@ -172,7 +172,7 @@ class DeckExtensionConfig(DataClassJSONMixin):
 class BlockExamSubdeckConfig(DataClassJSONMixin):
     ankihub_deck_id: str
     subdeck_id: str
-    due_date: str  # YYYY-MM-DD format
+    due_date: Optional[str]  # YYYY-MM-DD format
 
 
 @dataclass
