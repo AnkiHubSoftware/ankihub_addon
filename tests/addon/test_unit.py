@@ -3437,7 +3437,7 @@ class TestMoveSubdeckToMainDeck:
 
         mock_subdeck = {"name": "Test Deck::Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
-        mock_aqt.mw.col.find_notes.return_value = [1, 2, 3]
+        mock_aqt.mw.col.db.list.return_value = [1, 2, 3]
 
         subdeck_config = BlockExamSubdeckConfig(
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
@@ -3455,7 +3455,9 @@ class TestMoveSubdeckToMainDeck:
         """Test handling when deck config not found."""
         mock_config.deck_config.return_value = None
 
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        subdeck_config = BlockExamSubdeckConfig(
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+        )
 
         result = move_subdeck_to_main_deck(subdeck_config)
 
@@ -3485,18 +3487,6 @@ class TestMoveSubdeckToMainDeck:
         assert result is True
         mock_remove_config.assert_called_once_with(subdeck_config)
 
-    @patch("ankihub.main.block_exam_subdecks.aqt")
-    @patch("ankihub.main.block_exam_subdecks.config")
-    def test_move_subdeck_to_main_deck_exception(self, mock_config, mock_aqt):
-        """Test handling exceptions during move operation."""
-        mock_config.deck_config.side_effect = Exception("Test error")
-
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
-
-        result = move_subdeck_to_main_deck(subdeck_config)
-
-        assert result is False
-
 
 class TestSetSubdeckDueDate:
     """Tests for set_subdeck_due_date function."""
@@ -3506,24 +3496,12 @@ class TestSetSubdeckDueDate:
         """Test successfully setting a new due date."""
         subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
 
-        result = set_subdeck_due_date(subdeck_config, "2025-06-15")
+        set_subdeck_due_date(subdeck_config, "2025-06-15")
 
-        assert result is True
         expected_config = BlockExamSubdeckConfig(
             ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2025-06-15"
         )
         mock_config.add_block_exam_subdeck.assert_called_once_with(expected_config)
-
-    @patch("ankihub.main.block_exam_subdecks.config")
-    def test_set_subdeck_due_date_exception(self, mock_config):
-        """Test handling exceptions when setting due date."""
-        mock_config.add_block_exam_subdeck.side_effect = Exception("Test error")
-
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
-
-        result = set_subdeck_due_date(subdeck_config, "2025-06-15")
-
-        assert result is False
 
 
 class TestRemoveBlockExamSubdeckConfig:
@@ -3543,7 +3521,7 @@ class TestHandleExpiredSubdeck:
     """Tests for handle_expired_subdeck function."""
 
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateDialog")
-    @patch("ankihub.main.block_exam_subdecks.aqt")
+    @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
     def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class):
         """Test successfully handling an expired subdeck."""
         mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
@@ -3561,34 +3539,26 @@ class TestHandleExpiredSubdeck:
         mock_dialog_class.assert_called_once_with(subdeck_config, "Exam Subdeck", parent=mock_aqt.mw)
         mock_dialog.exec.assert_called_once()
 
-    @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
-    @patch("ankihub.main.block_exam_subdecks.aqt")
+    @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
+    @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
     def test_handle_expired_subdeck_not_found(self, mock_aqt, mock_remove_config):
         """Test handling when expired subdeck not found in Anki."""
         mock_aqt.mw.col.decks.get.return_value = False
 
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        subdeck_config = BlockExamSubdeckConfig(
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+        )
 
         handle_expired_subdeck(subdeck_config)
 
         mock_remove_config.assert_called_once_with(subdeck_config)
-
-    @patch("ankihub.main.block_exam_subdecks.aqt")
-    def test_handle_expired_subdeck_exception(self, mock_aqt):
-        """Test handling exceptions during expired subdeck handling."""
-        mock_aqt.mw.col.decks.get.side_effect = Exception("Test error")
-
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
-
-        # Should not raise exception
-        handle_expired_subdeck(subdeck_config)
 
 
 class TestCheckAndHandleBlockExamSubdeckDueDates:
     """Tests for check_and_handle_block_exam_subdeck_due_dates function."""
 
     @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
-    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    @patch("ankihub.gui.subdeck_due_date_dialog.check_block_exam_subdeck_due_dates")
     def test_check_and_handle_no_expired_subdecks(
         self,
         mock_check_due_dates,
@@ -3603,7 +3573,7 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         mock_handle_expired.assert_not_called()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
-    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
+    @patch("ankihub.gui.subdeck_due_date_dialog.check_block_exam_subdeck_due_dates")
     def test_check_and_handle_with_expired_subdecks(
         self,
         mock_check_due_dates,
@@ -3622,18 +3592,3 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         assert mock_handle_expired.call_count == 2
         mock_handle_expired.assert_any_call(expired_subdecks[0])
         mock_handle_expired.assert_any_call(expired_subdecks[1])
-
-    @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
-    @patch("ankihub.main.block_exam_subdecks.check_block_exam_subdeck_due_dates")
-    def test_check_and_handle_exception_in_check(
-        self,
-        mock_check_due_dates,
-        mock_handle_expired,
-    ):
-        """Test function handles exceptions in check_block_exam_subdeck_due_dates gracefully."""
-        mock_check_due_dates.side_effect = Exception("Check error")
-
-        check_and_handle_block_exam_subdeck_due_dates()
-
-        mock_check_due_dates.assert_called_once()
-        mock_handle_expired.assert_not_called()
