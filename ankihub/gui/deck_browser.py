@@ -3,23 +3,17 @@
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
-
-from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import config
-from .utils import ask_user
-
-import aqt
-from anki.decks import DeckId
 from aqt import QMenu, gui_hooks, qconnect
-
 
 from .. import LOGGER
 from ..gui.subdeck_due_date_dialog import DatePickerDialog
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
+from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import (
     BlockExamSubdeckConfig,
     config,
 )
+from .utils import ask_user
 
 
 def setup() -> None:
@@ -69,6 +63,7 @@ def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
 
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Update Subdeck due date")
+    action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
     subdecks = config.get_block_exam_subdecks()
     subdeck_exists = False
@@ -78,12 +73,14 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
     action.setEnabled(subdeck_exists)
 
     if subdeck_exists:
+        action.setToolTip("Change the due date of this subdeck.")
         subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None)
         qconnect(action.triggered, lambda: _open_dialog_date_picker_for_subdeck(subdeck_config))
 
 
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Remove subdeck")
+    action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
     subdecks = config.get_block_exam_subdecks()
     subdeck_exists = False
@@ -93,11 +90,13 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
     action.setEnabled(subdeck_exists)
 
     if subdeck_exists:
+        action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
         subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None)
         qconnect(action.triggered, lambda: _remove_block_exam_subdeck(subdeck_config))
 
 
 def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: DeckId) -> None:
+    menu.setToolTipsVisible(True)
     _setup_update_subdeck_due_date(menu, subdeck_did)
     _setup_remove_block_exam_subdeck(menu, subdeck_did)
 
