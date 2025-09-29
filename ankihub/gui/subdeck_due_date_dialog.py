@@ -216,12 +216,10 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        success = set_subdeck_due_date(self.subdeck_config, selected_date_str)
-        if success:
-            tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
-            self.accept()
-        else:
-            showInfo("Failed to update due date. Please try again.", parent=aqt.mw)
+        set_subdeck_due_date(self.subdeck_config, selected_date_str)
+
+        tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
+        self.accept()
 
 
 def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
