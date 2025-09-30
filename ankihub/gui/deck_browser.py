@@ -95,10 +95,10 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
         qconnect(action.triggered, lambda: _remove_block_exam_subdeck(subdeck_config))
 
 
-def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: DeckId) -> None:
+def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: int) -> None:
     menu.setToolTipsVisible(True)
-    _setup_update_subdeck_due_date(menu, subdeck_did)
-    _setup_remove_block_exam_subdeck(menu, subdeck_did)
+    _setup_update_subdeck_due_date(menu, DeckId(subdeck_did))
+    _setup_remove_block_exam_subdeck(menu, DeckId(subdeck_did))
 
 
 def setup_subdeck_ankihub_options() -> None:
