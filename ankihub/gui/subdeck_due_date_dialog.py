@@ -172,7 +172,11 @@ class DatePickerDialog(QDialog):
         date_layout.addWidget(date_label)
 
         self.date_input = QDateEdit()
-        last_due_date = date.fromisoformat(self.subdeck_config.due_date)
+        last_due_date = (
+            date.fromisoformat(self.subdeck_config.due_date)
+            if self.subdeck_config.due_date
+            else date.today() + timedelta(days=1)
+        )
         self.date_input.setDate(last_due_date)
         self.date_input.setCalendarPopup(True)
         self.date_input.setMinimumDate(date.today() + timedelta(days=1))

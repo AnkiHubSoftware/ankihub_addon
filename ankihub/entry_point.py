@@ -229,9 +229,6 @@ def _general_setup() -> None:
     progress.setup()
     LOGGER.info("Set up progress manager.")
 
-    deckbrowser.setup()
-    LOGGER.info("Set up deck browser")
-
     overview.setup()
     LOGGER.info("Set up deck overview")
 
@@ -250,6 +247,9 @@ def _general_setup() -> None:
 
     setup_full_sync_patch()
     LOGGER.info("Set up AnkiWeb full sync patch.")
+
+    deckbrowser.setup()
+    LOGGER.info("Set up deck browser")
 
     # Call setup_feature_flags_in_background last among the setup functions.
     # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
