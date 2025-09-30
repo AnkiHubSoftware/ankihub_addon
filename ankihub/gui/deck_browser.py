@@ -47,7 +47,7 @@ def _open_dialog_date_picker_for_subdeck(subdeck_config: BlockExamSubdeckConfig)
         LOGGER.warning("Subdeck with ID %s not found in configuration.", subdeck_config.subdeck_id)
         return
 
-    subdeck_name = aqt.mw.col.decks.get(subdeck_config.subdeck_id)["name"].split("::")[-1]
+    subdeck_name = aqt.mw.col.decks.get(subdeck_config.subdeck_id)["name"].split("::", maxsplit=1)[-1]
 
     DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw).exec()
 
