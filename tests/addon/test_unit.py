@@ -3443,9 +3443,8 @@ class TestMoveSubdeckToMainDeck:
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
         )
 
-        result = move_subdeck_to_main_deck(subdeck_config)
+        move_subdeck_to_main_deck(subdeck_config)
 
-        assert result is True
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
         mock_remove_config.assert_called_once_with(subdeck_config)
@@ -3459,9 +3458,8 @@ class TestMoveSubdeckToMainDeck:
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
         )
 
-        result = move_subdeck_to_main_deck(subdeck_config)
-
-        assert result is False
+        with pytest.raises(ValueError, match="Deck config not found"):
+            move_subdeck_to_main_deck(subdeck_config)
 
     @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
     @patch("ankihub.main.block_exam_subdecks.aqt")
@@ -3482,9 +3480,8 @@ class TestMoveSubdeckToMainDeck:
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
         )
 
-        result = move_subdeck_to_main_deck(subdeck_config)
+        move_subdeck_to_main_deck(subdeck_config)
 
-        assert result is True
         mock_remove_config.assert_called_once_with(subdeck_config)
 
 

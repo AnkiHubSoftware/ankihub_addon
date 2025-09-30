@@ -84,7 +84,6 @@ from ankihub.main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
-    get_existing_block_exam_subdecks,
 )
 
 from ..factories import (
@@ -8584,56 +8583,6 @@ class TestBlockExamSubdecks:
             subdeck = aqt.mw.col.decks.by_name(full_subdeck_name)
             saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
             assert saved_due_date == new_due_date
-
-    def test_get_existing_block_exam_subdecks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
-            # Initially should return empty list
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert existing == []
-
-            # Create some block exam subdecks
-            due_date1 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Exam 1", due_date1)
-
-            due_date2 = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Exam 2", due_date2)
-
-            # Should now return both subdecks
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert len(existing) == 2
-
-            subdeck_names = [name for name, _ in existing]
-            assert "Exam 1" in subdeck_names
-            assert "Exam 2" in subdeck_names
-
-    def test_get_existing_block_exam_subdecks_with_regular_subdecks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            deck_config = config.deck_config(ah_did)
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-
-            # Create a regular subdeck (not block exam)
-            regular_subdeck_name = f"{anki_deck_name}::Regular Subdeck"
-            aqt.mw.col.decks.add_normal_deck_with_name(regular_subdeck_name)
-
-            # Create a block exam subdeck
-            due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Block Exam", due_date)
-
-            # Should only return the block exam subdeck
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert len(existing) == 1
-            assert existing[0][0] == "Block Exam"
 
     def test_config_methods(
         self,
