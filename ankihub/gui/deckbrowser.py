@@ -5,14 +5,13 @@ from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 
-from .. import LOGGER
-from .subdeck_due_date_dialog import DatePickerDialog
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import (
     BlockExamSubdeckConfig,
     config,
 )
+from .subdeck_due_date_dialog import DatePickerDialog
 from .utils import ask_user
 
 
@@ -53,6 +52,7 @@ def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     move_subdeck_to_main_deck(subdeck_config)
     aqt.mw.deckBrowser.refresh()
 
+
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Update due date")
 
@@ -66,7 +66,6 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
         qconnect(action.triggered, lambda: _open_dialog_date_picker_for_subdeck(subdeck_config))
     else:
         action.setToolTip("This option is only available for subdecks created with SmartSearch")
-
 
 
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
