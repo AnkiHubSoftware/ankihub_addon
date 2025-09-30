@@ -13,31 +13,6 @@ from ..settings import BlockExamSubdeckConfig, config
 from .utils import move_notes_to_decks_while_respecting_odid
 
 
-def get_existing_block_exam_subdecks(ankihub_deck_id: uuid.UUID) -> List[Tuple[str, str]]:
-    """Get list of existing block exam subdecks for a deck.
-
-    Returns:
-        List of tuples (subdeck_name, subdeck_id)
-    """
-    deck_config = config.deck_config(ankihub_deck_id)
-    if not deck_config:
-        return []
-
-    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-    if not anki_deck_name:
-        return []
-
-    # Find all subdecks that contain block exam notes
-    subdecks = []
-    for child_name, child_id in aqt.mw.col.decks.children(deck_config.anki_id):
-        # Check if this subdeck has block exam configuration
-        if config.get_block_exam_subdeck_due_date(str(ankihub_deck_id), str(child_id)):
-            subdeck_name = child_name[len(anki_deck_name) + 2 :]  # +2 for the '::' separator
-            subdecks.append((subdeck_name, str(child_id)))
-
-    return subdecks
-
-
 def create_block_exam_subdeck(
     ankihub_deck_id: uuid.UUID, subdeck_name: str, due_date: Optional[str] = None
 ) -> Tuple[str, bool]:
@@ -138,27 +113,24 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
+def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """Move all notes from a subdeck back to the main deck and delete the subdeck.
 
     Args:
         subdeck_config: Configuration of the subdeck to move
-
-    Returns:
-        bool: True if successful, False otherwise
     """
     ankihub_deck_id = uuid.UUID(subdeck_config.ankihub_deck_id)
     deck_config = config.deck_config(ankihub_deck_id)
     if not deck_config:
         LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
-        return False
+        raise ValueError("Deck config not found")
 
     subdeck_id = DeckId(int(subdeck_config.subdeck_id))
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
         remove_block_exam_subdeck_config(subdeck_config)
-        return True
+        return
 
     parent_deck_id = deck_config.anki_id
 
@@ -172,7 +144,6 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> bool:
     remove_block_exam_subdeck_config(subdeck_config)
 
     LOGGER.info("Successfully moved subdeck to main deck", subdeck_name=subdeck["name"])
-    return True
 
 
 def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: Optional[str]) -> None:

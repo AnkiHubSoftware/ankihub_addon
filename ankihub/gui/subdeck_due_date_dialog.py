@@ -14,7 +14,7 @@ from aqt.qt import (
     Qt,
     QVBoxLayout,
 )
-from aqt.utils import showInfo, tooltip
+from aqt.utils import tooltip
 
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
@@ -97,23 +97,16 @@ class SubdeckDueDateDialog(QDialog):
         self.move_to_main_button.clicked.connect(self._on_move_to_main_deck)  # type: ignore[attr-defined]
         self.move_to_main_button.setDefault(True)
         button_layout.addWidget(self.move_to_main_button)
-        self.adjustSize()
 
         main_layout.addLayout(button_layout)
+        self.adjustSize()
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        try:
-            success = move_subdeck_to_main_deck(self.subdeck_config)
-            if success:
-                tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
-                self.accept()
-                aqt.mw.deckBrowser.refresh()
-            else:
-                showInfo("Failed to move subdeck to main deck. Please try again.", parent=aqt.mw)
-        except Exception as e:
-            LOGGER.error("Error moving subdeck to main deck", error=str(e))
-            showInfo(f"An error occurred: {e}", parent=aqt.mw)
+        move_subdeck_to_main_deck(self.subdeck_config)
+        tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
+        self.accept()
+        aqt.mw.deckBrowser.refresh()
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
@@ -126,7 +119,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _show_date_picker(self):
         """Show date picker dialog."""
-        date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=aqt.mw)
+        date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
         result = date_picker_dialog.exec()
         if result == QDialog.DialogCode.Accepted:
             self.accept()
