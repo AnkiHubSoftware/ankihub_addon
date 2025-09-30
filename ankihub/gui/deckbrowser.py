@@ -91,4 +91,4 @@ def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: int) -> None:
 
 
 def setup_subdeck_ankihub_options() -> None:
-    gui_hooks.deckbrowser_will_show_options_menu.append(_on_subdeck_ankihub_options_show)
+    gui_hooks.deck_browser_will_show_options_menu.append(_on_subdeck_ankihub_options_show)
