@@ -84,7 +84,6 @@ from ankihub.main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
-    get_existing_block_exam_subdecks,
 )
 
 from ..factories import (
@@ -8585,56 +8584,6 @@ class TestBlockExamSubdecks:
             saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
             assert saved_due_date == new_due_date
 
-    def test_get_existing_block_exam_subdecks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
-            # Initially should return empty list
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert existing == []
-
-            # Create some block exam subdecks
-            due_date1 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Exam 1", due_date1)
-
-            due_date2 = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Exam 2", due_date2)
-
-            # Should now return both subdecks
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert len(existing) == 2
-
-            subdeck_names = [name for name, _ in existing]
-            assert "Exam 1" in subdeck_names
-            assert "Exam 2" in subdeck_names
-
-    def test_get_existing_block_exam_subdecks_with_regular_subdecks(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            deck_config = config.deck_config(ah_did)
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-
-            # Create a regular subdeck (not block exam)
-            regular_subdeck_name = f"{anki_deck_name}::Regular Subdeck"
-            aqt.mw.col.decks.add_normal_deck_with_name(regular_subdeck_name)
-
-            # Create a block exam subdeck
-            due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            create_block_exam_subdeck(ah_did, "Block Exam", due_date)
-
-            # Should only return the block exam subdeck
-            existing = get_existing_block_exam_subdecks(ah_did)
-            assert len(existing) == 1
-            assert existing[0][0] == "Block Exam"
-
     def test_config_methods(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -8674,6 +8623,16 @@ class TestBlockExamSubdecks:
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
             assert configs[0].due_date == "2025-01-15"
+
+            # Test removing configuration
+            config.remove_block_exam_subdeck("test-deck-id", "test-subdeck-id")
+            configs = config.get_block_exam_subdecks()
+            assert len(configs) == 0
+
+            # Test removing non-existent configuration (should not error)
+            config.remove_block_exam_subdeck("non-existent", "non-existent")
+            configs = config.get_block_exam_subdecks()
+            assert len(configs) == 0
 
     def test_create_subdeck_deck_not_found(
         self,
@@ -8920,59 +8879,3 @@ class TestCheckBlockExamSubdeckDueDates:
             assert "deck1" in expired_deck_ids  # past date
             assert "deck2" in expired_deck_ids  # today's date
             assert "deck3" not in expired_deck_ids  # future date
-
-    def test_check_block_exam_subdeck_due_dates_with_invalid_dates(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        """Test function handles invalid date formats gracefully."""
-        with anki_session_with_addon_data.profile_loaded():
-            # Create configurations with invalid dates
-            config_items = [
-                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="invalid-date"),
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id="deck2",
-                    subdeck_id="subdeck2",
-                    due_date="2023-13-01",  # Invalid month
-                ),
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id="deck3",
-                    subdeck_id="subdeck3",
-                    due_date="",  # Empty string
-                ),
-            ]
-
-            # Add configurations
-            for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
-
-            expired = check_block_exam_subdeck_due_dates()
-
-            # Should return empty list since all dates are invalid
-            assert expired == []
-
-    def test_check_block_exam_subdeck_due_dates_mixed_valid_invalid(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        """Test function handles mix of valid and invalid dates."""
-        with anki_session_with_addon_data.profile_loaded():
-            # Mix of valid expired, valid future, and invalid dates
-            past_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-            future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
-
-            config_items = [
-                BlockExamSubdeckConfig(ankihub_deck_id="valid_expired", subdeck_id="subdeck1", due_date=past_date),
-                BlockExamSubdeckConfig(ankihub_deck_id="valid_future", subdeck_id="subdeck2", due_date=future_date),
-                BlockExamSubdeckConfig(ankihub_deck_id="invalid_date", subdeck_id="subdeck3", due_date="not-a-date"),
-            ]
-
-            # Add configurations
-            for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
-
-            expired = check_block_exam_subdeck_due_dates()
-
-            # Should return only the valid expired subdeck
-            assert len(expired) == 1
-            assert expired[0].ankihub_deck_id == "valid_expired"

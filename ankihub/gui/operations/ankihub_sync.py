@@ -18,7 +18,7 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...gui.operations import AddonQueryOp
-from ...main.block_exam_subdecks import check_and_handle_block_exam_subdeck_due_dates
+from ...gui.subdeck_due_date_dialog import check_and_handle_block_exam_subdeck_due_dates
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
