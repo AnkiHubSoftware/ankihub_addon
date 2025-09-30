@@ -6966,7 +6966,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert mw.col.decks.count() == 2
         assert deck_uuid
 
-        mocker.patch("ankihub.gui.deck_browser.ask_user", return_value=True)
+        mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=True)
 
         unsubscribe_from_deck_mock = mocker.patch.object(AnkiHubClient, "unsubscribe_from_deck")
         mw.deckBrowser._delete(anki_deck_id)
@@ -7012,7 +7012,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert mw.col.decks.count() == 2
         assert deck_uuid
 
-        mocker.patch("ankihub.gui.deck_browser.ask_user", return_value=False)
+        mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=False)
 
         mw.deckBrowser._delete(anki_deck_id)
 

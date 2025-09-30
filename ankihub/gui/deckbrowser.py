@@ -1,4 +1,4 @@
-"""Modifies the Anki deck browser (aqt.deck_browser)."""
+"""Modifies the Anki deck browser (aqt.deckbrowser)."""
 
 import aqt
 from anki.decks import DeckId
@@ -6,7 +6,7 @@ from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 
 from .. import LOGGER
-from ..gui.subdeck_due_date_dialog import DatePickerDialog
+from .subdeck_due_date_dialog import DatePickerDialog
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import (
@@ -40,59 +40,48 @@ def setup() -> None:
         old=aqt.mw.deckBrowser._delete,
         new=_after_anki_deck_deleted,
     )
+    setup_subdeck_ankihub_options()
 
 
 def _open_dialog_date_picker_for_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
-    if not subdeck_config:
-        LOGGER.warning("Subdeck with ID %s not found in configuration.", subdeck_config.subdeck_id)
-        return
-
     subdeck_name = aqt.mw.col.decks.get(subdeck_config.subdeck_id)["name"].split("::", maxsplit=1)[-1]
 
     DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw).exec()
 
 
 def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
-    if not subdeck_config:
-        LOGGER.warning("Subdeck with ID %s not found in configuration.", subdeck_config.subdeck_id)
-        return
-
     move_subdeck_to_main_deck(subdeck_config)
     aqt.mw.deckBrowser.refresh()
 
-
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
-    action = menu.addAction("Ankihub: Update Subdeck due date")
-    action.setToolTip("This option is only available for subdecks created with SmartSearch")
+    action = menu.addAction("Ankihub: Update due date")
 
     subdecks = config.get_block_exam_subdecks()
-    subdeck_exists = False
-    if subdecks:
-        subdeck_exists = any(int(sd.subdeck_id) == int(subdeck_did) for sd in subdecks)
+    subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None) if subdecks else None
 
-    action.setEnabled(subdeck_exists)
+    action.setEnabled(subdeck_config is not None)
 
-    if subdeck_exists:
+    if subdeck_config:
         action.setToolTip("Change the due date of this subdeck.")
-        subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None)
         qconnect(action.triggered, lambda: _open_dialog_date_picker_for_subdeck(subdeck_config))
+    else:
+        action.setToolTip("This option is only available for subdecks created with SmartSearch")
+
 
 
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Remove subdeck")
-    action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
     subdecks = config.get_block_exam_subdecks()
-    subdeck_exists = False
-    if subdecks:
-        subdeck_exists = any(int(sd.subdeck_id) == int(subdeck_did) for sd in subdecks)
+    subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None) if subdecks else None
 
-    action.setEnabled(subdeck_exists)
+    action.setEnabled(subdeck_config is not None)
 
-    if subdeck_exists:
+    if subdeck_config:
         action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
-        subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None)
         qconnect(action.triggered, lambda: _remove_block_exam_subdeck(subdeck_config))
+    else:
+        action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
 
 def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: int) -> None:
@@ -102,4 +91,4 @@ def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: int) -> None:
 
 
 def setup_subdeck_ankihub_options() -> None:
-    gui_hooks.deck_browser_will_show_options_menu.append(_on_subdeck_ankihub_options_show)
+    gui_hooks.deckbrowser_will_show_options_menu.append(_on_subdeck_ankihub_options_show)

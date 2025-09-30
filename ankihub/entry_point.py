@@ -15,8 +15,8 @@ from .db import ankihub_db
 from .feature_flags import update_feature_flags_in_background
 from .gui import (
     browser,
-    deck_browser,
     deck_options,
+    deckbrowser,
     editor,
     js_message_handling,
     overview,
@@ -26,7 +26,6 @@ from .gui import (
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
-from .gui.deck_browser import setup_subdeck_ankihub_options
 from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
@@ -230,7 +229,7 @@ def _general_setup() -> None:
     progress.setup()
     LOGGER.info("Set up progress manager.")
 
-    deck_browser.setup()
+    deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
     overview.setup()
@@ -245,9 +244,6 @@ def _general_setup() -> None:
     from . import media_export  # noqa: F401
 
     LOGGER.info("Loaded media_export.")
-
-    setup_subdeck_ankihub_options()
-    LOGGER.info("Set up subdeck Ankihub options.")
 
     setup_auto_sync()
     LOGGER.info("Set up auto sync.")
