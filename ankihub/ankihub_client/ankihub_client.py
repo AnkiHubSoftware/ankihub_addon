@@ -530,12 +530,6 @@ class AnkiHubClient:
             for media_name in media_names:
                 media_path = media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(media_name)
-
-                # First we check if the media file already exists.
-                # If yes, we skip this iteration.
-                if os.path.isfile(media_path):
-                    continue
-
                 futures.append(executor.submit(self._download_media, media_path, media_remote_path))
 
             downloaded_media_count = 0

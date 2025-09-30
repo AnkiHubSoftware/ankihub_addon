@@ -57,7 +57,7 @@ wheels = [
 
 [[package]]
 name = "ankihub-addon"
-version = "2025.8.14.1"
+version = "2025.9.17.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
