@@ -9026,5 +9026,4 @@ class TestNoteIdsInDeckHierarchy:
             # Get note IDs
             nids = note_ids_in_deck_hierarchy(deck_id)
 
-            assert len(nids) == 0
-            assert nids == []
+            assert set(nids) == set()
