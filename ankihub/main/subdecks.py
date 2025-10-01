@@ -21,6 +21,7 @@ from ..settings import config
 from .utils import (
     move_notes_to_decks_while_respecting_odid,
     nids_in_deck_but_not_in_subdeck,
+    note_ids_in_deck_hierarchy,
 )
 
 # root tag for tags that indicate which subdeck a note belongs to
@@ -169,10 +170,9 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     """
     # Get the root deck ID and name
     root_deck_id = config.deck_config(ankihub_did).anki_id
-    root_deck_name = aqt.mw.col.decks.name(root_deck_id)
 
     # Find all notes in subdecks and move them to the root deck
-    nids = aqt.mw.col.find_notes(f'"deck:{root_deck_name}::*"')
+    nids = note_ids_in_deck_hierarchy(root_deck_id, include_self=False)
     nid_to_did = {nid: root_deck_id for nid in nids}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
