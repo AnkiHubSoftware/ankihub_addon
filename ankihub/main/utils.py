@@ -231,7 +231,7 @@ def note_ids_in_deck_hierarchy(
     *,
     include_self: bool = True,
     include_filtered: bool = True,
-) -> list[int]:
+) -> list[NoteId]:
     """
     Return distinct note IDs for cards under `deck_id`'s hierarchy.
     - If `include_self` is True, include `deck_id` itself; otherwise only its subdecks.
@@ -248,7 +248,7 @@ def note_ids_in_deck_hierarchy(
     if include_filtered:
         sql += f" OR odid IN {dids_str}"
 
-    return aqt.mw.col.db.list(sql)
+    return [NoteId(nid) for nid in aqt.mw.col.db.list(sql)]
 
 
 def move_notes_to_decks_while_respecting_odid(nid_to_did: Dict[NoteId, DeckId]) -> None:
