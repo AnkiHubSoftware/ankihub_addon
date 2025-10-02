@@ -6,15 +6,8 @@ from typing import Optional
 
 import aqt
 from anki.decks import DeckId
-from aqt.qt import (
-    QDateEdit,
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    Qt,
-    QVBoxLayout,
-)
+from aqt import qconnect
+from aqt.qt import QDateEdit, QDialog, QHBoxLayout, QLabel, QPushButton, Qt, QVBoxLayout
 from aqt.utils import tooltip
 
 from .. import LOGGER
@@ -95,17 +88,17 @@ class SubdeckDueDateDialog(QDialog):
 
         # Set new due date button (leftmost)
         self.set_new_date_button = QPushButton("Set new due date")
-        self.set_new_date_button.clicked.connect(self._on_set_new_due_date)  # type: ignore[attr-defined]
+        qconnect(self.set_new_date_button.clicked, self._on_set_new_due_date)
         button_layout.addWidget(self.set_new_date_button)
 
         # Keep as is button (middle)
         self.keep_as_is_button = QPushButton("Keep it")
-        self.keep_as_is_button.clicked.connect(self._on_keep_as_is)  # type: ignore[attr-defined]
+        qconnect(self.keep_as_is_button.clicked, self._on_keep_as_is)
         button_layout.addWidget(self.keep_as_is_button)
 
         # Move to main deck button (rightmost, primary action)
         self.move_to_main_button = QPushButton("Move to main deck")
-        self.move_to_main_button.clicked.connect(self._on_move_to_main_deck)  # type: ignore[attr-defined]
+        qconnect(self.move_to_main_button.clicked, self._on_move_to_main_deck)
         self.move_to_main_button.setDefault(True)
         button_layout.addWidget(self.move_to_main_button)
 
@@ -131,7 +124,7 @@ class SubdeckDueDateDialog(QDialog):
     def _show_date_picker(self):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
-        date_picker_dialog.accepted.connect(self.accept)  # type: ignore[attr-defined]
+        qconnect(date_picker_dialog.accepted, self.accept)
         date_picker_dialog.open()
 
 
@@ -203,12 +196,12 @@ class DatePickerDialog(QDialog):
 
         # Cancel button
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         # Confirm button
         confirm_button = QPushButton("Save")
-        confirm_button.clicked.connect(self._on_confirm)  # type: ignore[attr-defined]
+        qconnect(confirm_button.clicked, self._on_confirm)
         confirm_button.setDefault(True)
         button_layout.addWidget(confirm_button)
 
@@ -246,7 +239,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
 
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
-    dialog.finished.connect(_show_next_expired_subdeck_dialog)  # type: ignore[attr-defined]
+    qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.open()
 
 
