@@ -1,19 +1,13 @@
 """Dialog for handling expired block exam subdecks."""
 
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
 
 import aqt
 from anki.decks import DeckId
-from aqt.qt import (
-    QDateEdit,
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    Qt,
-    QVBoxLayout,
-)
+from aqt import qconnect
+from aqt.qt import QDateEdit, QDialog, QHBoxLayout, QLabel, QPushButton, Qt, QVBoxLayout
 from aqt.utils import tooltip
 
 from .. import LOGGER
@@ -26,6 +20,16 @@ from ..main.block_exam_subdecks import (
 from ..settings import BlockExamSubdeckConfig
 
 
+@dataclass
+class _SubdeckDueDateDialogState:
+    """State for managing sequential SubdeckDueDate dialogs."""
+
+    queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
+
+
+_subdeck_due_date_dialog_state = _SubdeckDueDateDialogState()
+
+
 class SubdeckDueDateDialog(QDialog):
     """Dialog shown when a block exam subdeck's due date is reached."""
 
@@ -36,7 +40,7 @@ class SubdeckDueDateDialog(QDialog):
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setWindowTitle("")  # Empty title as per screenshot
+        self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(400)
         self.resize(440, 300)
 
@@ -84,17 +88,17 @@ class SubdeckDueDateDialog(QDialog):
 
         # Set new due date button (leftmost)
         self.set_new_date_button = QPushButton("Set new due date")
-        self.set_new_date_button.clicked.connect(self._on_set_new_due_date)  # type: ignore[attr-defined]
+        qconnect(self.set_new_date_button.clicked, self._on_set_new_due_date)
         button_layout.addWidget(self.set_new_date_button)
 
         # Keep as is button (middle)
         self.keep_as_is_button = QPushButton("Keep it")
-        self.keep_as_is_button.clicked.connect(self._on_keep_as_is)  # type: ignore[attr-defined]
+        qconnect(self.keep_as_is_button.clicked, self._on_keep_as_is)
         button_layout.addWidget(self.keep_as_is_button)
 
         # Move to main deck button (rightmost, primary action)
         self.move_to_main_button = QPushButton("Move to main deck")
-        self.move_to_main_button.clicked.connect(self._on_move_to_main_deck)  # type: ignore[attr-defined]
+        qconnect(self.move_to_main_button.clicked, self._on_move_to_main_deck)
         self.move_to_main_button.setDefault(True)
         button_layout.addWidget(self.move_to_main_button)
 
@@ -120,9 +124,8 @@ class SubdeckDueDateDialog(QDialog):
     def _show_date_picker(self):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
-        result = date_picker_dialog.exec()
-        if result == QDialog.DialogCode.Accepted:
-            self.accept()
+        qconnect(date_picker_dialog.accepted, self.accept)
+        date_picker_dialog.open()
 
 
 class DatePickerDialog(QDialog):
@@ -136,7 +139,7 @@ class DatePickerDialog(QDialog):
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(221)
         self.resize(400, 221)
 
@@ -178,8 +181,8 @@ class DatePickerDialog(QDialog):
             else date.today() + timedelta(days=1)
         )
         self.date_input.setDate(last_due_date)
+        self.date_input.setMinimumDate(date.today())
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(date.today() + timedelta(days=1))
         date_layout.addWidget(self.date_input)
         main_layout.addLayout(date_layout)
 
@@ -193,12 +196,12 @@ class DatePickerDialog(QDialog):
 
         # Cancel button
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         # Confirm button
         confirm_button = QPushButton("Save")
-        confirm_button.clicked.connect(self._on_confirm)  # type: ignore[attr-defined]
+        qconnect(confirm_button.clicked, self._on_confirm)
         confirm_button.setDefault(True)
         button_layout.addWidget(confirm_button)
 
@@ -225,23 +228,35 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the expired subdeck
     """
-    from ..gui.subdeck_due_date_dialog import SubdeckDueDateDialog
-
     subdeck_id = DeckId(int(subdeck_config.subdeck_id))
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
         remove_block_exam_subdeck_config(subdeck_config)
+        _show_next_expired_subdeck_dialog()
         return
 
     subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
 
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
-    dialog.exec()
+    qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
+    dialog.open()
+
+
+def _show_next_expired_subdeck_dialog() -> None:
+    """Show the next expired subdeck dialog from the queue."""
+    if not _subdeck_due_date_dialog_state.queue:
+        return
+
+    next_subdeck = _subdeck_due_date_dialog_state.queue.pop(0)
+    handle_expired_subdeck(next_subdeck)
 
 
 def check_and_handle_block_exam_subdeck_due_dates() -> None:
     """Check for expired block exam subdecks and handle each one."""
     expired_subdecks = check_block_exam_subdeck_due_dates()
-    for subdeck_config in expired_subdecks:
-        handle_expired_subdeck(subdeck_config)
+    if not expired_subdecks:
+        return
+
+    _subdeck_due_date_dialog_state.queue = expired_subdecks
+    _show_next_expired_subdeck_dialog()

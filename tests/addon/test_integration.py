@@ -8498,13 +8498,10 @@ class TestBlockExamSubdecks:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
-        mocker,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-
-            # Mock the utility function
-            mock_move_notes = mocker.patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
 
             # Create a subdeck first
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
@@ -8512,30 +8509,69 @@ class TestBlockExamSubdecks:
 
             # Create some notes
             deck_config = config.deck_config(ah_did)
-            note_type = aqt.mw.col.models.by_name("Basic")
-            note1 = aqt.mw.col.new_note(note_type)
-            note1["Front"] = "Test 1"
-            aqt.mw.col.add_note(note1, deck_config.anki_id)
-
-            note2 = aqt.mw.col.new_note(note_type)
-            note2["Front"] = "Test 2"
-            aqt.mw.col.add_note(note2, deck_config.anki_id)
-
+            note1 = add_anki_note(anki_did=deck_config.anki_id)
+            note2 = add_anki_note(anki_did=deck_config.anki_id)
             note_ids = [note1.id, note2.id]
 
             # Add notes to subdeck with new due date
             new_due_date = (date.today() + timedelta(days=10)).strftime("%Y-%m-%d")
-            add_notes_to_block_exam_subdeck(ah_did, subdeck_name, note_ids, new_due_date)
+            added_count = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, note_ids, new_due_date)
 
-            # Verify notes were moved via the utility function
-            mock_move_notes.assert_called_once()
+            # Verify return value shows 2 notes were moved
+            assert added_count == 2
 
-            # Verify configuration was updated with new due date
+            # Verify notes are actually in the subdeck
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
             full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
             subdeck = aqt.mw.col.decks.by_name(full_subdeck_name)
+            notes_in_subdeck = aqt.mw.col.find_notes(f'"deck:{full_subdeck_name}"')
+            assert len(notes_in_subdeck) == 2
+            assert note1.id in notes_in_subdeck
+            assert note2.id in notes_in_subdeck
+
+            # Verify configuration was updated with new due date
             saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
             assert saved_due_date == new_due_date
+
+    def test_add_notes_to_block_exam_subdeck_with_some_already_in_subdeck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test that only notes not already in subdeck are moved."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+            subdeck_name, _ = create_block_exam_subdeck(ah_did, "Mixed Subdeck", due_date)
+
+            # Create 3 notes in parent deck
+            deck_config = config.deck_config(ah_did)
+            note1 = add_anki_note(anki_did=deck_config.anki_id)
+            note2 = add_anki_note(anki_did=deck_config.anki_id)
+            note3 = add_anki_note(anki_did=deck_config.anki_id)
+
+            # Move 2 notes to subdeck first
+            first_added = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, [note1.id, note2.id], due_date)
+            assert first_added == 2
+
+            # Now try to add all 3 notes - only note3 should be moved
+            all_note_ids = [note1.id, note2.id, note3.id]
+            added_count = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, all_note_ids, due_date)
+
+            # Verify return value shows only 1 note was moved (note3)
+            assert added_count == 1
+
+            # Verify all 3 notes are in the subdeck
+            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
+            notes_in_subdeck = aqt.mw.col.find_notes(f'"deck:{full_subdeck_name}"')
+            assert len(notes_in_subdeck) == 3
+            assert note1.id in notes_in_subdeck
+            assert note2.id in notes_in_subdeck
+            assert note3.id in notes_in_subdeck
 
     def test_config_methods(
         self,
@@ -8807,7 +8843,7 @@ class TestBlockExamSubdeckDialog:
             dialog.name_input.setText("Valid Exam Name")
             qtbot.wait(100)
 
-            # Should be enabled now (date is set to tomorrow by default)
+            # Should be enabled now (date is set to today by default)
             assert dialog.create_button.isEnabled() is True
 
             # Test invalid name disables button
