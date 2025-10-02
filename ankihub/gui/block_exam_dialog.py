@@ -443,10 +443,10 @@ class BlockExamSubdeckDialog(QDialog):
             actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
             # Add notes to the new subdeck
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
             # Show success message
-            tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
+            tooltip(f"{added_count} note(s) added to '{actual_name}'")
             self.accept()
 
             aqt.mw.moveToState("deckBrowser")
@@ -480,9 +480,11 @@ class BlockExamSubdeckDialog(QDialog):
                 self._rename_subdeck(self.selected_subdeck_name, new_name)
                 self.selected_subdeck_name = new_name
 
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+            )
 
-            tooltip(f"{len(self.note_ids)} note(s) added to '{self.selected_subdeck_name}'")
+            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
             self.accept()
 
         except Exception as e:
@@ -521,9 +523,9 @@ class BlockExamSubdeckDialog(QDialog):
 
             actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
+            tooltip(f"{added_count} note(s) added to '{actual_name}'")
             self.accept()
 
             aqt.mw.moveToState("deckBrowser")
@@ -556,10 +558,12 @@ class BlockExamSubdeckDialog(QDialog):
             due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
             # Add notes to the existing subdeck
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                self.ankihub_deck_id, conflicting_name, self.note_ids, due_date
+            )
 
             # Show success message and close
-            tooltip(f"{len(self.note_ids)} note(s) added to '{conflicting_name}'")
+            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
             self.accept()
 
         except Exception as e:
