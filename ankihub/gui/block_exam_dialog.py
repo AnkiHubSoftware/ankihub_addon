@@ -449,6 +449,8 @@ class BlockExamSubdeckDialog(QDialog):
             tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
             self.accept()
 
+            aqt.mw.moveToState("deckBrowser")
+
         except Exception as e:
             LOGGER.error("Failed to create subdeck", error=str(e))
             showInfo(f"Failed to create subdeck: {e}")
@@ -523,6 +525,8 @@ class BlockExamSubdeckDialog(QDialog):
 
             tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
             self.accept()
+
+            aqt.mw.moveToState("deckBrowser")
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
