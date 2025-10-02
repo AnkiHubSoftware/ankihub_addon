@@ -112,7 +112,7 @@ class BlockExamSubdeckDialog(QDialog):
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)  # default spacing between elements is 12
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         # Title
         title = QLabel("Create a subdeck")
@@ -155,10 +155,9 @@ class BlockExamSubdeckDialog(QDialog):
         date_label.setFont(date_label_font)
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
-        tomorrow = date.today() + timedelta(days=1)
-        self.date_input.setDate(tomorrow)
+        self.date_input.setDate(date.today())
+        self.date_input.setMinimumDate(date.today())
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(tomorrow)
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
@@ -189,7 +188,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for adding notes to selected subdeck."""
         self._clear_layout()
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
@@ -238,17 +237,15 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(date_label)
         self.date_input = QDateEdit()
 
-        tomorrow = date.today() + timedelta(days=1)
-
         # Try to get existing due date
         existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
-            self.date_input.setDate(tomorrow)
+            self.date_input.setDate(date.today())
 
+        self.date_input.setMinimumDate(date.today())
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(tomorrow)
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
@@ -283,7 +280,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         self._clear_layout()
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
@@ -443,11 +440,13 @@ class BlockExamSubdeckDialog(QDialog):
             actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
             # Add notes to the new subdeck
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
             # Show success message
-            tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
+            tooltip(f"{added_count} note(s) added to '{actual_name}'")
             self.accept()
+
+            aqt.mw.moveToState("deckBrowser")
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck", error=str(e))
@@ -478,9 +477,11 @@ class BlockExamSubdeckDialog(QDialog):
                 self._rename_subdeck(self.selected_subdeck_name, new_name)
                 self.selected_subdeck_name = new_name
 
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+            )
 
-            tooltip(f"{len(self.note_ids)} note(s) added to '{self.selected_subdeck_name}'")
+            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
             self.accept()
 
         except Exception as e:
@@ -519,10 +520,12 @@ class BlockExamSubdeckDialog(QDialog):
 
             actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            tooltip(f"{len(self.note_ids)} note(s) added to '{actual_name}'")
+            tooltip(f"{added_count} note(s) added to '{actual_name}'")
             self.accept()
+
+            aqt.mw.moveToState("deckBrowser")
 
         except Exception as e:
             LOGGER.error("Failed to create subdeck with auto name", error=str(e))
@@ -552,10 +555,12 @@ class BlockExamSubdeckDialog(QDialog):
             due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
             # Add notes to the existing subdeck
-            add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                self.ankihub_deck_id, conflicting_name, self.note_ids, due_date
+            )
 
             # Show success message and close
-            tooltip(f"{len(self.note_ids)} note(s) added to '{conflicting_name}'")
+            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
             self.accept()
 
         except Exception as e:

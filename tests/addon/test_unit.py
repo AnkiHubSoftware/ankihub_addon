@@ -3537,7 +3537,7 @@ class TestHandleExpiredSubdeck:
         handle_expired_subdeck(subdeck_config)
 
         mock_dialog_class.assert_called_once_with(subdeck_config, "Exam Subdeck", parent=mock_aqt.mw)
-        mock_dialog.exec.assert_called_once()
+        mock_dialog.open.assert_called_once()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
@@ -3572,14 +3572,19 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         mock_check_due_dates.assert_called_once()
         mock_handle_expired.assert_not_called()
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
     @patch("ankihub.gui.subdeck_due_date_dialog.check_block_exam_subdeck_due_dates")
+    @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
     def test_check_and_handle_with_expired_subdecks(
         self,
-        mock_check_due_dates,
         mock_handle_expired,
+        mock_check_due_dates,
     ):
-        """Test function handles each expired subdeck."""
+        """Test function handles first expired subdeck, queues the rest, and processes them sequentially."""
+        from ankihub.gui.subdeck_due_date_dialog import (
+            _show_next_expired_subdeck_dialog,
+            _subdeck_due_date_dialog_state,
+        )
+
         expired_subdecks = [
             BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
             BlockExamSubdeckConfig(ankihub_deck_id="deck2", subdeck_id="subdeck2", due_date="2023-01-02"),
@@ -3589,6 +3594,23 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         check_and_handle_block_exam_subdeck_due_dates()
 
         mock_check_due_dates.assert_called_once()
+        # Only the first subdeck is handled immediately; the rest are queued
+        assert mock_handle_expired.call_count == 1
+        # Check the actual call argument
+        actual_call_arg = mock_handle_expired.call_args[0][0]
+        assert actual_call_arg.ankihub_deck_id == "deck1"
+        assert actual_call_arg.subdeck_id == "subdeck1"
+        # Verify the second subdeck is still in the queue waiting to be shown
+        assert len(_subdeck_due_date_dialog_state.queue) == 1
+        assert _subdeck_due_date_dialog_state.queue[0].ankihub_deck_id == "deck2"
+
+        # Simulate the first dialog finishing
+        _show_next_expired_subdeck_dialog()
+
+        # Now the second subdeck should have been handled and queue should be empty
         assert mock_handle_expired.call_count == 2
-        mock_handle_expired.assert_any_call(expired_subdecks[0])
-        mock_handle_expired.assert_any_call(expired_subdecks[1])
+        assert len(_subdeck_due_date_dialog_state.queue) == 0
+
+        # Calling again should do nothing (queue is empty)
+        _show_next_expired_subdeck_dialog()
+        assert mock_handle_expired.call_count == 2  # Should not increment

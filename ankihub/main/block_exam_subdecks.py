@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 import aqt
 from anki.decks import DeckId
 from anki.notes import NoteId
+from anki.utils import ids2str
 
 from .. import LOGGER
 from ..settings import BlockExamSubdeckConfig, config
@@ -57,8 +58,12 @@ def create_block_exam_subdeck(
 
 def add_notes_to_block_exam_subdeck(
     ankihub_deck_id: uuid.UUID, subdeck_name: str, note_ids: List[NoteId], due_date: Optional[str] = None
-) -> None:
-    """Add notes to a block exam subdeck and update configuration."""
+) -> int:
+    """Add notes to a block exam subdeck and update configuration.
+
+    Returns:
+        The number of notes actually moved to the subdeck (excluding notes already in the subdeck).
+    """
     deck_config = config.deck_config(ankihub_deck_id)
     if not deck_config:
         raise ValueError("Deck config not found")
@@ -72,8 +77,21 @@ def add_notes_to_block_exam_subdeck(
     if not subdeck:
         raise ValueError(f"Subdeck {full_subdeck_name} not found")
 
-    # Move notes to subdeck
-    move_notes_to_decks_while_respecting_odid({nid: subdeck["id"] for nid in note_ids})
+    subdeck_id = subdeck["id"]
+
+    # Find which notes are NOT already in the subdeck.
+    # A note is considered "not in subdeck" if it has at least one card not in that subdeck
+    query = f"""
+        SELECT DISTINCT nid
+        FROM cards
+        WHERE nid IN {ids2str(note_ids)}
+        AND did != {subdeck_id} AND odid != {subdeck_id}
+    """
+    notes_to_move = aqt.mw.col.db.list(query)
+
+    # Move only the notes that aren't already in the subdeck
+    if notes_to_move:
+        move_notes_to_decks_while_respecting_odid({nid: subdeck_id for nid in notes_to_move})
 
     # Update configuration with due date
     if due_date:
@@ -83,8 +101,14 @@ def add_notes_to_block_exam_subdeck(
         config.add_block_exam_subdeck(config_item)
 
     LOGGER.info(
-        "Added notes to block exam subdeck", subdeck_name=subdeck_name, note_count=len(note_ids), due_date=due_date
+        "Added notes to block exam subdeck",
+        subdeck_name=subdeck_name,
+        requested_count=len(note_ids),
+        actually_moved=len(notes_to_move),
+        due_date=due_date,
     )
+
+    return len(notes_to_move)
 
 
 def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
