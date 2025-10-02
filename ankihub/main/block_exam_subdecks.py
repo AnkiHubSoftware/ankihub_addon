@@ -10,7 +10,7 @@ from anki.notes import NoteId
 
 from .. import LOGGER
 from ..settings import BlockExamSubdeckConfig, config
-from .utils import move_notes_to_decks_while_respecting_odid
+from .utils import move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
 
 
 def create_block_exam_subdeck(
@@ -134,7 +134,7 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> None:
 
     parent_deck_id = deck_config.anki_id
 
-    note_ids = aqt.mw.col.db.list("SELECT DISTINCT nid FROM cards WHERE did=? OR odid=?", subdeck_id, subdeck_id)
+    note_ids = note_ids_in_deck_hierarchy(subdeck_id)
     if note_ids:
         move_notes_to_decks_while_respecting_odid({nid: parent_deck_id for nid in note_ids})
         LOGGER.info("Moved notes from subdeck to main deck", subdeck_name=subdeck["name"], note_count=len(note_ids))

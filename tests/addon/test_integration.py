@@ -10,19 +10,7 @@ from concurrent.futures import Future
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep, time
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Set, Tuple, Union, cast
 from unittest.mock import Mock
 from zipfile import ZipFile
 
@@ -69,10 +57,7 @@ from requests import Response  # type: ignore
 from requests_mock import Mocker
 
 from ankihub.gui.block_exam_dialog import BlockExamSubdeckDialog
-from ankihub.gui.enable_fsrs_dialog import (
-    ENABLE_FSRS_REMINDER_INTERVAL_DAYS,
-    maybe_show_enable_fsrs_reminder,
-)
+from ankihub.gui.enable_fsrs_dialog import ENABLE_FSRS_REMINDER_INTERVAL_DAYS, maybe_show_enable_fsrs_reminder
 from ankihub.gui.optimize_fsrs_dialog import (
     FSRS_OPTIMIZATION_REMINDER_INTERVAL_DAYS,
     _optimize_fsrs_parameters,
@@ -84,14 +69,10 @@ from ankihub.main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
+    move_subdeck_to_main_deck,
 )
 
-from ..factories import (
-    DeckExtensionFactory,
-    DeckFactory,
-    DeckMediaFactory,
-    NoteInfoFactory,
-)
+from ..factories import DeckExtensionFactory, DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
     AddAnkiNote,
     ImportAHNote,
@@ -153,10 +134,7 @@ from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
-from ankihub.gui.auto_sync import (
-    SYNC_RATE_LIMIT_SECONDS,
-    _setup_ankihub_sync_on_ankiweb_sync,
-)
+from ankihub.gui.auto_sync import SYNC_RATE_LIMIT_SECONDS, _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.browser import (
@@ -167,19 +145,10 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
-from ankihub.gui.browser.custom_search_nodes import (
-    AnkiHubNoteSearchNode,
-    UpdatedSinceLastReviewSearchNode,
-)
+from ankihub.gui.browser.custom_search_nodes import AnkiHubNoteSearchNode, UpdatedSinceLastReviewSearchNode
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
-from ankihub.gui.config_dialog import (
-    get_config_dialog_manager,
-    setup_config_dialog_manager,
-)
-from ankihub.gui.deck_options import (
-    _backup_fsrs_parameters,
-    _can_revert_from_fsrs_parameters,
-)
+from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
+from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
@@ -202,15 +171,10 @@ from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
-from ankihub.gui.operations.new_deck_subscriptions import (
-    check_and_install_new_deck_subscriptions,
-)
+from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.overview import (
-    FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
-    FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
-)
+from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
@@ -218,11 +182,7 @@ from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exceptions import ChangesRequireFullSyncError
 from ankihub.main.exporting import to_note_data
-from ankihub.main.importing import (
-    AnkiHubImporter,
-    AnkiHubImportResult,
-    change_note_types_of_notes,
-)
+from ankihub.main.importing import AnkiHubImporter, AnkiHubImportResult, change_note_types_of_notes
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
@@ -231,17 +191,9 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
-from ankihub.main.note_type_management import (
-    add_note_type,
-    add_note_type_fields,
-    update_note_type_templates_and_styles,
-)
+from ankihub.main.note_type_management import add_note_type, add_note_type_fields, update_note_type_templates_and_styles
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
-from ankihub.main.subdecks import (
-    SUBDECK_TAG,
-    build_subdecks_and_move_cards_to_them,
-    flatten_deck,
-)
+from ankihub.main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ankihub.main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
@@ -259,6 +211,7 @@ from ankihub.main.utils import (
     all_dids,
     get_note_types_in_deck,
     md5_file_hash,
+    note_ids_in_deck_hierarchy,
     note_type_contains_field,
 )
 from ankihub.settings import (
@@ -8666,6 +8619,64 @@ class TestBlockExamSubdecks:
             with pytest.raises(ValueError, match="Subdeck .* not found"):
                 add_notes_to_block_exam_subdeck(ah_did, "Non-existent Subdeck", [NoteId(1), NoteId(2), NoteId(3)])
 
+    def test_move_subdeck_to_main_deck_with_nested_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test moving a subdeck with nested children moves all notes to main deck."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            deck_config = config.deck_config(ah_did)
+            main_deck_id = deck_config.anki_id
+            main_deck_name = aqt.mw.col.decks.name_if_exists(main_deck_id)
+
+            # Create subdeck hierarchy: Main::Block Exam::Nested
+            due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+            subdeck_name, _ = create_block_exam_subdeck(ah_did, "Block Exam", due_date)
+
+            subdeck_full_name = f"{main_deck_name}::{subdeck_name}"
+            subdeck_id = aqt.mw.col.decks.id_for_name(subdeck_full_name)
+
+            nested_subdeck_name = f"{subdeck_full_name}::Nested"
+            nested_subdeck_id = create_anki_deck(nested_subdeck_name)
+
+            # Create notes at each level
+            note_main = add_anki_note(anki_did=main_deck_id)
+            note_subdeck = add_anki_note(anki_did=subdeck_id)
+            note_nested = add_anki_note(anki_did=nested_subdeck_id)
+
+            # Verify initial card locations
+            assert note_main.cards()[0].did == main_deck_id
+            assert note_subdeck.cards()[0].did == subdeck_id
+            assert note_nested.cards()[0].did == nested_subdeck_id
+
+            # Move subdeck to main deck
+            subdeck_config = BlockExamSubdeckConfig(
+                ankihub_deck_id=str(ah_did),
+                subdeck_id=str(subdeck_id),
+                due_date=due_date,
+            )
+            move_subdeck_to_main_deck(subdeck_config)
+
+            # Verify all notes from subdeck hierarchy moved to main deck
+            note_main = aqt.mw.col.get_note(note_main.id)
+            note_subdeck = aqt.mw.col.get_note(note_subdeck.id)
+            note_nested = aqt.mw.col.get_note(note_nested.id)
+
+            assert note_main.cards()[0].did == main_deck_id
+            assert note_subdeck.cards()[0].did == main_deck_id
+            assert note_nested.cards()[0].did == main_deck_id
+
+            # Verify subdeck hierarchy was deleted
+            assert aqt.mw.col.decks.id_for_name(subdeck_full_name) is None
+            assert aqt.mw.col.decks.id_for_name(nested_subdeck_name) is None
+
+            # Verify config was removed
+            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck_id))
+            assert saved_due_date is None
+
 
 @pytest.mark.sequential
 class TestBlockExamSubdeckDialog:
@@ -8879,3 +8890,140 @@ class TestCheckBlockExamSubdeckDueDates:
             assert "deck1" in expired_deck_ids  # past date
             assert "deck2" in expired_deck_ids  # today's date
             assert "deck3" not in expired_deck_ids  # future date
+
+
+class TestNoteIdsInDeckHierarchy:
+    """Tests for note_ids_in_deck_hierarchy utility function."""
+
+    @staticmethod
+    def _create_filtered_deck_for_search(mw: AnkiQt, name: str, search: str) -> DeckId:
+        """Helper to create a filtered deck with a search term."""
+        filtered_deck = mw.col.sched.get_or_create_filtered_deck(DeckId(0))
+        filtered_deck.name = name
+        filtered_deck.config.search_terms.pop(0)
+        filtered_deck.config.search_terms.append(
+            FilteredDeckConfig.SearchTerm(
+                search=search,
+                limit=100,
+            )
+        )
+        mw.col.sched.add_or_update_filtered_deck(filtered_deck)
+        return mw.col.decks.id_for_name(name)
+
+    def test_basic_deck_with_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test basic case: deck with subdecks returns all note IDs."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create deck hierarchy
+            parent_deck_id = create_anki_deck("Parent")
+            child_deck_id = create_anki_deck("Parent::Child")
+
+            # Create notes in both decks
+            note1 = add_anki_note(anki_did=parent_deck_id)
+            note2 = add_anki_note(anki_did=child_deck_id)
+
+            # Get all note IDs in hierarchy
+            nids = note_ids_in_deck_hierarchy(parent_deck_id)
+
+            assert set(nids) == {note1.id, note2.id}
+
+    def test_include_self_false(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test include_self=False returns only subdeck notes."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create deck hierarchy
+            parent_deck_id = create_anki_deck("Parent")
+            child_deck_id = create_anki_deck("Parent::Child")
+
+            # Create notes in both decks
+            _ = add_anki_note(anki_did=parent_deck_id)
+            note2 = add_anki_note(anki_did=child_deck_id)
+
+            # Get only subdeck note IDs
+            nids = note_ids_in_deck_hierarchy(parent_deck_id, include_self=False)
+
+            assert set(nids) == {note2.id}
+
+    def test_nested_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test deeply nested subdecks (3+ levels) are all included."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create 4-level hierarchy
+            deck1_id = create_anki_deck("Level1")
+            deck2_id = create_anki_deck("Level1::Level2")
+            deck3_id = create_anki_deck("Level1::Level2::Level3")
+            deck4_id = create_anki_deck("Level1::Level2::Level3::Level4")
+
+            # Create notes at each level
+            note1 = add_anki_note(anki_did=deck1_id)
+            note2 = add_anki_note(anki_did=deck2_id)
+            note3 = add_anki_note(anki_did=deck3_id)
+            note4 = add_anki_note(anki_did=deck4_id)
+
+            # Get all note IDs from top level
+            nids = note_ids_in_deck_hierarchy(deck1_id)
+
+            assert set(nids) == {note1.id, note2.id, note3.id, note4.id}
+
+    @pytest.mark.parametrize(
+        "include_filtered,expected_count",
+        [
+            (True, 1),  # include_filtered=True should include the note
+            (False, 0),  # include_filtered=False should exclude the note
+        ],
+    )
+    def test_include_filtered_parameter(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+        include_filtered: bool,
+        expected_count: int,
+    ):
+        """Test include_filtered parameter with notes in filtered decks."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Create regular deck
+            regular_deck_id = create_anki_deck("Regular")
+
+            # Create note in regular deck
+            note = add_anki_note(anki_did=regular_deck_id)
+
+            # Create filtered deck and move card there
+            self._create_filtered_deck_for_search(mw, "Filtered", "deck:Regular")
+
+            # Verify card is now in filtered deck with odid set
+            card = mw.col.get_card(note.cards()[0].id)
+            assert card.odid == regular_deck_id
+
+            # Get note IDs with the specified include_filtered parameter
+            nids = note_ids_in_deck_hierarchy(regular_deck_id, include_filtered=include_filtered)
+
+            # Verify expected result
+            if expected_count == 1:
+                assert set(nids) == {note.id}
+            else:
+                assert set(nids) == set()
+
+    def test_empty_deck_hierarchy(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Test empty deck hierarchy returns empty list."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Create empty deck
+            deck_id = create_anki_deck("Empty")
+
+            # Get note IDs
+            nids = note_ids_in_deck_hierarchy(deck_id)
+
+            assert set(nids) == set()

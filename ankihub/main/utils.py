@@ -226,6 +226,31 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         aqt.mw.col.save()
 
 
+def note_ids_in_deck_hierarchy(
+    deck_id: DeckId,
+    *,
+    include_self: bool = True,
+    include_filtered: bool = True,
+) -> list[NoteId]:
+    """
+    Return distinct note IDs for cards under `deck_id`'s hierarchy.
+    - If `include_self` is True, include `deck_id` itself; otherwise only its subdecks.
+    - If `include_filtered` is True, also include notes whose cards are currently in a filtered deck
+      but whose original deck (`odid`) is in that hierarchy.
+    """
+    descendant_ids = [id_ for _, id_ in aqt.mw.col.decks.children(deck_id)]
+    dids = ([deck_id] if include_self else []) + descendant_ids
+    if not dids:
+        return []
+
+    dids_str = ids2str(dids)
+    sql = f"SELECT DISTINCT nid FROM cards WHERE did IN {dids_str}"
+    if include_filtered:
+        sql += f" OR odid IN {dids_str}"
+
+    return [NoteId(nid) for nid in aqt.mw.col.db.list(sql)]
+
+
 def move_notes_to_decks_while_respecting_odid(nid_to_did: Dict[NoteId, DeckId]) -> None:
     """Moves the cards of notes to the decks specified in nid_to_did.
     If a card is in a filtered deck it is not moved and only its original deck id value gets changed.

@@ -3418,6 +3418,7 @@ class TestDeckImportSummaryDialog:
 class TestMoveSubdeckToMainDeck:
     """Tests for move_subdeck_to_main_deck function."""
 
+    @patch("ankihub.main.block_exam_subdecks.note_ids_in_deck_hierarchy")
     @patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
     @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
     @patch("ankihub.main.block_exam_subdecks.aqt")
@@ -3428,6 +3429,7 @@ class TestMoveSubdeckToMainDeck:
         mock_aqt,
         mock_remove_config,
         mock_move_notes,
+        mock_note_ids_in_deck_hierarchy,
     ):
         """Test successfully moving subdeck to main deck."""
         # Setup mocks
@@ -3437,7 +3439,7 @@ class TestMoveSubdeckToMainDeck:
 
         mock_subdeck = {"name": "Test Deck::Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
-        mock_aqt.mw.col.db.list.return_value = [1, 2, 3]
+        mock_note_ids_in_deck_hierarchy.return_value = [1, 2, 3]
 
         subdeck_config = BlockExamSubdeckConfig(
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
@@ -3445,6 +3447,7 @@ class TestMoveSubdeckToMainDeck:
 
         move_subdeck_to_main_deck(subdeck_config)
 
+        mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
         mock_remove_config.assert_called_once_with(subdeck_config)
