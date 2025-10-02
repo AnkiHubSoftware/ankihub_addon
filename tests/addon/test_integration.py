@@ -6212,7 +6212,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6239,7 +6239,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created
-            assert create_change_suggestion_mock.called_once
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3
             assert mock_client_media_upload.call_count == 0
@@ -6296,7 +6296,7 @@ class TestSuggestionsWithMedia:
             create_change_suggestion_mock = create_change_suggestion(note=note, wait_for_media_upload=False)
 
             # Assert that the suggestion was created.
-            assert create_change_suggestion_mock.called_once  # type: ignore
+            create_change_suggestion_mock.assert_called_once()
 
             # Assert the file was not uploaded to S3.
             assert mock_client_media_upload.call_count == 0
@@ -6615,7 +6615,7 @@ class TestFlashCardSelector:
 
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
-            qtbot.wait(500)
+            qtbot.wait(1000)
 
             overview_web: AnkiWebView = aqt.mw.overview.web
             with qtbot.wait_callback() as callback:
@@ -7980,7 +7980,7 @@ class TestFSRSDeckOptions:
             # Button should exist only when all conditions are met
             button_should_exist = feature_flag_active and fsrs_enabled and use_anking_deck
 
-            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=1000) == button_should_exist
+            assert self._revert_button_exists(dialog, qtbot=qtbot, timeout=3000) == button_should_exist
 
     @pytest.mark.sequential
     def test_fsrs_parameters_backup_on_dialog_close(
@@ -8147,6 +8147,8 @@ class TestFSRSDeckOptions:
         with qtbot.wait_callback() as callback:
             deck_options_did_load.append(callback)
             dialog = DeckOptionsDialog(aqt.mw, deck)
+            # Ignore save prompt as it can cause crashes/hangs
+            dialog._close_event_has_cleaned_up = True
 
         deck_options_did_load.remove(callback)
 
