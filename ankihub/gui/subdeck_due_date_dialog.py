@@ -181,8 +181,8 @@ class DatePickerDialog(QDialog):
             else date.today() + timedelta(days=1)
         )
         self.date_input.setDate(last_due_date)
+        self.date_input.setMinimumDate(date.today())
         self.date_input.setCalendarPopup(True)
-        self.date_input.setMinimumDate(date.today() + timedelta(days=1))
         date_layout.addWidget(self.date_input)
         main_layout.addLayout(date_layout)
 

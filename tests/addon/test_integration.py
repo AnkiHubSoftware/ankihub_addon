@@ -8843,7 +8843,7 @@ class TestBlockExamSubdeckDialog:
             dialog.name_input.setText("Valid Exam Name")
             qtbot.wait(100)
 
-            # Should be enabled now (date is set to tomorrow by default)
+            # Should be enabled now (date is set to today by default)
             assert dialog.create_button.isEnabled() is True
 
             # Test invalid name disables button
