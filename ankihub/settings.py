@@ -495,6 +495,14 @@ class _Config:
         """Get all block exam subdeck configurations."""
         return self._private_config.block_exams_subdecks or []
 
+    def get_block_exam_subdeck_config(self, deck_id: DeckId) -> Optional[BlockExamSubdeckConfig]:
+        """Get block exam subdeck configuration for a specific subdeck."""
+        subdeck_config = next(
+            (config_item for config_item in self.get_block_exam_subdecks() if config_item.subdeck_id == str(deck_id)),
+            None,
+        )
+        return subdeck_config
+
     def add_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
         """Add or update a block exam subdeck configuration."""
         current = self.get_block_exam_subdecks()

@@ -68,8 +68,7 @@ def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Update due date")
 
-    subdecks = config.get_block_exam_subdecks()
-    subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None) if subdecks else None
+    subdeck_config = config.get_block_exam_subdeck_config(subdeck_did)
 
     action.setEnabled(subdeck_config is not None)
 
@@ -83,8 +82,7 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
     action = menu.addAction("Ankihub: Remove subdeck")
 
-    subdecks = config.get_block_exam_subdecks()
-    subdeck_config = next((sd for sd in subdecks if int(sd.subdeck_id) == int(subdeck_did)), None) if subdecks else None
+    subdeck_config = config.get_block_exam_subdeck_config(subdeck_did)
 
     action.setEnabled(subdeck_config is not None)
 
@@ -97,7 +95,11 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
 
 def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     # Only show the menu actions for descendants of AnkiHub decks
-    if not get_ah_did_of_deck_or_ancestor_deck(deck_id):
+    is_descendant_of_ah_deck = (
+        get_ah_did_of_deck_or_ancestor_deck(DeckId(deck_id)) is not None
+        and aqt.mw.col.decks.parents(DeckId(deck_id))  # Ensure it's not a top-level deck
+    )
+    if not is_descendant_of_ah_deck:
         return
 
     menu.setToolTipsVisible(True)
