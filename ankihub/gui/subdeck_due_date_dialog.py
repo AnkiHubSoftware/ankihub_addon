@@ -1,5 +1,6 @@
 """Dialog for handling expired block exam subdecks."""
 
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
 
@@ -24,6 +25,16 @@ from ..main.block_exam_subdecks import (
     set_subdeck_due_date,
 )
 from ..settings import BlockExamSubdeckConfig
+
+
+@dataclass
+class _SubdeckDueDateDialogState:
+    """State for managing sequential SubdeckDueDate dialogs."""
+
+    queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
+
+
+_subdeck_due_date_dialog_state = _SubdeckDueDateDialogState()
 
 
 class SubdeckDueDateDialog(QDialog):
@@ -120,9 +131,8 @@ class SubdeckDueDateDialog(QDialog):
     def _show_date_picker(self):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
-        result = date_picker_dialog.exec()
-        if result == QDialog.DialogCode.Accepted:
-            self.accept()
+        date_picker_dialog.accepted.connect(self.accept)  # type: ignore[attr-defined]
+        date_picker_dialog.open()
 
 
 class DatePickerDialog(QDialog):
@@ -225,23 +235,35 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the expired subdeck
     """
-    from ..gui.subdeck_due_date_dialog import SubdeckDueDateDialog
-
     subdeck_id = DeckId(int(subdeck_config.subdeck_id))
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
         remove_block_exam_subdeck_config(subdeck_config)
+        _show_next_expired_subdeck_dialog()
         return
 
     subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
 
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
-    dialog.exec()
+    dialog.finished.connect(_show_next_expired_subdeck_dialog)  # type: ignore[attr-defined]
+    dialog.open()
+
+
+def _show_next_expired_subdeck_dialog() -> None:
+    """Show the next expired subdeck dialog from the queue."""
+    if not _subdeck_due_date_dialog_state.queue:
+        return
+
+    next_subdeck = _subdeck_due_date_dialog_state.queue.pop(0)
+    handle_expired_subdeck(next_subdeck)
 
 
 def check_and_handle_block_exam_subdeck_due_dates() -> None:
     """Check for expired block exam subdecks and handle each one."""
     expired_subdecks = check_block_exam_subdeck_due_dates()
-    for subdeck_config in expired_subdecks:
-        handle_expired_subdeck(subdeck_config)
+    if not expired_subdecks:
+        return
+
+    _subdeck_due_date_dialog_state.queue = expired_subdecks
+    _show_next_expired_subdeck_dialog()

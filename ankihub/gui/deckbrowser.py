@@ -1,9 +1,13 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
+from dataclasses import dataclass
+from typing import Optional
+
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
+from aqt.qt import QDialog
 
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -13,6 +17,16 @@ from ..settings import (
 )
 from .subdeck_due_date_dialog import DatePickerDialog
 from .utils import ask_user
+
+
+@dataclass
+class _DatePickerDialogState:
+    """State for keeping date picker dialog reference alive."""
+
+    dialog: Optional[QDialog] = None
+
+
+_dialog_state = _DatePickerDialogState()
 
 
 def setup() -> None:
@@ -45,7 +59,8 @@ def setup() -> None:
 def _open_dialog_date_picker_for_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck_name = aqt.mw.col.decks.get(subdeck_config.subdeck_id)["name"].split("::", maxsplit=1)[-1]
 
-    DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw).exec()
+    _dialog_state.dialog = DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw)
+    _dialog_state.dialog.open()
 
 
 def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
