@@ -40,7 +40,7 @@ class SubdeckDueDateDialog(QDialog):
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setWindowTitle("")  # Empty title as per screenshot
+        self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(400)
         self.resize(440, 300)
 
@@ -139,7 +139,7 @@ class DatePickerDialog(QDialog):
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(221)
         self.resize(400, 221)
 

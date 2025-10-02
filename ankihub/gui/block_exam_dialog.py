@@ -112,7 +112,7 @@ class BlockExamSubdeckDialog(QDialog):
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)  # default spacing between elements is 12
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         # Title
         title = QLabel("Create a subdeck")
@@ -189,7 +189,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for adding notes to selected subdeck."""
         self._clear_layout()
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
@@ -283,7 +283,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         self._clear_layout()
 
-        self.setWindowTitle("")
+        self.setWindowTitle("AnkiHub | Subdecks")
 
         layout = self.layout()
         layout.setContentsMargins(28, 28, 28, 28)
