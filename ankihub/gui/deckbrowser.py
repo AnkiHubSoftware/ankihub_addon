@@ -11,12 +11,9 @@ from aqt.qt import QDialog
 
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import (
-    BlockExamSubdeckConfig,
-    config,
-)
+from ..settings import BlockExamSubdeckConfig, config
 from .subdeck_due_date_dialog import DatePickerDialog
-from .utils import ask_user
+from .utils import ask_user, get_ah_did_of_deck_or_ancestor_deck
 
 
 @dataclass
@@ -98,11 +95,15 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
         action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
 
-def _on_subdeck_ankihub_options_show(menu: QMenu, subdeck_did: int) -> None:
+def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
+    # Only show the menu actions for descendants of AnkiHub decks
+    if not get_ah_did_of_deck_or_ancestor_deck(deck_id):
+        return
+
     menu.setToolTipsVisible(True)
-    _setup_update_subdeck_due_date(menu, DeckId(subdeck_did))
-    _setup_remove_block_exam_subdeck(menu, DeckId(subdeck_did))
+    _setup_update_subdeck_due_date(menu, DeckId(deck_id))
+    _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
 
 
 def setup_subdeck_ankihub_options() -> None:
-    gui_hooks.deck_browser_will_show_options_menu.append(_on_subdeck_ankihub_options_show)
+    gui_hooks.deck_browser_will_show_options_menu.append(_initialize_subdeck_context_menu_actions)
