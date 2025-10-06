@@ -4597,16 +4597,16 @@ def _setup_protected_deck_hierarchy(
 
     if deck_type == "exam":
         # Create all as normal decks (creating child creates parent chain)
-        aqt.mw.col.decks.add_normal_deck_with_name(child_name)
-        core_id = aqt.mw.col.decks.id_for_name(core_name)
+        create_anki_deck(child_name)
 
         # Register core deck as exam subdeck
+        core_id = aqt.mw.col.decks.id_for_name(core_name)
         config.add_block_exam_subdeck(
             BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=str(core_id), due_date="2024-12-31")
         )
     elif deck_type == "filtered":
         # Create parent as normal deck
-        aqt.mw.col.decks.add_normal_deck_with_name(parent_name)
+        create_anki_deck(parent_name)
 
         # Create core as filtered deck
         aqt.mw.col.decks.new_filtered(core_name)
