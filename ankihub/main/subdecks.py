@@ -10,6 +10,7 @@ import uuid
 from typing import Dict, Iterable, List, Optional
 
 import aqt
+from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
 
@@ -157,7 +158,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
 
     # Get all child decks except protected decks (exam subdecks, filtered decks, and their ancestors/descendants)
     decks_to_flatten = _get_subdecks_excluding_protected(root_deck_id)
-    deck_ids_to_flatten = [deck_id for _, deck_id in decks_to_flatten]
+    deck_ids_to_flatten: list[DeckId] = [deck_id for _, deck_id in decks_to_flatten]
 
     # Get note IDs from the decks we want to flatten
     nids = note_ids_in_decks(deck_ids_to_flatten, include_filtered=True)
@@ -170,7 +171,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         LOGGER.info(f"Removed {len(deck_ids_to_flatten)} subdeck(s)")
 
 
-def _get_subdecks_excluding_protected(root_deck_id: int) -> list[tuple[str, int]]:
+def _get_subdecks_excluding_protected(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
     """Get all child decks under root_deck_id, excluding protected decks and their descendants.
 
     Protected decks include:
