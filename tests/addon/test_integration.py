@@ -4640,12 +4640,12 @@ class TestBuildSubdecksAndMoveCardsToThem:
             assert mw.col.decks.id_for_name(parent_deck_name) is None
             assert mw.col.decks.id_for_name(empty_deck_name) is None
 
-    def test_filtered_decks_get_reparented_when_parent_deleted(
+    def test_filtered_decks_and_their_ancestor_are_protected(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        """Test that filtered decks get reparented when their parent deck is deleted."""
+        """Test that filtered decks and their ancestors are protected from deletion."""
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
             # Install sample AH deck and get its deck ID
@@ -4669,18 +4669,14 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # Call the function that reorganizes decks
             build_subdecks_and_move_cards_to_them(ah_did)
 
-            # Parent deck should be deleted
-            assert mw.col.decks.id_for_name(parent_deck_name) is None
+            # Parent deck should NOT be deleted (protected as ancestor of filtered deck)
+            assert mw.col.decks.id_for_name(parent_deck_name) is not None
 
-            # Filtered deck should be reparented to "Testdeck"
-            new_filtered_did = mw.col.decks.id_for_name("Testdeck::A")
-            assert new_filtered_did
+            # Filtered deck should still be in the same location
+            assert mw.col.decks.id_for_name(filtered_deck_name) is not None
 
             # Verify it's still a filtered deck
-            assert mw.col.decks.is_filtered(new_filtered_did)
-
-            # Verify it's the same deck (same ID)
-            assert filtered_did == new_filtered_did
+            assert mw.col.decks.is_filtered(filtered_did)
 
     def test_notes_not_moved_out_filtered_decks(
         self,
@@ -4827,16 +4823,13 @@ class TestFlattenDeck:
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
         """Test flatten_deck behavior with filtered decks, verifying:
-        1. Filtered decks get reparented to the root deck
-        2. Empty non-filtered decks are deleted
+        1. Ancestors of filtered decks are protected from deletion
+        2. Filtered decks remain in their original location
         3. Cards in filtered decks stay in those decks
-        4. Original deck IDs (odid) of cards are updated to point to the root deck"""
+        4. Original deck IDs (odid) of cards remain unchanged"""
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
             _, ah_did = install_sample_ah_deck()
-
-            # Get root deck ID for later reference
-            root_deck_id = mw.col.decks.id_for_name("Testdeck")
 
             # Set up: Create parent deck and filtered deck
             parent_deck_name = "Testdeck::A"
@@ -4867,14 +4860,13 @@ class TestFlattenDeck:
             # Act: Call flatten_deck
             flatten_deck(ah_did)
 
-            # Assert: Parent deck was deleted
-            assert mw.col.decks.by_name(parent_deck_name) is None
+            # Assert: Parent deck was NOT deleted (protected as ancestor of filtered deck)
+            assert mw.col.decks.by_name(parent_deck_name) is not None
 
-            # Assert: Filtered deck still exists with correct new name
-            expected_new_name = "Testdeck::Filtered"
-            reparented_deck = mw.col.decks.get(filtered_deck_id)
-            assert reparented_deck is not None
-            assert reparented_deck["name"] == expected_new_name
+            # Assert: Filtered deck still exists at its original location
+            filtered_deck = mw.col.decks.get(filtered_deck_id)
+            assert filtered_deck is not None
+            assert filtered_deck["name"] == filtered_deck_name
             assert mw.col.decks.is_filtered(filtered_deck_id)
 
             # Assert: Cards are still in the filtered deck
@@ -4882,8 +4874,8 @@ class TestFlattenDeck:
                 card = mw.col.get_card(card_id)
                 assert card.did == filtered_deck_id
 
-                # Assert: The odid should now point to the root deck
-                assert card.odid == root_deck_id, "Card's original deck ID should now point to root deck"
+                # Assert: The odid remains pointing to the parent deck
+                assert card.odid == parent_deck_id, "Card's original deck ID should remain pointing to parent deck"
 
 
 def test_reset_local_changes_to_notes(
