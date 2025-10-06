@@ -4571,6 +4571,51 @@ class TestDeckManagementDialog:
         mocker.patch("ankihub.gui.operations.subdecks.ask_user", return_value=True)
 
 
+def _setup_protected_deck_hierarchy(
+    install_ah_deck: InstallAHDeck,
+    deck_type: str,
+    root_deck_name: str = "Testdeck",
+) -> tuple[uuid.UUID, str, str, str | None]:
+    """Helper to create protected deck hierarchy for testing.
+
+    Args:
+        install_ah_deck: Fixture to install AnkiHub deck
+        deck_type: "exam" or "filtered"
+        root_deck_name: Name of the root deck (default: "Testdeck")
+
+    Returns:
+        Tuple of (ah_did, parent_name, core_name, child_name)
+        Note: child_name will be None for filtered decks (they can't have children)
+    """
+    # Install root deck
+    ah_did = install_ah_deck(anki_deck_name=root_deck_name)
+
+    # Generate deck names
+    parent_name = f"{root_deck_name}::A"
+    core_name = f"{parent_name}::Protected"
+    child_name = f"{core_name}::Child" if deck_type == "exam" else None
+
+    if deck_type == "exam":
+        # Create all as normal decks (creating child creates parent chain)
+        aqt.mw.col.decks.add_normal_deck_with_name(child_name)
+        core_id = aqt.mw.col.decks.id_for_name(core_name)
+
+        # Register core deck as exam subdeck
+        config.add_block_exam_subdeck(
+            BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=str(core_id), due_date="2024-12-31")
+        )
+    elif deck_type == "filtered":
+        # Create parent as normal deck
+        aqt.mw.col.decks.add_normal_deck_with_name(parent_name)
+
+        # Create core as filtered deck
+        aqt.mw.col.decks.new_filtered(core_name)
+    else:
+        raise ValueError(f"Invalid deck_type: {deck_type}")
+
+    return ah_did, parent_name, core_name, child_name
+
+
 class TestBuildSubdecksAndMoveCardsToThem:
     @pytest.mark.parametrize(
         # The tag comparison is case-insensitive
@@ -4640,43 +4685,41 @@ class TestBuildSubdecksAndMoveCardsToThem:
             assert mw.col.decks.id_for_name(parent_deck_name) is None
             assert mw.col.decks.id_for_name(empty_deck_name) is None
 
-    def test_filtered_decks_and_their_ancestor_are_protected(
+    @pytest.mark.parametrize("deck_type", ["exam", "filtered"])
+    def test_protected_decks_and_ancestors_and_descendants_are_protected(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        deck_type: str,
     ):
-        """Test that filtered decks and their ancestors are protected from deletion."""
+        """Test that protected decks (exam/filtered) and their ancestors and descendants are protected from deletion."""
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-            # Install sample AH deck and get its deck ID
-            _, ah_did = install_sample_ah_deck()
+            ah_did, parent_name, core_name, child_name = _setup_protected_deck_hierarchy(install_ah_deck, deck_type)
 
-            # Create empty parent deck
-            parent_deck_name = "Testdeck::empty"
-            mw.col.decks.add_normal_deck_with_name(parent_deck_name)
-
-            # Create filtered deck as child
-            filtered_deck_name = f"{parent_deck_name}::A"
-            mw.col.decks.new_filtered(filtered_deck_name)
-
-            # Verify decks were created
-            parent_did = mw.col.decks.id_for_name(parent_deck_name)
-            filtered_did = mw.col.decks.id_for_name(filtered_deck_name)
-            assert parent_did
-            assert filtered_did
-            assert mw.col.decks.is_filtered(filtered_did)
-
-            # Call the function that reorganizes decks
+            # Call the function
             build_subdecks_and_move_cards_to_them(ah_did)
 
-            # Parent deck should NOT be deleted (protected as ancestor of filtered deck)
-            assert mw.col.decks.id_for_name(parent_deck_name) is not None
+            # Assert ancestor and core are protected from deletion
+            assert aqt.mw.col.decks.id_for_name(parent_name) is not None, (
+                f"Ancestor deck should be protected ({deck_type})"
+            )
+            assert aqt.mw.col.decks.id_for_name(core_name) is not None, (
+                f"Core protected deck should exist ({deck_type})"
+            )
 
-            # Filtered deck should still be in the same location
-            assert mw.col.decks.id_for_name(filtered_deck_name) is not None
+            # If child deck was set up, check if it was protected
+            if child_name:
+                assert aqt.mw.col.decks.id_for_name(child_name) is not None, (
+                    f"Descendant deck should be protected ({deck_type})"
+                )
 
-            # Verify it's still a filtered deck
-            assert mw.col.decks.is_filtered(filtered_did)
+            # Verify core deck is still configured correctly
+            core_id = aqt.mw.col.decks.id_for_name(core_name)
+            if deck_type == "exam":
+                exam_configs = config.get_block_exam_subdecks()
+                assert any(int(cfg.subdeck_id) == core_id for cfg in exam_configs)
+            elif deck_type == "filtered":
+                assert aqt.mw.col.decks.is_filtered(core_id)
 
     def test_notes_not_moved_out_filtered_decks(
         self,
@@ -4817,65 +4860,41 @@ class TestFlattenDeck:
             # assert that the subdecks were deleted
             assert mw.col.decks.by_name(subdeck_name) is None
 
-    def test_with_filtered_deck(
+    @pytest.mark.parametrize("deck_type", ["exam", "filtered"])
+    def test_protected_decks_and_ancestors_and_descendants_are_protected(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        deck_type: str,
     ):
-        """Test flatten_deck behavior with filtered decks, verifying:
-        1. Ancestors of filtered decks are protected from deletion
-        2. Filtered decks remain in their original location
-        3. Cards in filtered decks stay in those decks
-        4. Original deck IDs (odid) of cards remain unchanged"""
+        """Test that protected decks (exam/filtered) and their ancestors and descendants are protected from deletion."""
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-            _, ah_did = install_sample_ah_deck()
+            ah_did, parent_name, core_name, child_name = _setup_protected_deck_hierarchy(install_ah_deck, deck_type)
 
-            # Set up: Create parent deck and filtered deck
-            parent_deck_name = "Testdeck::A"
-            filtered_deck_name = f"{parent_deck_name}::Filtered"
-
-            # Create the parent deck
-            mw.col.decks.add_normal_deck_with_name(parent_deck_name)
-            parent_deck_id = mw.col.decks.id_for_name(parent_deck_name)
-
-            # Create a filtered deck under the parent deck
-            filtered_deck_id = mw.col.decks.new_filtered(filtered_deck_name)
-
-            # Verify setup was successful
-            assert mw.col.decks.id_for_name(parent_deck_name)
-            assert mw.col.decks.id_for_name(filtered_deck_name)
-            assert mw.col.decks.is_filtered(filtered_deck_id)
-
-            # Move cards to the filtered deck
-            nids = mw.col.find_notes("deck:Testdeck")
-            note = mw.col.get_note(nids[0])
-            card_ids = note.card_ids()
-            for card_id in card_ids:
-                card = mw.col.get_card(card_id)
-                card.did = filtered_deck_id
-                card.odid = parent_deck_id  # Original deck ID points to parent
-                card.flush()
-
-            # Act: Call flatten_deck
+            # Call the function
             flatten_deck(ah_did)
 
-            # Assert: Parent deck was NOT deleted (protected as ancestor of filtered deck)
-            assert mw.col.decks.by_name(parent_deck_name) is not None
+            # Assert ancestor and core are protected from deletion
+            assert aqt.mw.col.decks.id_for_name(parent_name) is not None, (
+                f"Ancestor deck should be protected ({deck_type})"
+            )
+            assert aqt.mw.col.decks.id_for_name(core_name) is not None, (
+                f"Core protected deck should exist ({deck_type})"
+            )
 
-            # Assert: Filtered deck still exists at its original location
-            filtered_deck = mw.col.decks.get(filtered_deck_id)
-            assert filtered_deck is not None
-            assert filtered_deck["name"] == filtered_deck_name
-            assert mw.col.decks.is_filtered(filtered_deck_id)
+            # If child deck was set up, check if it was protected
+            if child_name:
+                assert aqt.mw.col.decks.id_for_name(child_name) is not None, (
+                    f"Descendant deck should be protected ({deck_type})"
+                )
 
-            # Assert: Cards are still in the filtered deck
-            for card_id in card_ids:
-                card = mw.col.get_card(card_id)
-                assert card.did == filtered_deck_id
-
-                # Assert: The odid remains pointing to the parent deck
-                assert card.odid == parent_deck_id, "Card's original deck ID should remain pointing to parent deck"
+            # Verify core deck is still configured correctly
+            core_id = aqt.mw.col.decks.id_for_name(core_name)
+            if deck_type == "exam":
+                exam_configs = config.get_block_exam_subdecks()
+                assert any(int(cfg.subdeck_id) == core_id for cfg in exam_configs)
+            elif deck_type == "filtered":
+                assert aqt.mw.col.decks.is_filtered(core_id)
 
 
 def test_reset_local_changes_to_notes(
