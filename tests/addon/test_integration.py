@@ -4575,7 +4575,7 @@ def _setup_protected_deck_hierarchy(
     install_ah_deck: InstallAHDeck,
     deck_type: str,
     root_deck_name: str = "Testdeck",
-) -> tuple[uuid.UUID, str, str, str | None]:
+) -> tuple[uuid.UUID, str, str, Optional[str]]:
     """Helper to create protected deck hierarchy for testing.
 
     Args:
@@ -4591,7 +4591,7 @@ def _setup_protected_deck_hierarchy(
     ah_did = install_ah_deck(anki_deck_name=root_deck_name)
 
     # Generate deck names
-    parent_name = f"{root_deck_name}::A"
+    parent_name = f"{root_deck_name}::Parent"
     core_name = f"{parent_name}::Protected"
     child_name = f"{core_name}::Child" if deck_type == "exam" else None
 
