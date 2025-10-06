@@ -199,3 +199,47 @@ def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> 
         subdeck_config: Configuration to remove
     """
     config.remove_block_exam_subdeck(subdeck_config.ankihub_deck_id, subdeck_config.subdeck_id)
+
+
+def get_exam_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
+    """Get descendants of the given root deck which are block exam subdeck.
+
+    Returns a list of (name, id) tuples.
+    Doesn't return exam subdecks that don't exist in Anki.
+    """
+    # Get all child decks under root
+    child_decks = aqt.mw.col.decks.children(root_deck_id)
+
+    # Get exam subdeck IDs from config
+    exam_subdeck_configs = config.get_block_exam_subdecks()
+    exam_subdeck_ids = {int(cfg.subdeck_id) for cfg in exam_subdeck_configs}
+
+    # Filter children to only include exam subdecks
+    return [(name, deck_id) for name, deck_id in child_decks if deck_id in exam_subdeck_ids]
+
+
+def get_subdecks_excluding_exam_hierarchy(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
+    """Get all descendants under root_deck_id, excluding exam subdecks and their entire hierarchy.
+
+    This excludes both:
+    - Exam subdecks themselves
+    - All descendants of exam subdecks (even if not marked as exam subdecks)
+
+    Returns a list of (name, id) tuples.
+    """
+    # Get all child decks
+    child_decks = aqt.mw.col.decks.children(root_deck_id)
+
+    # Get exam subdecks and extract names
+    exam_subdecks = get_exam_subdecks(root_deck_id)
+    exam_subdeck_names = {name for name, _ in exam_subdecks}
+
+    # Filter to exclude exam subdecks and their descendants
+    return [
+        (deck_name, deck_id)
+        for deck_name, deck_id in child_decks
+        if not any(
+            deck_name == exam_deck_name or deck_name.startswith(f"{exam_deck_name}::")
+            for exam_deck_name in exam_subdeck_names
+        )
+    ]

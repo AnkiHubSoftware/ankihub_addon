@@ -18,10 +18,11 @@ from ..db import ankihub_db
 from ..db.db import NOTE_NOT_DELETED_CONDITION
 from ..db.models import AnkiHubNote
 from ..settings import config
+from .block_exam_subdecks import get_subdecks_excluding_exam_hierarchy
 from .utils import (
     move_notes_to_decks_while_respecting_odid,
     nids_in_deck_but_not_in_subdeck,
-    note_ids_in_deck_hierarchy,
+    note_ids_in_decks,
 )
 
 # root tag for tags that indicate which subdeck a note belongs to
@@ -65,13 +66,13 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     nid_to_did = {nid: aqt.mw.col.decks.id_for_name(deck_name) for nid, deck_name in nid_to_dest_deck_name.items()}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # Remove empty subdecks, keeping filtered decks
-    for name, deck_id in aqt.mw.col.decks.children(root_deck_id):
+    # Remove empty non-exam subdecks, keeping filtered decks
+    for name, deck_id in get_subdecks_excluding_exam_hierarchy(root_deck_id):
         try:
             is_empty = aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
         except NotFoundError:
             # This can happen if a parent deck was deleted earlier in the loop
-            LOGGER.debug(f"Deck not found during removal process: {name}")
+            LOGGER.debug(f"Deck {deck_id} not found during removal process")
             continue
 
         if is_empty and not aqt.mw.col.decks.is_filtered(deck_id):
@@ -161,25 +162,30 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     """Flatten the deck hierarchy for the given ankihub_did.
 
     This function:
-    1. Moves all cards from subdecks to the root deck
+    1. Moves all cards from subdecks to the root deck (except exam subdecks and their descendants)
     2. Reparents filtered subdecks to be direct children of the root deck
-    3. Removes all non-filtered (regular) subdecks
+    3. Removes all non-filtered (regular) subdecks (except exam subdecks and their descendants)
+
+    Exam subdecks and their descendants are preserved and not affected by this operation.
 
     When cards are in filtered decks, they remain in those decks, but their
     original deck reference (odid) is updated to point to the root deck.
     """
-    # Get the root deck ID and name
+    # Get the root deck ID
     root_deck_id = config.deck_config(ankihub_did).anki_id
 
-    # Find all notes in subdecks and move them to the root deck
-    nids = note_ids_in_deck_hierarchy(root_deck_id, include_self=False)
+    # Get all child decks except exam subdecks and their descendants
+    decks_to_flatten = get_subdecks_excluding_exam_hierarchy(root_deck_id)
+    deck_ids_to_flatten = [deck_id for _, deck_id in decks_to_flatten]
+
+    # Get note IDs from the decks we want to flatten
+    nids = note_ids_in_decks(deck_ids_to_flatten, include_filtered=True)
     nid_to_did = {nid: root_deck_id for nid in nids}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # Get all child decks and separate them into filtered and regular decks
-    child_decks = aqt.mw.col.decks.children(root_deck_id)
-    filtered_deck_ids = [did for _, did in child_decks if aqt.mw.col.decks.is_filtered(did)]
-    regular_deck_ids = [did for _, did in child_decks if not aqt.mw.col.decks.is_filtered(did)]
+    # Separate decks to flatten into filtered and regular decks
+    filtered_deck_ids = [did for did in deck_ids_to_flatten if aqt.mw.col.decks.is_filtered(did)]
+    regular_deck_ids = [did for did in deck_ids_to_flatten if not aqt.mw.col.decks.is_filtered(did)]
 
     # Reparent all filtered subdecks to the root deck - we don't want to delete them
     if filtered_deck_ids:
