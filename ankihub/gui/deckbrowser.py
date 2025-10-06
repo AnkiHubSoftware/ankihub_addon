@@ -12,6 +12,7 @@ from aqt.qt import QDialog
 from ..main.block_exam_subdecks import move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import BlockExamSubdeckConfig, config
+from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import DatePickerDialog
 from .utils import ask_user, get_ah_did_of_deck_or_ancestor_deck
 
@@ -102,9 +103,15 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     if not is_descendant_of_ah_deck:
         return
 
-    menu.setToolTipsVisible(True)
-    _setup_update_subdeck_due_date(menu, DeckId(deck_id))
-    _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
+    def on_access_granted(_: dict) -> None:
+        menu.setToolTipsVisible(True)
+        _setup_update_subdeck_due_date(menu, DeckId(deck_id))
+        _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
+
+    check_user_feature_access(
+        feature_key="has_flashcard_selector_access",
+        on_access_granted=on_access_granted,
+    )
 
 
 def setup_subdeck_ankihub_options() -> None:
