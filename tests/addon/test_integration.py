@@ -4593,7 +4593,7 @@ def _setup_protected_deck_hierarchy(
     # Generate deck names
     parent_name = f"{root_deck_name}::Parent"
     core_name = f"{parent_name}::Protected"
-    child_name = f"{core_name}::Child" if deck_type == "exam" else None
+    child_name = f"{core_name}::Child" if deck_type != "filtered" else None
 
     if deck_type == "exam":
         # Create all as normal decks (creating child creates parent chain)
