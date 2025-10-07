@@ -8425,7 +8425,6 @@ def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
         assert not config._private_config.show_enable_fsrs_reminder
 
 
-@pytest.mark.sequential
 class TestBlockExamSubdecks:
     def test_create_block_exam_subdeck(
         self,
@@ -8460,7 +8459,7 @@ class TestBlockExamSubdecks:
             assert subdeck["conf"] == main_deck["conf"]
 
             # Verify configuration was saved
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date == due_date
 
     def test_create_subdeck_with_conflict(
@@ -8501,7 +8500,7 @@ class TestBlockExamSubdecks:
             subdeck = aqt.mw.col.decks.by_name(full_name)
             assert subdeck is not None
 
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date is None
 
     def test_add_notes_to_block_exam_subdeck(
@@ -8540,7 +8539,7 @@ class TestBlockExamSubdecks:
             assert note2.id in notes_in_subdeck
 
             # Verify configuration was updated with new due date
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date == new_due_date
 
     def test_add_notes_to_block_exam_subdeck_with_some_already_in_subdeck(
@@ -8632,7 +8631,7 @@ class TestBlockExamSubdecks:
             assert len(configs) == 0
 
             # Test removing non-existent configuration (should not error)
-            config.remove_block_exam_subdeck("non-existent", "non-existent")
+            config.remove_block_exam_subdeck(next_deterministic_uuid(), DeckId(999))
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 0
 
@@ -8703,7 +8702,7 @@ class TestBlockExamSubdecks:
 
             # Move subdeck to main deck
             subdeck_config = BlockExamSubdeckConfig(
-                ankihub_deck_id=str(ah_did),
+                ankihub_deck_id=ah_did,
                 subdeck_id=subdeck_id,
                 due_date=due_date,
             )
@@ -8723,7 +8722,7 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.decks.id_for_name(nested_subdeck_name) is None
 
             # Verify config was removed
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck_id))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck_id)
             assert saved_due_date is None
 
 
@@ -8775,13 +8774,13 @@ class TestBlockExamSubdeckDialog:
             # Create some test subdecks
             deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck1_id = aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id
+            subdeck1_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id)
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2")
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
             config.add_block_exam_subdeck(
-                BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=subdeck1_id, due_date="2024-12-31")
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=subdeck1_id, due_date="2024-12-31")
             )
 
             dialog = BlockExamSubdeckDialog(ah_did, self.note_ids, parent=None)
@@ -8891,12 +8890,8 @@ class TestCheckBlockExamSubdeckDueDates:
             future_date2 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
 
             config_items = [
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(100), due_date=future_date1
-                ),
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(200), due_date=future_date2
-                ),
+                BlockExamSubdeckConfig(ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(100), due_date=future_date1),
+                BlockExamSubdeckConfig(ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(200), due_date=future_date2),
             ]
 
             # Add configurations
