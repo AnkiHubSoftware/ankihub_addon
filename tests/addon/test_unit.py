@@ -3520,15 +3520,19 @@ class TestRemoveBlockExamSubdeckConfig:
 class TestHandleExpiredSubdeck:
     """Tests for handle_expired_subdeck function."""
 
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_name_without_parent")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateDialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class):
+    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class, mock_get_name):
         """Test successfully handling an expired subdeck."""
-        mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
+        subdeck_name = "Exam Subdeck"
+        mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
 
         mock_dialog = MagicMock()
         mock_dialog_class.return_value = mock_dialog
+
+        mock_get_name.return_value = subdeck_name
 
         subdeck_config = BlockExamSubdeckConfig(
             ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
@@ -3536,7 +3540,7 @@ class TestHandleExpiredSubdeck:
 
         handle_expired_subdeck(subdeck_config)
 
-        mock_dialog_class.assert_called_once_with(subdeck_config, "Exam Subdeck", parent=mock_aqt.mw)
+        mock_dialog_class.assert_called_once_with(subdeck_config, subdeck_name, parent=mock_aqt.mw)
         mock_dialog.open.assert_called_once()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
