@@ -172,6 +172,7 @@ from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
+from ankihub.gui.operations.user_details import check_user_feature_access
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
@@ -9075,3 +9076,144 @@ class TestNoteIdsInDeckHierarchy:
             nids = note_ids_in_deck_hierarchy(deck_id)
 
             assert set(nids) == set()
+
+
+class TestCheckUserFeatureAccess:
+    """Tests for check_user_feature_access function."""
+
+    FEATURE_KEY = "test_feature"
+
+    def _mock_get_user_details(self, mocker, return_value=None, side_effect=None):
+        """Helper method to mock AnkiHubClient.get_user_details."""
+        return mocker.patch.object(
+            AnkiHubClient,
+            "get_user_details",
+            return_value=return_value,
+            side_effect=side_effect,
+        )
+
+    def test_with_access_granted(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_access_granted callback is called when user has access."""
+        # Mock the client to return user details with access granted
+        user_details = {
+            self.FEATURE_KEY: True,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Call check_user_feature_access and wait for the callback to be invoked
+        with qtbot.wait_callback() as on_access_granted:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted,
+                parent=aqt.mw,
+            )
+
+        # Assert callback was called with the correct user details
+        on_access_granted.assert_called_with(user_details)
+
+    def test_with_access_denied_and_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_access_denied callback is called when user doesn't have access."""
+        # Mock the client to return user details with access denied
+        user_details = {
+            self.FEATURE_KEY: False,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Track both callbacks
+        on_access_granted_mock = Mock()
+
+        # Call check_user_feature_access and wait for on_access_denied to be invoked
+        with qtbot.wait_callback() as on_access_denied:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied,
+                parent=aqt.mw,
+            )
+
+        # Assert on_access_denied was called with the correct user details
+        on_access_denied.assert_called_with(user_details)
+        # Assert on_access_granted was not called
+        on_access_granted_mock.assert_not_called()
+
+    def test_with_access_denied_no_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that no error occurs when access is denied and on_access_denied is None."""
+        # Mock the client to return user details with access denied
+        user_details = {
+            self.FEATURE_KEY: False,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Track the on_access_granted callback
+        on_access_granted_mock = Mock()
+
+        # Call check_user_feature_access with no on_access_denied callback
+        check_user_feature_access(
+            feature_key=self.FEATURE_KEY,
+            on_access_granted=on_access_granted_mock,
+            on_access_denied=None,
+            parent=aqt.mw,
+        )
+
+        # Wait for the operation to complete
+        qtbot.wait(500)
+
+        # Assert on_access_granted was not called
+        on_access_granted_mock.assert_not_called()
+
+    def test_with_failure_and_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_failure callback is called when fetching user details fails."""
+        # Mock the client to raise an exception
+        test_exception = Exception("Failed to fetch user details")
+        self._mock_get_user_details(mocker, side_effect=test_exception)
+
+        # Track the callbacks
+        on_access_granted_mock = Mock()
+        on_access_denied_mock = Mock()
+
+        # Call check_user_feature_access and wait for on_failure to be invoked
+        with qtbot.wait_callback() as on_failure:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied_mock,
+                on_failure=on_failure,
+                parent=aqt.mw,
+            )
+
+        # Assert on_failure was called with the exception
+        on_failure.assert_called_with(test_exception)
+        # Assert other callbacks were not called
+        on_access_granted_mock.assert_not_called()
+        on_access_denied_mock.assert_not_called()
+
+    def test_with_failure_and_no_failure_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that exception is raised when fetching fails and on_failure is None."""
+        # Mock the client to raise an exception
+        test_exception = Exception("Failed to fetch user details")
+        self._mock_get_user_details(mocker, side_effect=test_exception)
+
+        # Track the callbacks
+        on_access_granted_mock = Mock()
+        on_access_denied_mock = Mock()
+
+        # Capture exceptions raised in Qt event loop
+        with qtbot.capture_exceptions() as exceptions:
+            # Call check_user_feature_access with no on_failure callback
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied_mock,
+                on_failure=None,
+                parent=aqt.mw,
+            )
+
+            # Wait for the exception to be raised
+            qtbot.wait_until(lambda: len(exceptions) > 0)
+
+        # Assert the exception was raised
+        assert len(exceptions) == 1
+        assert exceptions[0][1] == test_exception
+        # Assert other callbacks were not called
+        on_access_granted_mock.assert_not_called()
+        on_access_denied_mock.assert_not_called()
