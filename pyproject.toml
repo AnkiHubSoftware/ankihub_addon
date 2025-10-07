@@ -17,8 +17,8 @@ tests = [
   "aqt[qt5]==24.11",
 ]
 dev = [
-  "pyqt5==5.15.5; platform_system != 'Windows'",
-  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
+  "pyqt6==6.8.1; platform_system != 'Windows'",
+  "pyqt6-webengine==6.8.0; platform_system != 'Windows'",
   "ruff",
   "mypy==0.971",
   "coverage==6.5.0",
