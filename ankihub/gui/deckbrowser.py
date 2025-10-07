@@ -54,14 +54,14 @@ def setup() -> None:
     setup_subdeck_ankihub_options()
 
 
-def _open_dialog_date_picker_for_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
+def _open_date_picker_dialog_for_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
 
     _dialog_state.dialog = DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw)
     _dialog_state.dialog.open()
 
 
-def _remove_block_exam_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
+def _open_remove_block_exam_subdeck_dialog(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
 
     def on_button_clicked(button_index: int) -> None:
@@ -104,7 +104,7 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
 
     if subdeck_config:
         action.setToolTip("Change the due date of this subdeck.")
-        qconnect(action.triggered, lambda: _open_dialog_date_picker_for_subdeck(subdeck_config))
+        qconnect(action.triggered, lambda: _open_date_picker_dialog_for_subdeck(subdeck_config))
     else:
         action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
@@ -118,7 +118,7 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
 
     if subdeck_config:
         action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
-        qconnect(action.triggered, lambda: _remove_block_exam_subdeck(subdeck_config))
+        qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_config))
     else:
         action.setToolTip("This option is only available for subdecks created with SmartSearch")
 
