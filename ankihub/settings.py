@@ -170,7 +170,7 @@ class DeckExtensionConfig(DataClassJSONMixin):
 
 @dataclass
 class BlockExamSubdeckConfig(DataClassJSONMixin):
-    ankihub_deck_id: str
+    ankihub_deck_id: uuid.UUID
     subdeck_id: DeckId
     due_date: Optional[str]  # YYYY-MM-DD format
 
@@ -516,14 +516,14 @@ class _Config:
         self._private_config.block_exams_subdecks = current
         self._update_private_config()
 
-    def get_block_exam_subdeck_due_date(self, ankihub_deck_id: str, subdeck_id: DeckId) -> Optional[str]:
+    def get_block_exam_subdeck_due_date(self, ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> Optional[str]:
         """Get due date for a specific block exam subdeck."""
         for config_item in self.get_block_exam_subdecks():
             if config_item.ankihub_deck_id == ankihub_deck_id and config_item.subdeck_id == subdeck_id:
                 return config_item.due_date
         return None
 
-    def remove_block_exam_subdeck(self, ankihub_deck_id: str, subdeck_id: DeckId) -> None:
+    def remove_block_exam_subdeck(self, ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> None:
         """Remove a block exam subdeck configuration.
 
         Args:

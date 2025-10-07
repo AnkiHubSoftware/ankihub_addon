@@ -52,9 +52,7 @@ def create_block_exam_subdeck(
 
     # Save configuration if due date provided
     if due_date:
-        config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=subdeck_id, due_date=due_date
-        )
+        config_item = BlockExamSubdeckConfig(ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck_id, due_date=due_date)
         config.add_block_exam_subdeck(config_item)
 
     LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, due_date=due_date)
@@ -102,7 +100,7 @@ def add_notes_to_block_exam_subdeck(
     # Update configuration with due date
     if due_date:
         config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=subdeck["id"], due_date=due_date
+            ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck["id"], due_date=due_date
         )
         config.add_block_exam_subdeck(config_item)
 
@@ -149,7 +147,7 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the subdeck to move
     """
-    ankihub_deck_id = uuid.UUID(subdeck_config.ankihub_deck_id)
+    ankihub_deck_id = subdeck_config.ankihub_deck_id
     deck_config = config.deck_config(ankihub_deck_id)
     if not deck_config:
         LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))

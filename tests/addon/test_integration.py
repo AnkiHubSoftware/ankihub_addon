@@ -8586,35 +8586,38 @@ class TestBlockExamSubdecks:
     def test_config_methods(
         self,
         anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Test initially empty
             assert config.get_block_exam_subdecks() == []
 
             # Test adding configuration
+            ah_did = next_deterministic_uuid()
+            test_subdeck_id = DeckId(999)
             config_item = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id=DeckId(999), due_date="2024-12-31"
+                ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2024-12-31"
             )
             config.add_block_exam_subdeck(config_item)
 
             # Test retrieving configuration
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
-            assert configs[0].ankihub_deck_id == "test-deck-id"
-            assert configs[0].subdeck_id == "test-subdeck-id"
+            assert configs[0].ankihub_deck_id == ah_did
+            assert configs[0].subdeck_id == test_subdeck_id
             assert configs[0].due_date == "2024-12-31"
 
             # Test getting due date
-            due_date = config.get_block_exam_subdeck_due_date("test-deck-id", "test-subdeck-id")
+            due_date = config.get_block_exam_subdeck_due_date(ah_did, test_subdeck_id)
             assert due_date == "2024-12-31"
 
             # Test getting due date for non-existent
-            due_date = config.get_block_exam_subdeck_due_date("non-existent", "non-existent")
+            due_date = config.get_block_exam_subdeck_due_date(next_deterministic_uuid(), DeckId(888))
             assert due_date is None
 
             # Test updating existing configuration
             updated_config = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id=DeckId(999), due_date="2025-01-15"
+                ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2025-01-15"
             )
             config.add_block_exam_subdeck(updated_config)
 
@@ -8624,7 +8627,7 @@ class TestBlockExamSubdecks:
             assert configs[0].due_date == "2025-01-15"
 
             # Test removing configuration
-            config.remove_block_exam_subdeck("test-deck-id", "test-subdeck-id")
+            config.remove_block_exam_subdeck(ah_did, test_subdeck_id)
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 0
 
@@ -8906,6 +8909,7 @@ class TestCheckBlockExamSubdeckDueDates:
     def test_check_block_exam_subdeck_due_dates_with_expired(
         self,
         anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid,
     ):
         """Test function identifies expired subdecks correctly."""
         with anki_session_with_addon_data.profile_loaded():
@@ -8914,14 +8918,17 @@ class TestCheckBlockExamSubdeckDueDates:
             today_date = date.today().strftime("%Y-%m-%d")
             future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
+            ah_did_1 = next_deterministic_uuid()
+            ah_did_2 = next_deterministic_uuid()
+            ah_did_3 = next_deterministic_uuid()
             config_items = [
-                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id=DeckId(1), due_date=past_date),
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did_1, subdeck_id=DeckId(1), due_date=past_date),
                 BlockExamSubdeckConfig(
-                    ankihub_deck_id="deck2",
+                    ankihub_deck_id=ah_did_2,
                     subdeck_id=DeckId(2),
                     due_date=today_date,  # Today counts as expired (>= today)
                 ),
-                BlockExamSubdeckConfig(ankihub_deck_id="deck3", subdeck_id=DeckId(3), due_date=future_date),
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did_3, subdeck_id=DeckId(3), due_date=future_date),
             ]
 
             # Add configurations
@@ -8933,9 +8940,9 @@ class TestCheckBlockExamSubdeckDueDates:
             # Should return the two expired subdecks
             assert len(expired) == 2
             expired_deck_ids = [config.ankihub_deck_id for config in expired]
-            assert "deck1" in expired_deck_ids  # past date
-            assert "deck2" in expired_deck_ids  # today's date
-            assert "deck3" not in expired_deck_ids  # future date
+            assert ah_did_1 in expired_deck_ids  # past date
+            assert ah_did_2 in expired_deck_ids  # today's date
+            assert ah_did_3 not in expired_deck_ids  # future date
 
 
 class TestNoteIdsInDeckHierarchy:

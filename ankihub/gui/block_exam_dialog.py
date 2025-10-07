@@ -239,7 +239,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.date_input = QDateEdit()
 
         # Try to get existing due date
-        existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
+        existing_due_date = config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
@@ -366,7 +366,7 @@ class BlockExamSubdeckDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
 
             # Mark block exam subdecks differently (optional visual indication)
-            if config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), subdeck_id):
+            if config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, subdeck_id):
                 # This subdeck is already configured as a block exam subdeck
                 item.setToolTip("Block exam subdeck")
 
