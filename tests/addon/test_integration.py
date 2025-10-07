@@ -8435,6 +8435,13 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
+            # Set a custom deck options group for the main deck
+            deck_config = config.deck_config(ah_did)
+            main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
+            custom_options = aqt.mw.col.decks.add_config("Test Options Group")
+            main_deck["conf"] = custom_options["id"]
+            aqt.mw.col.decks.update(main_deck)
+
             # Test creating a new subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
             subdeck_name, was_renamed = create_block_exam_subdeck(ah_did, "Test Subdeck", due_date)
@@ -8443,11 +8450,14 @@ class TestBlockExamSubdecks:
             assert not was_renamed
 
             # Verify subdeck was created
-            deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
             full_name = f"{anki_deck_name}::Test Subdeck"
             subdeck = aqt.mw.col.decks.by_name(full_name)
             assert subdeck is not None
+
+            # Verify subdeck inherits parent deck's option group
+            assert subdeck["conf"] == custom_options["id"]
+            assert subdeck["conf"] == main_deck["conf"]
 
             # Verify configuration was saved
             saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))

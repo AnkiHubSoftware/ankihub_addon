@@ -44,6 +44,12 @@ def create_block_exam_subdeck(
     # Create the subdeck
     subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id
 
+    # Make the subdeck inherit the parent deck's option group
+    subdeck = aqt.mw.col.decks.get(DeckId(subdeck_id))
+    main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
+    subdeck["conf"] = main_deck["conf"]
+    aqt.mw.col.decks.update(subdeck)
+
     # Save configuration if due date provided
     if due_date:
         config_item = BlockExamSubdeckConfig(
