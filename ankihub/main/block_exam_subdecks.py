@@ -199,3 +199,10 @@ def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> 
         subdeck_config: Configuration to remove
     """
     config.remove_block_exam_subdeck(subdeck_config.ankihub_deck_id, subdeck_config.subdeck_id)
+
+
+def get_subdeck_name_without_parent(subdeck_id: DeckId) -> str:
+    """Get the subdeck name without the parent deck prefix.
+    E.g. for "MainDeck::Subdeck", returns "Subdeck".
+    """
+    return aqt.mw.col.decks.name(subdeck_id).split("::", maxsplit=1)[-1]

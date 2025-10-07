@@ -439,6 +439,7 @@ def show_dialog(
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
     use_show: bool = False,
+    modal: bool = False,
     open_dialog: bool = True,
     add_title_to_body_on_mac: bool = True,
     checkbox: Optional[QCheckBox] = None,
@@ -470,6 +471,9 @@ def show_dialog(
         icon=icon,
         checkbox=checkbox,
     )
+
+    if modal:
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
 
     if use_show:
         dialog.show()

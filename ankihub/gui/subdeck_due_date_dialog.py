@@ -13,6 +13,7 @@ from aqt.utils import tooltip
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
+    get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
@@ -236,8 +237,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
         _show_next_expired_subdeck_dialog()
         return
 
-    subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
-
+    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.open()
