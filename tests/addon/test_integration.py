@@ -8593,7 +8593,7 @@ class TestBlockExamSubdecks:
 
             # Test adding configuration
             config_item = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id="test-subdeck-id", due_date="2024-12-31"
+                ankihub_deck_id="test-deck-id", subdeck_id=DeckId(999), due_date="2024-12-31"
             )
             config.add_block_exam_subdeck(config_item)
 
@@ -8614,7 +8614,7 @@ class TestBlockExamSubdecks:
 
             # Test updating existing configuration
             updated_config = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id="test-subdeck-id", due_date="2025-01-15"
+                ankihub_deck_id="test-deck-id", subdeck_id=DeckId(999), due_date="2025-01-15"
             )
             config.add_block_exam_subdeck(updated_config)
 
@@ -8701,7 +8701,7 @@ class TestBlockExamSubdecks:
             # Move subdeck to main deck
             subdeck_config = BlockExamSubdeckConfig(
                 ankihub_deck_id=str(ah_did),
-                subdeck_id=str(subdeck_id),
+                subdeck_id=subdeck_id,
                 due_date=due_date,
             )
             move_subdeck_to_main_deck(subdeck_config)
@@ -8778,7 +8778,7 @@ class TestBlockExamSubdeckDialog:
 
             # Add block exam configuration for one of them
             config.add_block_exam_subdeck(
-                BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=str(subdeck1_id), due_date="2024-12-31")
+                BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=subdeck1_id, due_date="2024-12-31")
             )
 
             dialog = BlockExamSubdeckDialog(ah_did, self.note_ids, parent=None)
@@ -8889,10 +8889,10 @@ class TestCheckBlockExamSubdeckDueDates:
 
             config_items = [
                 BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date1
+                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(100), due_date=future_date1
                 ),
                 BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date2
+                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(200), due_date=future_date2
                 ),
             ]
 
@@ -8915,13 +8915,13 @@ class TestCheckBlockExamSubdeckDueDates:
             future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
             config_items = [
-                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date=past_date),
+                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id=DeckId(1), due_date=past_date),
                 BlockExamSubdeckConfig(
                     ankihub_deck_id="deck2",
-                    subdeck_id="subdeck2",
+                    subdeck_id=DeckId(2),
                     due_date=today_date,  # Today counts as expired (>= today)
                 ),
-                BlockExamSubdeckConfig(ankihub_deck_id="deck3", subdeck_id="subdeck3", due_date=future_date),
+                BlockExamSubdeckConfig(ankihub_deck_id="deck3", subdeck_id=DeckId(3), due_date=future_date),
             ]
 
             # Add configurations

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 import aqt
+from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import (
     QDateEdit,
@@ -37,7 +38,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.ankihub_deck_id = ankihub_deck_id
         self.note_ids = note_ids
         self.selected_subdeck_name: Optional[str] = None
-        self.selected_subdeck_id: Optional[str] = None
+        self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
         self.resize(440, 340)
@@ -354,7 +355,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         for deck_name, deck_id in aqt.mw.col.decks.children(deck_config.anki_id):
             subdeck_path = deck_name[len(anki_deck_name) + 2 :]
-            all_subdecks.append((subdeck_path, str(deck_id)))
+            all_subdecks.append((subdeck_path, deck_id))
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())

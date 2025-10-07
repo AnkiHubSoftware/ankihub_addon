@@ -42,10 +42,10 @@ def create_block_exam_subdeck(
         counter += 1
 
     # Create the subdeck
-    subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id
+    subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id)
 
     # Make the subdeck inherit the parent deck's option group
-    subdeck = aqt.mw.col.decks.get(DeckId(subdeck_id))
+    subdeck = aqt.mw.col.decks.get(subdeck_id)
     main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
     subdeck["conf"] = main_deck["conf"]
     aqt.mw.col.decks.update(subdeck)
@@ -53,7 +53,7 @@ def create_block_exam_subdeck(
     # Save configuration if due date provided
     if due_date:
         config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=str(subdeck_id), due_date=due_date
+            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=subdeck_id, due_date=due_date
         )
         config.add_block_exam_subdeck(config_item)
 
@@ -102,7 +102,7 @@ def add_notes_to_block_exam_subdeck(
     # Update configuration with due date
     if due_date:
         config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=str(subdeck["id"]), due_date=due_date
+            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=subdeck["id"], due_date=due_date
         )
         config.add_block_exam_subdeck(config_item)
 
@@ -155,7 +155,7 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> None:
         LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
         raise ValueError("Deck config not found")
 
-    subdeck_id = DeckId(int(subdeck_config.subdeck_id))
+    subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)

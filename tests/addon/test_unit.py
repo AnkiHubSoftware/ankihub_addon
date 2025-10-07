@@ -3442,7 +3442,7 @@ class TestMoveSubdeckToMainDeck:
         mock_note_ids_in_deck_hierarchy.return_value = [1, 2, 3]
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         move_subdeck_to_main_deck(subdeck_config)
@@ -3458,7 +3458,7 @@ class TestMoveSubdeckToMainDeck:
         mock_config.deck_config.return_value = None
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         with pytest.raises(ValueError, match="Deck config not found"):
@@ -3480,7 +3480,7 @@ class TestMoveSubdeckToMainDeck:
         mock_aqt.mw.col.decks.get.return_value = False
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         move_subdeck_to_main_deck(subdeck_config)
@@ -3494,12 +3494,14 @@ class TestSetSubdeckDueDate:
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_set_subdeck_due_date_success(self, mock_config):
         """Test successfully setting a new due date."""
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        subdeck_config = BlockExamSubdeckConfig(
+            ankihub_deck_id="test-deck-id", subdeck_id=DeckId(456), due_date="2024-12-31"
+        )
 
         set_subdeck_due_date(subdeck_config, "2025-06-15")
 
         expected_config = BlockExamSubdeckConfig(
-            ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2025-06-15"
+            ankihub_deck_id="test-deck-id", subdeck_id=DeckId(456), due_date="2025-06-15"
         )
         mock_config.add_block_exam_subdeck.assert_called_once_with(expected_config)
 
@@ -3510,7 +3512,9 @@ class TestRemoveBlockExamSubdeckConfig:
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_remove_block_exam_subdeck_config(self, mock_config):
         """Test removing a block exam subdeck configuration."""
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        subdeck_config = BlockExamSubdeckConfig(
+            ankihub_deck_id="test-deck-id", subdeck_id=DeckId(456), due_date="2024-12-31"
+        )
 
         remove_block_exam_subdeck_config(subdeck_config)
 
@@ -3535,7 +3539,7 @@ class TestHandleExpiredSubdeck:
         mock_get_name.return_value = subdeck_name
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         handle_expired_subdeck(subdeck_config)
@@ -3550,7 +3554,7 @@ class TestHandleExpiredSubdeck:
         mock_aqt.mw.col.decks.get.return_value = False
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=str(uuid.uuid4()), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         handle_expired_subdeck(subdeck_config)
@@ -3590,8 +3594,8 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         )
 
         expired_subdecks = [
-            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
-            BlockExamSubdeckConfig(ankihub_deck_id="deck2", subdeck_id="subdeck2", due_date="2023-01-02"),
+            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id=DeckId(1), due_date="2023-01-01"),
+            BlockExamSubdeckConfig(ankihub_deck_id="deck2", subdeck_id=DeckId(2), due_date="2023-01-02"),
         ]
         mock_check_due_dates.return_value = expired_subdecks
 

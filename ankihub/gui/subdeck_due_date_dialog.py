@@ -5,7 +5,6 @@ from datetime import date, timedelta
 from typing import Optional
 
 import aqt
-from anki.decks import DeckId
 from aqt import qconnect
 from aqt.qt import QDateEdit, QDialog, QHBoxLayout, QLabel, QPushButton, Qt, QVBoxLayout
 from aqt.utils import tooltip
@@ -229,7 +228,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the expired subdeck
     """
-    subdeck_id = DeckId(int(subdeck_config.subdeck_id))
+    subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
