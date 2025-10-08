@@ -261,8 +261,7 @@ def _general_setup() -> None:
 
     config.token_change_hook.append(update_feature_flags_in_background)
     config.token_change_hook.append(fetch_user_details_in_background)
-
-    LOGGER.info("Set up feature flag fetching (flags will be fetched in the background).")
+    LOGGER.info("Set up fetching of feature flags and user details on token change.")
 
 
 def _copy_web_media_to_media_folder() -> None:
