@@ -9,7 +9,7 @@ from ...gui.operations import AddonQueryOp
 from ...settings import config
 
 
-def _fetch_user_details_in_background() -> None:
+def _fetch_user_details() -> None:
     if not config.is_logged_in():
         config.save_username("")
         config.save_user_id(None)
@@ -37,7 +37,7 @@ def fetch_user_details_in_background() -> None:
 
     AddonQueryOp(
         parent=aqt.mw,
-        op=lambda _: _fetch_user_details_in_background(),
+        op=lambda _: _fetch_user_details(),
         success=on_done,
     ).without_collection().run_in_background()
 
