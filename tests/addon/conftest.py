@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Type
 
 import pytest
 from coverage.exceptions import DataError  # type: ignore
@@ -163,6 +163,6 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
     monkeypatch.setattr("ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", False)
 
 
-def pytest_set_filtered_exceptions() -> List[Exception]:
+def pytest_set_filtered_exceptions() -> List[Type[Exception]]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
