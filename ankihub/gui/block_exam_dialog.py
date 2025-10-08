@@ -437,21 +437,16 @@ class BlockExamSubdeckDialog(QDialog):
             return
 
         # Create subdeck
-        try:
-            actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
-            # Add notes to the new subdeck
-            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        # Add notes to the new subdeck
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            # Show success message
-            tooltip(f"{added_count} note(s) added to '{actual_name}'")
-            self.accept()
+        # Show success message
+        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.accept()
 
-            aqt.mw.moveToState("deckBrowser")
-
-        except Exception as e:
-            LOGGER.error("Failed to create subdeck", error=str(e))
-            showInfo(f"Failed to create subdeck: {e}")
+        aqt.mw.moveToState("deckBrowser")
 
     def _on_add_notes(self):
         """Handle adding notes to selected subdeck."""
@@ -459,35 +454,28 @@ class BlockExamSubdeckDialog(QDialog):
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
 
-        try:
-            # Check if subdeck name needs to be updated
-            if new_name != self.selected_subdeck_name:
-                # Check if new name conflicts with existing subdeck
-                deck_config = config.deck_config(self.ankihub_deck_id)
-                if deck_config:
-                    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-                    if anki_deck_name:
-                        # Handle full subdeck path for multi-level subdecks
-                        new_full_name = f"{anki_deck_name}::{new_name}"
-                        if aqt.mw.col.decks.by_name(new_full_name):
-                            showInfo(
-                                f"A subdeck with name '{new_name}' already exists. Please choose a different name."
-                            )
-                            return
+        # Check if subdeck name needs to be updated
+        if new_name != self.selected_subdeck_name:
+            # Check if new name conflicts with existing subdeck
+            deck_config = config.deck_config(self.ankihub_deck_id)
+            if deck_config:
+                anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+                if anki_deck_name:
+                    # Handle full subdeck path for multi-level subdecks
+                    new_full_name = f"{anki_deck_name}::{new_name}"
+                    if aqt.mw.col.decks.by_name(new_full_name):
+                        showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
+                        return
 
-                self._rename_subdeck(self.selected_subdeck_name, new_name)
-                self.selected_subdeck_name = new_name
+            self._rename_subdeck(self.selected_subdeck_name, new_name)
+            self.selected_subdeck_name = new_name
 
-            added_count = add_notes_to_block_exam_subdeck(
-                self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
-            )
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+        )
 
-            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
-            self.accept()
-
-        except Exception as e:
-            LOGGER.error("Failed to add notes to subdeck", error=str(e))
-            showInfo(f"Failed to add notes: {e}")
+        tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
+        self.accept()
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
@@ -515,58 +503,46 @@ class BlockExamSubdeckDialog(QDialog):
 
     def _handle_conflict_create_new(self, conflicting_name: str):
         """Handle creating a new subdeck with auto-generated name."""
-        try:
-            # Use stored due date from the original screen
-            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
+        # Use stored due date from the original screen
+        due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-            actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            tooltip(f"{added_count} note(s) added to '{actual_name}'")
-            self.accept()
+        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.accept()
 
-            aqt.mw.moveToState("deckBrowser")
-
-        except Exception as e:
-            LOGGER.error("Failed to create subdeck with auto name", error=str(e))
-            showInfo(f"Failed to create subdeck: {e}")
+        aqt.mw.moveToState("deckBrowser")
 
     def _handle_conflict_merge(self, conflicting_name: str):
         """Handle merging into existing subdeck directly."""
-        try:
-            # Find subdeck ID for the existing subdeck
-            deck_config = config.deck_config(self.ankihub_deck_id)
-            if not deck_config:
-                showInfo("Error: Deck configuration not found.")
-                return
+        # Find subdeck ID for the existing subdeck
+        deck_config = config.deck_config(self.ankihub_deck_id)
+        if not deck_config:
+            showInfo("Error: Deck configuration not found.")
+            return
 
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            if not anki_deck_name:
-                showInfo("Error: Parent deck not found.")
-                return
+        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+        if not anki_deck_name:
+            showInfo("Error: Parent deck not found.")
+            return
 
-            full_name = f"{anki_deck_name}::{conflicting_name}"
-            subdeck = aqt.mw.col.decks.by_name(full_name)
-            if not subdeck:
-                showInfo("Error: Could not find the existing subdeck.")
-                return
+        full_name = f"{anki_deck_name}::{conflicting_name}"
+        subdeck = aqt.mw.col.decks.by_name(full_name)
+        if not subdeck:
+            showInfo("Error: Could not find the existing subdeck.")
+            return
 
-            # Use stored due date from the original screen
-            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
+        # Use stored due date from the original screen
+        due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-            # Add notes to the existing subdeck
-            added_count = add_notes_to_block_exam_subdeck(
-                self.ankihub_deck_id, conflicting_name, self.note_ids, due_date
-            )
+        # Add notes to the existing subdeck
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
 
-            # Show success message and close
-            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
-            self.accept()
-
-        except Exception as e:
-            LOGGER.error("Failed to add notes to subdeck", error=str(e))
-            showInfo(f"Failed to add notes: {e}")
+        # Show success message and close
+        tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
+        self.accept()
 
     def _clear_layout(self):
         """Clear the current layout."""
