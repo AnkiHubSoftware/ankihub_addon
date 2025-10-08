@@ -8591,7 +8591,7 @@ class TestBlockExamSubdecks:
         add_anki_note: AddAnkiNote,
         qtbot: QtBot,
     ):
-        """Test that notes are unsuspended when unsuspend=True."""
+        """Test that notes are unsuspended when unsuspend_notes=True."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8613,7 +8613,7 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
-            # Add notes to subdeck with unsuspend=True
+            # Add notes to subdeck with unsuspend_notes=True
             added_count = add_notes_to_block_exam_subdeck(
                 ah_did, subdeck_name, [note1.id, note2.id], due_date, unsuspend_notes=True
             )
@@ -8634,7 +8634,7 @@ class TestBlockExamSubdecks:
         add_anki_note: AddAnkiNote,
         qtbot: QtBot,
     ):
-        """Test that notes remain suspended when unsuspend=False (default)."""
+        """Test that notes remain suspended when unsuspend_notes=False (default)."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8704,7 +8704,7 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
-            # Now add all 3 notes with unsuspend=True
+            # Now add all 3 notes with unsuspend_notes=True
             # Only note3 should be moved, but all 3 should be unsuspended
             added_count = add_notes_to_block_exam_subdeck(
                 ah_did, subdeck_name, [note1.id, note2.id, note3.id], due_date, unsuspend_notes=True
