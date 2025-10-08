@@ -39,7 +39,7 @@ dev = [
   "typeguard>=2.13.3",
   "types-factory-boy>=0.3.1",
   "types-requests>=2.28.9",
-  "urllib3>=1.26.14",
+  "urllib3>=1.26.14,<2",
   "vcrpy>=4.2.0",
 ]
 bundle = [
