@@ -132,6 +132,7 @@ def add_notes_to_block_exam_subdeck(
         requested_count=len(note_ids),
         actually_moved=len(notes_to_move),
         due_date=due_date,
+        unsuspend_notes=unsuspend_notes,
     )
 
     return len(notes_to_move)
