@@ -7,14 +7,13 @@ from aqt import QDialogButtonBox, sip
 from aqt.utils import openLink
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.webview import AnkiHubWebViewDialog
 from ..settings import (
     url_flashcard_selector,
     url_flashcard_selector_embed,
     url_plans_page,
 )
-from .operations import AddonQueryOp
+from .operations.user_details import check_user_feature_access
 from .utils import show_dialog
 
 
@@ -57,7 +56,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
 
 def _show_upsell(user_details: dict) -> None:
-    show_trial_ended_message = user_details["show_trial_ended_message"]
+    show_trial_ended_message = user_details.get("show_trial_ended_message", False)
     text = "Let AI do the heavy lifting! Find flashcards perfectly matched to your study materials and elevate your \
 learning experience with Premium. 🌟"
     if show_trial_ended_message:
@@ -83,19 +82,12 @@ learning experience with Premium. 🌟"
 
 
 def show_flashcard_selector(ah_did: UUID, parent=aqt.mw) -> None:
-    def fetch_user_details(_) -> dict:
-        user_details = AnkiHubClient().get_user_details()
-        return user_details
+    def on_access_granted(_: dict) -> None:
+        FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=parent)
+        LOGGER.info("Opened flashcard selector dialog.")
 
-    def on_fetched_user_details(user_details: dict) -> None:
-        if user_details.get("has_flashcard_selector_access"):
-            FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=parent)
-            LOGGER.info("Opened flashcard selector dialog.")
-        else:
-            _show_upsell(user_details)
-
-    AddonQueryOp(
-        op=fetch_user_details,
-        success=on_fetched_user_details,
-        parent=aqt.mw,
-    ).without_collection().run_in_background()
+    check_user_feature_access(
+        feature_key="has_flashcard_selector_access",
+        on_access_granted=on_access_granted,
+        on_access_denied=_show_upsell,
+    )

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 import aqt
+from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import (
     QDateEdit,
@@ -37,7 +38,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.ankihub_deck_id = ankihub_deck_id
         self.note_ids = note_ids
         self.selected_subdeck_name: Optional[str] = None
-        self.selected_subdeck_id: Optional[str] = None
+        self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
         self.resize(440, 340)
@@ -238,7 +239,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.date_input = QDateEdit()
 
         # Try to get existing due date
-        existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
+        existing_due_date = config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
@@ -354,7 +355,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         for deck_name, deck_id in aqt.mw.col.decks.children(deck_config.anki_id):
             subdeck_path = deck_name[len(anki_deck_name) + 2 :]
-            all_subdecks.append((subdeck_path, str(deck_id)))
+            all_subdecks.append((subdeck_path, deck_id))
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())
@@ -365,7 +366,7 @@ class BlockExamSubdeckDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
 
             # Mark block exam subdecks differently (optional visual indication)
-            if config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), subdeck_id):
+            if config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, subdeck_id):
                 # This subdeck is already configured as a block exam subdeck
                 item.setToolTip("Block exam subdeck")
 

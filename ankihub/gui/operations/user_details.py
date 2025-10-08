@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 import aqt
 
 from ... import LOGGER
@@ -31,3 +33,39 @@ def fetch_user_details_in_background() -> None:
         op=lambda _: _fetch_user_details_in_background(),
         success=on_done,
     ).without_collection().run_in_background()
+
+
+def check_user_feature_access(
+    feature_key: str,
+    on_access_granted: Callable[[dict], None],
+    on_access_denied: Optional[Callable[[dict], None]] = None,
+    on_failure: Optional[Callable[[Exception], None]] = None,
+    parent=None,
+) -> None:
+    """
+    Fetches user details and executes callbacks based on feature access.
+
+    Args:
+        feature_key: The key in user_details to check (e.g., "has_flashcard_selector_access")
+        on_access_granted: Callback to call if user has access, receives user_details dict
+        on_access_denied: Optional callback to call if user doesn't have access, receives user_details dict
+        on_failure: Optional callback to call if fetching user details fails, receives exception
+        parent: Parent widget for the operation (defaults to aqt.mw)
+    """
+
+    def on_fetched_user_details(user_details: dict) -> None:
+        if user_details.get(feature_key):
+            on_access_granted(user_details)
+        elif on_access_denied:
+            on_access_denied(user_details)
+
+    op = AddonQueryOp(
+        op=lambda _: AnkiHubClient().get_user_details(),
+        success=on_fetched_user_details,
+        parent=parent or aqt.mw,
+    ).without_collection()
+
+    if on_failure:
+        op = op.failure(on_failure)
+
+    op.run_in_background()
