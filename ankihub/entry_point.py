@@ -128,7 +128,11 @@ def _on_profile_did_open() -> None:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
-    media_sync.allow_background_threads()
+    # Call setup_feature_flags_in_background after the general setup.
+    # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
+    # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
+    # which would cause the callbacks to not be called.
+    update_feature_flags_in_background()
 
 
 def _on_profile_will_close() -> None:
@@ -176,6 +180,10 @@ def _after_profile_setup() -> None:
     # just a temporary fix for notes that were already manually deleted on the webapp.
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
+
+    fetch_user_details_in_background()
+
+    media_sync.allow_background_threads()
 
     if aqt.mw.can_auto_sync():
         sync_did_finish.append(_once_after_startup_ankiweb_sync)
@@ -250,13 +258,6 @@ def _general_setup() -> None:
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
-
-    # Call setup_feature_flags_in_background last among the setup functions.
-    # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
-    # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
-    # which would cause the callbacks to not be called.
-    update_feature_flags_in_background()
-    fetch_user_details_in_background()
 
     config.token_change_hook.append(update_feature_flags_in_background)
     config.token_change_hook.append(fetch_user_details_in_background)
