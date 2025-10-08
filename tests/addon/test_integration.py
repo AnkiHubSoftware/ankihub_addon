@@ -8583,13 +8583,15 @@ class TestBlockExamSubdecks:
             assert note2.id in notes_in_subdeck
             assert note3.id in notes_in_subdeck
 
+    @pytest.mark.qt_no_exception_capture
     def test_add_notes_to_block_exam_subdeck_unsuspends_notes(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
     ):
-        """Test that notes are unsuspended when unsuspend_notes=True."""
+        """Test that notes are unsuspended when unsuspend=True."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8611,12 +8613,15 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
-            # Add notes to subdeck with unsuspend_notes=True
+            # Add notes to subdeck with unsuspend=True
             added_count = add_notes_to_block_exam_subdeck(
                 ah_did, subdeck_name, [note1.id, note2.id], due_date, unsuspend_notes=True
             )
 
             assert added_count == 2
+
+            # Wait for background unsuspend to complete
+            qtbot.wait_until(lambda: aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED)
 
             # Verify cards are now unsuspended
             assert aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED
@@ -8627,8 +8632,9 @@ class TestBlockExamSubdecks:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
     ):
-        """Test that notes remain suspended when unsuspend_notes=False (default)."""
+        """Test that notes remain suspended when unsuspend=False (default)."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
@@ -8650,20 +8656,25 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
-            # Add notes to subdeck without unsuspend_notes parameter (defaults to False)
+            # Add notes to subdeck without unsuspend parameter (defaults to False)
             added_count = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, [note1.id, note2.id], due_date)
 
             assert added_count == 2
+
+            # Wait to ensure no background unsuspend happens
+            qtbot.wait(100)
 
             # Verify cards remain suspended
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
+    @pytest.mark.qt_no_exception_capture
     def test_add_notes_to_block_exam_subdeck_unsuspends_all_notes_including_already_in_subdeck(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
     ):
         """Test that unsuspend applies to all notes, including those already in subdeck."""
         with anki_session_with_addon_data.profile_loaded():
@@ -8693,13 +8704,16 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
 
-            # Now add all 3 notes with unsuspend_notes=True
+            # Now add all 3 notes with unsuspend=True
             # Only note3 should be moved, but all 3 should be unsuspended
             added_count = add_notes_to_block_exam_subdeck(
                 ah_did, subdeck_name, [note1.id, note2.id, note3.id], due_date, unsuspend_notes=True
             )
 
             assert added_count == 1  # Only note3 was moved
+
+            # Wait for background unsuspend to complete
+            qtbot.wait_until(lambda: aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED)
 
             # Verify all 3 cards are now unsuspended
             assert aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED
