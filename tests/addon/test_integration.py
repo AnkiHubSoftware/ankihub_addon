@@ -8735,7 +8735,7 @@ class TestBlockExamSubdecks:
             config_item = BlockExamSubdeckConfig(
                 ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2024-12-31"
             )
-            config.add_block_exam_subdeck(config_item)
+            config.upsert_block_exam_subdeck(config_item)
 
             # Test retrieving configuration
             configs = config.get_block_exam_subdecks()
@@ -8756,7 +8756,7 @@ class TestBlockExamSubdecks:
             updated_config = BlockExamSubdeckConfig(
                 ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2025-01-15"
             )
-            config.add_block_exam_subdeck(updated_config)
+            config.upsert_block_exam_subdeck(updated_config)
 
             # Should still only have one config but with updated date
             configs = config.get_block_exam_subdecks()
@@ -8915,7 +8915,7 @@ class TestBlockExamSubdeckDialog:
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
-            config.add_block_exam_subdeck(
+            config.upsert_block_exam_subdeck(
                 BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=subdeck1_id, due_date="2024-12-31")
             )
 
@@ -9031,7 +9031,7 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
+                config.upsert_block_exam_subdeck(config_item)
 
             expired = check_block_exam_subdeck_due_dates()
             assert expired == []
@@ -9063,7 +9063,7 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
+                config.upsert_block_exam_subdeck(config_item)
 
             expired = check_block_exam_subdeck_due_dates()
 
