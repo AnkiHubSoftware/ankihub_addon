@@ -43,7 +43,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
-        self.setFixedWidth(440)
+        self.setMinimumWidth(440)
 
         # Check if user has existing subdecks to determine entry point
         deck_config = config.deck_config(ankihub_deck_id)
