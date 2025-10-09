@@ -17,8 +17,6 @@ dev = [
   "faker>=19.12.0",
   "mypy>=1.18.2",
   "pre-commit>=2.20.0",
-  "pyqt5==5.15.5; platform_system != 'Windows'",
-  "pyqtwebengine==5.15.6; platform_system != 'Windows'",
   "pytest>=8.2.2",
   "pytest-anki",
   "pytest-cov>=4.0.0",
@@ -44,7 +42,7 @@ bundle = [
   "mashumaro",
 ]
 aqt = ["aqt[qt]==25.9.2"]
-aqt_legacy = ["aqt[qt5]==2.1.56"]
+aqt_legacy = ["aqt[qt5]==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
 
 [tool.uv]
 conflicts = [
