@@ -3500,7 +3500,7 @@ class TestSetSubdeckDueDate:
         set_subdeck_due_date(subdeck_config, "2025-06-15")
 
         expected_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2025-06-15")
-        mock_config.add_block_exam_subdeck.assert_called_once_with(expected_config)
+        mock_config.upsert_block_exam_subdeck.assert_called_once_with(expected_config)
 
 
 class TestRemoveBlockExamSubdeckConfig:

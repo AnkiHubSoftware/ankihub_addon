@@ -503,7 +503,7 @@ class _Config:
         )
         return subdeck_config
 
-    def add_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
+    def upsert_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
         """Add or update a block exam subdeck configuration."""
         current = self.get_block_exam_subdecks()
         # Remove existing entry with same ankihub_deck_id and subdeck_id
