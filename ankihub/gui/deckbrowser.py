@@ -79,7 +79,8 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_config: BlockExamSubdeckConfi
             "Are you sure you want to remove the subdeck?"
             "</span>"
             "<br><br>"
-            f"This will remove the subdeck <b>{subdeck_name}</b>, but all notes will be moved back into the main deck."
+            f"Removing the subdeck <b>{subdeck_name}</b> will move all its notes, "
+            "including those from nested subdecks, back to the main deck."
         ),
         title="AnkiHub | Subdecks",
         buttons=[

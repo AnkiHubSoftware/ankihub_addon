@@ -3541,7 +3541,7 @@ class TestHandleExpiredSubdeck:
         handle_expired_subdeck(subdeck_config)
 
         mock_dialog_class.assert_called_once_with(subdeck_config, subdeck_name, parent=mock_aqt.mw)
-        mock_dialog.open.assert_called_once()
+        mock_dialog.show.assert_called_once()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")

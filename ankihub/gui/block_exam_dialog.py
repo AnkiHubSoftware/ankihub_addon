@@ -18,6 +18,7 @@ from aqt.qt import (
     QListWidgetItem,
     QPushButton,
     Qt,
+    QTimer,
     QVBoxLayout,
     qconnect,
 )
@@ -43,7 +44,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
-        self.resize(440, 380)
+        self.setMinimumWidth(440)
 
         # Check if user has existing subdecks to determine entry point
         deck_config = config.deck_config(ankihub_deck_id)
@@ -106,6 +107,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(select_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so layout is fully calculated
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_create_subdeck_screen(self):
         """Show screen for creating new subdeck."""
@@ -191,6 +195,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Focus on name input
         self.name_input.setFocus()
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_add_notes_screen(self):
         """Show screen for adding notes to selected subdeck."""
@@ -283,6 +290,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         layout.addLayout(button_layout)
 
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
+
     def _show_subdeck_conflict_screen(self, conflicting_name: str):
         """Show screen for handling subdeck name conflicts."""
         # Store the due date from the current screen before clearing layout
@@ -309,7 +319,7 @@ class BlockExamSubdeckDialog(QDialog):
         layout.addSpacing(12)
 
         # Main message
-        message_label = QLabel(f"A subdeck already exists with the name '{conflicting_name}'.")
+        message_label = QLabel(f'A subdeck already exists with the name "<b>{conflicting_name}</b>".')
         message_font = message_label.font()
         message_label.setFont(message_font)
         message_label.setWordWrap(True)
@@ -319,7 +329,7 @@ class BlockExamSubdeckDialog(QDialog):
         # Info label
         info_label = QLabel(
             "You can either create a new one called "
-            f"'{conflicting_name} (1)' or merge these notes into the existing subdeck."
+            f'"<b>{conflicting_name}</b> (1)" or merge these notes into the existing subdeck.'
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
@@ -354,6 +364,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(merge_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _populate_subdeck_list(self):
         """Populate the subdeck list widget."""
