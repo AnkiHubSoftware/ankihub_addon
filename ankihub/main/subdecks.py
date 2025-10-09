@@ -7,7 +7,7 @@ revert the changes made by moving cards to their subdecks.
 
 import re
 import uuid
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, cast
 
 import aqt
 from anki.decks import DeckId
@@ -103,7 +103,9 @@ def _nid_to_destination_deck_name(
         # Filter out notes that are in exam subdecks
         nids = [nid for nid in nids if nid not in nids_in_exam_subdecks]
 
-    nid_to_tags = dict(aqt.mw.col.db.all(f"SELECT id, tags FROM notes WHERE id IN {ids2str(nids)}"))
+    nid_to_tags = dict(
+        cast(List[tuple[NoteId, str]], aqt.mw.col.db.all(f"SELECT id, tags FROM notes WHERE id IN {ids2str(nids)}"))
+    )
     for nid, tags_str in nid_to_tags.items():
         tags = aqt.mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
