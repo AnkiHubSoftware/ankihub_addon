@@ -10,12 +10,6 @@ dependencies = []
 package-dir = { "ankihub_addon" = "ankihub" }
 
 [dependency-groups]
-production = [
-  "aqt[qt]==25.9.2",
-]
-tests = [
-  "aqt[qt]==25.9.2",
-]
 dev = [
   "approvaltests>=12.2.0",
   "coverage>=6.5.0",
@@ -48,6 +42,16 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
+]
+aqt = ["aqt[qt]==25.9.2"]
+aqt_legacy = ["aqt[qt5]==2.1.56"]
+
+[tool.uv]
+conflicts = [
+    [
+      { group = "aqt" },
+      { group = "aqt_legacy" },
+    ],
 ]
 
 [tool.uv.sources]

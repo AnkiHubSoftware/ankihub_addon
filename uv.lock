@@ -9,6 +9,10 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
+conflicts = [[
+    { package = "ankihub-addon", group = "aqt" },
+    { package = "ankihub-addon", group = "aqt-legacy" },
+]]
 
 [[package]]
 name = "allpairspy"
@@ -21,15 +25,53 @@ wheels = [
 
 [[package]]
 name = "anki"
+version = "2.1.56"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
+]
+dependencies = [
+    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "decorator", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "markdown", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "orjson", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "protobuf", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/f7/ca5c6ecc78b3a43aab414fc28991879eb311f2a4c01fee78c96ed6ca0a76/anki-2.1.56-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:c6e9c5bfd64d326221a3190f9626b29557657374a41416a3aeb39e5894899d14", size = 9389971, upload-time = "2023-01-09T01:01:56.656Z" },
+    { url = "https://files.pythonhosted.org/packages/03/30/6fb292fc45d50af780893146ddc073d3f3d848e1cb92d07e7af7ca9da81c/anki-2.1.56-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a7e194098bc15bcc27a49853726cdecbea5da248d851df70052b76b773304462", size = 9120451, upload-time = "2023-01-09T01:02:05.206Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/ec/2128d36bda7b8fe1d0d6ad78faad4dbe0bfdda68bc008cc224dce935bb3b/anki-2.1.56-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:6bfe483611e99d471e1ba44d25b02668836d70d5eaca2837ef6d9f10ca449cc2", size = 11902907, upload-time = "2023-01-09T01:02:15.219Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/99/a36d6ea2c0defa316f4fcb04fe4e185a5341f1986987e0617c3b3dbcfe38/anki-2.1.56-cp39-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:9de030ce8d523e5292c999f9ab2f19b564a007af90d1f4d4299c5f887a33cfa0", size = 11903331, upload-time = "2023-01-09T01:02:25.113Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/53/90af2f95e1f20d1cceb89343a3c58e885d44b9a86352d6452e239c1d062f/anki-2.1.56-cp39-abi3-win_amd64.whl", hash = "sha256:5f5e683f0ddefa169061bfa30f42bad196e0c571943c560fe697a85ee4fa5ef4", size = 8414843, upload-time = "2023-01-09T01:02:32.731Z" },
+]
+
+[[package]]
+name = "anki"
 version = "25.9.2"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
+]
 dependencies = [
     { name = "decorator" },
-    { name = "distro", marker = "sys_platform != 'darwin' and sys_platform != 'win32'" },
+    { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform != 'darwin' and sys_platform != 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "markdown" },
     { name = "orjson" },
     { name = "protobuf" },
-    { name = "requests", extra = ["socks"] },
+    { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "typing-extensions" },
 ]
 wheels = [
@@ -54,6 +96,12 @@ version = "2025.9.17.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
+aqt = [
+    { name = "aqt", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, extra = ["qt"], marker = "extra == 'group-13-ankihub-addon-aqt'" },
+]
+aqt-legacy = [
+    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, extra = ["qt5"], marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+]
 bundle = [
     { name = "mashumaro" },
     { name = "peewee" },
@@ -68,8 +116,8 @@ dev = [
     { name = "faker" },
     { name = "mypy" },
     { name = "pre-commit" },
-    { name = "pyqt5", marker = "sys_platform != 'win32'" },
-    { name = "pyqtwebengine", marker = "sys_platform != 'win32'" },
+    { name = "pyqt5", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqtwebengine", marker = "sys_platform != 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "pytest" },
     { name = "pytest-anki" },
     { name = "pytest-cov" },
@@ -85,20 +133,14 @@ dev = [
     { name = "types-factory-boy" },
     { name = "types-requests" },
     { name = "urllib3" },
-    { name = "vcrpy", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "vcrpy", version = "5.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and platform_python_implementation == 'PyPy'" },
-    { name = "vcrpy", version = "7.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
-]
-production = [
-    { name = "aqt", extra = ["qt"] },
-]
-tests = [
-    { name = "aqt", extra = ["qt"] },
+    { name = "vcrpy" },
 ]
 
 [package.metadata]
 
 [package.metadata.requires-dev]
+aqt = [{ name = "aqt", extras = ["qt"], specifier = "==25.9.2" }]
+aqt-legacy = [{ name = "aqt", extras = ["qt5"], specifier = "==2.1.56" }]
 bundle = [
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
     { name = "peewee", specifier = "==3.18.2" },
@@ -132,8 +174,6 @@ dev = [
     { name = "urllib3", specifier = ">=1.26.14,<2" },
     { name = "vcrpy", specifier = ">=4.2.0" },
 ]
-production = [{ name = "aqt", extras = ["qt"], specifier = "==25.9.2" }]
-tests = [{ name = "aqt", extras = ["qt"], specifier = "==25.9.2" }]
 
 [[package]]
 name = "approval-utilities"
@@ -156,8 +196,8 @@ dependencies = [
     { name = "mock" },
     { name = "pyperclip" },
     { name = "pytest" },
-    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/53/af/8b51b58f99356052fd60df55370e1a251d96e1cb4592179257b0b5eadabc/approvaltests-15.3.2.tar.gz", hash = "sha256:e5bd42517f9b93f371497049af44f11bf5669edadeb31fa7675aa9917697cf15", size = 62456, upload-time = "2025-08-31T19:17:43.442Z" }
@@ -167,20 +207,63 @@ wheels = [
 
 [[package]]
 name = "aqt"
+version = "2.1.56"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
+]
+dependencies = [
+    { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "flask", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "flask-cors", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "jsonschema", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "psutil", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "requests", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "send2trash", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "waitress", marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "winrt", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/af/1a6f2d461f04bd965bd5e791448e1ca12cbb7cf96e7c92dacecb0373bd14/aqt-2.1.56-py3-none-any.whl", hash = "sha256:0bf9d7bfedea4c9b566439c4526e88213596644d017407f9de391dd7de3fabf1", size = 6252046, upload-time = "2023-01-09T01:02:38.891Z" },
+]
+
+[package.optional-dependencies]
+qt5 = [
+    { name = "pyqt5" },
+    { name = "pyqtwebengine" },
+]
+
+[[package]]
+name = "aqt"
 version = "25.9.2"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
+    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
+    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
+]
 dependencies = [
-    { name = "anki" },
-    { name = "anki-mac-helper", marker = "sys_platform == 'darwin'" },
+    { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "anki-mac-helper", marker = "(sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform == 'darwin' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "beautifulsoup4" },
     { name = "flask" },
     { name = "flask-cors" },
     { name = "jsonschema" },
-    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version < '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "pyqt6" },
     { name = "pyqt6-webengine" },
-    { name = "pywin32", marker = "sys_platform == 'win32'" },
+    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform == 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "requests" },
     { name = "send2trash" },
     { name = "waitress" },
@@ -331,7 +414,7 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "colorama", marker = "python_full_version < '3.10' and sys_platform == 'win32'" },
+    { name = "colorama", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
 wheels = [
@@ -349,7 +432,7 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "colorama", marker = "python_full_version >= '3.10' and sys_platform == 'win32'" },
+    { name = "colorama", marker = "(python_full_version >= '3.10' and sys_platform == 'win32') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/46/61/de6cd827efad202d7057d93e0fed9294b96952e188f7384832791c7b2254/click-8.3.0.tar.gz", hash = "sha256:e7b8232224eba16f4ebe410c25ced9f7875cb5f3263ffc93cc3e8da705e229c4", size = 276943, upload-time = "2025-09-18T17:32:23.696Z" }
 wheels = [
@@ -478,7 +561,7 @@ wheels = [
 
 [package.optional-dependencies]
 toml = [
-    { name = "tomli", marker = "python_full_version <= '3.11'" },
+    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 
 [[package]]
@@ -525,7 +608,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -580,9 +663,9 @@ version = "3.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blinker" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "itsdangerous" },
     { name = "jinja2" },
     { name = "markupsafe" },
@@ -629,7 +712,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.10'" },
+    { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -698,7 +781,7 @@ name = "markdown"
 version = "3.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8d/37/02347f6d6d8279247a5837082ebc26fc0d5aaeaf75aa013fcbb433c777ab/markdown-3.9.tar.gz", hash = "sha256:d2900fe1782bd33bdbbd56859defef70c2e78fc46668f8eb9df3128138f2cb6a", size = 364585, upload-time = "2025-09-04T20:25:22.885Z" }
 wheels = [
@@ -823,7 +906,7 @@ name = "multidict"
 version = "6.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/80/1e/5492c365f222f907de1039b91f922b93fa4f764c713ee858d235495d8f50/multidict-6.7.0.tar.gz", hash = "sha256:c6e99d9a65ca282e578dfea819cfa9c0a62b2499d8677392e09feaf305e9e6f5", size = 101834, upload-time = "2025-10-06T14:52:30.657Z" }
 wheels = [
@@ -981,7 +1064,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mypy-extensions" },
     { name = "pathspec" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c0/77/8f0d0001ffad290cef2f7f216f96c814866248a0b92a722365ed54648e7e/mypy-1.18.2.tar.gz", hash = "sha256:06a398102a5f203d7477b2923dda3634c36727fa5c237d8f859ef90c42a9924b", size = 3448846, upload-time = "2025-09-19T00:11:10.519Z" }
@@ -1175,7 +1258,7 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "wrapt", marker = "python_full_version < '3.10'" },
+    { name = "wrapt", marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version < '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/27/9a/4e949d0a281c5dd45c8d5b02b03fe32044936234675e967de49317a1daee/pip_system_certs-4.0.tar.gz", hash = "sha256:db8e6a31388d9795ec9139957df1a89fa5274fb66164456fd091a5d3e94c350c", size = 5622, upload-time = "2022-11-04T11:01:12.537Z" }
 wheels = [
@@ -1193,7 +1276,7 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "pip", marker = "python_full_version >= '3.10'" },
+    { name = "pip", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/0c/a338ae5d49192861cf54da4d5c2af0efe47edbaa0827995b284005366ca5/pip_system_certs-5.2.tar.gz", hash = "sha256:80b776b5cf17191bf99d313699b7fce2fdb84eb7bbb225fd134109a82706406f", size = 5408, upload-time = "2025-06-17T23:33:15.322Z" }
 wheels = [
@@ -1380,6 +1463,22 @@ wheels = [
 ]
 
 [[package]]
+name = "psutil"
+version = "7.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/31/4723d756b59344b643542936e37a31d1d3204bcdc42a7daa8ee9eb06fb50/psutil-7.1.0.tar.gz", hash = "sha256:655708b3c069387c8b77b072fc429a57d0e214221d01c0a772df7dfedcb3bcd2", size = 497660, upload-time = "2025-09-17T20:14:52.902Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/62/ce4051019ee20ce0ed74432dd73a5bb087a6704284a470bb8adff69a0932/psutil-7.1.0-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:76168cef4397494250e9f4e73eb3752b146de1dd950040b29186d0cce1d5ca13", size = 245242, upload-time = "2025-09-17T20:14:56.126Z" },
+    { url = "https://files.pythonhosted.org/packages/38/61/f76959fba841bf5b61123fbf4b650886dc4094c6858008b5bf73d9057216/psutil-7.1.0-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:5d007560c8c372efdff9e4579c2846d71de737e4605f611437255e81efcca2c5", size = 246682, upload-time = "2025-09-17T20:14:58.25Z" },
+    { url = "https://files.pythonhosted.org/packages/88/7a/37c99d2e77ec30d63398ffa6a660450b8a62517cabe44b3e9bae97696e8d/psutil-7.1.0-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:22e4454970b32472ce7deaa45d045b34d3648ce478e26a04c7e858a0a6e75ff3", size = 287994, upload-time = "2025-09-17T20:14:59.901Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/de/04c8c61232f7244aa0a4b9a9fbd63a89d5aeaf94b2fc9d1d16e2faa5cbb0/psutil-7.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8c70e113920d51e89f212dd7be06219a9b88014e63a4cec69b684c327bc474e3", size = 291163, upload-time = "2025-09-17T20:15:01.481Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/58/c4f976234bf6d4737bc8c02a81192f045c307b72cf39c9e5c5a2d78927f6/psutil-7.1.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7d4a113425c037300de3ac8b331637293da9be9713855c4fc9d2d97436d7259d", size = 293625, upload-time = "2025-09-17T20:15:04.492Z" },
+    { url = "https://files.pythonhosted.org/packages/79/87/157c8e7959ec39ced1b11cc93c730c4fb7f9d408569a6c59dbd92ceb35db/psutil-7.1.0-cp37-abi3-win32.whl", hash = "sha256:09ad740870c8d219ed8daae0ad3b726d3bf9a028a198e7f3080f6a1888b99bca", size = 244812, upload-time = "2025-09-17T20:15:07.462Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/e9/b44c4f697276a7a95b8e94d0e320a7bf7f3318521b23de69035540b39838/psutil-7.1.0-cp37-abi3-win_amd64.whl", hash = "sha256:57f5e987c36d3146c0dd2528cd42151cf96cd359b9d67cfff836995cc5df9a3d", size = 247965, upload-time = "2025-09-17T20:15:09.673Z" },
+    { url = "https://files.pythonhosted.org/packages/26/65/1070a6e3c036f39142c2820c4b52e9243246fcfc3f96239ac84472ba361e/psutil-7.1.0-cp37-abi3-win_arm64.whl", hash = "sha256:6937cb68133e7c97b6cc9649a570c9a18ba0efebed46d8c5dae4c07fa1b67a07", size = 244971, upload-time = "2025-09-17T20:15:12.262Z" },
+]
+
+[[package]]
 name = "py"
 version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1418,6 +1517,8 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/bf/4e7c66eefa9ede1ec
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/66/5907422187ccf92dd6f070c278b1c4ad9363eea56cb7068e3d2942bf4f8f/PyQt5-5.15.5-cp36-abi3-macosx_10_13_x86_64.whl", hash = "sha256:521130eea1eaac55cc6867b1dc627d292b6468fb8e525ce2a015cdf39028d6e8", size = 6974078, upload-time = "2021-10-18T09:12:13.685Z" },
     { url = "https://files.pythonhosted.org/packages/67/44/a106d9570fa66de1d1f72d2b678369af8128d072797a2b8b986c0b39c89a/PyQt5-5.15.5-cp36-abi3-manylinux1_x86_64.whl", hash = "sha256:5966fb291f316f8e35bc8775dda63acf1bb9855baeb5af3e33d3e7c4f1cd98d4", size = 8305612, upload-time = "2021-10-18T09:12:43.942Z" },
+    { url = "https://files.pythonhosted.org/packages/00/c6/193aaf2ec157e5886333a0aaa78fa77d8e8e9590088df3dea3341cbeccd6/PyQt5-5.15.5-cp36-abi3-win32.whl", hash = "sha256:b8e23c1a3fe1b7749c9106f36fba0bd4676dc77bcacca95304c6b840b782e24d", size = 5345864, upload-time = "2021-10-18T09:13:05.543Z" },
+    { url = "https://files.pythonhosted.org/packages/91/81/e3aa694b42f62ad380096e49f2b717af662ca5443e9453893fa052ab3874/PyQt5-5.15.5-cp36-abi3-win_amd64.whl", hash = "sha256:85e76b7a96995b9da12083850bf2a9f4f0aeba2b0b99461b3337ad7e44f428c3", size = 6749383, upload-time = "2021-10-18T09:13:30.942Z" },
 ]
 
 [[package]]
@@ -1438,16 +1539,28 @@ sdist = { url = "https://files.pythonhosted.org/packages/ea/08/88a20c862f40b5c17
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/38/d03cef62cc03348249ce279c7e42159d1c902b1d550924403b1986a2b0f4/pyqt5_sip-12.17.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:bd4f73b1ebd5e0bd8d4539a8e55132318efc70a92f648ef0f9d93329ad50adeb", size = 122532, upload-time = "2025-10-08T09:04:12.141Z" },
     { url = "https://files.pythonhosted.org/packages/08/92/5aa38d8c17ee857fc3f7866dc84d4f4e7ab2180b5026e4f6ffd594ed2432/pyqt5_sip-12.17.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:b52e85520dbfe5c3d0c0c47aa2c10fc1853d892ae60ebebfe8154b052394da50", size = 271388, upload-time = "2025-10-08T09:15:32.369Z" },
+    { url = "https://files.pythonhosted.org/packages/58/5c/0990f3a9a07346417a6728102cbe3d97b13786bce974b24a8d649a49db59/pyqt5_sip-12.17.1-cp310-cp310-win32.whl", hash = "sha256:71a67e2c9b77a74e943e220db0a341c702fd9bcf83c4a2e07342dfce691742ae", size = 49092, upload-time = "2025-10-08T09:11:22.875Z" },
+    { url = "https://files.pythonhosted.org/packages/07/ad/f101338acf81cbd562362741aee9d0ee3c9242a6127c12ca698a15c851c6/pyqt5_sip-12.17.1-cp310-cp310-win_amd64.whl", hash = "sha256:2710effb921bf6955b902779c763d890bb593da6325f0e128a0e3991cc855e9f", size = 58989, upload-time = "2025-10-08T09:08:33.535Z" },
     { url = "https://files.pythonhosted.org/packages/15/e4/451e465c75584a7cbd10e10404317b7443af83f56a64e02080b1f3cda5b5/pyqt5_sip-12.17.1-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:5134d637efadd108a70306bab55b3d7feaa951bf6b8162161a67ae847bea9130", size = 122581, upload-time = "2025-10-08T09:04:13.607Z" },
     { url = "https://files.pythonhosted.org/packages/dc/b2/330f97434b21fbc99ab16f6ce71358ff5ea1bf1f09ed14dfe6b28b5ed8f5/pyqt5_sip-12.17.1-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:155cf755266c8bf64428916e2ff720d5efa1aec003d4ccc40c003b147dbdac03", size = 276844, upload-time = "2025-10-08T09:15:33.713Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/fd/53925099d0fc8aaf7adee613b6cebfb3fdfcd1238add64ff9edf6711e5f8/pyqt5_sip-12.17.1-cp311-cp311-win32.whl", hash = "sha256:9dfa7fe4ac93b60004430699c4bf56fef842a356d64dfea7cbc6d580d0427d6d", size = 49099, upload-time = "2025-10-08T09:11:23.928Z" },
+    { url = "https://files.pythonhosted.org/packages/33/f8/f47a849c17676557c4220fbce9fcc24e15736af247c4dddcaf9ff0124b57/pyqt5_sip-12.17.1-cp311-cp311-win_amd64.whl", hash = "sha256:2ddd214cf40119b86942a5da2da5a7345334955ab00026d8dcc56326b30e6d3c", size = 58988, upload-time = "2025-10-08T09:08:34.903Z" },
     { url = "https://files.pythonhosted.org/packages/a5/15/291f83f336558300626bebb0c403084ec171bbc8a70683e3376234422eb6/pyqt5_sip-12.17.1-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:c362606de782d2d46374a38523632786f145c517ee62de246a6069e5f2c5f336", size = 124521, upload-time = "2025-10-08T09:04:15.825Z" },
     { url = "https://files.pythonhosted.org/packages/45/85/ea1ae099260fd1859d71b31f51760b4226abfa778d5796b76d92c8fe6dcd/pyqt5_sip-12.17.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:140cc582151456103ebb149fefc678f3cae803e7720733db51212af5219cd45c", size = 282182, upload-time = "2025-10-08T09:15:35.752Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/b3/d5b50c721651a0f2ccbef6f8db3dabf3db296b9ec239ba007f5615f57dd7/pyqt5_sip-12.17.1-cp312-cp312-win32.whl", hash = "sha256:9dc1f1525d4d42c080f6cfdfc70d78239f8f67b0a48ea0745497251d8d848b1d", size = 49447, upload-time = "2025-10-08T09:11:24.843Z" },
+    { url = "https://files.pythonhosted.org/packages/14/b6/474d8b17763683ab45fb364f3a44f25fdc25d97b47b29ad8819b95a15ac8/pyqt5_sip-12.17.1-cp312-cp312-win_amd64.whl", hash = "sha256:d5e2e9e175559017cd161d661e0ee0b551684f824bb90800c5a8c8a3bea9355e", size = 57946, upload-time = "2025-10-08T09:08:35.775Z" },
     { url = "https://files.pythonhosted.org/packages/1d/58/9ecb688050e79ffe7bbd9fc917aa13f63856a5081ac46bbce87bb11ab971/pyqt5_sip-12.17.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:9ebbd7769ccdaaa6295e9c872553b6cde17f38e171056f17300d8af9a14d1fc8", size = 124485, upload-time = "2025-10-08T09:04:17.473Z" },
     { url = "https://files.pythonhosted.org/packages/b1/9f/ae691360a9f18e3e06fd297e854d7ad175367e35ea184fd2fcf6c79b8c25/pyqt5_sip-12.17.1-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:b023da906a70af2cf5e6fc1932f441ede07530f3e164dd52c6c2bb5ab7c6f424", size = 281923, upload-time = "2025-10-08T09:15:37.004Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/31/491c45423174a359a4b8a8d84a7b541c453f48497ae928cbe4006bcd3e01/pyqt5_sip-12.17.1-cp313-cp313-win32.whl", hash = "sha256:36dbef482bd638786b909f3bda65b7b3d5cbd6cbf16797496de38bae542da307", size = 49400, upload-time = "2025-10-08T09:11:25.769Z" },
+    { url = "https://files.pythonhosted.org/packages/64/61/e28681dd5200094f7b2e6671e85c02a4d6693da36d23ad7d39ffbc70b15c/pyqt5_sip-12.17.1-cp313-cp313-win_amd64.whl", hash = "sha256:d04e5551bbc3bcec98acc63b3b0618ddcbf31ff107349225b516fe7e7c0a7c8b", size = 57979, upload-time = "2025-10-08T09:08:37.036Z" },
     { url = "https://files.pythonhosted.org/packages/71/f9/06c09dc94474ffe3f518f80e47fc69d34abf8e4a971ae7e7c667d6ff30a7/pyqt5_sip-12.17.1-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:c49918287e1ad77956d1589f1d3d432a0be7630c646ea02cf652413a48e14458", size = 124400, upload-time = "2025-10-08T08:38:23.927Z" },
     { url = "https://files.pythonhosted.org/packages/40/ae/be6e338ea427deac5cd81a93f51ae3fb6505d99d6d5e5d5341bcc099327e/pyqt5_sip-12.17.1-cp314-cp314-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:944a4bf1e1ee18ad03a54964c1c6433fb6de582313a1f0b17673e7203e22fc83", size = 282291, upload-time = "2025-10-08T08:38:25.735Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/a3/8b758518bd0dd5d1581f7a6d522c9b4d9b58d05087b1d0b4dfaad5376434/pyqt5_sip-12.17.1-cp314-cp314-win32.whl", hash = "sha256:99a2935fd662a67748625b1e6ffa0a2d1f2da068b9df6db04fa59a4a5d4ee613", size = 50578, upload-time = "2025-10-08T08:38:28.72Z" },
+    { url = "https://files.pythonhosted.org/packages/40/8c/e96f9877548810b1e537f46fc21ba74552dd4e8c498658114a8353bdf659/pyqt5_sip-12.17.1-cp314-cp314-win_amd64.whl", hash = "sha256:aaa33232cc80793d14fdb3b149b27eec0855612ed66aad480add5ac49b9cee63", size = 59763, upload-time = "2025-10-08T08:38:27.443Z" },
     { url = "https://files.pythonhosted.org/packages/1d/fd/097af91c0446c4877b2614f3e7e40729c7d0a276c401cef3ff95850cd236/pyqt5_sip-12.17.1-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:6fdc457bd528e5909a5893db0a7dee0066d5f22e08234c9152db0ae6df9a367f", size = 122513, upload-time = "2025-10-08T09:04:18.867Z" },
     { url = "https://files.pythonhosted.org/packages/2c/cf/58143e15d0bfa1d1450071ad9a2d71adca82ebefbd7729d0c543463d4d31/pyqt5_sip-12.17.1-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:06ea59741c1bffb198d99b00d26594791f45fb11b10f774c8105aea5962e3835", size = 268959, upload-time = "2025-10-08T09:15:38.323Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/9b/8e8f1af1b500f0d4fcd48c9f7ee474731db8b046d3629151e382634eaf59/pyqt5_sip-12.17.1-cp39-cp39-win32.whl", hash = "sha256:b9ef23869d35c6740a95fcb1f387f4aea8d8fac80e19096fbaf1a64e18409c4b", size = 49030, upload-time = "2025-10-08T09:11:26.984Z" },
+    { url = "https://files.pythonhosted.org/packages/64/1e/08bd86000c8294772c6c4aaaf53babd69b9b37e80d1c87583c1fe8eeab5b/pyqt5_sip-12.17.1-cp39-cp39-win_amd64.whl", hash = "sha256:90eed15f19557dfab22e68c7763e3690053cc8dd30d93ade2523d1b5a04a87be", size = 59011, upload-time = "2025-10-08T09:08:37.924Z" },
 ]
 
 [[package]]
@@ -1560,6 +1673,8 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/57/b5276d92800b4c1ee6f214c98610fe8909006b58ba9b213ee58a1bf6a095/PyQtWebEngine-5.15.6-cp37-abi3-macosx_10_13_x86_64.whl", hash = "sha256:8c2fce2458e7b781d2cc3070b336f67d39a717c5eef2f823cae501d5d9f200de", size = 187561, upload-time = "2022-06-18T16:53:40.946Z" },
     { url = "https://files.pythonhosted.org/packages/27/92/a8c45d97fbfb202638670e02c251430e4f1528b4de9911ae0f68d043cc3d/PyQtWebEngine-5.15.6-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:61d0ceb20025ba4d2d1ce3c2b3a7a43e240069c4203dfc4a8dddfb00923b1d3c", size = 181637, upload-time = "2023-10-20T15:01:13.303Z" },
     { url = "https://files.pythonhosted.org/packages/cd/90/fcc59d99ed597ac3d1aa465f8c7711cb33e02cc867940db6c62dcdaa2689/PyQtWebEngine-5.15.6-cp37-abi3-manylinux1_x86_64.whl", hash = "sha256:67110bc9d5b7e633dcc242b8228cc54b1532abc039fdf534b383ac40a60b7ba3", size = 230380, upload-time = "2022-06-18T16:53:43.784Z" },
+    { url = "https://files.pythonhosted.org/packages/81/67/041d81bd0a16ac62e7663f170afe0c1cf9e47ddeb1cd35decc8ad0546f05/PyQtWebEngine-5.15.6-cp37-abi3-win32.whl", hash = "sha256:a90c945606683a53c9b264a7509943fd835d50366d535c22ddde952f23d35748", size = 159404, upload-time = "2022-06-18T16:53:46.223Z" },
+    { url = "https://files.pythonhosted.org/packages/65/d9/4b480349ac6d05cb5e82a37582479696beb6717bb717ad64c7d543d1a56a/PyQtWebEngine-5.15.6-cp37-abi3-win_amd64.whl", hash = "sha256:dbd1a768877040050d3159270f5ab95758af4954c4cb4e54195bd3cad519d5b6", size = 182674, upload-time = "2022-06-18T16:53:48.616Z" },
 ]
 
 [[package]]
@@ -1586,13 +1701,13 @@ name = "pytest"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
 wheels = [
@@ -1604,8 +1719,10 @@ name = "pytest-anki"
 version = "1.0.0b3.post1"
 source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=main#835e060420fc71f36635b1480ac7ea0f4fa70ba3" }
 dependencies = [
-    { name = "anki" },
-    { name = "aqt" },
+    { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "aqt", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "pytest" },
     { name = "pytest-forked" },
     { name = "pytest-qt" },
@@ -1634,7 +1751,7 @@ version = "1.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1f/31/27f28431a16b83cab7a636dce59cf397517807d247caa38ee67d65e71ef8/pytest_env-1.1.5.tar.gz", hash = "sha256:91209840aa0e43385073ac464a554ad2947cc2fd663a9debf88d03b01e0cc1cf", size = 8911, upload-time = "2024-09-17T22:39:18.566Z" }
 wheels = [
@@ -1710,9 +1827,7 @@ version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
-    { name = "vcrpy", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "vcrpy", version = "5.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and platform_python_implementation == 'PyPy'" },
-    { name = "vcrpy", version = "7.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
+    { name = "vcrpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1a/60/104c619483c1a42775d3f8b27293f1ecfc0728014874d065e68cb9702d49/pytest-vcr-1.0.2.tar.gz", hash = "sha256:23ee51b75abbcc43d926272773aae4f39f93aceb75ed56852d0bf618f92e1896", size = 3810, upload-time = "2019-04-26T19:04:00.806Z" }
 wheels = [
@@ -1860,7 +1975,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "rpds-py" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2f/db/98b5c277be99dd18bfd91dd04e1b759cad18d1a338188c936e92f921c7e2/referencing-0.36.2.tar.gz", hash = "sha256:df2e89862cd09deabbdba16944cc3f10feb6b3e6f18e902f7cc25609a34775aa", size = 74744, upload-time = "2025-01-25T08:48:16.138Z" }
 wheels = [
@@ -2122,15 +2237,6 @@ wheels = [
 ]
 
 [[package]]
-name = "six"
-version = "1.17.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
 name = "soupsieve"
 version = "2.8"
 source = { registry = "https://pypi.org/simple" }
@@ -2229,7 +2335,7 @@ name = "typeguard"
 version = "4.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203, upload-time = "2025-06-18T09:56:07.624Z" }
@@ -2300,54 +2406,13 @@ wheels = [
 
 [[package]]
 name = "vcrpy"
-version = "4.3.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
-    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
-]
-dependencies = [
-    { name = "pyyaml", marker = "python_full_version < '3.10'" },
-    { name = "six", marker = "python_full_version < '3.10'" },
-    { name = "wrapt", marker = "python_full_version < '3.10'" },
-    { name = "yarl", marker = "python_full_version < '3.10'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/ef/0adac7ae234126b7ce90c4f45cf3750ea7d21320ad472a45fc2e13625245/vcrpy-4.3.0.tar.gz", hash = "sha256:49c270ce67e826dba027d83e20d25b67a5885487697e97bca6dbdf53d750a0ac", size = 80891, upload-time = "2023-05-24T19:35:30.77Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/42/463fb8e4da067708299264c09b3c8ce68051e8e4850df2379dc0f49f6968/vcrpy-4.3.0-py2.py3-none-any.whl", hash = "sha256:8fbd4be412e8a7f35f623dd61034e6380a1c8dbd0edf6e87277a3289f6e98093", size = 40580, upload-time = "2023-05-24T19:35:28.4Z" },
-]
-
-[[package]]
-name = "vcrpy"
-version = "5.1.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-]
-dependencies = [
-    { name = "pyyaml", marker = "python_full_version >= '3.10' and platform_python_implementation == 'PyPy'" },
-    { name = "wrapt", marker = "python_full_version >= '3.10' and platform_python_implementation == 'PyPy'" },
-    { name = "yarl", marker = "python_full_version >= '3.10' and platform_python_implementation == 'PyPy'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/ea/a166a3cce4ac5958ba9bbd9768acdb1ba38ae17ff7986da09fa5b9dbc633/vcrpy-5.1.0.tar.gz", hash = "sha256:bbf1532f2618a04f11bce2a99af3a9647a32c880957293ff91e0a5f187b6b3d2", size = 84576, upload-time = "2023-07-31T03:19:32.231Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/5b/3f70bcb279ad30026cc4f1df0a0491a0205a24dddd88301f396c485de9e7/vcrpy-5.1.0-py2.py3-none-any.whl", hash = "sha256:605e7b7a63dcd940db1df3ab2697ca7faf0e835c0852882142bafb19649d599e", size = 41969, upload-time = "2023-07-31T03:19:30.128Z" },
-]
-
-[[package]]
-name = "vcrpy"
 version = "7.0.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
-]
 dependencies = [
-    { name = "pyyaml", marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
-    { name = "urllib3", marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
-    { name = "wrapt", marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
-    { name = "yarl", marker = "python_full_version >= '3.10' and platform_python_implementation != 'PyPy'" },
+    { name = "pyyaml" },
+    { name = "urllib3" },
+    { name = "wrapt" },
+    { name = "yarl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/25/d3/856e06184d4572aada1dd559ddec3bedc46df1f2edc5ab2c91121a2cccdb/vcrpy-7.0.0.tar.gz", hash = "sha256:176391ad0425edde1680c5b20738ea3dc7fb942520a48d2993448050986b3a50", size = 85502, upload-time = "2024-12-31T00:07:57.894Z" }
 wheels = [
@@ -2362,7 +2427,7 @@ dependencies = [
     { name = "distlib" },
     { name = "filelock" },
     { name = "platformdirs" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/14/37fcdba2808a6c615681cd216fecae00413c9dab44fb2e57805ecf3eaee3/virtualenv-20.34.0.tar.gz", hash = "sha256:44815b2c9dee7ed86e387b842a84f20b93f7f417f95886ca1996a72a4138eb1a", size = 6003808, upload-time = "2025-08-13T14:24:07.464Z" }
 wheels = [
@@ -2388,6 +2453,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9f/69/83029f1f6300c5fb2471d621ab06f6ec6b3324685a2ce0f9777fd4a8b71e/werkzeug-3.1.3.tar.gz", hash = "sha256:60723ce945c19328679790e3282cc758aa4a6040e4bb330f53d30fa546d44746", size = 806925, upload-time = "2024-11-08T15:52:18.093Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/24/ab44c871b0f07f491e5d2ad12c9bd7358e527510618cb1b803a88e986db1/werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e", size = 224498, upload-time = "2024-11-08T15:52:16.132Z" },
+]
+
+[[package]]
+name = "winrt"
+version = "1.0.21033.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/7b/0599e61103c2eb10cde633e93917f481026a551595a6d193a4a9448008c9/winrt-1.0.21033.1-cp39-none-win32.whl", hash = "sha256:9d7b7d2e48c301855afd3280aaf51ea0d3c683450f46de2db813f71ee1cd5937", size = 4671176, upload-time = "2021-02-03T00:19:00.182Z" },
+    { url = "https://files.pythonhosted.org/packages/78/e7/179a6599dfd47132ef7cf29d9deee5212bb5d7c38345740b981c96bbbef5/winrt-1.0.21033.1-cp39-none-win_amd64.whl", hash = "sha256:ad4afd1c7b041a6b770256d70e07093920fa83eecd80e42cac2704cd03902243", size = 4221795, upload-time = "2021-02-03T00:19:07.055Z" },
 ]
 
 [[package]]

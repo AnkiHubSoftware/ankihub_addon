@@ -3,7 +3,7 @@ default:
 
 # Set up Python environment and install dependencies
 install:
-    uv sync --dev --group production --group bundle
+    uv sync --group bundle --group aqt
 
 lint:
     uv run pre-commit run --all

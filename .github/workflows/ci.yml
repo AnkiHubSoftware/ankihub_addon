@@ -21,9 +21,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - replace_anki_version: false
-          - replace_anki_version: true
-            anki_package_version: 'aqt[qt5]==2.1.56'
+          - aqt_dependency_group: aqt
+            qt_package: pyqt6
+          - aqt_dependency_group: aqt_legacy
+            qt_package: pyqt5
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -37,15 +38,18 @@ jobs:
         with:
           python-version-file: ".python-version"
 
+      - name: Install dependencies and detect Qt version
+        run: |
+          uv sync --group ${{ matrix.aqt_dependency_group }}
+          QT_VERSION=$(uv pip show ${{ matrix.qt_package }} | sed -n 's/^Version: //p')
+          echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
+
       - name: Setup addon
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
-
-      - name: Replace Anki version
-        if: ${{ matrix.replace_anki_version }}
-        run: uv pip install "${{ matrix.anki_package_version }}"
+          qt_version: ${{ env.QT_VERSION }}
 
       - name: Run pytest with coverage
         run: |
