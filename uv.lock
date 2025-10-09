@@ -66,13 +66,13 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "decorator" },
+    { name = "decorator", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "distro", marker = "(sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform != 'darwin' and sys_platform != 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "markdown" },
-    { name = "orjson" },
-    { name = "protobuf" },
+    { name = "markdown", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "orjson", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "protobuf", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "requests", extra = ["socks"], marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/ea/4befc79361774c8e1e5421a884aa8090d4b97c5b83087510f4a1c82ee521/anki-25.9.2-cp39-abi3-macosx_12_0_arm64.whl", hash = "sha256:76788f41246dfdb383bf318f1a0c141c57bfe693441fd3d82500e17ad7c6ac04", size = 9676135, upload-time = "2025-09-17T07:11:45.028Z" },
@@ -158,7 +158,7 @@ dev = [
     { name = "pyqt5", marker = "sys_platform != 'win32'", specifier = "==5.15.5" },
     { name = "pyqtwebengine", marker = "sys_platform != 'win32'", specifier = "==5.15.6" },
     { name = "pytest", specifier = ">=8.2.2" },
-    { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=main" },
+    { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=anki-25" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-env", specifier = ">=0.6.2" },
     { name = "pytest-mock", specifier = ">=3.12.0" },
@@ -253,20 +253,20 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "anki-mac-helper", marker = "(sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform == 'darwin' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "beautifulsoup4" },
-    { name = "flask" },
-    { name = "flask-cors" },
-    { name = "jsonschema" },
+    { name = "beautifulsoup4", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "flask", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "flask-cors", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "jsonschema", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "pip-system-certs", version = "4.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version < '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "pip-system-certs", version = "5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6" },
-    { name = "pyqt6-webengine" },
+    { name = "pyqt6", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "pyqt6-webengine", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt') or (sys_platform == 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "requests" },
-    { name = "send2trash" },
-    { name = "waitress" },
+    { name = "requests", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "send2trash", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "waitress", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/d4/26016857a780290264866e1818b1a408106c379906fbd186a0aa26eb1054/aqt-25.9.2-py3-none-any.whl", hash = "sha256:9a36c7aed6d62d1e7f47bb7ab40d111f9eecff0b057ea88ac2fbe2492a8bfd69", size = 4176032, upload-time = "2025-09-17T07:12:10.546Z" },
@@ -608,7 +608,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -712,7 +712,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -1568,8 +1568,8 @@ name = "pyqt6"
 version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt6-qt6" },
-    { name = "pyqt6-sip" },
+    { name = "pyqt6-qt6", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "pyqt6-sip", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/32/1b/567f46eb43ca961efd38d7a0b73efb70d7342854f075fd919179fdb2a571/pyqt6-6.9.1.tar.gz", hash = "sha256:50642be03fb40f1c2111a09a1f5a0f79813e039c15e78267e6faaf8a96c1c3a6", size = 1067230, upload-time = "2025-06-06T08:49:30.307Z" }
 wheels = [
@@ -1634,9 +1634,9 @@ name = "pyqt6-webengine"
 version = "6.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt6" },
-    { name = "pyqt6-sip" },
-    { name = "pyqt6-webengine-qt6" },
+    { name = "pyqt6", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "pyqt6-sip", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "pyqt6-webengine-qt6", marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cd/c8/cadaa950eaf97f29e48c435e274ea5a81c051e745a3e2f5d9d994b7a6cda/PyQt6_WebEngine-6.8.0.tar.gz", hash = "sha256:64045ea622b6a41882c2b18f55ae9714b8660acff06a54e910eb72822c2f3ff2", size = 34203, upload-time = "2024-12-12T15:34:35.573Z" }
 wheels = [
@@ -1717,7 +1717,7 @@ wheels = [
 [[package]]
 name = "pytest-anki"
 version = "1.0.0b3.post1"
-source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=main#835e060420fc71f36635b1480ac7ea0f4fa70ba3" }
+source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=anki-25#a66d84dbbf144ac95819f335da65d8a34655f9c8" }
 dependencies = [
     { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
