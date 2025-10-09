@@ -18,6 +18,7 @@ runs:
         QT_VERSION=$(uv pip show ${{ inputs.qt_package }} | sed -n 's/^Version: //p')
         echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
         echo "PYTEST_QT_API=${{ inputs.qt_package }}" >> $GITHUB_ENV
+      shell: bash
 
     - name: Install Qt
       if: ${{ inputs.install_qt == 'true' }}
