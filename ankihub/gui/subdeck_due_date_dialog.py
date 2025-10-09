@@ -5,7 +5,6 @@ from datetime import date, timedelta
 from typing import Optional
 
 import aqt
-from anki.decks import DeckId
 from aqt import qconnect
 from aqt.qt import QDateEdit, QDialog, QHBoxLayout, QLabel, QPushButton, Qt, QVBoxLayout
 from aqt.utils import tooltip
@@ -13,6 +12,7 @@ from aqt.utils import tooltip
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
+    get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
@@ -228,7 +228,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the expired subdeck
     """
-    subdeck_id = DeckId(int(subdeck_config.subdeck_id))
+    subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
@@ -236,8 +236,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
         _show_next_expired_subdeck_dialog()
         return
 
-    subdeck_name = subdeck["name"].split("::", maxsplit=1)[-1]  # Get name without parent deck prefix
-
+    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.open()

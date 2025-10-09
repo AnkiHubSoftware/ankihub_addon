@@ -1270,10 +1270,6 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
-    def has_reviewer_extension_access(self) -> bool:
-        data = self.get_user_details()
-        return data.get("has_reviewer_extension_access", False)
-
 
 class ThreadLocalSession:
     def __init__(self):

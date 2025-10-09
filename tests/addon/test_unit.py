@@ -3442,7 +3442,7 @@ class TestMoveSubdeckToMainDeck:
         mock_note_ids_in_deck_hierarchy.return_value = [1, 2, 3]
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         move_subdeck_to_main_deck(subdeck_config)
@@ -3458,7 +3458,7 @@ class TestMoveSubdeckToMainDeck:
         mock_config.deck_config.return_value = None
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         with pytest.raises(ValueError, match="Deck config not found"):
@@ -3480,7 +3480,7 @@ class TestMoveSubdeckToMainDeck:
         mock_aqt.mw.col.decks.get.return_value = False
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         move_subdeck_to_main_deck(subdeck_config)
@@ -3492,15 +3492,14 @@ class TestSetSubdeckDueDate:
     """Tests for set_subdeck_due_date function."""
 
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_set_subdeck_due_date_success(self, mock_config):
+    def test_set_subdeck_due_date_success(self, mock_config, next_deterministic_uuid):
         """Test successfully setting a new due date."""
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        ah_did = next_deterministic_uuid()
+        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31")
 
         set_subdeck_due_date(subdeck_config, "2025-06-15")
 
-        expected_config = BlockExamSubdeckConfig(
-            ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2025-06-15"
-        )
+        expected_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2025-06-15")
         mock_config.add_block_exam_subdeck.assert_called_once_with(expected_config)
 
 
@@ -3508,35 +3507,40 @@ class TestRemoveBlockExamSubdeckConfig:
     """Tests for remove_block_exam_subdeck_config function."""
 
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_remove_block_exam_subdeck_config(self, mock_config):
+    def test_remove_block_exam_subdeck_config(self, mock_config, next_deterministic_uuid):
         """Test removing a block exam subdeck configuration."""
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id="test-deck-id", subdeck_id="456", due_date="2024-12-31")
+        ah_did = next_deterministic_uuid()
+        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31")
 
         remove_block_exam_subdeck_config(subdeck_config)
 
-        mock_config.remove_block_exam_subdeck.assert_called_once_with("test-deck-id", "456")
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(ah_did, DeckId(456))
 
 
 class TestHandleExpiredSubdeck:
     """Tests for handle_expired_subdeck function."""
 
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_name_without_parent")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateDialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class):
+    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class, mock_get_name):
         """Test successfully handling an expired subdeck."""
-        mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
+        subdeck_name = "Exam Subdeck"
+        mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
 
         mock_dialog = MagicMock()
         mock_dialog_class.return_value = mock_dialog
 
+        mock_get_name.return_value = subdeck_name
+
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         handle_expired_subdeck(subdeck_config)
 
-        mock_dialog_class.assert_called_once_with(subdeck_config, "Exam Subdeck", parent=mock_aqt.mw)
+        mock_dialog_class.assert_called_once_with(subdeck_config, subdeck_name, parent=mock_aqt.mw)
         mock_dialog.open.assert_called_once()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
@@ -3546,7 +3550,7 @@ class TestHandleExpiredSubdeck:
         mock_aqt.mw.col.decks.get.return_value = False
 
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(uuid.uuid4()), subdeck_id="456", due_date="2024-12-31"
+            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
         )
 
         handle_expired_subdeck(subdeck_config)
@@ -3578,6 +3582,7 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         self,
         mock_handle_expired,
         mock_check_due_dates,
+        next_deterministic_uuid,
     ):
         """Test function handles first expired subdeck, queues the rest, and processes them sequentially."""
         from ankihub.gui.subdeck_due_date_dialog import (
@@ -3585,9 +3590,11 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
             _subdeck_due_date_dialog_state,
         )
 
+        ah_did_1 = next_deterministic_uuid()
+        ah_did_2 = next_deterministic_uuid()
         expired_subdecks = [
-            BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date="2023-01-01"),
-            BlockExamSubdeckConfig(ankihub_deck_id="deck2", subdeck_id="subdeck2", due_date="2023-01-02"),
+            BlockExamSubdeckConfig(ankihub_deck_id=ah_did_1, subdeck_id=DeckId(1), due_date="2023-01-01"),
+            BlockExamSubdeckConfig(ankihub_deck_id=ah_did_2, subdeck_id=DeckId(2), due_date="2023-01-02"),
         ]
         mock_check_due_dates.return_value = expired_subdecks
 
@@ -3598,11 +3605,11 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         assert mock_handle_expired.call_count == 1
         # Check the actual call argument
         actual_call_arg = mock_handle_expired.call_args[0][0]
-        assert actual_call_arg.ankihub_deck_id == "deck1"
-        assert actual_call_arg.subdeck_id == "subdeck1"
+        assert actual_call_arg.ankihub_deck_id == ah_did_1
+        assert actual_call_arg.subdeck_id == DeckId(1)
         # Verify the second subdeck is still in the queue waiting to be shown
         assert len(_subdeck_due_date_dialog_state.queue) == 1
-        assert _subdeck_due_date_dialog_state.queue[0].ankihub_deck_id == "deck2"
+        assert _subdeck_due_date_dialog_state.queue[0].ankihub_deck_id == ah_did_2
 
         # Simulate the first dialog finishing
         _show_next_expired_subdeck_dialog()

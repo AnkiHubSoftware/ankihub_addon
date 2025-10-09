@@ -1,6 +1,7 @@
 from typing import Dict
 
 import aqt
+from anki.decks import DeckId
 
 from . import LOGGER
 
@@ -133,11 +134,11 @@ def _remove_orphaned_block_exams_subdecks_config(private_config_dict: Dict) -> N
     if not block_exams_subdecks:
         return
 
-    all_deck_ids = set(str(deck_id) for deck_id in aqt.mw.col.decks.all_ids())
+    all_deck_ids = set(DeckId(deck.id) for deck in aqt.mw.col.decks.all_names_and_ids())
 
     filtered_subdecks = []
     for subdeck in block_exams_subdecks:
-        subdeck_id = subdeck.get("subdeck_id", "")
+        subdeck_id = subdeck.get("subdeck_id", None)
         if subdeck_id in all_deck_ids:
             filtered_subdecks.append(subdeck)
 

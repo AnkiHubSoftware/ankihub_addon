@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 import aqt
+from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import (
     QDateEdit,
@@ -17,6 +18,7 @@ from aqt.qt import (
     QPushButton,
     Qt,
     QVBoxLayout,
+    qconnect,
 )
 from aqt.utils import showInfo, tooltip
 
@@ -37,7 +39,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.ankihub_deck_id = ankihub_deck_id
         self.note_ids = note_ids
         self.selected_subdeck_name: Optional[str] = None
-        self.selected_subdeck_id: Optional[str] = None
+        self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
         self.resize(440, 340)
@@ -74,7 +76,7 @@ class BlockExamSubdeckDialog(QDialog):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Filter:"))
         self.filter_input = QLineEdit()
-        self.filter_input.textChanged.connect(self._filter_subdecks)  # type: ignore[attr-defined]
+        qconnect(self.filter_input.textChanged, self._filter_subdecks)
         self.filter_input.setPlaceholderText("Search subdecks...")
         filter_layout.addWidget(self.filter_input)
         layout.addLayout(filter_layout)
@@ -82,7 +84,7 @@ class BlockExamSubdeckDialog(QDialog):
         # Subdeck list
         self.subdeck_list = QListWidget()
         self._populate_subdeck_list()
-        self.subdeck_list.itemDoubleClicked.connect(self._on_subdeck_selected)  # type: ignore[attr-defined]
+        qconnect(self.subdeck_list.itemDoubleClicked, self._on_subdeck_selected)
         layout.addWidget(self.subdeck_list)
 
         # Buttons
@@ -90,15 +92,15 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         create_button = QPushButton("Create new subdeck")
-        create_button.clicked.connect(self._show_create_subdeck_screen)  # type: ignore[attr-defined]
+        qconnect(create_button.clicked, self._show_create_subdeck_screen)
         button_layout.addWidget(create_button)
 
         select_button = QPushButton("Choose")
-        select_button.clicked.connect(self._on_subdeck_selected)  # type: ignore[attr-defined]
+        qconnect(select_button.clicked, self._on_subdeck_selected)
         select_button.setDefault(True)
         button_layout.addWidget(select_button)
 
@@ -142,7 +144,7 @@ class BlockExamSubdeckDialog(QDialog):
         name_layout.addWidget(name_label)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g. Cardio Block Exam")
-        self.name_input.textChanged.connect(self._update_create_button_state)  # type: ignore[attr-defined]
+        qconnect(self.name_input.textChanged, self._update_create_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         layout.addSpacing(8)
@@ -169,11 +171,11 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         create_button = QPushButton("Create subdeck")
-        create_button.clicked.connect(self._on_create_subdeck)  # type: ignore[attr-defined]
+        qconnect(create_button.clicked, self._on_create_subdeck)
         create_button.setDefault(True)
         create_button.setEnabled(False)  # Initially disabled
         self.create_button = create_button  # Store reference for enabling/disabling
@@ -223,7 +225,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setText(self.selected_subdeck_name)
         self.name_input.setPlaceholderText("Enter subdeck name")
-        self.name_input.textChanged.connect(self._update_add_notes_button_state)  # type: ignore[attr-defined]
+        qconnect(self.name_input.textChanged, self._update_add_notes_button_state)
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
         layout.addSpacing(8)
@@ -238,7 +240,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.date_input = QDateEdit()
 
         # Try to get existing due date
-        existing_due_date = config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), self.selected_subdeck_id)
+        existing_due_date = config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
@@ -257,11 +259,11 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addStretch()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         add_button = QPushButton("Add notes")
-        add_button.clicked.connect(self._on_add_notes)  # type: ignore[attr-defined]
+        qconnect(add_button.clicked, self._on_add_notes)
         add_button.setDefault(True)
         # Enable initially if there's already a name, disable if empty
         add_button.setEnabled(bool(self.selected_subdeck_name and self.selected_subdeck_name.strip()))
@@ -322,15 +324,15 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.setSpacing(12)
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)  # type: ignore[attr-defined]
+        qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
         create_new_button = QPushButton("Create new")
-        create_new_button.clicked.connect(lambda: self._handle_conflict_create_new(conflicting_name))  # type: ignore[attr-defined]
+        qconnect(create_new_button.clicked, lambda: self._handle_conflict_create_new(conflicting_name))
         button_layout.addWidget(create_new_button)
 
         merge_button = QPushButton("Merge")
-        merge_button.clicked.connect(lambda: self._handle_conflict_merge(conflicting_name))  # type: ignore[attr-defined]
+        qconnect(merge_button.clicked, lambda: self._handle_conflict_merge(conflicting_name))
         merge_button.setDefault(True)
         button_layout.addWidget(merge_button)
 
@@ -354,7 +356,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         for deck_name, deck_id in aqt.mw.col.decks.children(deck_config.anki_id):
             subdeck_path = deck_name[len(anki_deck_name) + 2 :]
-            all_subdecks.append((subdeck_path, str(deck_id)))
+            all_subdecks.append((subdeck_path, deck_id))
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())
@@ -365,7 +367,7 @@ class BlockExamSubdeckDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
 
             # Mark block exam subdecks differently (optional visual indication)
-            if config.get_block_exam_subdeck_due_date(str(self.ankihub_deck_id), subdeck_id):
+            if config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, subdeck_id):
                 # This subdeck is already configured as a block exam subdeck
                 item.setToolTip("Block exam subdeck")
 
@@ -436,21 +438,16 @@ class BlockExamSubdeckDialog(QDialog):
             return
 
         # Create subdeck
-        try:
-            actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
-            # Add notes to the new subdeck
-            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        # Add notes to the new subdeck
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            # Show success message
-            tooltip(f"{added_count} note(s) added to '{actual_name}'")
-            self.accept()
+        # Show success message
+        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.accept()
 
-            aqt.mw.moveToState("deckBrowser")
-
-        except Exception as e:
-            LOGGER.error("Failed to create subdeck", error=str(e))
-            showInfo(f"Failed to create subdeck: {e}")
+        aqt.mw.moveToState("deckBrowser")
 
     def _on_add_notes(self):
         """Handle adding notes to selected subdeck."""
@@ -458,35 +455,28 @@ class BlockExamSubdeckDialog(QDialog):
 
         due_date = self.date_input.date().toString("yyyy-MM-dd")
 
-        try:
-            # Check if subdeck name needs to be updated
-            if new_name != self.selected_subdeck_name:
-                # Check if new name conflicts with existing subdeck
-                deck_config = config.deck_config(self.ankihub_deck_id)
-                if deck_config:
-                    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-                    if anki_deck_name:
-                        # Handle full subdeck path for multi-level subdecks
-                        new_full_name = f"{anki_deck_name}::{new_name}"
-                        if aqt.mw.col.decks.by_name(new_full_name):
-                            showInfo(
-                                f"A subdeck with name '{new_name}' already exists. Please choose a different name."
-                            )
-                            return
+        # Check if subdeck name needs to be updated
+        if new_name != self.selected_subdeck_name:
+            # Check if new name conflicts with existing subdeck
+            deck_config = config.deck_config(self.ankihub_deck_id)
+            if deck_config:
+                anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+                if anki_deck_name:
+                    # Handle full subdeck path for multi-level subdecks
+                    new_full_name = f"{anki_deck_name}::{new_name}"
+                    if aqt.mw.col.decks.by_name(new_full_name):
+                        showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
+                        return
 
-                self._rename_subdeck(self.selected_subdeck_name, new_name)
-                self.selected_subdeck_name = new_name
+            self._rename_subdeck(self.selected_subdeck_name, new_name)
+            self.selected_subdeck_name = new_name
 
-            added_count = add_notes_to_block_exam_subdeck(
-                self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
-            )
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+        )
 
-            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
-            self.accept()
-
-        except Exception as e:
-            LOGGER.error("Failed to add notes to subdeck", error=str(e))
-            showInfo(f"Failed to add notes: {e}")
+        tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
+        self.accept()
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
@@ -514,58 +504,46 @@ class BlockExamSubdeckDialog(QDialog):
 
     def _handle_conflict_create_new(self, conflicting_name: str):
         """Handle creating a new subdeck with auto-generated name."""
-        try:
-            # Use stored due date from the original screen
-            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
+        # Use stored due date from the original screen
+        due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-            actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-            added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
 
-            tooltip(f"{added_count} note(s) added to '{actual_name}'")
-            self.accept()
+        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.accept()
 
-            aqt.mw.moveToState("deckBrowser")
-
-        except Exception as e:
-            LOGGER.error("Failed to create subdeck with auto name", error=str(e))
-            showInfo(f"Failed to create subdeck: {e}")
+        aqt.mw.moveToState("deckBrowser")
 
     def _handle_conflict_merge(self, conflicting_name: str):
         """Handle merging into existing subdeck directly."""
-        try:
-            # Find subdeck ID for the existing subdeck
-            deck_config = config.deck_config(self.ankihub_deck_id)
-            if not deck_config:
-                showInfo("Error: Deck configuration not found.")
-                return
+        # Find subdeck ID for the existing subdeck
+        deck_config = config.deck_config(self.ankihub_deck_id)
+        if not deck_config:
+            showInfo("Error: Deck configuration not found.")
+            return
 
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            if not anki_deck_name:
-                showInfo("Error: Parent deck not found.")
-                return
+        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+        if not anki_deck_name:
+            showInfo("Error: Parent deck not found.")
+            return
 
-            full_name = f"{anki_deck_name}::{conflicting_name}"
-            subdeck = aqt.mw.col.decks.by_name(full_name)
-            if not subdeck:
-                showInfo("Error: Could not find the existing subdeck.")
-                return
+        full_name = f"{anki_deck_name}::{conflicting_name}"
+        subdeck = aqt.mw.col.decks.by_name(full_name)
+        if not subdeck:
+            showInfo("Error: Could not find the existing subdeck.")
+            return
 
-            # Use stored due date from the original screen
-            due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
+        # Use stored due date from the original screen
+        due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-            # Add notes to the existing subdeck
-            added_count = add_notes_to_block_exam_subdeck(
-                self.ankihub_deck_id, conflicting_name, self.note_ids, due_date
-            )
+        # Add notes to the existing subdeck
+        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
 
-            # Show success message and close
-            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
-            self.accept()
-
-        except Exception as e:
-            LOGGER.error("Failed to add notes to subdeck", error=str(e))
-            showInfo(f"Failed to add notes: {e}")
+        # Show success message and close
+        tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
+        self.accept()
 
     def _clear_layout(self):
         """Clear the current layout."""

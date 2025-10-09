@@ -172,6 +172,7 @@ from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
+from ankihub.gui.operations.user_details import check_user_feature_access
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
@@ -8436,7 +8437,6 @@ def test_show_enable_fsrs_reminder_skip_and_dont_show_again(
         assert not config._private_config.show_enable_fsrs_reminder
 
 
-@pytest.mark.sequential
 class TestBlockExamSubdecks:
     def test_create_block_exam_subdeck(
         self,
@@ -8446,6 +8446,13 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
 
+            # Set a custom deck options group for the main deck
+            deck_config = config.deck_config(ah_did)
+            main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
+            custom_options = aqt.mw.col.decks.add_config("Test Options Group")
+            main_deck["conf"] = custom_options["id"]
+            aqt.mw.col.decks.update(main_deck)
+
             # Test creating a new subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
             subdeck_name, was_renamed = create_block_exam_subdeck(ah_did, "Test Subdeck", due_date)
@@ -8454,14 +8461,17 @@ class TestBlockExamSubdecks:
             assert not was_renamed
 
             # Verify subdeck was created
-            deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
             full_name = f"{anki_deck_name}::Test Subdeck"
             subdeck = aqt.mw.col.decks.by_name(full_name)
             assert subdeck is not None
 
+            # Verify subdeck inherits parent deck's option group
+            assert subdeck["conf"] == custom_options["id"]
+            assert subdeck["conf"] == main_deck["conf"]
+
             # Verify configuration was saved
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date == due_date
 
     def test_create_subdeck_with_conflict(
@@ -8502,7 +8512,7 @@ class TestBlockExamSubdecks:
             subdeck = aqt.mw.col.decks.by_name(full_name)
             assert subdeck is not None
 
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date is None
 
     def test_add_notes_to_block_exam_subdeck(
@@ -8541,7 +8551,7 @@ class TestBlockExamSubdecks:
             assert note2.id in notes_in_subdeck
 
             # Verify configuration was updated with new due date
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck["id"]))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date == new_due_date
 
     def test_add_notes_to_block_exam_subdeck_with_some_already_in_subdeck(
@@ -8587,35 +8597,38 @@ class TestBlockExamSubdecks:
     def test_config_methods(
         self,
         anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Test initially empty
             assert config.get_block_exam_subdecks() == []
 
             # Test adding configuration
+            ah_did = next_deterministic_uuid()
+            test_subdeck_id = DeckId(999)
             config_item = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id="test-subdeck-id", due_date="2024-12-31"
+                ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2024-12-31"
             )
             config.add_block_exam_subdeck(config_item)
 
             # Test retrieving configuration
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
-            assert configs[0].ankihub_deck_id == "test-deck-id"
-            assert configs[0].subdeck_id == "test-subdeck-id"
+            assert configs[0].ankihub_deck_id == ah_did
+            assert configs[0].subdeck_id == test_subdeck_id
             assert configs[0].due_date == "2024-12-31"
 
             # Test getting due date
-            due_date = config.get_block_exam_subdeck_due_date("test-deck-id", "test-subdeck-id")
+            due_date = config.get_block_exam_subdeck_due_date(ah_did, test_subdeck_id)
             assert due_date == "2024-12-31"
 
             # Test getting due date for non-existent
-            due_date = config.get_block_exam_subdeck_due_date("non-existent", "non-existent")
+            due_date = config.get_block_exam_subdeck_due_date(next_deterministic_uuid(), DeckId(888))
             assert due_date is None
 
             # Test updating existing configuration
             updated_config = BlockExamSubdeckConfig(
-                ankihub_deck_id="test-deck-id", subdeck_id="test-subdeck-id", due_date="2025-01-15"
+                ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2025-01-15"
             )
             config.add_block_exam_subdeck(updated_config)
 
@@ -8625,12 +8638,12 @@ class TestBlockExamSubdecks:
             assert configs[0].due_date == "2025-01-15"
 
             # Test removing configuration
-            config.remove_block_exam_subdeck("test-deck-id", "test-subdeck-id")
+            config.remove_block_exam_subdeck(ah_did, test_subdeck_id)
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 0
 
             # Test removing non-existent configuration (should not error)
-            config.remove_block_exam_subdeck("non-existent", "non-existent")
+            config.remove_block_exam_subdeck(next_deterministic_uuid(), DeckId(999))
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 0
 
@@ -8701,8 +8714,8 @@ class TestBlockExamSubdecks:
 
             # Move subdeck to main deck
             subdeck_config = BlockExamSubdeckConfig(
-                ankihub_deck_id=str(ah_did),
-                subdeck_id=str(subdeck_id),
+                ankihub_deck_id=ah_did,
+                subdeck_id=subdeck_id,
                 due_date=due_date,
             )
             move_subdeck_to_main_deck(subdeck_config)
@@ -8721,7 +8734,7 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.decks.id_for_name(nested_subdeck_name) is None
 
             # Verify config was removed
-            saved_due_date = config.get_block_exam_subdeck_due_date(str(ah_did), str(subdeck_id))
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck_id)
             assert saved_due_date is None
 
 
@@ -8773,13 +8786,13 @@ class TestBlockExamSubdeckDialog:
             # Create some test subdecks
             deck_config = config.deck_config(ah_did)
             anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck1_id = aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id
+            subdeck1_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id)
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2")
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
             config.add_block_exam_subdeck(
-                BlockExamSubdeckConfig(ankihub_deck_id=str(ah_did), subdeck_id=str(subdeck1_id), due_date="2024-12-31")
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=subdeck1_id, due_date="2024-12-31")
             )
 
             dialog = BlockExamSubdeckDialog(ah_did, self.note_ids, parent=None)
@@ -8889,12 +8902,8 @@ class TestCheckBlockExamSubdeckDueDates:
             future_date2 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
 
             config_items = [
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date1
-                ),
-                BlockExamSubdeckConfig(
-                    ankihub_deck_id=str(uuid.uuid4()), subdeck_id=str(uuid.uuid4()), due_date=future_date2
-                ),
+                BlockExamSubdeckConfig(ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(100), due_date=future_date1),
+                BlockExamSubdeckConfig(ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(200), due_date=future_date2),
             ]
 
             # Add configurations
@@ -8907,6 +8916,7 @@ class TestCheckBlockExamSubdeckDueDates:
     def test_check_block_exam_subdeck_due_dates_with_expired(
         self,
         anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid,
     ):
         """Test function identifies expired subdecks correctly."""
         with anki_session_with_addon_data.profile_loaded():
@@ -8915,14 +8925,17 @@ class TestCheckBlockExamSubdeckDueDates:
             today_date = date.today().strftime("%Y-%m-%d")
             future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
+            ah_did_1 = next_deterministic_uuid()
+            ah_did_2 = next_deterministic_uuid()
+            ah_did_3 = next_deterministic_uuid()
             config_items = [
-                BlockExamSubdeckConfig(ankihub_deck_id="deck1", subdeck_id="subdeck1", due_date=past_date),
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did_1, subdeck_id=DeckId(1), due_date=past_date),
                 BlockExamSubdeckConfig(
-                    ankihub_deck_id="deck2",
-                    subdeck_id="subdeck2",
+                    ankihub_deck_id=ah_did_2,
+                    subdeck_id=DeckId(2),
                     due_date=today_date,  # Today counts as expired (>= today)
                 ),
-                BlockExamSubdeckConfig(ankihub_deck_id="deck3", subdeck_id="subdeck3", due_date=future_date),
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did_3, subdeck_id=DeckId(3), due_date=future_date),
             ]
 
             # Add configurations
@@ -8934,9 +8947,9 @@ class TestCheckBlockExamSubdeckDueDates:
             # Should return the two expired subdecks
             assert len(expired) == 2
             expired_deck_ids = [config.ankihub_deck_id for config in expired]
-            assert "deck1" in expired_deck_ids  # past date
-            assert "deck2" in expired_deck_ids  # today's date
-            assert "deck3" not in expired_deck_ids  # future date
+            assert ah_did_1 in expired_deck_ids  # past date
+            assert ah_did_2 in expired_deck_ids  # today's date
+            assert ah_did_3 not in expired_deck_ids  # future date
 
 
 class TestNoteIdsInDeckHierarchy:
@@ -9074,3 +9087,144 @@ class TestNoteIdsInDeckHierarchy:
             nids = note_ids_in_deck_hierarchy(deck_id)
 
             assert set(nids) == set()
+
+
+class TestCheckUserFeatureAccess:
+    """Tests for check_user_feature_access function."""
+
+    FEATURE_KEY = "test_feature"
+
+    def _mock_get_user_details(self, mocker, return_value=None, side_effect=None):
+        """Helper method to mock AnkiHubClient.get_user_details."""
+        return mocker.patch.object(
+            AnkiHubClient,
+            "get_user_details",
+            return_value=return_value,
+            side_effect=side_effect,
+        )
+
+    def test_with_access_granted(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_access_granted callback is called when user has access."""
+        # Mock the client to return user details with access granted
+        user_details = {
+            self.FEATURE_KEY: True,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Call check_user_feature_access and wait for the callback to be invoked
+        with qtbot.wait_callback() as on_access_granted:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted,
+                parent=aqt.mw,
+            )
+
+        # Assert callback was called with the correct user details
+        on_access_granted.assert_called_with(user_details)
+
+    def test_with_access_denied_and_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_access_denied callback is called when user doesn't have access."""
+        # Mock the client to return user details with access denied
+        user_details = {
+            self.FEATURE_KEY: False,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Track both callbacks
+        on_access_granted_mock = Mock()
+
+        # Call check_user_feature_access and wait for on_access_denied to be invoked
+        with qtbot.wait_callback() as on_access_denied:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied,
+                parent=aqt.mw,
+            )
+
+        # Assert on_access_denied was called with the correct user details
+        on_access_denied.assert_called_with(user_details)
+        # Assert on_access_granted was not called
+        on_access_granted_mock.assert_not_called()
+
+    def test_with_access_denied_no_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that no error occurs when access is denied and on_access_denied is None."""
+        # Mock the client to return user details with access denied
+        user_details = {
+            self.FEATURE_KEY: False,
+        }
+        self._mock_get_user_details(mocker, return_value=user_details)
+
+        # Track the on_access_granted callback
+        on_access_granted_mock = Mock()
+
+        # Call check_user_feature_access with no on_access_denied callback
+        check_user_feature_access(
+            feature_key=self.FEATURE_KEY,
+            on_access_granted=on_access_granted_mock,
+            on_access_denied=None,
+            parent=aqt.mw,
+        )
+
+        # Wait for the operation to complete
+        qtbot.wait(500)
+
+        # Assert on_access_granted was not called
+        on_access_granted_mock.assert_not_called()
+
+    def test_with_failure_and_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that on_failure callback is called when fetching user details fails."""
+        # Mock the client to raise an exception
+        test_exception = Exception("Failed to fetch user details")
+        self._mock_get_user_details(mocker, side_effect=test_exception)
+
+        # Track the callbacks
+        on_access_granted_mock = Mock()
+        on_access_denied_mock = Mock()
+
+        # Call check_user_feature_access and wait for on_failure to be invoked
+        with qtbot.wait_callback() as on_failure:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied_mock,
+                on_failure=on_failure,
+                parent=aqt.mw,
+            )
+
+        # Assert on_failure was called with the exception
+        on_failure.assert_called_with(test_exception)
+        # Assert other callbacks were not called
+        on_access_granted_mock.assert_not_called()
+        on_access_denied_mock.assert_not_called()
+
+    def test_with_failure_and_no_failure_callback(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that exception is raised when fetching fails and on_failure is None."""
+        # Mock the client to raise an exception
+        test_exception = Exception("Failed to fetch user details")
+        self._mock_get_user_details(mocker, side_effect=test_exception)
+
+        # Track the callbacks
+        on_access_granted_mock = Mock()
+        on_access_denied_mock = Mock()
+
+        # Capture exceptions raised in Qt event loop
+        with qtbot.capture_exceptions() as exceptions:
+            # Call check_user_feature_access with no on_failure callback
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied_mock,
+                on_failure=None,
+                parent=aqt.mw,
+            )
+
+            # Wait for the exception to be raised
+            qtbot.wait_until(lambda: len(exceptions) > 0)
+
+        # Assert the exception was raised
+        assert len(exceptions) == 1
+        assert exceptions[0][1] == test_exception
+        # Assert other callbacks were not called
+        on_access_granted_mock.assert_not_called()
+        on_access_denied_mock.assert_not_called()

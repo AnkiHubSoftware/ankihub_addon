@@ -42,13 +42,17 @@ def create_block_exam_subdeck(
         counter += 1
 
     # Create the subdeck
-    subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id
+    subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(full_subdeck_name).id)
+
+    # Make the subdeck inherit the parent deck's option group
+    subdeck = aqt.mw.col.decks.get(subdeck_id)
+    main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
+    subdeck["conf"] = main_deck["conf"]
+    aqt.mw.col.decks.update(subdeck)
 
     # Save configuration if due date provided
     if due_date:
-        config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=str(subdeck_id), due_date=due_date
-        )
+        config_item = BlockExamSubdeckConfig(ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck_id, due_date=due_date)
         config.add_block_exam_subdeck(config_item)
 
     LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, due_date=due_date)
@@ -96,7 +100,7 @@ def add_notes_to_block_exam_subdeck(
     # Update configuration with due date
     if due_date:
         config_item = BlockExamSubdeckConfig(
-            ankihub_deck_id=str(ankihub_deck_id), subdeck_id=str(subdeck["id"]), due_date=due_date
+            ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck["id"], due_date=due_date
         )
         config.add_block_exam_subdeck(config_item)
 
@@ -143,13 +147,13 @@ def move_subdeck_to_main_deck(subdeck_config: BlockExamSubdeckConfig) -> None:
     Args:
         subdeck_config: Configuration of the subdeck to move
     """
-    ankihub_deck_id = uuid.UUID(subdeck_config.ankihub_deck_id)
+    ankihub_deck_id = subdeck_config.ankihub_deck_id
     deck_config = config.deck_config(ankihub_deck_id)
     if not deck_config:
         LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
         raise ValueError("Deck config not found")
 
-    subdeck_id = DeckId(int(subdeck_config.subdeck_id))
+    subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
@@ -216,3 +220,10 @@ def get_exam_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
 
     # Filter children to only include exam subdecks
     return [(name, deck_id) for name, deck_id in child_decks if deck_id in exam_subdeck_ids]
+
+
+def get_subdeck_name_without_parent(subdeck_id: DeckId) -> str:
+    """Get the subdeck name without the parent deck prefix.
+    E.g. for "MainDeck::Subdeck", returns "Subdeck".
+    """
+    return aqt.mw.col.decks.name(subdeck_id).split("::", maxsplit=1)[-1]

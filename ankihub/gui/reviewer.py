@@ -24,7 +24,6 @@ from aqt.utils import openLink
 from aqt.webview import WebContent
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
@@ -32,7 +31,7 @@ from ..main.utils import Resource, mh_tag_to_resource
 from ..settings import config, url_login
 from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
-from .operations import AddonQueryOp
+from .operations.user_details import check_user_feature_access
 from .utils import (
     anki_theme,
     get_ah_did_of_deck_or_ancestor_deck,
@@ -428,10 +427,6 @@ def _check_access_and_notify_buttons() -> None:
     """Fetches the user's access to the reviwer extension feature in the background and notifies the reviewer buttons
     once the status is fetched."""
 
-    def fetch_has_reviewer_extension_access(_) -> bool:
-        client = AnkiHubClient()
-        return client.has_reviewer_extension_access()
-
     def notify_reviewer_buttons(has_reviewer_extension_access: bool) -> None:
         js = _wrap_with_reviewer_buttons_check(
             f"ankihubReviewerButtons.updateHasReviewerExtensionAccess({'true' if has_reviewer_extension_access else 'false'})"  # noqa: E501
@@ -442,11 +437,12 @@ def _check_access_and_notify_buttons() -> None:
         notify_reviewer_buttons(False)
         raise exception
 
-    AddonQueryOp(
-        op=fetch_has_reviewer_extension_access,
-        success=notify_reviewer_buttons,
-        parent=aqt.mw,
-    ).without_collection().failure(on_failure).run_in_background()
+    check_user_feature_access(
+        feature_key="has_reviewer_extension_access",
+        on_access_granted=lambda _: notify_reviewer_buttons(True),
+        on_access_denied=lambda _: notify_reviewer_buttons(False),
+        on_failure=on_failure,
+    )
 
 
 def _related_ah_deck_has_note_embeddings(note: Note) -> bool:
