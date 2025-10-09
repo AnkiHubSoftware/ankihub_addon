@@ -298,7 +298,7 @@ class BlockExamSubdeckDialog(QDialog):
         layout.addSpacing(12)
 
         # Main message
-        message_label = QLabel(f"A subdeck already exists with the name '{conflicting_name}'.")
+        message_label = QLabel(f'A subdeck already exists with the name "<b>{conflicting_name}</b>".')
         message_font = message_label.font()
         message_label.setFont(message_font)
         message_label.setWordWrap(True)
@@ -308,7 +308,7 @@ class BlockExamSubdeckDialog(QDialog):
         # Info label
         info_label = QLabel(
             "You can either create a new one called "
-            f"'{conflicting_name} (1)' or merge these notes into the existing subdeck."
+            f'"<b>{conflicting_name}</b> (1)" or merge these notes into the existing subdeck.'
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
