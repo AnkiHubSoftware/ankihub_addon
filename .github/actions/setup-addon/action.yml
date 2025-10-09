@@ -4,16 +4,25 @@ inputs:
     required: true
   install_qt:
     required: true
-  qt_version:
+  aqt_dependency_group:
+    required: false
+  qt_package:
     required: false
 runs:
   using: "composite"
   steps:
+    - name: Install dependencies and detect Qt version
+      if: ${{ inputs.install_qt == 'true' }}
+      run: |
+        uv sync --group ${{ inputs.aqt_dependency_group }}
+        QT_VERSION=$(uv pip show ${{ inputs.qt_package }} | sed -n 's/^Version: //p')
+        echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
+
     - name: Install Qt
       if: ${{ inputs.install_qt == 'true' }}
       uses: jurplel/install-qt-action@v4
       with:
-        version: ${{ inputs.qt_version }}
+        version: ${{ env.QT_VERSION }}
         setup-python: false
         cache: true
       continue-on-error: true

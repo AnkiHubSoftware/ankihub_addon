@@ -38,18 +38,13 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install dependencies and detect Qt version
-        run: |
-          uv sync --group ${{ matrix.aqt_dependency_group }}
-          QT_VERSION=$(uv pip show ${{ matrix.qt_package }} | sed -n 's/^Version: //p')
-          echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
-
       - name: Setup addon
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
-          qt_version: ${{ env.QT_VERSION }}
+          aqt_dependency_group: ${{ matrix.aqt_dependency_group }}
+          qt_package: ${{ matrix.qt_package }}
 
       - name: Run pytest with coverage
         run: |
@@ -87,7 +82,9 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
+          install_qt: yes
+          aqt_dependency_group: aqt
+          qt_package: pyqt6
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
