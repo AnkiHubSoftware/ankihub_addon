@@ -13,6 +13,7 @@ import aqt
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
+from anki.utils import ids2str
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -87,38 +88,23 @@ def _nid_to_destination_deck_name(
     nids: List[NoteId], anki_root_deck_name: str, root_deck_id: DeckId
 ) -> Dict[NoteId, str]:
     result = dict()
-    missing_nids = []
 
-    # Get exam subdeck names to check if notes are already in them
+    # Get exam subdeck IDs and filter out notes that are in them
     exam_subdecks_list = get_exam_subdecks(root_deck_id)
     exam_subdeck_ids = {deck_id for _, deck_id in exam_subdecks_list}
+    if exam_subdeck_ids:
+        query = f"""
+            SELECT DISTINCT nid
+            FROM cards
+            WHERE nid IN {ids2str(nids)}
+              AND (did IN {ids2str(exam_subdeck_ids)} OR odid IN {ids2str(exam_subdeck_ids)})
+        """
+        nids_in_exam_subdecks = set(aqt.mw.col.db.list(query))
+        # Filter out notes that are in exam subdecks
+        nids = [nid for nid in nids if nid not in nids_in_exam_subdecks]
 
-    for nid in nids:
-        tags_str = aqt.mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
-        if not tags_str:
-            # When this query returns None, that means that the note does not exist in the Anki database.
-            # (Notes without tags have an empty string in the tags field.)
-            # In this case we ignore the note.
-            missing_nids.append(nid)
-            continue
-
-        # Check if note is in a block exam subdeck - if so, don't move it
-        if exam_subdeck_ids:
-            cards = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid={nid}")
-            is_in_exam_subdeck = False
-            for cid in cards:
-                card = aqt.mw.col.get_card(cid)
-                # Check both did (current deck) and odid (original deck for filtered decks)
-                card_deck_id = card.odid if card.odid != 0 else card.did
-                # card_deck_name = aqt.mw.col.decks.name(card_deck_id)
-                if card_deck_id in exam_subdeck_ids:
-                    # Note has at least one card in an exam subdeck, skip this note
-                    is_in_exam_subdeck = True
-                    break
-
-            if is_in_exam_subdeck:
-                continue
-
+    nid_to_tags = dict(aqt.mw.col.db.all(f"SELECT id, tags FROM notes WHERE id IN {ids2str(nids)}"))
+    for nid, tags_str in nid_to_tags.items():
         tags = aqt.mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
@@ -134,9 +120,6 @@ def _nid_to_destination_deck_name(
                 # ignore invalid subdeck tag
                 continue
         result[nid] = deck_name
-
-    if missing_nids:
-        LOGGER.warning("Notes are not in the Anki database.", missing_nids=missing_nids)
 
     return result
 
