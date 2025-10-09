@@ -53,7 +53,9 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
 
     # create mapping between notes and destination decks
-    nid_to_dest_deck_name = _nid_to_destination_deck_name(nids, anki_root_deck_name=anki_root_deck_name)
+    nid_to_dest_deck_name = _nid_to_destination_deck_name(
+        nids, anki_root_deck_name=anki_root_deck_name, root_deck_id=root_deck_id
+    )
 
     # create missing subdecks
     deck_names = set(nid_to_dest_deck_name.values())
@@ -63,8 +65,9 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     nid_to_did = {nid: aqt.mw.col.decks.id_for_name(deck_name) for nid, deck_name in nid_to_dest_deck_name.items()}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # Remove empty unprotected subdecks
-    for name, deck_id in _get_subdecks_excluding_protected(root_deck_id):
+    # Remove empty unprotected subdecks (including empty exam subdecks)
+    # TODO Make _get_subdecks_excluding_protected only return empty decks?
+    for name, deck_id in _get_subdecks_excluding_protected(root_deck_id, include_empty_exam_subdecks=True):
         try:
             is_empty = aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
         except NotFoundError:
@@ -80,9 +83,16 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     LOGGER.info("Built subdecks and moved cards to them.")
 
 
-def _nid_to_destination_deck_name(nids: List[NoteId], anki_root_deck_name: str) -> Dict[NoteId, str]:
+def _nid_to_destination_deck_name(
+    nids: List[NoteId], anki_root_deck_name: str, root_deck_id: DeckId
+) -> Dict[NoteId, str]:
     result = dict()
     missing_nids = []
+
+    # Get exam subdeck names to check if notes are already in them
+    exam_subdecks_list = get_exam_subdecks(root_deck_id)
+    exam_subdeck_ids = {deck_id for _, deck_id in exam_subdecks_list}
+
     for nid in nids:
         tags_str = aqt.mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
         if not tags_str:
@@ -91,6 +101,23 @@ def _nid_to_destination_deck_name(nids: List[NoteId], anki_root_deck_name: str) 
             # In this case we ignore the note.
             missing_nids.append(nid)
             continue
+
+        # Check if note is in a block exam subdeck - if so, don't move it
+        if exam_subdeck_ids:
+            cards = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid={nid}")
+            is_in_exam_subdeck = False
+            for cid in cards:
+                card = aqt.mw.col.get_card(cid)
+                # Check both did (current deck) and odid (original deck for filtered decks)
+                card_deck_id = card.odid if card.odid != 0 else card.did
+                # card_deck_name = aqt.mw.col.decks.name(card_deck_id)
+                if card_deck_id in exam_subdeck_ids:
+                    # Note has at least one card in an exam subdeck, skip this note
+                    is_in_exam_subdeck = True
+                    break
+
+            if is_in_exam_subdeck:
+                continue
 
         tags = aqt.mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
@@ -171,13 +198,19 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         LOGGER.info(f"Removed {len(deck_ids_to_flatten)} subdeck(s)")
 
 
-def _get_subdecks_excluding_protected(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
+def _get_subdecks_excluding_protected(
+    root_deck_id: DeckId, include_empty_exam_subdecks: bool = False
+) -> list[tuple[str, DeckId]]:
     """Get all child decks under root_deck_id, excluding protected decks and their descendants.
 
     Protected decks include:
-    - Block exam subdecks
+    - Block exam subdecks (unless they are empty and include_empty_exam_subdecks is True)
     - Filtered decks
     - All ancestors and descendants of the above
+
+    Args:
+        root_deck_id: The root deck ID to get children from
+        include_empty_exam_subdecks: If True, empty exam subdecks will be included in the result
 
     Returns a list of (name, id) tuples.
     """
@@ -186,7 +219,18 @@ def _get_subdecks_excluding_protected(root_deck_id: DeckId) -> list[tuple[str, D
     child_decks = aqt.mw.col.decks.children(root_deck_id)
 
     # Build set of core protected deck names (exam subdecks and filtered decks)
-    exam_subdeck_names = {exam_name for exam_name, _ in get_exam_subdecks(root_deck_id)}
+    exam_subdecks = get_exam_subdecks(root_deck_id)
+
+    # If include_empty_exam_subdecks is True, filter out empty exam subdecks from protection
+    if include_empty_exam_subdecks:
+        exam_subdeck_names = {
+            exam_name
+            for exam_name, exam_id in exam_subdecks
+            if aqt.mw.col.decks.card_count(exam_id, include_subdecks=True) > 0
+        }
+    else:
+        exam_subdeck_names = {exam_name for exam_name, _ in exam_subdecks}
+
     filtered_deck_names = {deck_name for deck_name, deck_id in child_decks if aqt.mw.col.decks.is_filtered(deck_id)}
     core_protected_names = exam_subdeck_names | filtered_deck_names
 

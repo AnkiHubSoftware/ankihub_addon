@@ -4686,41 +4686,81 @@ class TestBuildSubdecksAndMoveCardsToThem:
             assert mw.col.decks.id_for_name(parent_deck_name) is None
             assert mw.col.decks.id_for_name(empty_deck_name) is None
 
-    @pytest.mark.parametrize("deck_type", ["exam", "filtered"])
-    def test_protected_decks_and_ancestors_and_descendants_are_protected(
+    def test_filtered_decks_and_ancestors_and_descendants_are_protected(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
-        deck_type: str,
     ):
-        """Test that protected decks (exam/filtered) and their ancestors and descendants are protected from deletion."""
+        """Test that filtered decks and their ancestors and descendants are protected from deletion."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did, parent_name, core_name, child_name = _setup_protected_deck_hierarchy(install_ah_deck, deck_type)
+            ah_did, parent_name, core_name, child_name = _setup_protected_deck_hierarchy(install_ah_deck, "filtered")
 
             # Call the function
             build_subdecks_and_move_cards_to_them(ah_did)
 
             # Assert ancestor and core are protected from deletion
-            assert aqt.mw.col.decks.id_for_name(parent_name) is not None, (
-                f"Ancestor deck should be protected ({deck_type})"
-            )
-            assert aqt.mw.col.decks.id_for_name(core_name) is not None, (
-                f"Core protected deck should exist ({deck_type})"
-            )
-
-            # If child deck was set up, check if it was protected
-            if child_name:
-                assert aqt.mw.col.decks.id_for_name(child_name) is not None, (
-                    f"Descendant deck should be protected ({deck_type})"
-                )
+            assert aqt.mw.col.decks.id_for_name(parent_name) is not None, "Ancestor deck should be protected"
+            assert aqt.mw.col.decks.id_for_name(core_name) is not None, "Core protected deck should exist"
 
             # Verify core deck is still configured correctly
             core_id = aqt.mw.col.decks.id_for_name(core_name)
-            if deck_type == "exam":
-                exam_configs = config.get_block_exam_subdecks()
-                assert any(int(cfg.subdeck_id) == core_id for cfg in exam_configs)
-            elif deck_type == "filtered":
-                assert aqt.mw.col.decks.is_filtered(core_id)
+            assert aqt.mw.col.decks.is_filtered(core_id)
+
+    def test_empty_exam_subdecks_are_removed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that empty exam subdecks are removed during build_subdecks_and_move_cards_to_them."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did, parent_name, core_name, child_name = _setup_protected_deck_hierarchy(install_ah_deck, "exam")
+
+            # Call the function
+            build_subdecks_and_move_cards_to_them(ah_did)
+
+            # Empty exam subdecks should be removed
+            assert aqt.mw.col.decks.id_for_name(core_name) is None, "Empty exam subdeck should be removed"
+            assert aqt.mw.col.decks.id_for_name(child_name) is None, "Empty exam subdeck descendant should be removed"
+            # Parent should also be removed since it's empty
+            assert aqt.mw.col.decks.id_for_name(parent_name) is None, "Empty parent should be removed"
+
+    def test_notes_not_moved_out_of_block_exam_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        """Test that notes in block exam subdecks are not moved even if they have subdeck tags."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            _, ah_did = install_sample_ah_deck()
+
+            # Create a block exam subdeck
+            exam_subdeck_name = "Testdeck::ExamSubdeck"
+            exam_subdeck_id = DeckId(mw.col.decks.add_normal_deck_with_name(exam_subdeck_name).id)
+            config.add_block_exam_subdeck(
+                BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=exam_subdeck_id, due_date="2024-12-31")
+            )
+
+            # Move a note to the exam subdeck
+            nids = mw.col.find_notes("deck:Testdeck")
+            note = mw.col.get_note(nids[0])
+            cards = note.cards()
+            for card in cards:
+                card.did = exam_subdeck_id
+            mw.col.update_cards(cards)
+
+            # Add a subdeck tag that would normally move the note to a different deck
+            note.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
+            note.flush()
+
+            # Call the function
+            build_subdecks_and_move_cards_to_them(ah_did)
+
+            # Assert that the note is still in the exam subdeck (not moved)
+            note.load()
+            for card in note.cards():
+                assert mw.col.decks.name(card.did) == exam_subdeck_name, "Note should remain in exam subdeck"
 
     def test_notes_not_moved_out_filtered_decks(
         self,
