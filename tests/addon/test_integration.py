@@ -4733,7 +4733,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
         """Test that notes in block exam subdecks are not moved even if they have subdeck tags."""
         with anki_session_with_addon_data.profile_loaded():
             # Create deck and install it as an AnkiHub deck
-            anki_did = 1
+            anki_did = DeckId(1)
             ah_did = install_ah_deck(anki_did=anki_did, anki_deck_name="Testdeck")
 
             # Create a block exam subdeck
