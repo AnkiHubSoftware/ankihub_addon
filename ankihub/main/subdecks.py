@@ -67,19 +67,19 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
     # Remove empty unprotected subdecks (including empty exam subdecks)
-    # TODO Make _get_subdecks_excluding_protected only return empty decks?
-    for name, deck_id in _get_subdecks_excluding_protected(root_deck_id, include_empty_exam_subdecks=True):
+    unprotected_subdecks = _get_unprotected_subdecks(root_deck_id, protect_exam_subdecks=False)
+    empty_subdecks = [
+        (name, deck_id)
+        for name, deck_id in unprotected_subdecks
+        if aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
+    ]
+    for name, deck_id in empty_subdecks:
         try:
-            is_empty = aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
-        except NotFoundError:
-            # This can happen if a parent deck was deleted earlier in the loop
-            LOGGER.debug(f"Deck {deck_id} not found during removal process")
-            continue
-
-        if is_empty:
-            # Remove the empty deck
             aqt.mw.col.decks.remove([deck_id])
             LOGGER.info("Removed empty subdeck", did=deck_id, name=name)
+        except NotFoundError:
+            # This can happen if a parent deck was deleted earlier in the loop
+            LOGGER.debug("Deck not found during removal process", deck_id=deck_id, name=name)
 
     LOGGER.info("Built subdecks and moved cards to them.")
 
@@ -167,7 +167,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     root_deck_id = config.deck_config(ankihub_did).anki_id
 
     # Get all child decks except protected decks (exam subdecks, filtered decks, and their ancestors/descendants)
-    decks_to_flatten = _get_subdecks_excluding_protected(root_deck_id)
+    decks_to_flatten = _get_unprotected_subdecks(root_deck_id)
     deck_ids_to_flatten: list[DeckId] = [deck_id for _, deck_id in decks_to_flatten]
 
     # Get note IDs from the decks we want to flatten
@@ -181,41 +181,32 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         LOGGER.info(f"Removed {len(deck_ids_to_flatten)} subdeck(s)")
 
 
-def _get_subdecks_excluding_protected(
-    root_deck_id: DeckId, include_empty_exam_subdecks: bool = False
-) -> list[tuple[str, DeckId]]:
+def _get_unprotected_subdecks(root_deck_id: DeckId, protect_exam_subdecks: bool = True) -> list[tuple[str, DeckId]]:
     """Get all child decks under root_deck_id, excluding protected decks and their descendants.
 
     Protected decks include:
-    - Block exam subdecks (unless they are empty and include_empty_exam_subdecks is True)
+    - Block exam subdecks (if protect_exam_subdecks is True)
     - Filtered decks
     - All ancestors and descendants of the above
+        We don't want to remove ancestors because removing an ancestor would also remove its descendants.
+        Removing descendants of protected decks might be unexpected for users.
 
     Args:
         root_deck_id: The root deck ID to get children from
-        include_empty_exam_subdecks: If True, empty exam subdecks will be included in the result
+        protect_exam_subdecks: If True, exam subdecks are protected from being returned
 
     Returns a list of (name, id) tuples.
     """
 
-    # Get all child decks
     child_decks = aqt.mw.col.decks.children(root_deck_id)
-
-    # Build set of core protected deck names (exam subdecks and filtered decks)
-    exam_subdecks = get_exam_subdecks(root_deck_id)
-
-    # If include_empty_exam_subdecks is True, filter out empty exam subdecks from protection
-    if include_empty_exam_subdecks:
-        exam_subdeck_names = {
-            exam_name
-            for exam_name, exam_id in exam_subdecks
-            if aqt.mw.col.decks.card_count(exam_id, include_subdecks=True) > 0
-        }
-    else:
-        exam_subdeck_names = {exam_name for exam_name, _ in exam_subdecks}
-
     filtered_deck_names = {deck_name for deck_name, deck_id in child_decks if aqt.mw.col.decks.is_filtered(deck_id)}
-    core_protected_names = exam_subdeck_names | filtered_deck_names
+
+    if protect_exam_subdecks:
+        exam_subdecks = get_exam_subdecks(root_deck_id)
+        exam_subdeck_names = {exam_name for exam_name, _ in exam_subdecks}
+        core_protected_names = filtered_deck_names | exam_subdeck_names
+    else:
+        core_protected_names = filtered_deck_names
 
     def is_protected(deck_name: str) -> bool:
         """Check if deck is protected (core, ancestor, or descendant of core)."""
@@ -225,6 +216,7 @@ def _get_subdecks_excluding_protected(
             or any(core_name.startswith(f"{deck_name}::") for core_name in core_protected_names)
         )
 
+    # Get unprotected decks
     return [(deck_name, deck_id) for deck_name, deck_id in child_decks if not is_protected(deck_name)]
 
 
