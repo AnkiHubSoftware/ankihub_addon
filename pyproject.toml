@@ -11,10 +11,10 @@ package-dir = { "ankihub_addon" = "ankihub" }
 
 [dependency-groups]
 production = [
-  "aqt[qt6]==24.11",
+  "aqt[qt]==25.9.2",
 ]
 tests = [
-  "aqt[qt5]==24.11",
+  "aqt[qt]==25.9.2",
 ]
 dev = [
   "approvaltests>=12.2.0",
