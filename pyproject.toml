@@ -42,7 +42,7 @@ bundle = [
   "mashumaro",
 ]
 aqt = ["aqt[qt]==25.9.2"]
-aqt_legacy = ["aqt[qt5]==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
+aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
 
 [tool.uv]
 conflicts = [

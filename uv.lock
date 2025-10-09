@@ -100,7 +100,7 @@ aqt = [
     { name = "aqt", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, extra = ["qt"], marker = "extra == 'group-13-ankihub-addon-aqt'" },
 ]
 aqt-legacy = [
-    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, extra = ["qt5"], marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" } },
     { name = "pyqt5" },
     { name = "pyqtwebengine" },
 ]
@@ -141,7 +141,7 @@ dev = [
 [package.metadata.requires-dev]
 aqt = [{ name = "aqt", extras = ["qt"], specifier = "==25.9.2" }]
 aqt-legacy = [
-    { name = "aqt", extras = ["qt5"], specifier = "==2.1.56" },
+    { name = "aqt", specifier = "==2.1.56" },
     { name = "pyqt5", specifier = "==5.15.2" },
     { name = "pyqtwebengine", specifier = "==5.15.2" },
 ]
@@ -234,12 +234,6 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/af/1a6f2d461f04bd965bd5e791448e1ca12cbb7cf96e7c92dacecb0373bd14/aqt-2.1.56-py3-none-any.whl", hash = "sha256:0bf9d7bfedea4c9b566439c4526e88213596644d017407f9de391dd7de3fabf1", size = 6252046, upload-time = "2023-01-09T01:02:38.891Z" },
-]
-
-[package.optional-dependencies]
-qt5 = [
-    { name = "pyqt5" },
-    { name = "pyqtwebengine" },
 ]
 
 [[package]]
