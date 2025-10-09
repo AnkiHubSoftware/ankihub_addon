@@ -4602,7 +4602,7 @@ def _setup_protected_deck_hierarchy(
 
         # Register core deck as exam subdeck
         core_id = aqt.mw.col.decks.id_for_name(core_name)
-        config.add_block_exam_subdeck(
+        config.upsert_block_exam_subdeck(
             BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=core_id, due_date="2024-12-31")
         )
     elif deck_type == "filtered":
@@ -4739,7 +4739,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # Create a block exam subdeck
             exam_subdeck_name = "Testdeck::ExamSubdeck"
             exam_subdeck_id = create_anki_deck(exam_subdeck_name)
-            config.add_block_exam_subdeck(
+            config.upsert_block_exam_subdeck(
                 BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=exam_subdeck_id, due_date="2024-12-31")
             )
 
