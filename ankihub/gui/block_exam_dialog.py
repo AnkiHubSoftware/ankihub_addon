@@ -8,6 +8,7 @@ import aqt
 from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import (
+    QCheckBox,
     QDateEdit,
     QDialog,
     QHBoxLayout,
@@ -167,6 +168,11 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
+
         # Add stretch to push buttons to bottom
         layout.addStretch()
 
@@ -258,6 +264,11 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
+
         # Add stretch to push buttons to bottom
         layout.addStretch()
 
@@ -324,6 +335,12 @@ class BlockExamSubdeckDialog(QDialog):
         info_label.setFont(info_font)
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
+        layout.addSpacing(12)
+
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
 
         # Add stretch to push buttons to bottom
         layout.addStretch()
@@ -454,7 +471,13 @@ class BlockExamSubdeckDialog(QDialog):
         actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
         # Add notes to the new subdeck
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            actual_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         # Show success message
         tooltip(f"{added_count} note(s) added to '{actual_name}'")
@@ -485,7 +508,11 @@ class BlockExamSubdeckDialog(QDialog):
             self.selected_subdeck_name = new_name
 
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+            self.ankihub_deck_id,
+            self.selected_subdeck_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 
         tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
@@ -522,7 +549,13 @@ class BlockExamSubdeckDialog(QDialog):
 
         actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            actual_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         tooltip(f"{added_count} note(s) added to '{actual_name}'")
         self.accept()
@@ -552,7 +585,13 @@ class BlockExamSubdeckDialog(QDialog):
         due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
         # Add notes to the existing subdeck
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            conflicting_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         # Show success message and close
         tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
