@@ -55,7 +55,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_addon_${{ matrix.anki_package_version }}
+          name: coverage_addon_${{ matrix.aqt_dependency_group }}
           path: .coverage
           include-hidden-files: true
 
