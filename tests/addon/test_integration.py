@@ -4727,40 +4727,35 @@ class TestBuildSubdecksAndMoveCardsToThem:
     def test_notes_not_moved_out_of_block_exam_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
     ):
         """Test that notes in block exam subdecks are not moved even if they have subdeck tags."""
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            _, ah_did = install_sample_ah_deck()
+            # Create deck and install it as an AnkiHub deck
+            anki_did = 1
+            ah_did = install_ah_deck(anki_did=anki_did, anki_deck_name="Testdeck")
 
             # Create a block exam subdeck
             exam_subdeck_name = "Testdeck::ExamSubdeck"
-            exam_subdeck_id = DeckId(mw.col.decks.add_normal_deck_with_name(exam_subdeck_name).id)
+            exam_subdeck_id = create_anki_deck(exam_subdeck_name)
             config.add_block_exam_subdeck(
                 BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=exam_subdeck_id, due_date="2024-12-31")
             )
 
-            # Move a note to the exam subdeck
-            nids = mw.col.find_notes("deck:Testdeck")
-            note = mw.col.get_note(nids[0])
-            cards = note.cards()
-            for card in cards:
-                card.did = exam_subdeck_id
-            mw.col.update_cards(cards)
+            # Create a note with subdeck tags directly in the exam subdeck
+            note_info = NoteInfoFactory.create(tags=[f"{SUBDECK_TAG}::Testdeck::B"])
+            import_ah_note(ah_did=ah_did, anki_did=exam_subdeck_id, note_data=note_info)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
 
-            # Add a subdeck tag that would normally move the note to a different deck
-            note.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
-            note.flush()
+            assert note.cards()[0].did == exam_subdeck_id, "Note should be in the exam subdeck"
 
             # Call the function
             build_subdecks_and_move_cards_to_them(ah_did)
 
-            # Assert that the note is still in the exam subdeck (not moved)
+            # Assert that the note is still in the exam subdeck (not moved to the subdeck from the tag)
             note.load()
-            for card in note.cards():
-                assert mw.col.decks.name(card.did) == exam_subdeck_name, "Note should remain in exam subdeck"
+            assert aqt.mw.col.decks.name(note.cards()[0].did) == exam_subdeck_name, "Note should remain in exam subdeck"
 
     def test_notes_not_moved_out_filtered_decks(
         self,
