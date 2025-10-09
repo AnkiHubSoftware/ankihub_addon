@@ -125,7 +125,7 @@ class SubdeckDueDateDialog(QDialog):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
         qconnect(date_picker_dialog.accepted, self.accept)
-        date_picker_dialog.open()
+        date_picker_dialog.show()
 
 
 class DatePickerDialog(QDialog):
@@ -239,7 +239,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck_name = get_subdeck_name_without_parent(subdeck_id)
     dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
-    dialog.open()
+    dialog.show()
 
 
 def _show_next_expired_subdeck_dialog() -> None:
