@@ -83,7 +83,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: yes
+          install_qt: true
           aqt_dependency_group: aqt
           qt_package: pyqt6
 
