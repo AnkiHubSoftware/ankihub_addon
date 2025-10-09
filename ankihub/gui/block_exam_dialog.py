@@ -17,6 +17,7 @@ from aqt.qt import (
     QListWidgetItem,
     QPushButton,
     Qt,
+    QTimer,
     QVBoxLayout,
     qconnect,
 )
@@ -42,7 +43,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
-        self.resize(440, 340)
+        self.setFixedWidth(440)
 
         # Check if user has existing subdecks to determine entry point
         deck_config = config.deck_config(ankihub_deck_id)
@@ -105,6 +106,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(select_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so layout is fully calculated
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_create_subdeck_screen(self):
         """Show screen for creating new subdeck."""
@@ -185,6 +189,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Focus on name input
         self.name_input.setFocus()
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_add_notes_screen(self):
         """Show screen for adding notes to selected subdeck."""
@@ -272,6 +279,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         layout.addLayout(button_layout)
 
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
+
     def _show_subdeck_conflict_screen(self, conflicting_name: str):
         """Show screen for handling subdeck name conflicts."""
         # Store the due date from the current screen before clearing layout
@@ -337,6 +347,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(merge_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _populate_subdeck_list(self):
         """Populate the subdeck list widget."""
