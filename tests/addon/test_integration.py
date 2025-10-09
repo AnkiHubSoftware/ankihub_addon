@@ -7509,6 +7509,7 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
         reviewer_sidebar_mock.close_sidebar.assert_called_once()
 
 
+@pytest.mark.sequential
 @pytest.mark.parametrize(
     "use_search_string, use_note_ids, tag_name",
     [
