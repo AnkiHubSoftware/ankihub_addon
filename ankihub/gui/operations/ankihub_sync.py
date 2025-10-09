@@ -203,7 +203,7 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     if config.schema_to_do_full_upload_for_once():
         # Sync with AnkiWeb to resolve the pending full upload immediately.
         # Otherwise, Anki's Sync button will be red, and clicking it will trigger a full upload.
-        sync_with_ankiweb(on_done=partial(on_done, future=future_with_result(None)))
+        sync_with_ankiweb(on_done=partial(on_done, future_with_result(None)))
     else:
         on_done(future_with_result(None))
 

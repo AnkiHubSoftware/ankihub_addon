@@ -8,6 +8,7 @@ import aqt
 from anki.decks import DeckId
 from anki.notes import NoteId
 from anki.utils import ids2str
+from aqt.operations.scheduling import unsuspend_cards
 
 from .. import LOGGER
 from ..settings import BlockExamSubdeckConfig, config
@@ -53,7 +54,7 @@ def create_block_exam_subdeck(
     # Save configuration if due date provided
     if due_date:
         config_item = BlockExamSubdeckConfig(ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck_id, due_date=due_date)
-        config.add_block_exam_subdeck(config_item)
+        config.upsert_block_exam_subdeck(config_item)
 
     LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, due_date=due_date)
 
@@ -61,13 +62,27 @@ def create_block_exam_subdeck(
 
 
 def add_notes_to_block_exam_subdeck(
-    ankihub_deck_id: uuid.UUID, subdeck_name: str, note_ids: List[NoteId], due_date: Optional[str] = None
+    ankihub_deck_id: uuid.UUID,
+    subdeck_name: str,
+    note_ids: List[NoteId],
+    due_date: Optional[str] = None,
+    unsuspend_notes: bool = False,
 ) -> int:
     """Add notes to a block exam subdeck and update configuration.
+
+    Args:
+        ankihub_deck_id: The AnkiHub deck ID
+        subdeck_name: Name of the subdeck (without parent deck prefix)
+        note_ids: List of note IDs to add to the subdeck
+        due_date: Due date for the subdeck in YYYY-MM-DD format
+        unsuspend_notes: Whether to unsuspend the notes after adding them
 
     Returns:
         The number of notes actually moved to the subdeck (excluding notes already in the subdeck).
     """
+    if not note_ids:
+        return 0
+
     deck_config = config.deck_config(ankihub_deck_id)
     if not deck_config:
         raise ValueError("Deck config not found")
@@ -97,12 +112,19 @@ def add_notes_to_block_exam_subdeck(
     if notes_to_move:
         move_notes_to_decks_while_respecting_odid({nid: subdeck_id for nid in notes_to_move})
 
+    # Unsuspend notes if requested
+    if unsuspend_notes:
+        # Get card IDs for provided notes that are currently in the subdeck
+        card_ids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid IN {ids2str(note_ids)} AND did = {subdeck_id}")
+        if card_ids:
+            unsuspend_cards(parent=aqt.mw, card_ids=card_ids).run_in_background()
+
     # Update configuration with due date
     if due_date:
         config_item = BlockExamSubdeckConfig(
             ankihub_deck_id=ankihub_deck_id, subdeck_id=subdeck["id"], due_date=due_date
         )
-        config.add_block_exam_subdeck(config_item)
+        config.upsert_block_exam_subdeck(config_item)
 
     LOGGER.info(
         "Added notes to block exam subdeck",
@@ -110,6 +132,7 @@ def add_notes_to_block_exam_subdeck(
         requested_count=len(note_ids),
         actually_moved=len(notes_to_move),
         due_date=due_date,
+        unsuspend_notes=unsuspend_notes,
     )
 
     return len(notes_to_move)
@@ -185,7 +208,7 @@ def set_subdeck_due_date(subdeck_config: BlockExamSubdeckConfig, new_due_date: O
         ankihub_deck_id=subdeck_config.ankihub_deck_id, subdeck_id=subdeck_config.subdeck_id, due_date=new_due_date
     )
 
-    config.add_block_exam_subdeck(updated_config)
+    config.upsert_block_exam_subdeck(updated_config)
 
     LOGGER.info(
         "Updated subdeck due date",

@@ -7555,6 +7555,7 @@ def test_terms_agreement_not_accepted_with_reviewer_sidebar_instance(
         reviewer_sidebar_mock.close_sidebar.assert_called_once()
 
 
+@pytest.mark.sequential
 @pytest.mark.parametrize(
     "use_search_string, use_note_ids, tag_name",
     [
@@ -8629,6 +8630,143 @@ class TestBlockExamSubdecks:
             assert note2.id in notes_in_subdeck
             assert note3.id in notes_in_subdeck
 
+    @pytest.mark.qt_no_exception_capture
+    def test_add_notes_to_block_exam_subdeck_unsuspends_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+    ):
+        """Test that notes are unsuspended when unsuspend_notes=True."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+            subdeck_name, _ = create_block_exam_subdeck(ah_did, "Unsuspend Test Subdeck", due_date)
+
+            # Create notes and suspend their cards
+            deck_config = config.deck_config(ah_did)
+            note1 = add_anki_note(anki_did=deck_config.anki_id)
+            note2 = add_anki_note(anki_did=deck_config.anki_id)
+
+            # Suspend all cards
+            card1 = note1.cards()[0]
+            card2 = note2.cards()[0]
+            aqt.mw.col.sched.suspend_cards([card1.id, card2.id])
+
+            # Verify cards are suspended
+            assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
+
+            # Add notes to subdeck with unsuspend_notes=True
+            added_count = add_notes_to_block_exam_subdeck(
+                ah_did, subdeck_name, [note1.id, note2.id], due_date, unsuspend_notes=True
+            )
+
+            assert added_count == 2
+
+            # Wait for background unsuspend to complete
+            qtbot.wait_until(lambda: aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED)
+
+            # Verify cards are now unsuspended
+            assert aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue != QUEUE_TYPE_SUSPENDED
+
+    def test_add_notes_to_block_exam_subdeck_does_not_unsuspend_by_default(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+    ):
+        """Test that notes remain suspended when unsuspend_notes=False (default)."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+            subdeck_name, _ = create_block_exam_subdeck(ah_did, "No Unsuspend Subdeck", due_date)
+
+            # Create notes and suspend their cards
+            deck_config = config.deck_config(ah_did)
+            note1 = add_anki_note(anki_did=deck_config.anki_id)
+            note2 = add_anki_note(anki_did=deck_config.anki_id)
+
+            # Suspend all cards
+            card1 = note1.cards()[0]
+            card2 = note2.cards()[0]
+            aqt.mw.col.sched.suspend_cards([card1.id, card2.id])
+
+            # Verify cards are suspended
+            assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
+
+            # Add notes to subdeck without unsuspend parameter (defaults to False)
+            added_count = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, [note1.id, note2.id], due_date)
+
+            assert added_count == 2
+
+            # Wait to ensure no background unsuspend happens
+            qtbot.wait(100)
+
+            # Verify cards remain suspended
+            assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
+
+    @pytest.mark.qt_no_exception_capture
+    def test_add_notes_to_block_exam_subdeck_unsuspends_all_notes_including_already_in_subdeck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+    ):
+        """Test that unsuspend applies to all notes, including those already in subdeck."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+            subdeck_name, _ = create_block_exam_subdeck(ah_did, "Partial Unsuspend Subdeck", due_date)
+
+            # Create 3 notes
+            deck_config = config.deck_config(ah_did)
+            note1 = add_anki_note(anki_did=deck_config.anki_id)
+            note2 = add_anki_note(anki_did=deck_config.anki_id)
+            note3 = add_anki_note(anki_did=deck_config.anki_id)
+
+            # Suspend all cards
+            card1 = note1.cards()[0]
+            card2 = note2.cards()[0]
+            card3 = note3.cards()[0]
+            aqt.mw.col.sched.suspend_cards([card1.id, card2.id, card3.id])
+
+            # Add first 2 notes to subdeck without unsuspending
+            first_added = add_notes_to_block_exam_subdeck(ah_did, subdeck_name, [note1.id, note2.id], due_date)
+            assert first_added == 2
+
+            # Verify cards 1 and 2 are still suspended
+            assert aqt.mw.col.get_card(card1.id).queue == QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue == QUEUE_TYPE_SUSPENDED
+
+            # Now add all 3 notes with unsuspend_notes=True
+            # Only note3 should be moved, but all 3 should be unsuspended
+            added_count = add_notes_to_block_exam_subdeck(
+                ah_did, subdeck_name, [note1.id, note2.id, note3.id], due_date, unsuspend_notes=True
+            )
+
+            assert added_count == 1  # Only note3 was moved
+
+            # Wait for background unsuspend to complete
+            qtbot.wait_until(lambda: aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED)
+
+            # Verify all 3 cards are now unsuspended
+            assert aqt.mw.col.get_card(card1.id).queue != QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card2.id).queue != QUEUE_TYPE_SUSPENDED
+            assert aqt.mw.col.get_card(card3.id).queue != QUEUE_TYPE_SUSPENDED
+
     def test_config_methods(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -8644,7 +8782,7 @@ class TestBlockExamSubdecks:
             config_item = BlockExamSubdeckConfig(
                 ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2024-12-31"
             )
-            config.add_block_exam_subdeck(config_item)
+            config.upsert_block_exam_subdeck(config_item)
 
             # Test retrieving configuration
             configs = config.get_block_exam_subdecks()
@@ -8665,7 +8803,7 @@ class TestBlockExamSubdecks:
             updated_config = BlockExamSubdeckConfig(
                 ankihub_deck_id=ah_did, subdeck_id=test_subdeck_id, due_date="2025-01-15"
             )
-            config.add_block_exam_subdeck(updated_config)
+            config.upsert_block_exam_subdeck(updated_config)
 
             # Should still only have one config but with updated date
             configs = config.get_block_exam_subdecks()
@@ -8773,7 +8911,6 @@ class TestBlockExamSubdecks:
             assert saved_due_date is None
 
 
-@pytest.mark.sequential
 class TestBlockExamSubdeckDialog:
     def setup_method(self):
         """Set up test fixtures."""
@@ -8812,7 +8949,6 @@ class TestBlockExamSubdeckDialog:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
-        mocker: MockerFixture,
     ):
         """Test choose subdeck screen displays correctly with existing subdecks."""
         with anki_session_with_addon_data.profile_loaded():
@@ -8826,7 +8962,7 @@ class TestBlockExamSubdeckDialog:
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
-            config.add_block_exam_subdeck(
+            config.upsert_block_exam_subdeck(
                 BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=subdeck1_id, due_date="2024-12-31")
             )
 
@@ -8845,7 +8981,6 @@ class TestBlockExamSubdeckDialog:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
-        mocker: MockerFixture,
     ):
         """Test selecting a subdeck shows add notes screen."""
         with anki_session_with_addon_data.profile_loaded():
@@ -8943,7 +9078,7 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
+                config.upsert_block_exam_subdeck(config_item)
 
             expired = check_block_exam_subdeck_due_dates()
             assert expired == []
@@ -8975,7 +9110,7 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             for config_item in config_items:
-                config.add_block_exam_subdeck(config_item)
+                config.upsert_block_exam_subdeck(config_item)
 
             expired = check_block_exam_subdeck_due_dates()
 

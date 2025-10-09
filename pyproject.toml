@@ -17,30 +17,30 @@ tests = [
   "aqt[qt5]==24.11",
 ]
 dev = [
+  "approvaltests>=12.2.0",
+  "coverage>=6.5.0",
+  "factory-boy>=3.2.1",
+  "faker>=19.12.0",
+  "mypy>=1.18.2",
+  "pre-commit>=2.20.0",
   "pyqt5==5.15.5; platform_system != 'Windows'",
   "pyqtwebengine==5.15.6; platform_system != 'Windows'",
-  "ruff",
-  "mypy==0.971",
-  "coverage==6.5.0",
-  "pre-commit==2.20.0",
-  "requests-mock==1.9.3",
-  "types-requests==2.28.9",
-  "urllib3==1.26.14",
-  "typeguard==2.13.3",
-  "vcrpy==4.2.0",
-  "pytest==8.2.2",
-  "pytest-vcr==1.0.2",
-  "pytest-qt==4.2.0",
-  "pytest-split==0.9",
-  "pytest-mock==3.12.0",
-  "pytest-cov==4.0.0",
-  "pytest-env==0.6.2",
-  "pytest-retry==1.6.3",
+  "pytest>=8.2.2",
   "pytest-anki",
-  "factory-boy==3.2.1",
-  "types-factory-boy==0.3.1",
-  "faker==19.12.0",
-  "approvaltests==12.2.0"
+  "pytest-cov>=4.0.0",
+  "pytest-env>=0.6.2",
+  "pytest-mock>=3.12.0",
+  "pytest-qt>=4.2.0",
+  "pytest-retry>=1.6.3",
+  "pytest-split>=0.9.0",
+  "pytest-vcr>=1.0.2",
+  "requests-mock>=1.9.3",
+  "ruff>=0.14.0",
+  "typeguard>=2.13.3",
+  "types-factory-boy>=0.3.1",
+  "types-requests>=2.28.9",
+  "urllib3>=1.26.14,<2",
+  "vcrpy>=4.2.0",
 ]
 bundle = [
   "sentry_sdk==1.6.0",
@@ -99,7 +99,6 @@ ignore = ["E722", "E731", "E203", "E402"]
 [tool.coverage.run]
 source = ["ankihub"]
 omit = ["ankihub/lib/**", "ankihub/media_export/**", "ankihub/media_import/**"]
-dynamic_context = "test_function"
 
 [tool.coverage.paths]
 source = ["./ankihub", "*/addons21/ankihub"]
