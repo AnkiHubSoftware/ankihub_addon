@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import aqt
 from anki.decks import DeckId
@@ -66,7 +66,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for choosing existing subdeck or creating new one."""
         self._clear_layout()
 
-        layout = self.layout()
+        layout = cast(QVBoxLayout, self.layout())
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
 
@@ -110,7 +110,7 @@ class BlockExamSubdeckDialog(QDialog):
         """Show screen for creating new subdeck."""
         self._clear_layout()
 
-        layout = self.layout()
+        layout = cast(QVBoxLayout, self.layout())
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)  # default spacing between elements is 12
 
@@ -192,7 +192,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         self.setWindowTitle("AnkiHub | Subdecks")
 
-        layout = self.layout()
+        layout = cast(QVBoxLayout, self.layout())
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(12)
 
@@ -284,7 +284,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         self.setWindowTitle("AnkiHub | Subdecks")
 
-        layout = self.layout()
+        layout = cast(QVBoxLayout, self.layout())
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(0)
 

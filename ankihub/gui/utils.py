@@ -51,13 +51,13 @@ ButtonParam = Union[
 ]
 
 
-def add_button_from_param(button_box: QDialogButtonBox, button: ButtonParam) -> QPushButton:
-    if isinstance(button, str):
-        button = button_box.addButton(button, QDialogButtonBox.ButtonRole.ActionRole)
-    elif isinstance(button, QDialogButtonBox.StandardButton):
-        button = button_box.addButton(button)
-    elif isinstance(button, tuple):
-        button = button_box.addButton(*button)
+def add_button_from_param(button_box: QDialogButtonBox, button_param: ButtonParam) -> QPushButton:
+    if isinstance(button_param, str):
+        button = button_box.addButton(button_param, QDialogButtonBox.ButtonRole.ActionRole)
+    elif isinstance(button_param, QDialogButtonBox.StandardButton):
+        button = button_box.addButton(button_param)
+    elif isinstance(button_param, tuple):
+        button = button_box.addButton(*button_param)
 
     return button
 
@@ -384,8 +384,8 @@ class _Dialog(QDialog):
         button_box = QDialogButtonBox()
 
         self.default_button = None
-        for button_index, button in enumerate(self.buttons):
-            button = add_button_from_param(button_box, button)
+        for button_index, button_param in enumerate(self.buttons):
+            button = add_button_from_param(button_box, button_param)
             qconnect(
                 button.clicked,
                 partial(self._on_btn_clicked_or_dialog_rejected, button_index),
