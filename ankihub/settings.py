@@ -172,7 +172,7 @@ class DeckExtensionConfig(DataClassJSONMixin):
 class BlockExamSubdeckConfig(DataClassJSONMixin):
     ankihub_deck_id: uuid.UUID
     subdeck_id: DeckId
-    due_date: Optional[str]  # YYYY-MM-DD format
+    due_date: str  # YYYY-MM-DD format
 
 
 @dataclass
@@ -536,6 +536,26 @@ class _Config:
         ]
         self._private_config.block_exams_subdecks = updated_configs
         self._update_private_config()
+
+    def remove_all_block_exam_subdecks_for_deck(self, ankihub_deck_id: uuid.UUID) -> None:
+        """Remove all block exam subdeck configs for a given AnkiHub deck.
+
+        Args:
+            ankihub_deck_id: The AnkiHub deck ID
+        """
+        subdeck_configs = [sc for sc in self.get_block_exam_subdecks() if sc.ankihub_deck_id == ankihub_deck_id]
+        if not subdeck_configs:
+            return
+
+        updated_configs = [sc for sc in self.get_block_exam_subdecks() if sc.ankihub_deck_id != ankihub_deck_id]
+        self._private_config.block_exams_subdecks = updated_configs
+        self._update_private_config()
+
+        LOGGER.info(
+            "Removed all block exam subdeck configs for deck",
+            ankihub_deck_id=ankihub_deck_id,
+            count=len(subdeck_configs),
+        )
 
     def is_logged_in(self) -> bool:
         return bool(self.token())

@@ -3441,11 +3441,13 @@ class TestMoveSubdeckToMainDeck:
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
         mock_note_ids_in_deck_hierarchy.return_value = [1, 2, 3]
 
+        ankihub_deck_id = uuid.uuid4()
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
+            ankihub_deck_id=ankihub_deck_id, subdeck_id=DeckId(456), due_date="2024-12-31"
         )
+        mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        move_subdeck_to_main_deck(subdeck_config)
+        move_subdeck_to_main_deck(ankihub_deck_id, DeckId(456))
 
         mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
@@ -3457,12 +3459,10 @@ class TestMoveSubdeckToMainDeck:
         """Test handling when deck config not found."""
         mock_config.deck_config.return_value = None
 
-        subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
-        )
+        ankihub_deck_id = uuid.uuid4()
 
         with pytest.raises(ValueError, match="Deck config not found"):
-            move_subdeck_to_main_deck(subdeck_config)
+            move_subdeck_to_main_deck(ankihub_deck_id, DeckId(456))
 
     @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
     @patch("ankihub.main.block_exam_subdecks.aqt")
@@ -3479,11 +3479,13 @@ class TestMoveSubdeckToMainDeck:
 
         mock_aqt.mw.col.decks.get.return_value = False
 
+        ankihub_deck_id = uuid.uuid4()
         subdeck_config = BlockExamSubdeckConfig(
-            ankihub_deck_id=uuid.uuid4(), subdeck_id=DeckId(456), due_date="2024-12-31"
+            ankihub_deck_id=ankihub_deck_id, subdeck_id=DeckId(456), due_date="2024-12-31"
         )
+        mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        move_subdeck_to_main_deck(subdeck_config)
+        move_subdeck_to_main_deck(ankihub_deck_id, DeckId(456))
 
         mock_remove_config.assert_called_once_with(subdeck_config)
 
@@ -3495,9 +3497,12 @@ class TestSetSubdeckDueDate:
     def test_set_subdeck_due_date_success(self, mock_config, next_deterministic_uuid):
         """Test successfully setting a new due date."""
         ah_did = next_deterministic_uuid()
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31")
+        old_subdeck_config = BlockExamSubdeckConfig(
+            ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31"
+        )
+        mock_config.get_block_exam_subdeck_config.return_value = old_subdeck_config
 
-        set_subdeck_due_date(subdeck_config, "2025-06-15")
+        set_subdeck_due_date(ah_did, DeckId(456), "2025-06-15")
 
         expected_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2025-06-15")
         mock_config.upsert_block_exam_subdeck.assert_called_once_with(expected_config)

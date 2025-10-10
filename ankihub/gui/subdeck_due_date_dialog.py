@@ -1,10 +1,12 @@
 """Dialog for handling expired block exam subdecks."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
 
 import aqt
+from anki.decks import DeckId
 from aqt import qconnect
 from aqt.qt import QDateEdit, QDialog, QHBoxLayout, QLabel, QPushButton, Qt, QVBoxLayout
 from aqt.utils import tooltip
@@ -107,14 +109,14 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        move_subdeck_to_main_deck(self.subdeck_config)
+        move_subdeck_to_main_deck(self.subdeck_config.ankihub_deck_id, self.subdeck_config.subdeck_id)
         tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
-        set_subdeck_due_date(self.subdeck_config, None)
+        remove_block_exam_subdeck_config(self.subdeck_config)
         self.accept()
 
     def _on_set_new_due_date(self):
@@ -123,7 +125,13 @@ class SubdeckDueDateDialog(QDialog):
 
     def _show_date_picker(self):
         """Show date picker dialog."""
-        date_picker_dialog = DatePickerDialog(self.subdeck_name, self.subdeck_config, parent=self)
+        date_picker_dialog = DatePickerDialog(
+            self.subdeck_name,
+            self.subdeck_config.ankihub_deck_id,
+            self.subdeck_config.subdeck_id,
+            self.subdeck_config.due_date,
+            parent=self,
+        )
         qconnect(date_picker_dialog.accepted, self.accept)
         date_picker_dialog.show()
 
@@ -131,10 +139,19 @@ class SubdeckDueDateDialog(QDialog):
 class DatePickerDialog(QDialog):
     """Dialog for selecting a new due date."""
 
-    def __init__(self, subdeck_name: str, subdeck_config: BlockExamSubdeckConfig, parent=None):
+    def __init__(
+        self,
+        subdeck_name: str,
+        ankihub_deck_id: uuid.UUID,
+        subdeck_id: DeckId,
+        initial_due_date: Optional[str] = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.subdeck_name = subdeck_name
-        self.subdeck_config = subdeck_config
+        self.ankihub_deck_id = ankihub_deck_id
+        self.subdeck_id = subdeck_id
+        self.initial_due_date = initial_due_date
         self.selected_date: Optional[str] = None
 
         self.setModal(True)
@@ -176,9 +193,7 @@ class DatePickerDialog(QDialog):
 
         self.date_input = QDateEdit()
         last_due_date = (
-            date.fromisoformat(self.subdeck_config.due_date)
-            if self.subdeck_config.due_date
-            else date.today() + timedelta(days=1)
+            date.fromisoformat(self.initial_due_date) if self.initial_due_date else date.today() + timedelta(days=1)
         )
         self.date_input.setDate(last_due_date)
         self.date_input.setMinimumDate(date.today())
@@ -216,7 +231,7 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        set_subdeck_due_date(self.subdeck_config, selected_date_str)
+        set_subdeck_due_date(self.ankihub_deck_id, self.subdeck_id, selected_date_str)
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
         self.accept()

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict
 
 import aqt
@@ -28,7 +29,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     _remove_orphaned_deck_extensions(private_config_dict)
     _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
     _move_credentials_to_profile_config(private_config_dict)
-    _remove_orphaned_block_exams_subdecks_config(private_config_dict)
+    _remove_invalid_block_exams_subdecks_configs(private_config_dict)
 
 
 def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -129,17 +130,46 @@ def _move_credentials_to_profile_config(
         aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = username
 
 
-def _remove_orphaned_block_exams_subdecks_config(private_config_dict: Dict) -> None:
+def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> None:
+    """Remove invalid block exam subdeck configs (non-existent AnkiHub decks/subdecks, missing/invalid due dates)."""
+
     block_exams_subdecks = private_config_dict.get("block_exams_subdecks", [])
     if not block_exams_subdecks:
         return
 
-    all_deck_ids = set(DeckId(deck.id) for deck in aqt.mw.col.decks.all_names_and_ids())
+    # Get all valid AnkiHub deck IDs and Anki deck IDs
+    installed_ankihub_deck_ids = set(private_config_dict.get("decks", {}).keys())
+    all_anki_deck_ids = set(DeckId(deck.id) for deck in aqt.mw.col.decks.all_names_and_ids())
 
     filtered_subdecks = []
+    removed_count = 0
     for subdeck in block_exams_subdecks:
+        ankihub_deck_id = subdeck.get("ankihub_deck_id", None)
         subdeck_id = subdeck.get("subdeck_id", None)
-        if subdeck_id in all_deck_ids:
+        due_date = subdeck.get("due_date", None)
+
+        # Validate due_date format (should be YYYY-MM-DD)
+        is_valid_due_date = False
+        if due_date is not None:
+            try:
+                datetime.strptime(due_date, "%Y-%m-%d")
+                is_valid_due_date = True
+            except (ValueError, TypeError):
+                pass
+
+        # Keep only configs where:
+        # 1. AnkiHub deck is still installed
+        # 2. Subdeck exists in Anki collection
+        # 3. Has a valid due date
+        if ankihub_deck_id in installed_ankihub_deck_ids and subdeck_id in all_anki_deck_ids and is_valid_due_date:
             filtered_subdecks.append(subdeck)
+        else:
+            removed_count += 1
+
+    if removed_count > 0:
+        LOGGER.info(
+            "Removed block exam subdeck configs",
+            removed_count=removed_count,
+        )
 
     private_config_dict["block_exams_subdecks"] = filtered_subdecks

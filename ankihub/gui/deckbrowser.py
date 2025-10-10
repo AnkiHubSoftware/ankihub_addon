@@ -1,5 +1,6 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 
@@ -11,7 +12,7 @@ from aqt.qt import QDialog, QDialogButtonBox
 
 from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import BlockExamSubdeckConfig, config
+from ..settings import config
 from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import DatePickerDialog
 from .utils import ask_user, get_ah_did_of_deck_or_ancestor_deck, show_dialog, show_tooltip
@@ -54,21 +55,29 @@ def setup() -> None:
     setup_subdeck_ankihub_options()
 
 
-def _open_date_picker_dialog_for_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
-    subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
+def _open_date_picker_dialog_for_subdeck(
+    ankihub_deck_id: uuid.UUID, subdeck_id: DeckId, initial_due_date: Optional[str]
+) -> None:
+    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
 
-    _dialog_state.dialog = DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw)
+    _dialog_state.dialog = DatePickerDialog(
+        subdeck_name=subdeck_name,
+        ankihub_deck_id=ankihub_deck_id,
+        subdeck_id=subdeck_id,
+        initial_due_date=initial_due_date,
+        parent=aqt.mw,
+    )
     _dialog_state.dialog.open()
 
 
-def _open_remove_block_exam_subdeck_dialog(subdeck_config: BlockExamSubdeckConfig) -> None:
-    subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
+def _open_remove_block_exam_subdeck_dialog(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> None:
+    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
 
     def on_button_clicked(button_index: int) -> None:
         if button_index != 1:
             return
 
-        move_subdeck_to_main_deck(subdeck_config)
+        move_subdeck_to_main_deck(ankihub_deck_id, subdeck_id)
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip("Subdeck removed and notes moved to main deck", parent=aqt.mw)
@@ -96,47 +105,39 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_config: BlockExamSubdeckConfi
     )
 
 
-def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
+def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId, ankihub_deck_id: uuid.UUID) -> None:
     action = menu.addAction("Ankihub: Update due date")
 
     subdeck_config = config.get_block_exam_subdeck_config(subdeck_did)
+    initial_due_date = subdeck_config.due_date if subdeck_config else None
 
-    action.setEnabled(subdeck_config is not None)
-
-    if subdeck_config:
-        action.setToolTip("Change the due date of this subdeck.")
-        qconnect(action.triggered, lambda: _open_date_picker_dialog_for_subdeck(subdeck_config))
-    else:
-        action.setToolTip("This option is only available for subdecks created with SmartSearch")
+    action.setToolTip("Change the due date of this subdeck.")
+    qconnect(
+        action.triggered,
+        lambda: _open_date_picker_dialog_for_subdeck(ankihub_deck_id, subdeck_did, initial_due_date),
+    )
 
 
-def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
+def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId, ankihub_deck_id: uuid.UUID) -> None:
     action = menu.addAction("Ankihub: Remove subdeck")
 
-    subdeck_config = config.get_block_exam_subdeck_config(subdeck_did)
-
-    action.setEnabled(subdeck_config is not None)
-
-    if subdeck_config:
-        action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
-        qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_config))
-    else:
-        action.setToolTip("This option is only available for subdecks created with SmartSearch")
+    action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
+    qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(ankihub_deck_id, subdeck_did))
 
 
 def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     # Only show the menu actions for descendants of AnkiHub decks
-    is_descendant_of_ah_deck = (
-        get_ah_did_of_deck_or_ancestor_deck(DeckId(deck_id)) is not None
-        and aqt.mw.col.decks.parents(DeckId(deck_id))  # Ensure it's not a top-level deck
-    )
+    ankihub_deck_id = get_ah_did_of_deck_or_ancestor_deck(DeckId(deck_id))
+    is_descendant_of_ah_deck = ankihub_deck_id is not None and aqt.mw.col.decks.parents(
+        DeckId(deck_id)
+    )  # Ensure it's not a top-level deck
     if not is_descendant_of_ah_deck:
         return
 
     def on_access_granted(_: dict) -> None:
         menu.setToolTipsVisible(True)
-        _setup_update_subdeck_due_date(menu, DeckId(deck_id))
-        _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
+        _setup_update_subdeck_due_date(menu, DeckId(deck_id), ankihub_deck_id)
+        _setup_remove_block_exam_subdeck(menu, DeckId(deck_id), ankihub_deck_id)
 
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
