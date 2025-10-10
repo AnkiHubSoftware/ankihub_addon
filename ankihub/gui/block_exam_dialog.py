@@ -8,6 +8,7 @@ import aqt
 from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import (
+    QCheckBox,
     QDateEdit,
     QDialog,
     QHBoxLayout,
@@ -17,6 +18,7 @@ from aqt.qt import (
     QListWidgetItem,
     QPushButton,
     Qt,
+    QTimer,
     QVBoxLayout,
     qconnect,
 )
@@ -42,7 +44,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.setModal(True)
-        self.resize(440, 340)
+        self.setMinimumWidth(440)
 
         # Check if user has existing subdecks to determine entry point
         deck_config = config.deck_config(ankihub_deck_id)
@@ -106,6 +108,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         layout.addLayout(button_layout)
 
+        # Defer adjustSize to next event loop iteration so layout is fully calculated
+        QTimer.singleShot(0, self.adjustSize)
+
     def _show_create_subdeck_screen(self):
         """Show screen for creating new subdeck."""
         self._clear_layout()
@@ -163,6 +168,11 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
+
         # Add stretch to push buttons to bottom
         layout.addStretch()
 
@@ -185,6 +195,9 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Focus on name input
         self.name_input.setFocus()
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_add_notes_screen(self):
         """Show screen for adding notes to selected subdeck."""
@@ -251,6 +264,11 @@ class BlockExamSubdeckDialog(QDialog):
         date_layout.addWidget(self.date_input)
         layout.addLayout(date_layout)
 
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
+
         # Add stretch to push buttons to bottom
         layout.addStretch()
 
@@ -271,6 +289,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(add_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _show_subdeck_conflict_screen(self, conflicting_name: str):
         """Show screen for handling subdeck name conflicts."""
@@ -298,7 +319,7 @@ class BlockExamSubdeckDialog(QDialog):
         layout.addSpacing(12)
 
         # Main message
-        message_label = QLabel(f"A subdeck already exists with the name '{conflicting_name}'.")
+        message_label = QLabel(f'A subdeck already exists with the name "<b>{conflicting_name}</b>".')
         message_font = message_label.font()
         message_label.setFont(message_font)
         message_label.setWordWrap(True)
@@ -308,12 +329,18 @@ class BlockExamSubdeckDialog(QDialog):
         # Info label
         info_label = QLabel(
             "You can either create a new one called "
-            f"'{conflicting_name} (1)' or merge these notes into the existing subdeck."
+            f'"<b>{conflicting_name}</b> (1)" or merge these notes into the existing subdeck.'
         )
         info_font = info_label.font()
         info_label.setFont(info_font)
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
+        layout.addSpacing(12)
+
+        # Unsuspend checkbox
+        self.unsuspend_checkbox = QCheckBox("Unsuspend selected notes")
+        self.unsuspend_checkbox.setChecked(True)
+        layout.addWidget(self.unsuspend_checkbox)
 
         # Add stretch to push buttons to bottom
         layout.addStretch()
@@ -337,6 +364,9 @@ class BlockExamSubdeckDialog(QDialog):
         button_layout.addWidget(merge_button)
 
         layout.addLayout(button_layout)
+
+        # Defer adjustSize to next event loop iteration so word-wrapped labels calculate their height
+        QTimer.singleShot(0, self.adjustSize)
 
     def _populate_subdeck_list(self):
         """Populate the subdeck list widget."""
@@ -441,7 +471,13 @@ class BlockExamSubdeckDialog(QDialog):
         actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
 
         # Add notes to the new subdeck
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            actual_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         # Show success message
         tooltip(f"{added_count} note(s) added to '{actual_name}'")
@@ -472,7 +508,11 @@ class BlockExamSubdeckDialog(QDialog):
             self.selected_subdeck_name = new_name
 
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id, self.selected_subdeck_name, self.note_ids, due_date
+            self.ankihub_deck_id,
+            self.selected_subdeck_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 
         tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
@@ -509,7 +549,13 @@ class BlockExamSubdeckDialog(QDialog):
 
         actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
 
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, actual_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            actual_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         tooltip(f"{added_count} note(s) added to '{actual_name}'")
         self.accept()
@@ -539,7 +585,13 @@ class BlockExamSubdeckDialog(QDialog):
         due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
         # Add notes to the existing subdeck
-        added_count = add_notes_to_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, self.note_ids, due_date)
+        added_count = add_notes_to_block_exam_subdeck(
+            self.ankihub_deck_id,
+            conflicting_name,
+            self.note_ids,
+            due_date,
+            unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+        )
 
         # Show success message and close
         tooltip(f"{added_count} note(s) added to '{conflicting_name}'")

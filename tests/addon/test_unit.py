@@ -3500,7 +3500,7 @@ class TestSetSubdeckDueDate:
         set_subdeck_due_date(subdeck_config, "2025-06-15")
 
         expected_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2025-06-15")
-        mock_config.add_block_exam_subdeck.assert_called_once_with(expected_config)
+        mock_config.upsert_block_exam_subdeck.assert_called_once_with(expected_config)
 
 
 class TestRemoveBlockExamSubdeckConfig:
@@ -3541,7 +3541,7 @@ class TestHandleExpiredSubdeck:
         handle_expired_subdeck(subdeck_config)
 
         mock_dialog_class.assert_called_once_with(subdeck_config, subdeck_name, parent=mock_aqt.mw)
-        mock_dialog.open.assert_called_once()
+        mock_dialog.show.assert_called_once()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
