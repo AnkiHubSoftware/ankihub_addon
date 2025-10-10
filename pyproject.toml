@@ -53,7 +53,7 @@ conflicts = [
 ]
 
 [tool.uv.sources]
-pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "anki-25" }
+pytest-anki = { git = "https://github.com/ankipalace/pytest-anki.git", branch = "main" }
 mashumaro = { git = "https://github.com/AnkiHubSoftware/mashumaro.git", branch = "master" }
 
 [tool.mypy]

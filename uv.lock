@@ -160,7 +160,7 @@ dev = [
     { name = "mypy", specifier = ">=1.18.2" },
     { name = "pre-commit", specifier = ">=2.20.0" },
     { name = "pytest", specifier = ">=8.2.2" },
-    { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=anki-25" },
+    { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=main" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-env", specifier = ">=0.6.2" },
     { name = "pytest-mock", specifier = ">=3.12.0" },
@@ -1690,7 +1690,7 @@ wheels = [
 [[package]]
 name = "pytest-anki"
 version = "1.0.0b3.post1"
-source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=anki-25#a66d84dbbf144ac95819f335da65d8a34655f9c8" }
+source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=main#db0da3228510fc9cedc72e5dbd93d501a28178d9" }
 dependencies = [
     { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "anki", version = "25.9.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-13-ankihub-addon-aqt' or extra != 'group-13-ankihub-addon-aqt-legacy'" },
