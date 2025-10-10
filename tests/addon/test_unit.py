@@ -2326,6 +2326,146 @@ class TestPrivateConfigMigrations:
 
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
 
+    def test_invalid_block_exam_subdeck_configs_with_missing_due_dates_are_removed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that migration removes configs with None or missing due dates."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            deck_config = config.deck_config(ah_did)
+            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
+
+            # Add invalid config with None due date and reload to trigger migration
+            self._add_subdeck_configs_and_trigger_migration(
+                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": None}
+            )
+
+            # Verify invalid config was removed
+            assert len(config.get_block_exam_subdecks()) == 0
+
+    def test_invalid_block_exam_subdeck_configs_with_invalid_due_date_format_are_removed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that migration removes configs with invalid due date formats."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            deck_config = config.deck_config(ah_did)
+            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
+
+            # Add configs with invalid due date formats and reload to trigger migration
+            self._add_subdeck_configs_and_trigger_migration(
+                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": "invalid-date"},
+                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": "2025/01/01"},
+            )
+
+            # Verify invalid configs were removed
+            assert len(config.get_block_exam_subdecks()) == 0
+
+    def test_invalid_block_exam_subdeck_configs_for_non_existent_ah_decks_are_removed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        """Test that migration removes configs for uninstalled AnkiHub decks."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Use a deck ID that doesn't exist
+            fake_ah_did = next_deterministic_uuid()
+            fake_subdeck_id = 123456
+
+            # Add config for non-existent deck and reload to trigger migration
+            self._add_subdeck_configs_and_trigger_migration(
+                {
+                    "ankihub_deck_id": str(fake_ah_did),
+                    "subdeck_id": fake_subdeck_id,
+                    "due_date": "2025-12-31",
+                }
+            )
+
+            # Verify invalid config was removed
+            assert len(config.get_block_exam_subdecks()) == 0
+
+    def test_invalid_block_exam_subdeck_configs_for_non_existent_subdecks_are_removed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that migration removes configs for deleted Anki subdecks."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Use a subdeck ID that doesn't exist
+            fake_subdeck_id = 999999
+
+            # Add config for non-existent subdeck and reload to trigger migration
+            self._add_subdeck_configs_and_trigger_migration(
+                {"ankihub_deck_id": str(ah_did), "subdeck_id": fake_subdeck_id, "due_date": "2025-12-31"}
+            )
+
+            # Verify invalid config was removed
+            assert len(config.get_block_exam_subdecks()) == 0
+
+    def test_valid_block_exam_subdeck_configs_are_preserved(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that migration preserves valid block exam subdeck configs."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create a subdeck
+            deck_config = config.deck_config(ah_did)
+            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
+
+            # Add valid config using the proper API
+            valid_due_date = "2025-12-31"
+            subdeck_config = BlockExamSubdeckConfig(
+                ankihub_deck_id=ah_did, subdeck_id=DeckId(subdeck_id), due_date=valid_due_date
+            )
+            config.upsert_block_exam_subdeck(subdeck_config)
+
+            # Verify config was added
+            assert len(config.get_block_exam_subdecks()) == 1
+
+            # Reload to trigger migration
+            config.setup_private_config()
+
+            # Verify valid config was preserved
+            configs = config.get_block_exam_subdecks()
+            assert len(configs) == 1
+            assert configs[0].ankihub_deck_id == ah_did
+            assert configs[0].subdeck_id == subdeck_id
+            assert configs[0].due_date == valid_due_date
+
+    def _add_subdeck_configs_and_trigger_migration(self, *subdeck_configs):
+        """Helper to add subdeck configs to private config file and trigger migration by reloading.
+
+        Args:
+            *subdeck_configs: One or more dictionaries representing subdeck configs
+        """
+        private_config_dict = config._private_config.to_dict()
+        private_config_dict["block_exams_subdecks"].extend(subdeck_configs)
+
+        # Write the modified dict to the file so setup_private_config can read it
+        with open(config._private_config_path, "w") as f:
+            f.write(json.dumps(private_config_dict, indent=4, sort_keys=True))
+
+        config.setup_private_config()
+
 
 class TestOptionalTagSuggestionDialog:
     def test_submit_tags_for_validated_groups(

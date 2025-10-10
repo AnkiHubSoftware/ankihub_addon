@@ -70,6 +70,7 @@ from ankihub.main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
     move_subdeck_to_main_deck,
+    set_subdeck_due_date,
 )
 
 from ..factories import DeckExtensionFactory, DeckFactory, DeckMediaFactory, NoteInfoFactory
@@ -8505,6 +8506,16 @@ class TestBlockExamSubdecks:
             saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck["id"])
             assert saved_due_date is None
 
+    def test_create_subdeck_deck_not_found(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Try to create subdeck for non-existent deck
+            fake_ah_did = uuid.uuid4()
+            with pytest.raises(ValueError, match="Deck config not found"):
+                create_block_exam_subdeck(fake_ah_did, "Test Subdeck")
+
     def test_add_notes_to_block_exam_subdeck(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -8721,6 +8732,29 @@ class TestBlockExamSubdecks:
             assert aqt.mw.col.get_card(card2.id).queue != QUEUE_TYPE_SUSPENDED
             assert aqt.mw.col.get_card(card3.id).queue != QUEUE_TYPE_SUSPENDED
 
+    def test_add_notes_deck_not_found(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Try to add notes for non-existent deck
+            fake_ah_did = uuid.uuid4()
+            with pytest.raises(ValueError, match="Deck config not found"):
+                add_notes_to_block_exam_subdeck(fake_ah_did, "Non-existent", [NoteId(1), NoteId(2), NoteId(3)])
+
+    def test_add_notes_subdeck_not_found(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Try to add notes to non-existent subdeck
+            with pytest.raises(ValueError, match="Subdeck .* not found"):
+                add_notes_to_block_exam_subdeck(ah_did, "Non-existent Subdeck", [NoteId(1), NoteId(2), NoteId(3)])
+
+    # ===== Configuration tests (set_subdeck_due_date and config methods) =====
     def test_config_methods(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -8774,37 +8808,31 @@ class TestBlockExamSubdecks:
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 0
 
-    def test_create_subdeck_deck_not_found(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            # Try to create subdeck for non-existent deck
-            fake_ah_did = uuid.uuid4()
-            with pytest.raises(ValueError, match="Deck config not found"):
-                create_block_exam_subdeck(fake_ah_did, "Test Subdeck")
-
-    def test_add_notes_deck_not_found(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            # Try to add notes for non-existent deck
-            fake_ah_did = uuid.uuid4()
-            with pytest.raises(ValueError, match="Deck config not found"):
-                add_notes_to_block_exam_subdeck(fake_ah_did, "Non-existent", [NoteId(1), NoteId(2), NoteId(3)])
-
-    def test_add_notes_subdeck_not_found(
+    def test_set_due_date_on_regular_subdeck(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
     ):
+        """Test setting due date on a regular subdeck (not created through block exam dialog)."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
+            deck_config = config.deck_config(ah_did)
+            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
 
-            # Try to add notes to non-existent subdeck
-            with pytest.raises(ValueError, match="Subdeck .* not found"):
-                add_notes_to_block_exam_subdeck(ah_did, "Non-existent Subdeck", [NoteId(1), NoteId(2), NoteId(3)])
+            # Create a regular subdeck manually (not through create_block_exam_subdeck)
+            subdeck_name = f"{main_deck_name}::Regular Subdeck"
+            subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id)
+
+            # Verify no config exists initially
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id) is None
+
+            # Set due date on the regular subdeck
+            due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+            set_subdeck_due_date(ah_did, subdeck_id, due_date)
+
+            # Verify config was created with the due date
+            saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck_id)
+            assert saved_due_date == due_date
 
     def test_move_subdeck_to_main_deck_with_nested_subdecks(
         self,
@@ -8840,12 +8868,7 @@ class TestBlockExamSubdecks:
             assert note_nested.cards()[0].did == nested_subdeck_id
 
             # Move subdeck to main deck
-            subdeck_config = BlockExamSubdeckConfig(
-                ankihub_deck_id=ah_did,
-                subdeck_id=subdeck_id,
-                due_date=due_date,
-            )
-            move_subdeck_to_main_deck(subdeck_config)
+            move_subdeck_to_main_deck(ah_did, subdeck_id)
 
             # Verify all notes from subdeck hierarchy moved to main deck
             note_main = aqt.mw.col.get_note(note_main.id)
@@ -8863,6 +8886,70 @@ class TestBlockExamSubdecks:
             # Verify config was removed
             saved_due_date = config.get_block_exam_subdeck_due_date(ah_did, subdeck_id)
             assert saved_due_date is None
+
+    def test_remove_regular_subdeck_without_config(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test removing a regular subdeck that doesn't have a BlockExamSubdeckConfig."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            deck_config = config.deck_config(ah_did)
+            main_deck_id = deck_config.anki_id
+            main_deck_name = aqt.mw.col.decks.name_if_exists(main_deck_id)
+
+            # Create a regular subdeck manually
+            subdeck_name = f"{main_deck_name}::Regular Subdeck"
+            subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id)
+
+            # Add a note to the subdeck
+            note = add_anki_note(anki_did=subdeck_id)
+
+            # Verify no config exists for this subdeck
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id) is None
+
+            # Move subdeck to main deck (should work without config)
+            move_subdeck_to_main_deck(ah_did, subdeck_id)
+
+            # Verify note was moved to main deck
+            note = aqt.mw.col.get_note(note.id)
+            assert note.cards()[0].did == main_deck_id
+
+            # Verify subdeck was deleted
+            assert aqt.mw.col.decks.id_for_name(subdeck_name) is None
+
+    def test_uninstall_deck_removes_block_exam_subdeck_configs(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+    ):
+        """Test that uninstalling a deck removes all its block exam subdeck configs."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Create multiple block exam subdecks with due dates
+            due_date1 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+            due_date2 = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
+            subdeck_name1, _ = create_block_exam_subdeck(ah_did, "Subdeck 1", due_date1)
+            subdeck_name2, _ = create_block_exam_subdeck(ah_did, "Subdeck 2", due_date2)
+
+            # Verify configs exist
+            deck_config = config.deck_config(ah_did)
+            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            subdeck_id1 = aqt.mw.col.decks.id_for_name(f"{main_deck_name}::{subdeck_name1}")
+            subdeck_id2 = aqt.mw.col.decks.id_for_name(f"{main_deck_name}::{subdeck_name2}")
+
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id1) == due_date1
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id2) == due_date2
+
+            # Uninstall the deck
+            uninstall_deck(ah_did)
+
+            # Verify all subdeck configs were removed
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id1) is None
+            assert config.get_block_exam_subdeck_due_date(ah_did, subdeck_id2) is None
 
 
 class TestBlockExamSubdeckDialog:
@@ -9010,7 +9097,7 @@ class TestCheckBlockExamSubdeckDueDates:
         """Test function returns empty list when no subdecks exist."""
         with anki_session_with_addon_data.profile_loaded():
             # Ensure no existing configurations
-            config._private_config.block_exam_subdecks = []
+            config._private_config.block_exams_subdecks = []
 
             expired = check_block_exam_subdeck_due_dates()
             assert expired == []
