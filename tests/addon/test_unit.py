@@ -3633,14 +3633,17 @@ class TestMoveSubdeckToMainDeck:
 class TestSetSubdeckDueDate:
     """Tests for set_subdeck_due_date function."""
 
+    @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_set_subdeck_due_date_success(self, mock_config, next_deterministic_uuid):
+    def test_set_subdeck_due_date_success(self, mock_config, mock_aqt, next_deterministic_uuid):
         """Test successfully setting a new due date."""
         ah_did = next_deterministic_uuid()
         old_subdeck_config = BlockExamSubdeckConfig(
             ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31"
         )
         mock_config.get_block_exam_subdeck_config.return_value = old_subdeck_config
+        mock_config.deck_config.return_value = MagicMock()  # Mock deck config exists
+        mock_aqt.mw.col.decks.get.return_value = {"name": "Test Subdeck"}  # Mock subdeck exists
 
         set_subdeck_due_date(ah_did, DeckId(456), "2025-06-15")
 

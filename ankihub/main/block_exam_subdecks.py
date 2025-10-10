@@ -176,10 +176,11 @@ def move_subdeck_to_main_deck(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) ->
         LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
         raise ValueError("Deck config not found")
 
+    subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
+
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config if exists", subdeck_id=subdeck_id)
-        subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
         if subdeck_config:
             remove_block_exam_subdeck_config(subdeck_config)
         return
@@ -193,7 +194,6 @@ def move_subdeck_to_main_deck(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) ->
 
     aqt.mw.col.decks.remove([subdeck_id])
 
-    subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
     if subdeck_config:
         remove_block_exam_subdeck_config(subdeck_config)
 
@@ -207,7 +207,20 @@ def set_subdeck_due_date(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId, new_due
         ankihub_deck_id: The AnkiHub deck ID
         subdeck_id: The Anki subdeck ID
         new_due_date: New due date in YYYY-MM-DD format
+
+    Raises:
+        ValueError: If deck config not found or subdeck not found
     """
+    # Validate deck config exists
+    deck_config = config.deck_config(ankihub_deck_id)
+    if not deck_config:
+        raise ValueError("Deck config not found")
+
+    # Validate subdeck exists
+    subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
+    if not subdeck:
+        raise ValueError(f"Subdeck with ID {subdeck_id} not found")
+
     # Get old due date for logging if config exists
     old_config = config.get_block_exam_subdeck_config(subdeck_id)
     old_due_date = old_config.due_date if old_config else None
