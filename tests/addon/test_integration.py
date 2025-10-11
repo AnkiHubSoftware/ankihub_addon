@@ -8513,7 +8513,7 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             # Try to create subdeck for non-existent deck
             fake_ah_did = uuid.uuid4()
-            with pytest.raises(ValueError, match="Deck config not found"):
+            with pytest.raises(ValueError, match="Deck not found"):
                 create_block_exam_subdeck(fake_ah_did, "Test Subdeck")
 
     def test_add_notes_to_block_exam_subdeck(
@@ -8739,7 +8739,7 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             # Try to add notes for non-existent deck
             fake_ah_did = uuid.uuid4()
-            with pytest.raises(ValueError, match="Deck config not found"):
+            with pytest.raises(ValueError, match="Deck not found"):
                 add_notes_to_block_exam_subdeck(fake_ah_did, "Non-existent", [NoteId(1), NoteId(2), NoteId(3)])
 
     def test_add_notes_subdeck_not_found(

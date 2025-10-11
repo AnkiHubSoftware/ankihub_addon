@@ -12,7 +12,7 @@ from aqt.operations.scheduling import unsuspend_cards
 
 from .. import LOGGER
 from ..settings import BlockExamSubdeckConfig, config
-from .utils import move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
+from .utils import get_deck_for_ah_did, move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
 
 
 def create_block_exam_subdeck(
@@ -24,13 +24,11 @@ def create_block_exam_subdeck(
         Tuple of (actual_subdeck_name, was_renamed)
         was_renamed is True if the name was modified to avoid conflicts
     """
-    deck_config = config.deck_config(ankihub_deck_id)
-    if not deck_config:
-        raise ValueError("Deck config not found")
+    deck = get_deck_for_ah_did(ankihub_deck_id)
+    if not deck:
+        raise ValueError("Deck not found")
 
-    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-    if not anki_deck_name:
-        raise ValueError("Parent deck not found")
+    anki_deck_name = deck["name"]
 
     # Check for conflicts and generate unique name if needed
     full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
@@ -47,8 +45,7 @@ def create_block_exam_subdeck(
 
     # Make the subdeck inherit the parent deck's option group
     subdeck = aqt.mw.col.decks.get(subdeck_id)
-    main_deck = aqt.mw.col.decks.get(deck_config.anki_id)
-    subdeck["conf"] = main_deck["conf"]
+    subdeck["conf"] = deck["conf"]
     aqt.mw.col.decks.update(subdeck)
 
     # Save configuration if due date provided
@@ -83,14 +80,11 @@ def add_notes_to_block_exam_subdeck(
     if not note_ids:
         return 0
 
-    deck_config = config.deck_config(ankihub_deck_id)
-    if not deck_config:
-        raise ValueError("Deck config not found")
+    deck = get_deck_for_ah_did(ankihub_deck_id)
+    if not deck:
+        raise ValueError("Deck not found")
 
-    anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-    if not anki_deck_name:
-        raise ValueError("Parent deck not found")
-
+    anki_deck_name = deck["name"]
     full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
     subdeck = aqt.mw.col.decks.by_name(full_subdeck_name)
     if not subdeck:
@@ -171,10 +165,9 @@ def move_subdeck_to_main_deck(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) ->
         ankihub_deck_id: The AnkiHub deck ID
         subdeck_id: The Anki subdeck ID
     """
-    deck_config = config.deck_config(ankihub_deck_id)
-    if not deck_config:
-        LOGGER.error("Deck config not found for moving subdeck", ankihub_deck_id=str(ankihub_deck_id))
-        raise ValueError("Deck config not found")
+    deck = get_deck_for_ah_did(ankihub_deck_id)
+    if not deck:
+        raise ValueError("Deck not found")
 
     subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
 
@@ -185,7 +178,7 @@ def move_subdeck_to_main_deck(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) ->
             remove_block_exam_subdeck_config(subdeck_config)
         return
 
-    parent_deck_id = deck_config.anki_id
+    parent_deck_id = deck["id"]
 
     note_ids = note_ids_in_deck_hierarchy(subdeck_id)
     if note_ids:
@@ -209,12 +202,12 @@ def set_subdeck_due_date(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId, new_due
         new_due_date: New due date in YYYY-MM-DD format
 
     Raises:
-        ValueError: If deck config not found or subdeck not found
+        ValueError: If deck not found or subdeck not found
     """
-    # Validate deck config exists
-    deck_config = config.deck_config(ankihub_deck_id)
-    if not deck_config:
-        raise ValueError("Deck config not found")
+    # Validate deck exists
+    deck = get_deck_for_ah_did(ankihub_deck_id)
+    if not deck:
+        raise ValueError("Deck not found")
 
     # Validate subdeck exists
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
