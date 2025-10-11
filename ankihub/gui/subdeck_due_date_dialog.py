@@ -19,7 +19,7 @@ from ..main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig
+from ..settings import BlockExamSubdeckConfig, config
 
 
 @dataclass
@@ -245,8 +245,16 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """
     subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
-    if not subdeck:
-        LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
+    deck_config = config.deck_config(subdeck_config.ankihub_deck_id)
+
+    if not deck_config or not subdeck:
+        LOGGER.warning(
+            "Removing config for expired subdeck with missing deck or subdeck",
+            ankihub_deck_id=str(subdeck_config.ankihub_deck_id),
+            subdeck_id=subdeck_config.subdeck_id,
+            deck_exists=bool(deck_config),
+            subdeck_exists=bool(subdeck),
+        )
         remove_block_exam_subdeck_config(subdeck_config)
         _show_next_expired_subdeck_dialog()
         return
