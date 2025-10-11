@@ -579,7 +579,7 @@ class TestEditor:
             if not logged_in:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
-                qtbot.wait_until(lambda: window and window.isVisible())
+                qtbot.wait_until(lambda: window and window.isVisible())  # type: ignore
             elif note_fields_changed or suggest_deletion:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
@@ -639,7 +639,7 @@ class TestEditor:
             if not logged_in:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
-                qtbot.wait_until(lambda: window and window.isVisible())
+                qtbot.wait_until(lambda: window and window.isVisible())  # type: ignore
             else:
                 # Assert that the suggestion was created with the correct data
                 qtbot.wait_until(lambda: create_new_note_suggestion_mock.called)
@@ -8149,6 +8149,8 @@ class TestFSRSDeckOptions:
         with qtbot.wait_callback() as callback:
             deck_options_did_load.append(callback)
             dialog = DeckOptionsDialog(aqt.mw, deck)
+            # Ignore save prompt as it can cause crashes/hangs
+            dialog._close_event_has_cleaned_up = True
 
         deck_options_did_load.remove(callback)
 
@@ -9010,7 +9012,7 @@ class TestCheckBlockExamSubdeckDueDates:
         """Test function returns empty list when no subdecks exist."""
         with anki_session_with_addon_data.profile_loaded():
             # Ensure no existing configurations
-            config._private_config.block_exam_subdecks = []
+            config._private_config.block_exams_subdecks = []
 
             expired = check_block_exam_subdeck_due_dates()
             assert expired == []

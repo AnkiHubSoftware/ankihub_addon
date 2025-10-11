@@ -17,13 +17,14 @@ on:
 
 jobs:
   test-addon:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - replace_anki_version: false
-          - replace_anki_version: true
-            anki_package_version: 'aqt[qt5]==2.1.56'
+          - aqt_dependency_group: aqt
+            qt_package: pyqt6
+          - aqt_dependency_group: aqt_legacy
+            qt_package: pyqt5
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -42,21 +43,19 @@ jobs:
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
           install_qt: true
-
-      - name: Replace Anki version
-        if: ${{ matrix.replace_anki_version }}
-        run: uv pip install "${{ matrix.anki_package_version }}"
+          aqt_dependency_group: ${{ matrix.aqt_dependency_group }}
+          qt_package: ${{ matrix.qt_package }}
 
       - name: Run pytest with coverage
         run: |
-          xvfb-run uv run pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          xvfb-run uv run pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          xvfb-run uv run pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_addon_${{ matrix.anki_package_version }}
+          name: coverage_addon_${{ matrix.aqt_dependency_group }}
           path: .coverage
           include-hidden-files: true
 
@@ -83,7 +82,9 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
+          install_qt: true
+          aqt_dependency_group: aqt
+          qt_package: pyqt6
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -112,7 +113,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          uv run pytest ./tests/client --disable-vcr --cov --cov-report=xml \
+          uv run --exact --group aqt pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage

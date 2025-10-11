@@ -4,21 +4,36 @@ inputs:
     required: true
   install_qt:
     required: true
+  aqt_dependency_group:
+    required: false
+  qt_package:
+    required: false
 runs:
   using: "composite"
   steps:
+    - name: Install dependencies and detect Qt version
+      if: ${{ inputs.install_qt == 'true' }}
+      run: |
+        uv sync --group ${{ inputs.aqt_dependency_group }}
+        QT_VERSION=$(uv pip show ${{ inputs.qt_package }} | sed -n 's/^Version: //p')
+        echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
+        echo "PYTEST_QT_API=${{ inputs.qt_package }}" >> $GITHUB_ENV
+      shell: bash
+
     - name: Install Qt
       if: ${{ inputs.install_qt == 'true' }}
       uses: jurplel/install-qt-action@v4
       with:
-        version: "5.15.2"
+        version: ${{ env.QT_VERSION }}
         setup-python: false
         cache: true
       continue-on-error: true
 
-    - name: Install deps
+    - name: Install additional Qt6 dependencies
+      if: ${{ inputs.install_qt == 'true' && startsWith(inputs.qt_version, '6.') }}
       run: |
-        uv sync --locked --no-default-groups --dev --group tests
+        sudo apt-get update
+        sudo apt-get -y install libgl1 libegl1 libdbus-1-3 libnss3 libxdamage1 libxkbcommon0 libasound2t64
       shell: bash
 
     - name: Build
