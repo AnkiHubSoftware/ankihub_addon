@@ -240,10 +240,23 @@ def note_ids_in_deck_hierarchy(
     """
     descendant_ids = [id_ for _, id_ in aqt.mw.col.decks.children(deck_id)]
     dids = ([deck_id] if include_self else []) + descendant_ids
-    if not dids:
+    return note_ids_in_decks(dids, include_filtered=include_filtered)
+
+
+def note_ids_in_decks(
+    deck_ids: list[DeckId],
+    *,
+    include_filtered: bool = True,
+) -> list[NoteId]:
+    """
+    Return distinct note IDs for cards in the specified decks (without including subdecks).
+    - If `include_filtered` is True, also include notes whose cards are currently in a filtered deck
+      but whose original deck (`odid`) matches one of the specified deck IDs.
+    """
+    if not deck_ids:
         return []
 
-    dids_str = ids2str(dids)
+    dids_str = ids2str(deck_ids)
     sql = f"SELECT DISTINCT nid FROM cards WHERE did IN {dids_str}"
     if include_filtered:
         sql += f" OR odid IN {dids_str}"

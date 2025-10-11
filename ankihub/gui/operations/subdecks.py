@@ -33,12 +33,11 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
         if not ask_user(
             "Do you want to remove the subdecks of<br>"
             f"<b>{config.deck_config(ankihub_id).name}</b>?<br><br>"
-            "<b>Warning:</b> This will remove all subdecks of this deck and move "
-            "all of its cards back to the main deck.</b>"
+            "⚠ <b>Note:</b> This will remove all regular subdecks of this deck and move "
+            "their cards back to the main deck. Filtered decks and block exam subdecks will be preserved."
             "<br><br>"
             "See <a href='https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2'>"
-            "the AnkiHub docs</a> "
-            "for details.",
+            "the AnkiHub docs</a> for details.",
             default_no=True,
             show_cancel_button=True,
         ):

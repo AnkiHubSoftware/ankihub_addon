@@ -7,22 +7,21 @@ revert the changes made by moving cards to their subdecks.
 
 import re
 import uuid
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, cast
 
 import aqt
+from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
+from anki.utils import ids2str
 
 from .. import LOGGER
 from ..db import ankihub_db
 from ..db.db import NOTE_NOT_DELETED_CONDITION
 from ..db.models import AnkiHubNote
 from ..settings import config
-from .utils import (
-    move_notes_to_decks_while_respecting_odid,
-    nids_in_deck_but_not_in_subdeck,
-    note_ids_in_deck_hierarchy,
-)
+from .block_exam_subdecks import get_exam_subdecks
+from .utils import move_notes_to_decks_while_respecting_odid, nids_in_deck_but_not_in_subdeck, note_ids_in_decks
 
 # root tag for tags that indicate which subdeck a note belongs to
 SUBDECK_TAG = "AnkiHub_Subdeck"
@@ -55,7 +54,9 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
 
     # create mapping between notes and destination decks
-    nid_to_dest_deck_name = _nid_to_destination_deck_name(nids, anki_root_deck_name=anki_root_deck_name)
+    nid_to_dest_deck_name = _nid_to_destination_deck_name(
+        nids, anki_root_deck_name=anki_root_deck_name, root_deck_id=root_deck_id
+    )
 
     # create missing subdecks
     deck_names = set(nid_to_dest_deck_name.values())
@@ -65,48 +66,47 @@ def build_subdecks_and_move_cards_to_them(ankihub_did: uuid.UUID, nids: Optional
     nid_to_did = {nid: aqt.mw.col.decks.id_for_name(deck_name) for nid, deck_name in nid_to_dest_deck_name.items()}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # Remove empty subdecks, keeping filtered decks
-    for name, deck_id in aqt.mw.col.decks.children(root_deck_id):
+    # Remove empty unprotected subdecks (including empty exam subdecks)
+    unprotected_subdecks = _get_unprotected_subdecks(root_deck_id, protect_exam_subdecks=False)
+    empty_subdecks = [
+        (name, deck_id)
+        for name, deck_id in unprotected_subdecks
+        if aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
+    ]
+    for name, deck_id in empty_subdecks:
         try:
-            is_empty = aqt.mw.col.decks.card_count(deck_id, include_subdecks=True) == 0
-        except NotFoundError:
-            # This can happen if a parent deck was deleted earlier in the loop
-            LOGGER.debug(f"Deck not found during removal process: {name}")
-            continue
-
-        if is_empty and not aqt.mw.col.decks.is_filtered(deck_id):
-            # Find any filtered decks that need to be preserved by reparenting
-            filtered_child_deck_ids = [
-                child_id for _, child_id in aqt.mw.col.decks.children(deck_id) if aqt.mw.col.decks.is_filtered(child_id)
-            ]
-
-            # Get the parent deck ID to reparent filtered decks to
-            parent_name = aqt.mw.col.decks.immediate_parent(name)
-            parent_deck_id = aqt.mw.col.decks.id_for_name(parent_name)
-
-            # Reparent any filtered child decks to the parent before removing this deck
-            if filtered_child_deck_ids:
-                aqt.mw.col.decks.reparent(filtered_child_deck_ids, parent_deck_id)
-
-            # Remove the empty deck
             aqt.mw.col.decks.remove([deck_id])
             LOGGER.info("Removed empty subdeck", did=deck_id, name=name)
+        except NotFoundError:
+            # This can happen if a parent deck was deleted earlier in the loop
+            LOGGER.debug("Deck not found during removal process", deck_id=deck_id, name=name)
 
     LOGGER.info("Built subdecks and moved cards to them.")
 
 
-def _nid_to_destination_deck_name(nids: List[NoteId], anki_root_deck_name: str) -> Dict[NoteId, str]:
+def _nid_to_destination_deck_name(
+    nids: List[NoteId], anki_root_deck_name: str, root_deck_id: DeckId
+) -> Dict[NoteId, str]:
     result = dict()
-    missing_nids = []
-    for nid in nids:
-        tags_str = aqt.mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
-        if not tags_str:
-            # When this query returns None, that means that the note does not exist in the Anki database.
-            # (Notes without tags have an empty string in the tags field.)
-            # In this case we ignore the note.
-            missing_nids.append(nid)
-            continue
 
+    # Get exam subdeck IDs and filter out notes that are in them
+    exam_subdecks_list = get_exam_subdecks(root_deck_id)
+    exam_subdeck_ids = {deck_id for _, deck_id in exam_subdecks_list}
+    if exam_subdeck_ids:
+        query = f"""
+            SELECT DISTINCT nid
+            FROM cards
+            WHERE nid IN {ids2str(nids)}
+              AND (did IN {ids2str(exam_subdeck_ids)} OR odid IN {ids2str(exam_subdeck_ids)})
+        """
+        nids_in_exam_subdecks = set(aqt.mw.col.db.list(query))
+        # Filter out notes that are in exam subdecks
+        nids = [nid for nid in nids if nid not in nids_in_exam_subdecks]
+
+    nid_to_tags = dict(
+        cast(List[tuple[NoteId, str]], aqt.mw.col.db.all(f"SELECT id, tags FROM notes WHERE id IN {ids2str(nids)}"))
+    )
+    for nid, tags_str in nid_to_tags.items():
         tags = aqt.mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
@@ -122,9 +122,6 @@ def _nid_to_destination_deck_name(nids: List[NoteId], anki_root_deck_name: str) 
                 # ignore invalid subdeck tag
                 continue
         result[nid] = deck_name
-
-    if missing_nids:
-        LOGGER.warning("Notes are not in the Anki database.", missing_nids=missing_nids)
 
     return result
 
@@ -161,35 +158,68 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     """Flatten the deck hierarchy for the given ankihub_did.
 
     This function:
-    1. Moves all cards from subdecks to the root deck
-    2. Reparents filtered subdecks to be direct children of the root deck
-    3. Removes all non-filtered (regular) subdecks
+    1. Moves all cards from non-protected subdecks to the root deck
+    2. Removes all non-protected subdecks
 
-    When cards are in filtered decks, they remain in those decks, but their
-    original deck reference (odid) is updated to point to the root deck.
+    Protected decks are excluded from this operation:
+    - Block exam subdecks and their ancestors/descendants
+    - Filtered decks and their ancestors/descendants
     """
-    # Get the root deck ID and name
+    # Get the root deck ID
     root_deck_id = config.deck_config(ankihub_did).anki_id
 
-    # Find all notes in subdecks and move them to the root deck
-    nids = note_ids_in_deck_hierarchy(root_deck_id, include_self=False)
+    # Get all child decks except protected decks (exam subdecks, filtered decks, and their ancestors/descendants)
+    decks_to_flatten = _get_unprotected_subdecks(root_deck_id)
+    deck_ids_to_flatten: list[DeckId] = [deck_id for _, deck_id in decks_to_flatten]
+
+    # Get note IDs from the decks we want to flatten
+    nids = note_ids_in_decks(deck_ids_to_flatten, include_filtered=True)
     nid_to_did = {nid: root_deck_id for nid in nids}
     move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
-    # Get all child decks and separate them into filtered and regular decks
+    # Remove unprotected subdecks
+    if deck_ids_to_flatten:
+        aqt.mw.col.decks.remove(deck_ids_to_flatten)
+        LOGGER.info(f"Removed {len(deck_ids_to_flatten)} subdeck(s)")
+
+
+def _get_unprotected_subdecks(root_deck_id: DeckId, protect_exam_subdecks: bool = True) -> list[tuple[str, DeckId]]:
+    """Get all child decks under root_deck_id, excluding protected decks and their descendants.
+
+    Protected decks include:
+    - Block exam subdecks (if protect_exam_subdecks is True)
+    - Filtered decks
+    - All ancestors and descendants of the above
+        We don't want to remove ancestors because removing an ancestor would also remove its descendants.
+        Removing descendants of protected decks might be unexpected for users.
+
+    Args:
+        root_deck_id: The root deck ID to get children from
+        protect_exam_subdecks: If True, exam subdecks are protected from being returned
+
+    Returns a list of (name, id) tuples.
+    """
+
     child_decks = aqt.mw.col.decks.children(root_deck_id)
-    filtered_deck_ids = [did for _, did in child_decks if aqt.mw.col.decks.is_filtered(did)]
-    regular_deck_ids = [did for _, did in child_decks if not aqt.mw.col.decks.is_filtered(did)]
+    filtered_deck_names = {deck_name for deck_name, deck_id in child_decks if aqt.mw.col.decks.is_filtered(deck_id)}
 
-    # Reparent all filtered subdecks to the root deck - we don't want to delete them
-    if filtered_deck_ids:
-        aqt.mw.col.decks.reparent(filtered_deck_ids, root_deck_id)
-        LOGGER.info(f"Reparented {len(filtered_deck_ids)} filtered deck(s) to root deck")
+    if protect_exam_subdecks:
+        exam_subdecks = get_exam_subdecks(root_deck_id)
+        exam_subdeck_names = {exam_name for exam_name, _ in exam_subdecks}
+        core_protected_names = filtered_deck_names | exam_subdeck_names
+    else:
+        core_protected_names = filtered_deck_names
 
-    # Remove all regular subdecks
-    if regular_deck_ids:
-        aqt.mw.col.decks.remove(regular_deck_ids)
-        LOGGER.info(f"Removed {len(regular_deck_ids)} subdeck(s)")
+    def is_protected(deck_name: str) -> bool:
+        """Check if deck is protected (core, ancestor, or descendant of core)."""
+        return (
+            deck_name in core_protected_names
+            or any(deck_name.startswith(f"{core_name}::") for core_name in core_protected_names)
+            or any(core_name.startswith(f"{deck_name}::") for core_name in core_protected_names)
+        )
+
+    # Get unprotected decks
+    return [(deck_name, deck_id) for deck_name, deck_id in child_decks if not is_protected(deck_name)]
 
 
 def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> None:
