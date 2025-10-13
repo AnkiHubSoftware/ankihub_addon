@@ -3561,21 +3561,21 @@ class TestMoveSubdeckToMainDeck:
     @patch("ankihub.main.block_exam_subdecks.note_ids_in_deck_hierarchy")
     @patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
     @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
+    @patch("ankihub.main.block_exam_subdecks.get_deck_for_ah_did")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_move_subdeck_to_main_deck_success(
         self,
         mock_config,
         mock_aqt,
+        mock_get_deck,
         mock_remove_config,
         mock_move_notes,
         mock_note_ids_in_deck_hierarchy,
     ):
         """Test successfully moving subdeck to main deck."""
         # Setup mocks
-        mock_deck_config = MagicMock()
-        mock_deck_config.anki_id = 123
-        mock_config.deck_config.return_value = mock_deck_config
+        mock_get_deck.return_value = {"name": "Test Deck", "id": 123}
 
         mock_subdeck = {"name": "Test Deck::Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
@@ -3594,28 +3594,29 @@ class TestMoveSubdeckToMainDeck:
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
         mock_remove_config.assert_called_once_with(subdeck_config)
 
-    @patch("ankihub.main.block_exam_subdecks.config")
-    def test_move_subdeck_to_main_deck_no_deck_config(self, mock_config):
+    @patch("ankihub.main.block_exam_subdecks.get_deck_for_ah_did")
+    def test_move_subdeck_to_main_deck_no_deck_config(self, mock_get_deck):
         """Test handling when deck config not found."""
-        mock_config.deck_config.return_value = None
+        mock_get_deck.return_value = None
 
         ankihub_deck_id = uuid.uuid4()
 
-        with pytest.raises(ValueError, match="Deck config not found"):
+        with pytest.raises(ValueError, match="Deck not found"):
             move_subdeck_to_main_deck(ankihub_deck_id, DeckId(456))
 
     @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
+    @patch("ankihub.main.block_exam_subdecks.get_deck_for_ah_did")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_move_subdeck_to_main_deck_subdeck_not_found(
         self,
         mock_config,
         mock_aqt,
+        mock_get_deck,
         mock_remove_config,
     ):
         """Test handling when subdeck not found in Anki."""
-        mock_deck_config = MagicMock()
-        mock_config.deck_config.return_value = mock_deck_config
+        mock_get_deck.return_value = {"name": "Test Deck", "id": 123}
 
         mock_aqt.mw.col.decks.get.return_value = False
 
@@ -3633,16 +3634,17 @@ class TestMoveSubdeckToMainDeck:
 class TestSetSubdeckDueDate:
     """Tests for set_subdeck_due_date function."""
 
+    @patch("ankihub.main.block_exam_subdecks.get_deck_for_ah_did")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_set_subdeck_due_date_success(self, mock_config, mock_aqt, next_deterministic_uuid):
+    def test_set_subdeck_due_date_success(self, mock_config, mock_aqt, mock_get_deck, next_deterministic_uuid):
         """Test successfully setting a new due date."""
         ah_did = next_deterministic_uuid()
         old_subdeck_config = BlockExamSubdeckConfig(
             ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31"
         )
         mock_config.get_block_exam_subdeck_config.return_value = old_subdeck_config
-        mock_config.deck_config.return_value = MagicMock()  # Mock deck config exists
+        mock_get_deck.return_value = {"name": "Test Deck", "id": 123}
         mock_aqt.mw.col.decks.get.return_value = {"name": "Test Subdeck"}  # Mock subdeck exists
 
         set_subdeck_due_date(ah_did, DeckId(456), "2025-06-15")
