@@ -1,6 +1,5 @@
 """Dialog for handling expired block exam subdecks."""
 
-import uuid
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
@@ -19,7 +18,7 @@ from ..main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, config
+from ..settings import BlockExamSubdeckConfig
 
 
 @dataclass
@@ -109,7 +108,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        move_subdeck_to_main_deck(self.subdeck_config.ankihub_deck_id, self.subdeck_config.subdeck_id)
+        move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
         tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
@@ -127,7 +126,6 @@ class SubdeckDueDateDialog(QDialog):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(
             self.subdeck_name,
-            self.subdeck_config.ankihub_deck_id,
             self.subdeck_config.subdeck_id,
             self.subdeck_config.due_date,
             parent=self,
@@ -142,14 +140,12 @@ class DatePickerDialog(QDialog):
     def __init__(
         self,
         subdeck_name: str,
-        ankihub_deck_id: uuid.UUID,
         subdeck_id: DeckId,
         initial_due_date: Optional[str] = None,
         parent=None,
     ):
         super().__init__(parent)
         self.subdeck_name = subdeck_name
-        self.ankihub_deck_id = ankihub_deck_id
         self.subdeck_id = subdeck_id
         self.initial_due_date = initial_due_date
         self.selected_date: Optional[str] = None
@@ -231,7 +227,7 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        set_subdeck_due_date(self.ankihub_deck_id, self.subdeck_id, selected_date_str)
+        set_subdeck_due_date(self.subdeck_id, selected_date_str)
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
         self.accept()
@@ -245,14 +241,11 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """
     subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
-    deck_config = config.deck_config(subdeck_config.ankihub_deck_id)
 
-    if not deck_config or not subdeck:
+    if not subdeck:
         LOGGER.warning(
-            "Removing config for expired subdeck with missing deck or subdeck",
-            ankihub_deck_id=str(subdeck_config.ankihub_deck_id),
+            "Removing config for expired subdeck with missing subdeck",
             subdeck_id=subdeck_config.subdeck_id,
-            deck_exists=bool(deck_config),
             subdeck_exists=bool(subdeck),
         )
         remove_block_exam_subdeck_config(subdeck_config)

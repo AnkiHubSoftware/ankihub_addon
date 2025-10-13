@@ -170,7 +170,6 @@ class DeckExtensionConfig(DataClassJSONMixin):
 
 @dataclass
 class BlockExamSubdeckConfig(DataClassJSONMixin):
-    ankihub_deck_id: uuid.UUID
     subdeck_id: DeckId
     due_date: str  # YYYY-MM-DD format
 
@@ -506,55 +505,46 @@ class _Config:
     def upsert_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
         """Add or update a block exam subdeck configuration."""
         current = self.get_block_exam_subdecks()
-        # Remove existing entry with same ankihub_deck_id and subdeck_id
-        current = [
-            c
-            for c in current
-            if not (c.ankihub_deck_id == config_item.ankihub_deck_id and c.subdeck_id == config_item.subdeck_id)
-        ]
+        # Remove existing entry with same subdeck_id
+        current = [c for c in current if c.subdeck_id != config_item.subdeck_id]
         current.append(config_item)
         self._private_config.block_exams_subdecks = current
         self._update_private_config()
 
-    def get_block_exam_subdeck_due_date(self, ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> Optional[str]:
+    def get_block_exam_subdeck_due_date(self, subdeck_id: DeckId) -> Optional[str]:
         """Get due date for a specific block exam subdeck."""
-        for config_item in self.get_block_exam_subdecks():
-            if config_item.ankihub_deck_id == ankihub_deck_id and config_item.subdeck_id == subdeck_id:
-                return config_item.due_date
-        return None
+        config_item = self.get_block_exam_subdeck_config(subdeck_id)
+        return config_item.due_date if config_item else None
 
-    def remove_block_exam_subdeck(self, ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> None:
+    def remove_block_exam_subdeck(self, subdeck_id: DeckId) -> None:
         """Remove a block exam subdeck configuration.
 
         Args:
-            ankihub_deck_id: The AnkiHub deck ID
             subdeck_id: The Anki subdeck ID
         """
         current_configs = self.get_block_exam_subdecks()
-        updated_configs = [
-            c for c in current_configs if not (c.ankihub_deck_id == ankihub_deck_id and c.subdeck_id == subdeck_id)
-        ]
+        updated_configs = [c for c in current_configs if c.subdeck_id != subdeck_id]
         self._private_config.block_exams_subdecks = updated_configs
         self._update_private_config()
 
-    def remove_all_block_exam_subdecks_for_deck(self, ankihub_deck_id: uuid.UUID) -> None:
-        """Remove all block exam subdeck configs for a given AnkiHub deck.
+    def remove_all_block_exam_subdecks_for_deck(self, root_deck_id: DeckId) -> None:
+        """Remove all block exam subdeck configs for a given root deck.
 
         Args:
-            ankihub_deck_id: The AnkiHub deck ID
+            root_deck_id: The root deck ID
         """
-        subdeck_configs = [sc for sc in self.get_block_exam_subdecks() if sc.ankihub_deck_id == ankihub_deck_id]
-        if not subdeck_configs:
-            return
+        original_count = len(self.get_block_exam_subdecks())
 
-        updated_configs = [sc for sc in self.get_block_exam_subdecks() if sc.ankihub_deck_id != ankihub_deck_id]
+        descendant_ids = [id for _, id in aqt.mw.col.decks.children(root_deck_id)]
+        updated_configs = [sc for sc in self.get_block_exam_subdecks() if sc.subdeck_id not in descendant_ids]
+
         self._private_config.block_exams_subdecks = updated_configs
         self._update_private_config()
 
         LOGGER.info(
             "Removed all block exam subdeck configs for deck",
-            ankihub_deck_id=ankihub_deck_id,
-            count=len(subdeck_configs),
+            root_deck_id=root_deck_id,
+            count=original_count - len(updated_configs),
         )
 
     def is_logged_in(self) -> bool:
