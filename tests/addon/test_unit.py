@@ -2329,22 +2329,16 @@ class TestPrivateConfigMigrations:
     def test_invalid_block_exam_subdeck_configs_with_missing_due_dates_are_removed(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
     ):
         """Test that migration removes configs with None or missing due dates."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
             # Create a subdeck
-            deck_config = config.deck_config(ah_did)
-            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            root_deck_name = "Test Deck"
+            subdeck_name = f"{root_deck_name}::Test Subdeck"
             subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
 
             # Add invalid config with None due date and reload to trigger migration
-            self._add_subdeck_configs_and_trigger_migration(
-                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": None}
-            )
+            self._add_subdeck_configs_and_trigger_migration({"subdeck_id": subdeck_id, "due_date": None})
 
             # Verify invalid config was removed
             assert len(config.get_block_exam_subdecks()) == 0
@@ -2352,66 +2346,34 @@ class TestPrivateConfigMigrations:
     def test_invalid_block_exam_subdeck_configs_with_invalid_due_date_format_are_removed(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
     ):
         """Test that migration removes configs with invalid due date formats."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
             # Create a subdeck
-            deck_config = config.deck_config(ah_did)
-            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            root_deck_name = "Test Deck"
+            subdeck_name = f"{root_deck_name}::Test Subdeck"
             subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
 
             # Add configs with invalid due date formats and reload to trigger migration
             self._add_subdeck_configs_and_trigger_migration(
-                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": "invalid-date"},
-                {"ankihub_deck_id": str(ah_did), "subdeck_id": subdeck_id, "due_date": "2025/01/01"},
+                {"subdeck_id": subdeck_id, "due_date": "invalid-date"},
+                {"subdeck_id": subdeck_id, "due_date": "2025/01/01"},
             )
 
             # Verify invalid configs were removed
             assert len(config.get_block_exam_subdecks()) == 0
 
-    def test_invalid_block_exam_subdeck_configs_for_non_existent_ah_decks_are_removed(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        """Test that migration removes configs for uninstalled AnkiHub decks."""
-        with anki_session_with_addon_data.profile_loaded():
-            # Use a deck ID that doesn't exist
-            fake_ah_did = next_deterministic_uuid()
-            fake_subdeck_id = 123456
-
-            # Add config for non-existent deck and reload to trigger migration
-            self._add_subdeck_configs_and_trigger_migration(
-                {
-                    "ankihub_deck_id": str(fake_ah_did),
-                    "subdeck_id": fake_subdeck_id,
-                    "due_date": "2025-12-31",
-                }
-            )
-
-            # Verify invalid config was removed
-            assert len(config.get_block_exam_subdecks()) == 0
-
     def test_invalid_block_exam_subdeck_configs_for_non_existent_subdecks_are_removed(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
     ):
         """Test that migration removes configs for deleted Anki subdecks."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
             # Use a subdeck ID that doesn't exist
             fake_subdeck_id = 999999
 
             # Add config for non-existent subdeck and reload to trigger migration
-            self._add_subdeck_configs_and_trigger_migration(
-                {"ankihub_deck_id": str(ah_did), "subdeck_id": fake_subdeck_id, "due_date": "2025-12-31"}
-            )
+            self._add_subdeck_configs_and_trigger_migration({"subdeck_id": fake_subdeck_id, "due_date": "2025-12-31"})
 
             # Verify invalid config was removed
             assert len(config.get_block_exam_subdecks()) == 0
@@ -2419,23 +2381,17 @@ class TestPrivateConfigMigrations:
     def test_valid_block_exam_subdeck_configs_are_preserved(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
     ):
         """Test that migration preserves valid block exam subdeck configs."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
             # Create a subdeck
-            deck_config = config.deck_config(ah_did)
-            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck_name = f"{main_deck_name}::Test Subdeck"
+            root_deck_name = "Test Deck"
+            subdeck_name = f"{root_deck_name}::Test Subdeck"
             subdeck_id = aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id
 
             # Add valid config using the proper API
             valid_due_date = "2025-12-31"
-            subdeck_config = BlockExamSubdeckConfig(
-                ankihub_deck_id=ah_did, subdeck_id=DeckId(subdeck_id), due_date=valid_due_date
-            )
+            subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(subdeck_id), due_date=valid_due_date)
             config.upsert_block_exam_subdeck(subdeck_config)
 
             # Verify config was added
@@ -2447,7 +2403,6 @@ class TestPrivateConfigMigrations:
             # Verify valid config was preserved
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
-            assert configs[0].ankihub_deck_id == ah_did
             assert configs[0].subdeck_id == subdeck_id
             assert configs[0].due_date == valid_due_date
 
@@ -3659,12 +3614,11 @@ class TestRemoveBlockExamSubdeckConfig:
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_remove_block_exam_subdeck_config(self, mock_config, next_deterministic_uuid):
         """Test removing a block exam subdeck configuration."""
-        ah_did = next_deterministic_uuid()
-        subdeck_config = BlockExamSubdeckConfig(ankihub_deck_id=ah_did, subdeck_id=DeckId(456), due_date="2024-12-31")
+        subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
 
         remove_block_exam_subdeck_config(subdeck_config)
 
-        mock_config.remove_block_exam_subdeck.assert_called_once_with(ah_did, DeckId(456))
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
 
 
 class TestHandleExpiredSubdeck:

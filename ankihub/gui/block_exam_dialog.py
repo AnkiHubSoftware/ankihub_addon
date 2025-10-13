@@ -1,6 +1,5 @@
 """Dialog for managing block exam subdecks."""
 
-import uuid
 from datetime import date, datetime, timedelta
 from typing import List, Optional, cast
 
@@ -36,9 +35,9 @@ from .utils import clear_layout
 class BlockExamSubdeckDialog(QDialog):
     """Main dialog for block exam subdeck management."""
 
-    def __init__(self, ankihub_deck_id: uuid.UUID, note_ids: List[NoteId], parent=None):
+    def __init__(self, root_deck_id: DeckId, note_ids: List[NoteId], parent=None):
         super().__init__(parent)
-        self.ankihub_deck_id = ankihub_deck_id
+        self.root_deck_id = root_deck_id
         self.note_ids = note_ids
         self.selected_subdeck_name: Optional[str] = None
         self.selected_subdeck_id: Optional[DeckId] = None
@@ -47,14 +46,12 @@ class BlockExamSubdeckDialog(QDialog):
         self.setMinimumWidth(440)
 
         # Check if user has existing subdecks to determine entry point
-        deck_config = config.deck_config(ankihub_deck_id)
+        root_deck = aqt.mw.col.decks.get(root_deck_id, default=False)
         has_subdecks = False
 
-        if deck_config:
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            if anki_deck_name:
-                # Check if there are any subdecks under the parent deck
-                has_subdecks = len(list(aqt.mw.col.decks.children(deck_config.anki_id))) > 0
+        if root_deck:
+            # Check if there are any subdecks under the root deck
+            has_subdecks = len(list(aqt.mw.col.decks.children(root_deck_id))) > 0
 
         layout = QVBoxLayout()
         self.setLayout(layout)
@@ -253,7 +250,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.date_input = QDateEdit()
 
         # Try to get existing due date
-        existing_due_date = config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, self.selected_subdeck_id)
+        existing_due_date = config.get_block_exam_subdeck_due_date(self.selected_subdeck_id)
         if existing_due_date:
             self.date_input.setDate(datetime.strptime(existing_due_date, "%Y-%m-%d").date())
         else:
@@ -372,20 +369,18 @@ class BlockExamSubdeckDialog(QDialog):
         """Populate the subdeck list widget."""
         self.subdeck_list.clear()
 
-        # Get the parent deck configuration
-        deck_config = config.deck_config(self.ankihub_deck_id)
-        if not deck_config:
+        # Get the root deck
+        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
+        if not root_deck:
             return
 
-        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-        if not anki_deck_name:
-            return
+        root_deck_name = root_deck["name"]
 
-        # Get ALL subdecks under the parent deck (including nested ones)
+        # Get ALL subdecks under the root deck (including nested ones)
         all_subdecks = []
 
-        for deck_name, deck_id in aqt.mw.col.decks.children(deck_config.anki_id):
-            subdeck_path = deck_name[len(anki_deck_name) + 2 :]
+        for deck_name, deck_id in aqt.mw.col.decks.children(self.root_deck_id):
+            subdeck_path = deck_name[len(root_deck_name) + 2 :]
             all_subdecks.append((subdeck_path, deck_id))
 
         # Sort subdecks alphabetically by name
@@ -397,7 +392,8 @@ class BlockExamSubdeckDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
 
             # Mark block exam subdecks differently (optional visual indication)
-            if config.get_block_exam_subdeck_due_date(self.ankihub_deck_id, subdeck_id):
+            subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
+            if subdeck_config:
                 # This subdeck is already configured as a block exam subdeck
                 item.setToolTip("Block exam subdeck")
 
@@ -451,28 +447,25 @@ class BlockExamSubdeckDialog(QDialog):
         due_date = self.date_input.date().toString("yyyy-MM-dd")
 
         # Check if subdeck already exists
-        deck_config = config.deck_config(self.ankihub_deck_id)
-        if not deck_config:
-            showInfo("Error: Deck configuration not found.")
+        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
+        if not root_deck:
+            showInfo("Error: Root deck not found.")
             return
 
-        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-        if not anki_deck_name:
-            showInfo("Error: Parent deck not found.")
-            return
+        root_deck_name = root_deck["name"]
 
-        full_name = f"{anki_deck_name}::{name}"
+        full_name = f"{root_deck_name}::{name}"
 
         if aqt.mw.col.decks.by_name(full_name):
             self._show_subdeck_conflict_screen(name)
             return
 
         # Create subdeck
-        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.root_deck_id, name, due_date)
 
         # Add notes to the new subdeck
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id,
+            self.root_deck_id,
             actual_name,
             self.note_ids,
             due_date,
@@ -494,21 +487,20 @@ class BlockExamSubdeckDialog(QDialog):
         # Check if subdeck name needs to be updated
         if new_name != self.selected_subdeck_name:
             # Check if new name conflicts with existing subdeck
-            deck_config = config.deck_config(self.ankihub_deck_id)
-            if deck_config:
-                anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-                if anki_deck_name:
-                    # Handle full subdeck path for multi-level subdecks
-                    new_full_name = f"{anki_deck_name}::{new_name}"
-                    if aqt.mw.col.decks.by_name(new_full_name):
-                        showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
-                        return
+            root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
+            if root_deck:
+                root_deck_name = root_deck["name"]
+                # Handle full subdeck path for multi-level subdecks
+                new_full_name = f"{root_deck_name}::{new_name}"
+                if aqt.mw.col.decks.by_name(new_full_name):
+                    showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
+                    return
 
             self._rename_subdeck(self.selected_subdeck_name, new_name)
             self.selected_subdeck_name = new_name
 
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id,
+            self.root_deck_id,
             self.selected_subdeck_name,
             self.note_ids,
             due_date,
@@ -520,16 +512,14 @@ class BlockExamSubdeckDialog(QDialog):
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
-        deck_config = config.deck_config(self.ankihub_deck_id)
-        if not deck_config:
-            raise ValueError("Deck configuration not found")
+        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
+        if not root_deck:
+            raise ValueError("Root deck not found")
 
-        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-        if not anki_deck_name:
-            raise ValueError("Parent deck not found")
+        root_deck_name = root_deck["name"]
 
-        old_full_name = f"{anki_deck_name}::{old_subdeck_path}"
-        new_full_name = f"{anki_deck_name}::{new_subdeck_path}"
+        old_full_name = f"{root_deck_name}::{old_subdeck_path}"
+        new_full_name = f"{root_deck_name}::{new_subdeck_path}"
 
         # Get the subdeck to rename
         subdeck = aqt.mw.col.decks.by_name(old_full_name)
@@ -547,10 +537,10 @@ class BlockExamSubdeckDialog(QDialog):
         # Use stored due date from the original screen
         due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-        actual_name, _ = create_block_exam_subdeck(self.ankihub_deck_id, conflicting_name, due_date)
+        actual_name, _ = create_block_exam_subdeck(self.root_deck_id, conflicting_name, due_date)
 
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id,
+            self.root_deck_id,
             actual_name,
             self.note_ids,
             due_date,
@@ -565,17 +555,14 @@ class BlockExamSubdeckDialog(QDialog):
     def _handle_conflict_merge(self, conflicting_name: str):
         """Handle merging into existing subdeck directly."""
         # Find subdeck ID for the existing subdeck
-        deck_config = config.deck_config(self.ankihub_deck_id)
-        if not deck_config:
-            showInfo("Error: Deck configuration not found.")
+        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
+        if not root_deck:
+            showInfo("Error: Root deck not found.")
             return
 
-        anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-        if not anki_deck_name:
-            showInfo("Error: Parent deck not found.")
-            return
+        root_deck_name = root_deck["name"]
 
-        full_name = f"{anki_deck_name}::{conflicting_name}"
+        full_name = f"{root_deck_name}::{conflicting_name}"
         subdeck = aqt.mw.col.decks.by_name(full_name)
         if not subdeck:
             showInfo("Error: Could not find the existing subdeck.")
@@ -586,7 +573,7 @@ class BlockExamSubdeckDialog(QDialog):
 
         # Add notes to the existing subdeck
         added_count = add_notes_to_block_exam_subdeck(
-            self.ankihub_deck_id,
+            self.root_deck_id,
             conflicting_name,
             self.note_ids,
             due_date,

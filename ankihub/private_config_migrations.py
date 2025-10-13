@@ -131,20 +131,18 @@ def _move_credentials_to_profile_config(
 
 
 def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> None:
-    """Remove invalid block exam subdeck configs (non-existent AnkiHub decks/subdecks, missing/invalid due dates)."""
+    """Remove invalid block exam subdeck configs (non-existent subdecks, missing/invalid due dates)."""
 
     block_exams_subdecks = private_config_dict.get("block_exams_subdecks", [])
     if not block_exams_subdecks:
         return
 
-    # Get all valid AnkiHub deck IDs and Anki deck IDs
-    installed_ankihub_deck_ids = set(private_config_dict.get("decks", {}).keys())
+    # Get all valid Anki deck IDs
     all_anki_deck_ids = set(DeckId(deck.id) for deck in aqt.mw.col.decks.all_names_and_ids())
 
     filtered_subdecks = []
     removed_count = 0
     for subdeck in block_exams_subdecks:
-        ankihub_deck_id = subdeck.get("ankihub_deck_id", None)
         subdeck_id = subdeck.get("subdeck_id", None)
         due_date = subdeck.get("due_date", None)
 
@@ -158,10 +156,9 @@ def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> N
                 pass
 
         # Keep only configs where:
-        # 1. AnkiHub deck is still installed
-        # 2. Subdeck exists in Anki collection
-        # 3. Has a valid due date
-        if ankihub_deck_id in installed_ankihub_deck_ids and subdeck_id in all_anki_deck_ids and is_valid_due_date:
+        # 1. Subdeck exists in Anki collection
+        # 2. Has a valid due date
+        if subdeck_id in all_anki_deck_ids and is_valid_due_date:
             filtered_subdecks.append(subdeck)
         else:
             removed_count += 1

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Tuple
 
 import aqt
 from anki.consts import QUEUE_TYPE_SUSPENDED
+from anki.decks import DeckId
 from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import webview_did_receive_js_message
@@ -18,7 +19,7 @@ from jinja2 import Template
 from ..db import ankihub_db
 from ..gui.block_exam_dialog import BlockExamSubdeckDialog
 from ..gui.terms_dialog import TermsAndConditionsDialog
-from ..settings import url_view_note
+from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import robust_filter
@@ -150,7 +151,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             note_ids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
         elif search_string.strip():
             note_ids = list(aqt.mw.col.find_notes(search_string))
-        BlockExamSubdeckDialog(ankihub_deck_id=uuid.UUID(ankihub_did), note_ids=note_ids, parent=aqt.mw).show()
+
+        deck_config = config.deck_config(uuid.UUID(ankihub_did))
+        BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw).show()
+
         return (True, None)
 
     return handled
