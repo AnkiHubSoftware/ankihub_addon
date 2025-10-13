@@ -392,7 +392,10 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
         self.subdecks_tooltip_message = (
-            f"Use subdecks to organize this deck.<br>Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
+            "On sync, notes will be moved to<br>"
+            "subdecks based on<br>"
+            f"{SUBDECK_TAG} tags, and<br>"
+            "empty subdecks will be removed."
         )
 
         # Set up the subdecks checkbox

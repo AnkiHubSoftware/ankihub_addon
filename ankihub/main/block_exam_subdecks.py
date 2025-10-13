@@ -242,6 +242,23 @@ def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> 
     config.remove_block_exam_subdeck(subdeck_config.ankihub_deck_id, subdeck_config.subdeck_id)
 
 
+def get_exam_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
+    """Get descendants of the given root deck which are block exam subdeck.
+
+    Returns a list of (name, id) tuples.
+    Doesn't return exam subdecks that don't exist in Anki.
+    """
+    # Get all child decks under root
+    child_decks = aqt.mw.col.decks.children(root_deck_id)
+
+    # Get exam subdeck IDs from config
+    exam_subdeck_configs = config.get_block_exam_subdecks()
+    exam_subdeck_ids = {int(cfg.subdeck_id) for cfg in exam_subdeck_configs}
+
+    # Filter children to only include exam subdecks
+    return [(name, deck_id) for name, deck_id in child_decks if deck_id in exam_subdeck_ids]
+
+
 def get_subdeck_name_without_parent(subdeck_id: DeckId) -> str:
     """Get the subdeck name without the parent deck prefix.
     E.g. for "MainDeck::Subdeck", returns "Subdeck".

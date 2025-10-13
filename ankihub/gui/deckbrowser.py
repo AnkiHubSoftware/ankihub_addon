@@ -67,7 +67,7 @@ def _open_date_picker_dialog_for_subdeck(
         initial_due_date=initial_due_date,
         parent=aqt.mw,
     )
-    _dialog_state.dialog.open()
+    _dialog_state.dialog.show()
 
 
 def _open_remove_block_exam_subdeck_dialog(ankihub_deck_id: uuid.UUID, subdeck_id: DeckId) -> None:
