@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import aqt
 from anki import scheduler_pb2
@@ -127,7 +127,7 @@ def _optimize_fsrs_parameters(conf_id: DeckConfigId, on_done: Optional[Callable[
         ignore_revlog_before_date = datetime.fromisoformat(ignore_revlog_before_date_str).replace(tzinfo=timezone.utc)
         ignore_revlog_before_ms = int(ignore_revlog_before_date.timestamp() * 1000)
 
-        extra_kwargs = {}
+        extra_kwargs: dict[str, Any] = {}
         if ANKI_INT_VERSION >= 250200:
             # The num_of_relearning_steps parameter became available in Anki 25.02
             extra_kwargs["num_of_relearning_steps"] = _get_amount_relearning_steps_in_day(

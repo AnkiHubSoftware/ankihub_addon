@@ -152,7 +152,7 @@ class ReviewerSidebar:
         layout.addWidget(self.splitter)
         self.splitter.setSizePolicy(aqt.QSizePolicy(aqt.QSizePolicy.Policy.Expanding, aqt.QSizePolicy.Policy.Expanding))
 
-        widget = self.reviewer.web
+        widget: aqt.QWidget = self.reviewer.web
         # For compatibility with other add-ons that add a sidebar too (e.g. AMBOSS)
         if isinstance(self.reviewer.web.parentWidget(), aqt.QSplitter):
             widget = self.reviewer.web.parentWidget()
