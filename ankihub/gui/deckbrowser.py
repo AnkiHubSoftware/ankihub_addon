@@ -58,7 +58,7 @@ def _open_date_picker_dialog_for_subdeck(subdeck_config: BlockExamSubdeckConfig)
     subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
 
     _dialog_state.dialog = DatePickerDialog(subdeck_name=subdeck_name, subdeck_config=subdeck_config, parent=aqt.mw)
-    _dialog_state.dialog.open()
+    _dialog_state.dialog.show()
 
 
 def _open_remove_block_exam_subdeck_dialog(subdeck_config: BlockExamSubdeckConfig) -> None:
