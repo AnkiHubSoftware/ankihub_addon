@@ -239,14 +239,8 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """
     subdeck_id = subdeck_config.subdeck_id
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
-
-    # Validate subdeck exists and is actually a subdeck
-    if not subdeck or "::" not in subdeck["name"]:
-        LOGGER.warning(
-            "Removing block exam subdeck config for missing or invalid subdeck",
-            subdeck_id=subdeck_config.subdeck_id,
-            reason="not found" if not subdeck else "not a subdeck",
-        )
+    if not subdeck:
+        LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
         remove_block_exam_subdeck_config(subdeck_config)
         _show_next_expired_subdeck_dialog()
         return

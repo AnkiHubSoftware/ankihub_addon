@@ -173,10 +173,13 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
 
 
 def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
-    """Move all notes from a subdeck back to the root deck and delete the subdeck.
+    """Move all notes from a subdeck back to the root deck, delete the subdeck,
+    and remove its configuration (if it exists).
+
+    If the deck is already a root deck, only the block exam subdeck configuration is removed (if it exists).
 
     Args:
-        subdeck_id: The Anki subdeck ID
+        subdeck_id: The Anki deck ID (can be subdeck or root deck)
     """
     subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
 
@@ -187,20 +190,21 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
             remove_block_exam_subdeck_config(subdeck_config)
         return
 
-    # Get the root deck ID from the subdeck hierarchy
     root_deck_id = get_root_deck_id_from_subdeck(subdeck_id)
+    if root_deck_id == subdeck_id:
+        LOGGER.warning("Deck is already a root deck", subdeck_id=subdeck_id)
+    else:
+        note_ids = note_ids_in_deck_hierarchy(subdeck_id)
+        if note_ids:
+            move_notes_to_decks_while_respecting_odid({nid: root_deck_id for nid in note_ids})
+            LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=len(note_ids))
 
-    note_ids = note_ids_in_deck_hierarchy(subdeck_id)
-    if note_ids:
-        move_notes_to_decks_while_respecting_odid({nid: root_deck_id for nid in note_ids})
-        LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=len(note_ids))
+        aqt.mw.col.decks.remove([subdeck_id])
 
-    aqt.mw.col.decks.remove([subdeck_id])
+        LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
 
     if subdeck_config:
         remove_block_exam_subdeck_config(subdeck_config)
-
-    LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
 
 
 def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: str) -> None:

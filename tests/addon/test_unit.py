@@ -3608,21 +3608,6 @@ class TestHandleExpiredSubdeck:
 
         mock_remove_config.assert_called_once_with(subdeck_config)
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
-    @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_is_not_subdeck(self, mock_aqt, mock_remove_config):
-        """Test handling when deck exists but is not a subdeck (top-level deck)."""
-        # Deck exists but has no "::" in name (not a subdeck)
-        mock_top_level_deck = {"name": "TopLevelDeck", "id": 456}
-        mock_aqt.mw.col.decks.get.return_value = mock_top_level_deck
-
-        subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
-
-        handle_expired_subdeck(subdeck_config)
-
-        # Should remove config since it's not actually a subdeck
-        mock_remove_config.assert_called_once_with(subdeck_config)
-
 
 class TestCheckAndHandleBlockExamSubdeckDueDates:
     """Tests for check_and_handle_block_exam_subdeck_due_dates function."""

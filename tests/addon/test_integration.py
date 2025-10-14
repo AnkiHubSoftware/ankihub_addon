@@ -8945,19 +8945,16 @@ class TestBlockExamSubdecks:
     def test_move_subdeck_to_main_deck_without_config(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
         add_anki_note: AddAnkiNote,
     ):
         """Test removing a regular subdeck that doesn't have a BlockExamSubdeckConfig."""
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            deck_config = config.deck_config(ah_did)
-            main_deck_id = deck_config.anki_id
+            main_deck_id = create_anki_deck("Test Deck")
             main_deck_name = aqt.mw.col.decks.name_if_exists(main_deck_id)
 
-            # Create a regular subdeck manually
+            # Create a regular subdeck
             subdeck_name = f"{main_deck_name}::Regular Subdeck"
-            subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id)
+            subdeck_id = create_anki_deck(subdeck_name)
 
             # Add a note to the subdeck
             note = add_anki_note(anki_did=subdeck_id)
@@ -8975,6 +8972,39 @@ class TestBlockExamSubdecks:
 
             # Verify subdeck was deleted
             assert aqt.mw.col.decks.id_for_name(subdeck_name) is None
+
+    def test_move_subdeck_to_main_deck_already_root_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Test calling move_subdeck_to_main_deck on a root deck only removes config."""
+        with anki_session_with_addon_data.profile_loaded():
+            root_deck_id = create_anki_deck("Test Deck")
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+
+            # Add a BlockExamSubdeckConfig for the root deck
+            subdeck_config = BlockExamSubdeckConfig(subdeck_id=root_deck_id, due_date="2024-12-31")
+            config.upsert_block_exam_subdeck(subdeck_config)
+
+            # Add a note to the root deck
+            note = add_anki_note(anki_did=root_deck_id)
+
+            # Verify config exists
+            assert config.get_block_exam_subdeck_config(root_deck_id) is not None
+
+            # Call move_subdeck_to_main_deck on the root deck
+            move_subdeck_to_main_deck(root_deck_id)
+
+            # Verify note stayed in the same deck (not moved)
+            note = aqt.mw.col.get_note(note.id)
+            assert note.cards()[0].did == root_deck_id
+
+            # Verify root deck still exists (not deleted)
+            assert aqt.mw.col.decks.name_if_exists(root_deck_id) == root_deck_name
+
+            # Verify config was removed
+            assert config.get_block_exam_subdeck_config(root_deck_id) is None
 
 
 class TestBlockExamSubdeckDialog:
