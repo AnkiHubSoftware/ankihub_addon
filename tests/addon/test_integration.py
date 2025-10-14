@@ -8976,40 +8976,6 @@ class TestBlockExamSubdecks:
             # Verify subdeck was deleted
             assert aqt.mw.col.decks.id_for_name(subdeck_name) is None
 
-    def test_uninstall_deck_removes_block_exam_subdeck_configs(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-    ):
-        """Test that uninstalling a deck removes all its block exam subdeck configs."""
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            deck_config = config.deck_config(ah_did)
-            root_deck_id = deck_config.anki_id
-
-            # Create multiple block exam subdecks with due dates
-            due_date1 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            due_date2 = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
-            subdeck_name1, _ = create_block_exam_subdeck(root_deck_id, "Subdeck 1", due_date1)
-            subdeck_name2, _ = create_block_exam_subdeck(root_deck_id, "Subdeck 2", due_date2)
-
-            # Verify configs exist
-            main_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
-            subdeck_id1 = aqt.mw.col.decks.id_for_name(f"{main_deck_name}::{subdeck_name1}")
-            subdeck_id2 = aqt.mw.col.decks.id_for_name(f"{main_deck_name}::{subdeck_name2}")
-
-            subdeck_config1 = config.get_block_exam_subdeck_config(subdeck_id1)
-            subdeck_config2 = config.get_block_exam_subdeck_config(subdeck_id2)
-            assert subdeck_config1 and subdeck_config1.due_date == due_date1
-            assert subdeck_config2 and subdeck_config2.due_date == due_date2
-
-            # Uninstall the deck
-            uninstall_deck(ah_did)
-
-            # Verify all subdeck configs were removed
-            assert config.get_block_exam_subdeck_config(subdeck_id1) is None
-            assert config.get_block_exam_subdeck_config(subdeck_id2) is None
-
 
 class TestBlockExamSubdeckDialog:
     def setup_method(self):

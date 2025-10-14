@@ -527,26 +527,6 @@ class _Config:
         self._private_config.block_exams_subdecks = updated_configs
         self._update_private_config()
 
-    def remove_all_block_exam_subdecks_for_deck(self, root_deck_id: DeckId) -> None:
-        """Remove all block exam subdeck configs for a given root deck.
-
-        Args:
-            root_deck_id: The root deck ID
-        """
-        original_count = len(self.get_block_exam_subdecks())
-
-        descendant_ids = [id for _, id in aqt.mw.col.decks.children(root_deck_id)]
-        updated_configs = [sc for sc in self.get_block_exam_subdecks() if sc.subdeck_id not in descendant_ids]
-
-        self._private_config.block_exams_subdecks = updated_configs
-        self._update_private_config()
-
-        LOGGER.info(
-            "Removed all block exam subdeck configs for deck",
-            root_deck_id=root_deck_id,
-            count=original_count - len(updated_configs),
-        )
-
     def is_logged_in(self) -> bool:
         return bool(self.token())
 
