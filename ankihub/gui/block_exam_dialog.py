@@ -38,6 +38,10 @@ class BlockExamSubdeckDialog(QDialog):
     def __init__(self, root_deck_id: DeckId, note_ids: List[NoteId], parent=None):
         super().__init__(parent)
         self.root_deck_id = root_deck_id
+        self.root_deck = aqt.mw.col.decks.get(root_deck_id, default=False)
+        if not self.root_deck:
+            raise ValueError(f"Root deck with ID {root_deck_id} not found")
+
         self.note_ids = note_ids
         self.selected_subdeck_name: Optional[str] = None
         self.selected_subdeck_id: Optional[DeckId] = None
@@ -46,12 +50,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.setMinimumWidth(440)
 
         # Check if user has existing subdecks to determine entry point
-        root_deck = aqt.mw.col.decks.get(root_deck_id, default=False)
-        has_subdecks = False
-
-        if root_deck:
-            # Check if there are any subdecks under the root deck
-            has_subdecks = len(list(aqt.mw.col.decks.children(root_deck_id))) > 0
+        has_subdecks = len(list(aqt.mw.col.decks.children(root_deck_id))) > 0
 
         layout = QVBoxLayout()
         self.setLayout(layout)
@@ -369,18 +368,11 @@ class BlockExamSubdeckDialog(QDialog):
         """Populate the subdeck list widget."""
         self.subdeck_list.clear()
 
-        # Get the root deck
-        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
-        if not root_deck:
-            return
-
-        root_deck_name = root_deck["name"]
-
         # Get ALL subdecks under the root deck (including nested ones)
         all_subdecks = []
 
         for deck_name, deck_id in aqt.mw.col.decks.children(self.root_deck_id):
-            subdeck_path = deck_name[len(root_deck_name) + 2 :]
+            subdeck_path = deck_name[len(self.root_deck["name"]) + 2 :]
             all_subdecks.append((subdeck_path, deck_id))
 
         # Sort subdecks alphabetically by name
@@ -447,14 +439,7 @@ class BlockExamSubdeckDialog(QDialog):
         due_date = self.date_input.date().toString("yyyy-MM-dd")
 
         # Check if subdeck already exists
-        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
-        if not root_deck:
-            showInfo("Error: Root deck not found.")
-            return
-
-        root_deck_name = root_deck["name"]
-
-        full_name = f"{root_deck_name}::{name}"
+        full_name = f"{self.root_deck['name']}::{name}"
 
         if aqt.mw.col.decks.by_name(full_name):
             self._show_subdeck_conflict_screen(name)
@@ -487,14 +472,10 @@ class BlockExamSubdeckDialog(QDialog):
         # Check if subdeck name needs to be updated
         if new_name != self.selected_subdeck_name:
             # Check if new name conflicts with existing subdeck
-            root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
-            if root_deck:
-                root_deck_name = root_deck["name"]
-                # Handle full subdeck path for multi-level subdecks
-                new_full_name = f"{root_deck_name}::{new_name}"
-                if aqt.mw.col.decks.by_name(new_full_name):
-                    showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
-                    return
+            new_full_name = f"{self.root_deck['name']}::{new_name}"
+            if aqt.mw.col.decks.by_name(new_full_name):
+                showInfo(f"A subdeck with name '{new_name}' already exists. Please choose a different name.")
+                return
 
             self._rename_subdeck(self.selected_subdeck_name, new_name)
             self.selected_subdeck_name = new_name
@@ -512,12 +493,7 @@ class BlockExamSubdeckDialog(QDialog):
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
-        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
-        if not root_deck:
-            raise ValueError("Root deck not found")
-
-        root_deck_name = root_deck["name"]
-
+        root_deck_name = self.root_deck["name"]
         old_full_name = f"{root_deck_name}::{old_subdeck_path}"
         new_full_name = f"{root_deck_name}::{new_subdeck_path}"
 
@@ -555,14 +531,7 @@ class BlockExamSubdeckDialog(QDialog):
     def _handle_conflict_merge(self, conflicting_name: str):
         """Handle merging into existing subdeck directly."""
         # Find subdeck ID for the existing subdeck
-        root_deck = aqt.mw.col.decks.get(self.root_deck_id, default=False)
-        if not root_deck:
-            showInfo("Error: Root deck not found.")
-            return
-
-        root_deck_name = root_deck["name"]
-
-        full_name = f"{root_deck_name}::{conflicting_name}"
+        full_name = f"{self.root_deck['name']}::{conflicting_name}"
         subdeck = aqt.mw.col.decks.by_name(full_name)
         if not subdeck:
             showInfo("Error: Could not find the existing subdeck.")
