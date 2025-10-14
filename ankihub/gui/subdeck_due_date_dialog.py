@@ -101,6 +101,12 @@ class SubdeckDueDateDialog(QDialog):
         self.move_to_main_button = QPushButton("Move to main deck")
         qconnect(self.move_to_main_button.clicked, self._on_move_to_main_deck)
         self.move_to_main_button.setDefault(True)
+
+        has_parents = bool(aqt.mw.col.decks.parents(self.subdeck_config.subdeck_id))
+        self.move_to_main_button.setEnabled(has_parents)
+        if not has_parents:
+            self.move_to_main_button.setToolTip("The deck is already a top-level deck")
+
         button_layout.addWidget(self.move_to_main_button)
 
         main_layout.addLayout(button_layout)
