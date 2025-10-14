@@ -34,10 +34,10 @@ _subdeck_due_date_dialog_state = _SubdeckDueDateDialogState()
 class SubdeckDueDateDialog(QDialog):
     """Dialog shown when a block exam subdeck's due date is reached."""
 
-    def __init__(self, subdeck_config: BlockExamSubdeckConfig, subdeck_name: str, parent=None):
+    def __init__(self, subdeck_config: BlockExamSubdeckConfig, parent=None):
         super().__init__(parent)
         self.subdeck_config = subdeck_config
-        self.subdeck_name = subdeck_name
+        self.subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -125,7 +125,6 @@ class SubdeckDueDateDialog(QDialog):
     def _show_date_picker(self):
         """Show date picker dialog."""
         date_picker_dialog = DatePickerDialog(
-            self.subdeck_name,
             self.subdeck_config.subdeck_id,
             self.subdeck_config.due_date,
             parent=self,
@@ -139,14 +138,13 @@ class DatePickerDialog(QDialog):
 
     def __init__(
         self,
-        subdeck_name: str,
         subdeck_id: DeckId,
         initial_due_date: Optional[str] = None,
         parent=None,
     ):
         super().__init__(parent)
-        self.subdeck_name = subdeck_name
         self.subdeck_id = subdeck_id
+        self.subdeck_name = get_subdeck_name_without_parent(subdeck_id)
         self.initial_due_date = initial_due_date
         self.selected_date: Optional[str] = None
 
@@ -253,8 +251,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
         _show_next_expired_subdeck_dialog()
         return
 
-    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
-    dialog = SubdeckDueDateDialog(subdeck_config, subdeck_name, parent=aqt.mw)
+    dialog = SubdeckDueDateDialog(subdeck_config, parent=aqt.mw)
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.show()
 

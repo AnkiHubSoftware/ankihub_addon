@@ -55,10 +55,7 @@ def setup() -> None:
 
 
 def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: Optional[str]) -> None:
-    subdeck_name = get_subdeck_name_without_parent(subdeck_id)
-
     _dialog_state.dialog = DatePickerDialog(
-        subdeck_name=subdeck_name,
         subdeck_id=subdeck_id,
         initial_due_date=initial_due_date,
         parent=aqt.mw,
