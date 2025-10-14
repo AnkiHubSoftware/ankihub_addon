@@ -4,10 +4,10 @@
             "path": "/workspaces/ankihub_addon"
         },
         {
-            "path": "/workspaces/ankihub_addon/.venv/lib/python3.9/site-packages/anki"
+            "path": "/workspaces/ankihub_addon/.venv/lib/python3.13/site-packages/anki"
         },
         {
-            "path": "/workspaces/ankihub_addon/.venv/lib/python3.9/site-packages/aqt"
+            "path": "/workspaces/ankihub_addon/.venv/lib/python3.13/site-packages/aqt"
         }
     ],
     "settings": {
