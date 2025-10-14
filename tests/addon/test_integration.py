@@ -6940,6 +6940,7 @@ class TestFlashCardSelector:
         mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
 
 
+@pytest.mark.qt_no_exception_capture
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
