@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.9
+FROM mcr.microsoft.com/devcontainers/python:3.13
 
 # Install UV from the official distroless image with a pinned version
 COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
@@ -80,14 +80,14 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --dev --group production --group bundle
+    uv sync --locked --no-install-project --dev --group aqt --group bundle
 
 # This is copied last to take advantage of Docker layer caching.
 COPY . .
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --dev --group production --group bundle
+    uv sync --locked --dev --group aqt --group bundle
 
 # Install Anki
 ARG ANKI_DIR=/opt/anki

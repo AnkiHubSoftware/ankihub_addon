@@ -23,8 +23,10 @@ jobs:
         include:
           - aqt_dependency_group: aqt
             qt_package: pyqt6
+            python_version: 3.13.5
           - aqt_dependency_group: aqt_legacy
             qt_package: pyqt5
+            python_version: 3.9
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
@@ -36,7 +38,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version-file: ".python-version"
+          python-version: ${{ matrix.python_version }}
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
@@ -48,9 +50,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
