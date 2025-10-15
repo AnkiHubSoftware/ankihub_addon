@@ -18,7 +18,7 @@ from ..main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig
+from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 
 
 @dataclass
@@ -121,7 +121,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
-        set_subdeck_due_date(self.subdeck_config.subdeck_id, None)
+        set_subdeck_due_date(self.subdeck_config.subdeck_id, None, origin_hint=self.subdeck_config.config_origin)
         self.accept()
 
     def _on_set_new_due_date(self):
@@ -231,7 +231,7 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        set_subdeck_due_date(self.subdeck_id, selected_date_str)
+        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
         self.accept()

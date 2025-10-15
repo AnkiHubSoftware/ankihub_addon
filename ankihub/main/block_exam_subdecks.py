@@ -10,7 +10,7 @@ from anki.utils import ids2str
 from aqt.operations.scheduling import unsuspend_cards
 
 from .. import LOGGER
-from ..settings import BlockExamSubdeckConfig, config
+from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 from .utils import move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
 
 
@@ -28,7 +28,10 @@ def get_root_deck_id_from_subdeck(subdeck_id: DeckId) -> DeckId:
 
 
 def create_block_exam_subdeck(
-    root_deck_id: DeckId, subdeck_name: str, due_date: Optional[str] = None
+    root_deck_id: DeckId,
+    subdeck_name: str,
+    due_date: Optional[str],
+    origin_hint: BlockExamSubdeckConfigOrigin,
 ) -> Tuple[str, bool]:
     """Create a new block exam subdeck.
 
@@ -36,6 +39,7 @@ def create_block_exam_subdeck(
         root_deck_id: The ID of the root deck
         subdeck_name: Name of the subdeck (without parent deck prefix)
         due_date: Due date for the subdeck in YYYY-MM-DD format
+        origin_hint: Origin of this subdeck creation
 
     Returns:
         Tuple of (actual_subdeck_name, was_renamed)
@@ -65,8 +69,12 @@ def create_block_exam_subdeck(
     subdeck["conf"] = root_deck["conf"]
     aqt.mw.col.decks.update(subdeck)
 
-    config_item = BlockExamSubdeckConfig(subdeck_id=subdeck_id, due_date=due_date)
-    config.upsert_block_exam_subdeck(config_item)
+    # Save configuration
+    config.upsert_block_exam_subdeck(
+        subdeck_id,
+        due_date=due_date,
+        origin_hint=origin_hint,
+    )
 
     LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, subdeck_id=subdeck_id, due_date=due_date)
 
@@ -77,7 +85,8 @@ def add_notes_to_block_exam_subdeck(
     root_deck_id: DeckId,
     subdeck_name: str,
     note_ids: List[NoteId],
-    due_date: Optional[str] = None,
+    due_date: Optional[str],
+    origin_hint: BlockExamSubdeckConfigOrigin,
     unsuspend_notes: bool = False,
 ) -> int:
     """Add notes to a block exam subdeck and update configuration.
@@ -87,6 +96,7 @@ def add_notes_to_block_exam_subdeck(
         subdeck_name: Name of the subdeck (without parent deck prefix)
         note_ids: List of note IDs to add to the subdeck
         due_date: Due date for the subdeck in YYYY-MM-DD format
+        origin_hint: Origin of this subdeck operation
         unsuspend_notes: Whether to unsuspend the notes after adding them
 
     Returns:
@@ -128,9 +138,12 @@ def add_notes_to_block_exam_subdeck(
         if card_ids:
             unsuspend_cards(parent=aqt.mw, card_ids=card_ids).run_in_background()
 
-    # Update configuration with due date
-    config_item = BlockExamSubdeckConfig(subdeck_id=subdeck["id"], due_date=due_date)
-    config.upsert_block_exam_subdeck(config_item)
+    # Update configuration
+    config.upsert_block_exam_subdeck(
+        subdeck["id"],
+        due_date=due_date,
+        origin_hint=origin_hint,
+    )
 
     LOGGER.info(
         "Added notes to block exam subdeck",
@@ -154,8 +167,10 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     today = date.today()
 
     for subdeck_config in config.get_block_exam_subdecks():
-        if not subdeck_config.due_date:
+        # Skip configs with no due date (e.g., user chose "Keep it" after expiry)
+        if subdeck_config.due_date is None:
             continue
+
         due_date = datetime.strptime(subdeck_config.due_date, "%Y-%m-%d").date()
 
         if today >= due_date:
@@ -205,12 +220,13 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
         remove_block_exam_subdeck_config(subdeck_config)
 
 
-def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: Optional[str]) -> None:
+def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: str, origin_hint: BlockExamSubdeckConfigOrigin) -> None:
     """Set a new due date for a block exam subdeck.
 
     Args:
         subdeck_id: The Anki subdeck ID
-        new_due_date: New due date in YYYY-MM-DD format, or None to clear the due date
+        new_due_date: New due date in YYYY-MM-DD format
+        origin_hint: Origin of this subdeck operation
 
     Raises:
         ValueError: If subdeck not found
@@ -220,10 +236,14 @@ def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: Optional[str]) -> Non
     if not subdeck:
         raise ValueError(f"Subdeck with ID {subdeck_id} not found")
 
-    old_due_date = config.get_block_exam_subdeck_due_date(subdeck_id)
+    existing_config = config.get_block_exam_subdeck_config(subdeck_id)
+    old_due_date = existing_config.due_date if existing_config else None
 
-    updated_config = BlockExamSubdeckConfig(subdeck_id=subdeck_id, due_date=new_due_date)
-    config.upsert_block_exam_subdeck(updated_config)
+    config.upsert_block_exam_subdeck(
+        subdeck_id,
+        due_date=new_due_date,
+        origin_hint=origin_hint,
+    )
 
     LOGGER.info(
         "Updated subdeck due date",

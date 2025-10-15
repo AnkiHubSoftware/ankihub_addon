@@ -28,7 +28,7 @@ from ..main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
 )
-from ..settings import config
+from ..settings import BlockExamSubdeckConfigOrigin, config
 from .utils import clear_layout
 
 
@@ -446,7 +446,12 @@ class BlockExamSubdeckDialog(QDialog):
             return
 
         # Create subdeck
-        actual_name, _ = create_block_exam_subdeck(self.root_deck_id, name, due_date)
+        actual_name, _ = create_block_exam_subdeck(
+            self.root_deck_id,
+            name,
+            due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+        )
 
         # Add notes to the new subdeck
         added_count = add_notes_to_block_exam_subdeck(
@@ -454,6 +459,7 @@ class BlockExamSubdeckDialog(QDialog):
             actual_name,
             self.note_ids,
             due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 
@@ -485,6 +491,7 @@ class BlockExamSubdeckDialog(QDialog):
             self.selected_subdeck_name,
             self.note_ids,
             due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 
@@ -513,13 +520,19 @@ class BlockExamSubdeckDialog(QDialog):
         # Use stored due date from the original screen
         due_date = getattr(self, "stored_due_date", (date.today() + timedelta(days=1)).strftime("%Y-%m-%d"))
 
-        actual_name, _ = create_block_exam_subdeck(self.root_deck_id, conflicting_name, due_date)
+        actual_name, _ = create_block_exam_subdeck(
+            self.root_deck_id,
+            conflicting_name,
+            due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+        )
 
         added_count = add_notes_to_block_exam_subdeck(
             self.root_deck_id,
             actual_name,
             self.note_ids,
             due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 
@@ -546,6 +559,7 @@ class BlockExamSubdeckDialog(QDialog):
             conflicting_name,
             self.note_ids,
             due_date,
+            origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
         )
 

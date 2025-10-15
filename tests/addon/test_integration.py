@@ -65,7 +65,6 @@ from ankihub.gui.optimize_fsrs_dialog import (
     maybe_show_fsrs_optimization_reminder,
 )
 from ankihub.main.block_exam_subdecks import (
-    BlockExamSubdeckConfig,
     add_notes_to_block_exam_subdeck,
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
@@ -223,6 +222,7 @@ from ankihub.settings import (
     MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
+    BlockExamSubdeckConfigOrigin,
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
@@ -4603,7 +4603,9 @@ def _setup_protected_deck_hierarchy(
 
         # Register core deck as exam subdeck
         core_id = aqt.mw.col.decks.id_for_name(core_name)
-        config.upsert_block_exam_subdeck(BlockExamSubdeckConfig(subdeck_id=core_id, due_date="2024-12-31"))
+        config.upsert_block_exam_subdeck(
+            core_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+        )
     elif deck_type == "filtered":
         # Create parent as normal deck
         create_anki_deck(parent_name)
@@ -4738,7 +4740,9 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # Create a block exam subdeck
             exam_subdeck_name = "Testdeck::ExamSubdeck"
             exam_subdeck_id = create_anki_deck(exam_subdeck_name)
-            config.upsert_block_exam_subdeck(BlockExamSubdeckConfig(subdeck_id=exam_subdeck_id, due_date="2024-12-31"))
+            config.upsert_block_exam_subdeck(
+                exam_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             # Create a note with subdeck tags directly in the exam subdeck
             note_info = NoteInfoFactory.create(tags=[f"{SUBDECK_TAG}::Testdeck::B"])
@@ -8492,7 +8496,9 @@ class TestBlockExamSubdecks:
 
             # Test creating a new subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            subdeck_name, was_renamed = create_block_exam_subdeck(root_deck_id, "Test Subdeck", due_date)
+            subdeck_name, was_renamed = create_block_exam_subdeck(
+                root_deck_id, "Test Subdeck", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             assert subdeck_name == "Test Subdeck"
             assert not was_renamed
@@ -8523,12 +8529,22 @@ class TestBlockExamSubdecks:
             root_deck_id = deck_config.anki_id
 
             # Create first subdeck
-            subdeck_name1, was_renamed1 = create_block_exam_subdeck(root_deck_id, "Test Subdeck")
+            subdeck_name1, was_renamed1 = create_block_exam_subdeck(
+                root_deck_id,
+                "Test Subdeck",
+                due_date=None,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
             assert subdeck_name1 == "Test Subdeck"
             assert not was_renamed1
 
             # Create second subdeck with same name
-            subdeck_name2, was_renamed2 = create_block_exam_subdeck(root_deck_id, "Test Subdeck")
+            subdeck_name2, was_renamed2 = create_block_exam_subdeck(
+                root_deck_id,
+                "Test Subdeck",
+                due_date=None,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
             assert subdeck_name2 == "Test Subdeck (1)"
             assert was_renamed2
 
@@ -8543,7 +8559,12 @@ class TestBlockExamSubdecks:
             root_deck_id = deck_config.anki_id
 
             # Create subdeck without due date
-            subdeck_name, was_renamed = create_block_exam_subdeck(root_deck_id, "No Date Subdeck")
+            subdeck_name, was_renamed = create_block_exam_subdeck(
+                root_deck_id,
+                "No Date Subdeck",
+                due_date=None,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
             assert subdeck_name == "No Date Subdeck"
             assert not was_renamed
 
@@ -8565,7 +8586,12 @@ class TestBlockExamSubdecks:
             # Try to create subdeck for non-existent deck
             fake_deck_id = DeckId(999999)
             with pytest.raises(ValueError, match="Root deck not found"):
-                create_block_exam_subdeck(fake_deck_id, "Test Subdeck")
+                create_block_exam_subdeck(
+                    fake_deck_id,
+                    "Test Subdeck",
+                    due_date=None,
+                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                )
 
     def test_add_notes_to_block_exam_subdeck(
         self,
@@ -8580,7 +8606,9 @@ class TestBlockExamSubdecks:
 
             # Create a subdeck first
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(root_deck_id, "Notes Subdeck", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                root_deck_id, "Notes Subdeck", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             # Create some notes
             note1 = add_anki_note(anki_did=root_deck_id)
@@ -8589,7 +8617,13 @@ class TestBlockExamSubdecks:
 
             # Add notes to subdeck with new due date
             new_due_date = (date.today() + timedelta(days=10)).strftime("%Y-%m-%d")
-            added_count = add_notes_to_block_exam_subdeck(root_deck_id, subdeck_name, note_ids, new_due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                root_deck_id,
+                subdeck_name,
+                note_ids,
+                new_due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Verify return value shows 2 notes were moved
             assert added_count == 2
@@ -8621,7 +8655,12 @@ class TestBlockExamSubdecks:
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(deck_config.anki_id, "Mixed Subdeck", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                deck_config.anki_id,
+                "Mixed Subdeck",
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Create 3 notes in parent deck
             note1 = add_anki_note(anki_did=deck_config.anki_id)
@@ -8630,13 +8669,23 @@ class TestBlockExamSubdecks:
 
             # Move 2 notes to subdeck first
             first_added = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id, subdeck_name, [note1.id, note2.id], due_date
+                deck_config.anki_id,
+                subdeck_name,
+                [note1.id, note2.id],
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
             assert first_added == 2
 
             # Now try to add all 3 notes - only note3 should be moved
             all_note_ids = [note1.id, note2.id, note3.id]
-            added_count = add_notes_to_block_exam_subdeck(deck_config.anki_id, subdeck_name, all_note_ids, due_date)
+            added_count = add_notes_to_block_exam_subdeck(
+                deck_config.anki_id,
+                subdeck_name,
+                all_note_ids,
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Verify return value shows only 1 note was moved (note3)
             assert added_count == 1
@@ -8665,7 +8714,12 @@ class TestBlockExamSubdecks:
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(deck_config.anki_id, "Unsuspend Test Subdeck", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                deck_config.anki_id,
+                "Unsuspend Test Subdeck",
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Create notes and suspend their cards
             note1 = add_anki_note(anki_did=deck_config.anki_id)
@@ -8682,7 +8736,12 @@ class TestBlockExamSubdecks:
 
             # Add notes to subdeck with unsuspend_notes=True
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id, subdeck_name, [note1.id, note2.id], due_date, unsuspend_notes=True
+                deck_config.anki_id,
+                subdeck_name,
+                [note1.id, note2.id],
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                unsuspend_notes=True,
             )
 
             assert added_count == 2
@@ -8708,7 +8767,12 @@ class TestBlockExamSubdecks:
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(deck_config.anki_id, "No Unsuspend Subdeck", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                deck_config.anki_id,
+                "No Unsuspend Subdeck",
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Create notes and suspend their cards
             note1 = add_anki_note(anki_did=deck_config.anki_id)
@@ -8725,7 +8789,11 @@ class TestBlockExamSubdecks:
 
             # Add notes to subdeck without unsuspend parameter (defaults to False)
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id, subdeck_name, [note1.id, note2.id], due_date
+                deck_config.anki_id,
+                subdeck_name,
+                [note1.id, note2.id],
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             assert added_count == 2
@@ -8752,7 +8820,12 @@ class TestBlockExamSubdecks:
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(deck_config.anki_id, "Partial Unsuspend Subdeck", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                deck_config.anki_id,
+                "Partial Unsuspend Subdeck",
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            )
 
             # Create 3 notes
             note1 = add_anki_note(anki_did=deck_config.anki_id)
@@ -8767,7 +8840,11 @@ class TestBlockExamSubdecks:
 
             # Add first 2 notes to subdeck without unsuspending
             first_added = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id, subdeck_name, [note1.id, note2.id], due_date
+                deck_config.anki_id,
+                subdeck_name,
+                [note1.id, note2.id],
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
             assert first_added == 2
 
@@ -8778,7 +8855,12 @@ class TestBlockExamSubdecks:
             # Now add all 3 notes with unsuspend_notes=True
             # Only note3 should be moved, but all 3 should be unsuspended
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id, subdeck_name, [note1.id, note2.id, note3.id], due_date, unsuspend_notes=True
+                deck_config.anki_id,
+                subdeck_name,
+                [note1.id, note2.id, note3.id],
+                due_date,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                unsuspend_notes=True,
             )
 
             assert added_count == 1  # Only note3 was moved
@@ -8799,7 +8881,13 @@ class TestBlockExamSubdecks:
             # Try to add notes for non-existent deck
             fake_deck_id = DeckId(999999)
             with pytest.raises(ValueError, match="Root deck not found"):
-                add_notes_to_block_exam_subdeck(fake_deck_id, "Non-existent", [NoteId(1), NoteId(2), NoteId(3)])
+                add_notes_to_block_exam_subdeck(
+                    fake_deck_id,
+                    "Non-existent",
+                    [NoteId(1), NoteId(2), NoteId(3)],
+                    due_date=None,
+                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                )
 
     def test_add_notes_subdeck_not_found(
         self,
@@ -8813,7 +8901,13 @@ class TestBlockExamSubdecks:
 
             # Try to add notes to non-existent subdeck
             with pytest.raises(ValueError, match="Subdeck .* not found"):
-                add_notes_to_block_exam_subdeck(root_deck_id, "Non-existent Subdeck", [NoteId(1), NoteId(2), NoteId(3)])
+                add_notes_to_block_exam_subdeck(
+                    root_deck_id,
+                    "Non-existent Subdeck",
+                    [NoteId(1), NoteId(2), NoteId(3)],
+                    due_date=None,
+                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                )
 
     def test_config_methods(
         self,
@@ -8825,32 +8919,37 @@ class TestBlockExamSubdecks:
 
             # Test adding configuration
             test_subdeck_id = DeckId(999)
-            config_item = BlockExamSubdeckConfig(subdeck_id=test_subdeck_id, due_date="2024-12-31")
-            config.upsert_block_exam_subdeck(config_item)
+            config.upsert_block_exam_subdeck(
+                test_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             # Test retrieving configuration
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
             assert configs[0].subdeck_id == test_subdeck_id
             assert configs[0].due_date == "2024-12-31"
+            assert configs[0].config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
 
             # Test getting config by subdeck_id
             subdeck_config = config.get_block_exam_subdeck_config(test_subdeck_id)
             assert subdeck_config is not None
             assert subdeck_config.due_date == "2024-12-31"
+            assert subdeck_config.config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
 
             # Test getting config for non-existent
             subdeck_config = config.get_block_exam_subdeck_config(DeckId(888))
             assert subdeck_config is None
 
-            # Test updating existing configuration
-            updated_config = BlockExamSubdeckConfig(subdeck_id=test_subdeck_id, due_date="2025-01-15")
-            config.upsert_block_exam_subdeck(updated_config)
+            # Test updating existing configuration (should preserve origin)
+            config.upsert_block_exam_subdeck(
+                test_subdeck_id, due_date="2025-01-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+            )
 
-            # Should still only have one config but with updated date
+            # Should still only have one config but with updated date and preserved origin
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
             assert configs[0].due_date == "2025-01-15"
+            assert configs[0].config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG  # Origin preserved
 
             # Test removing configuration
             config.remove_block_exam_subdeck(test_subdeck_id)
@@ -8883,7 +8982,7 @@ class TestBlockExamSubdecks:
 
             # Set due date on the regular subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            set_subdeck_due_date(subdeck_id, due_date)
+            set_subdeck_due_date(subdeck_id, due_date, origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
 
             # Verify config was created with the due date
             subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
@@ -8905,7 +9004,9 @@ class TestBlockExamSubdecks:
 
             # Create subdeck hierarchy: Main::Block Exam::Nested
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            subdeck_name, _ = create_block_exam_subdeck(main_deck_id, "Block Exam", due_date)
+            subdeck_name, _ = create_block_exam_subdeck(
+                main_deck_id, "Block Exam", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             subdeck_full_name = f"{main_deck_name}::{subdeck_name}"
             subdeck_id = aqt.mw.col.decks.id_for_name(subdeck_full_name)
@@ -9038,7 +9139,9 @@ class TestBlockExamSubdeckDialog:
             aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
-            config.upsert_block_exam_subdeck(BlockExamSubdeckConfig(subdeck_id=subdeck1_id, due_date="2024-12-31"))
+            config.upsert_block_exam_subdeck(
+                subdeck1_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             dialog = BlockExamSubdeckDialog(deck_config.anki_id, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
@@ -9146,14 +9249,13 @@ class TestCheckBlockExamSubdeckDueDates:
             future_date1 = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
             future_date2 = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
 
-            config_items = [
-                BlockExamSubdeckConfig(subdeck_id=DeckId(100), due_date=future_date1),
-                BlockExamSubdeckConfig(subdeck_id=DeckId(200), due_date=future_date2),
-            ]
-
             # Add configurations
-            for config_item in config_items:
-                config.upsert_block_exam_subdeck(config_item)
+            config.upsert_block_exam_subdeck(
+                DeckId(100), due_date=future_date1, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
+            config.upsert_block_exam_subdeck(
+                DeckId(200), due_date=future_date2, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             expired = check_block_exam_subdeck_due_dates()
             assert expired == []
@@ -9170,18 +9272,16 @@ class TestCheckBlockExamSubdeckDueDates:
             today_date = date.today().strftime("%Y-%m-%d")
             future_date = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            config_items = [
-                BlockExamSubdeckConfig(subdeck_id=DeckId(1), due_date=past_date),
-                BlockExamSubdeckConfig(
-                    subdeck_id=DeckId(2),
-                    due_date=today_date,  # Today counts as expired (>= today)
-                ),
-                BlockExamSubdeckConfig(subdeck_id=DeckId(3), due_date=future_date),
-            ]
-
             # Add configurations
-            for config_item in config_items:
-                config.upsert_block_exam_subdeck(config_item)
+            config.upsert_block_exam_subdeck(
+                DeckId(1), due_date=past_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
+            config.upsert_block_exam_subdeck(
+                DeckId(2), due_date=today_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
+            config.upsert_block_exam_subdeck(
+                DeckId(3), due_date=future_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            )
 
             expired = check_block_exam_subdeck_due_dates()
 

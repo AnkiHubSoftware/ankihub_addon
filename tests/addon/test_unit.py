@@ -37,7 +37,7 @@ from ankihub.main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ankihub.settings import BlockExamSubdeckConfig
+from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
 
 from ..factories import (
     AnkiHubImportResultFactory,
@@ -2349,10 +2349,14 @@ class TestPrivateConfigMigrations:
             valid_due_date1 = "2025-12-31"
             valid_due_date2 = "2026-01-15"
             config.upsert_block_exam_subdeck(
-                BlockExamSubdeckConfig(subdeck_id=DeckId(subdeck1_id), due_date=valid_due_date1)
+                DeckId(subdeck1_id),
+                due_date=valid_due_date1,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
             config.upsert_block_exam_subdeck(
-                BlockExamSubdeckConfig(subdeck_id=DeckId(subdeck2_id), due_date=valid_due_date2)
+                DeckId(subdeck2_id),
+                due_date=valid_due_date2,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Verify valid configs were added

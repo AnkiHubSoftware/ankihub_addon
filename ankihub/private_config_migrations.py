@@ -145,6 +145,7 @@ def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> N
     for subdeck in block_exams_subdecks:
         subdeck_id = subdeck.get("subdeck_id", None)
         due_date = subdeck.get("due_date", None)
+        config_origin = subdeck.get("config_origin", None)
 
         # Validate due_date format (should be YYYY-MM-DD or None)
         is_valid_due_date = due_date is None
@@ -157,8 +158,9 @@ def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> N
 
         # Keep only configs where:
         # 1. Subdeck exists in Anki collection
-        # 2. Has a valid due date (including None)
-        if subdeck_id in all_anki_deck_ids and is_valid_due_date:
+        # 2. Has a valid due date (or None)
+        # 3. Has a config_origin
+        if subdeck_id in all_anki_deck_ids and is_valid_due_date and config_origin is not None:
             filtered_subdecks.append(subdeck)
         else:
             removed_count += 1
