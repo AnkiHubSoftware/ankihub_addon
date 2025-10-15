@@ -33,12 +33,12 @@ def create_block_exam_subdeck(
     due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
 ) -> Tuple[str, bool]:
-    """Create a new block exam subdeck.
+    """Create a new block exam subdeck and its configuration.
 
     Args:
         root_deck_id: The ID of the root deck
         subdeck_name: Name of the subdeck (without parent deck prefix)
-        due_date: Due date for the subdeck in YYYY-MM-DD format
+        due_date: Due date for the subdeck in YYYY-MM-DD format, or None
         origin_hint: Origin of this subdeck creation
 
     Returns:
@@ -89,13 +89,15 @@ def add_notes_to_block_exam_subdeck(
     origin_hint: BlockExamSubdeckConfigOrigin,
     unsuspend_notes: bool = False,
 ) -> int:
-    """Add notes to a block exam subdeck and update configuration.
+    """Add notes to a block exam subdeck and create/update its configuration.
+
+    A configuration entry is created if it doesn't exist, or updated if it does.
 
     Args:
         root_deck_id: The ID of the root deck
         subdeck_name: Name of the subdeck (without parent deck prefix)
         note_ids: List of note IDs to add to the subdeck
-        due_date: Due date for the subdeck in YYYY-MM-DD format
+        due_date: Due date for the subdeck in YYYY-MM-DD format, or None
         origin_hint: Origin of this subdeck operation
         unsuspend_notes: Whether to unsuspend the notes after adding them
 
@@ -222,12 +224,14 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
 def set_subdeck_due_date(
     subdeck_id: DeckId, new_due_date: Optional[str], origin_hint: BlockExamSubdeckConfigOrigin
 ) -> None:
-    """Set a new due date for a block exam subdeck.
+    """Set or clear the due date for a block exam subdeck.
+
+    A configuration entry is created if it doesn't exist.
 
     Args:
         subdeck_id: The Anki subdeck ID
         new_due_date: New due date in YYYY-MM-DD format, or None to clear the due date
-        origin_hint: Origin of this subdeck operation
+        origin_hint: Origin of this subdeck operation (used only if creating a new config)
 
     Raises:
         ValueError: If subdeck not found
