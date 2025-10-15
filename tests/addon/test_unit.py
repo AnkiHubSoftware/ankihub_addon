@@ -34,7 +34,6 @@ from ankihub.gui.subdeck_due_date_dialog import (
 )
 from ankihub.main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
-    remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
 from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
@@ -3518,8 +3517,9 @@ class TestMoveSubdeckToMainDeck:
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
         mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        move_subdeck_to_main_deck(DeckId(456))
+        result = move_subdeck_to_main_deck(DeckId(456))
 
+        assert result == 3  # Should return the number of notes moved
         mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
@@ -3540,8 +3540,9 @@ class TestMoveSubdeckToMainDeck:
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
         mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        move_subdeck_to_main_deck(DeckId(456))
+        result = move_subdeck_to_main_deck(DeckId(456))
 
+        assert result == 0  # Should return 0 when subdeck not found
         mock_remove_config.assert_called_once_with(subdeck_config)
 
 
@@ -3567,19 +3568,6 @@ class TestSetSubdeckDueDate:
         mock_config.upsert_block_exam_subdeck.assert_called_once_with(
             DeckId(456), due_date="2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
         )
-
-
-class TestRemoveBlockExamSubdeckConfig:
-    """Tests for remove_block_exam_subdeck_config function."""
-
-    @patch("ankihub.main.block_exam_subdecks.config")
-    def test_remove_block_exam_subdeck_config(self, mock_config, next_deterministic_uuid):
-        """Test removing a block exam subdeck configuration."""
-        subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
-
-        remove_block_exam_subdeck_config(subdeck_config)
-
-        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
 
 
 class TestHandleExpiredSubdeck:
