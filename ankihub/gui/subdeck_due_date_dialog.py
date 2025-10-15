@@ -168,7 +168,7 @@ class DatePickerDialog(QDialog):
         main_layout.setSpacing(12)
 
         # Title
-        title_label = QLabel("Reschedule due date")
+        title_label = QLabel("Set due date")
         title_font = title_label.font()
         title_font.setBold(True)
         title_font.setPointSize(title_font.pointSize() + 2)
