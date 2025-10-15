@@ -7,7 +7,7 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
-from aqt.qt import QDialog, QDialogButtonBox
+from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -99,7 +99,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
 
 
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
-    action = menu.addAction("Ankihub: Update due date")
+    action = menu.addAction("Set due date")
 
     initial_due_date = config.get_block_exam_subdeck_due_date(subdeck_did)
 
@@ -111,7 +111,7 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
 
 
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
-    action = menu.addAction("Ankihub: Remove subdeck")
+    action = menu.addAction("Merge into parent deck")
 
     action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
     qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_did))
@@ -124,6 +124,17 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
 
     def on_access_granted(_: dict) -> None:
         menu.setToolTipsVisible(True)
+
+        menu.addSeparator()
+
+        # Add AnkiHub section header
+        label_action = menu.addAction("ANKIHUB")
+        label_action.setEnabled(False)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        label_action.setFont(font)
+
         _setup_update_subdeck_due_date(menu, DeckId(deck_id))
         _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
 
