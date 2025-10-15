@@ -167,7 +167,6 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     today = date.today()
 
     for subdeck_config in config.get_block_exam_subdecks():
-        # Skip configs with no due date (e.g., user chose "Keep it" after expiry)
         if subdeck_config.due_date is None:
             continue
 
@@ -220,12 +219,14 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
         remove_block_exam_subdeck_config(subdeck_config)
 
 
-def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: str, origin_hint: BlockExamSubdeckConfigOrigin) -> None:
+def set_subdeck_due_date(
+    subdeck_id: DeckId, new_due_date: Optional[str], origin_hint: BlockExamSubdeckConfigOrigin
+) -> None:
     """Set a new due date for a block exam subdeck.
 
     Args:
         subdeck_id: The Anki subdeck ID
-        new_due_date: New due date in YYYY-MM-DD format
+        new_due_date: New due date in YYYY-MM-DD format, or None to clear the due date
         origin_hint: Origin of this subdeck operation
 
     Raises:

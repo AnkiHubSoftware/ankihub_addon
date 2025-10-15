@@ -3553,12 +3553,20 @@ class TestSetSubdeckDueDate:
     def test_set_subdeck_due_date_success(self, mock_config, mock_aqt):
         """Test successfully setting a new due date."""
         mock_aqt.mw.col.decks.get.return_value = {"name": "Test Subdeck"}  # Mock subdeck exists
-        mock_config.get_block_exam_subdeck_due_date.return_value = "2024-12-31"
 
-        set_subdeck_due_date(DeckId(456), "2025-06-15")
+        # Mock existing config to return an old due date
+        existing_config = BlockExamSubdeckConfig(
+            subdeck_id=DeckId(456),
+            due_date="2024-12-31",
+            config_origin=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+        )
+        mock_config.get_block_exam_subdeck_config.return_value = existing_config
 
-        expected_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2025-06-15")
-        mock_config.upsert_block_exam_subdeck.assert_called_once_with(expected_config)
+        set_subdeck_due_date(DeckId(456), "2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+
+        mock_config.upsert_block_exam_subdeck.assert_called_once_with(
+            DeckId(456), due_date="2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+        )
 
 
 class TestRemoveBlockExamSubdeckConfig:
