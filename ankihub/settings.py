@@ -171,7 +171,7 @@ class DeckExtensionConfig(DataClassJSONMixin):
 @dataclass
 class BlockExamSubdeckConfig(DataClassJSONMixin):
     subdeck_id: DeckId
-    due_date: Optional[str]  # YYYY-MM-DD format
+    due_date: Optional[str] = None  # YYYY-MM-DD format
 
 
 @dataclass
