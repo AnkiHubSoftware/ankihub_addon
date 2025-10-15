@@ -114,8 +114,8 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
-        tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
+        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
+        tooltip(f"{note_count} notes merged into the parent deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
 

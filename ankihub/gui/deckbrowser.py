@@ -70,24 +70,24 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        move_subdeck_to_main_deck(subdeck_id)
+        note_count = move_subdeck_to_main_deck(subdeck_id)
         aqt.mw.deckBrowser.refresh()
 
-        show_tooltip("Subdeck removed and notes moved to main deck", parent=aqt.mw)
+        show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)
 
     show_dialog(
         text=(
             "<span style='font-size: 16px; font-weight: bold;'>"
-            "Are you sure you want to remove the subdeck?"
+            "Are you sure you want to merge this subdeck?"
             "</span>"
             "<br><br>"
-            f"Removing the subdeck <b>{subdeck_name}</b> will move all its notes, "
+            f"Merging the subdeck <b>{subdeck_name}</b> will move all its notes, "
             "including those from nested subdecks, back to the main deck."
         ),
         title="AnkiHub | Subdecks",
         buttons=[
             ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
-            ("Remove subdeck", QDialogButtonBox.ButtonRole.AcceptRole),
+            ("Merge subdeck", QDialogButtonBox.ButtonRole.AcceptRole),
         ],
         default_button_idx=1,
         callback=on_button_clicked,
