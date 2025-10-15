@@ -65,10 +65,8 @@ def create_block_exam_subdeck(
     subdeck["conf"] = root_deck["conf"]
     aqt.mw.col.decks.update(subdeck)
 
-    # Save configuration if due date provided
-    if due_date:
-        config_item = BlockExamSubdeckConfig(subdeck_id=subdeck_id, due_date=due_date)
-        config.upsert_block_exam_subdeck(config_item)
+    config_item = BlockExamSubdeckConfig(subdeck_id=subdeck_id, due_date=due_date)
+    config.upsert_block_exam_subdeck(config_item)
 
     LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, subdeck_id=subdeck_id, due_date=due_date)
 
@@ -131,9 +129,8 @@ def add_notes_to_block_exam_subdeck(
             unsuspend_cards(parent=aqt.mw, card_ids=card_ids).run_in_background()
 
     # Update configuration with due date
-    if due_date:
-        config_item = BlockExamSubdeckConfig(subdeck_id=subdeck["id"], due_date=due_date)
-        config.upsert_block_exam_subdeck(config_item)
+    config_item = BlockExamSubdeckConfig(subdeck_id=subdeck["id"], due_date=due_date)
+    config.upsert_block_exam_subdeck(config_item)
 
     LOGGER.info(
         "Added notes to block exam subdeck",
