@@ -208,12 +208,12 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
         remove_block_exam_subdeck_config(subdeck_config)
 
 
-def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: str) -> None:
+def set_subdeck_due_date(subdeck_id: DeckId, new_due_date: Optional[str]) -> None:
     """Set a new due date for a block exam subdeck.
 
     Args:
         subdeck_id: The Anki subdeck ID
-        new_due_date: New due date in YYYY-MM-DD format
+        new_due_date: New due date in YYYY-MM-DD format, or None to clear the due date
 
     Raises:
         ValueError: If subdeck not found

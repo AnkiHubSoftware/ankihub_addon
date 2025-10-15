@@ -2334,7 +2334,6 @@ class TestPrivateConfigMigrations:
 
         Tests that migration correctly:
         - Preserves valid configs added via proper API
-        - Removes configs with None/missing due dates
         - Removes configs with invalid date formats (e.g., "invalid-date", "2025/01/01")
         - Removes configs for non-existent Anki subdecks
         """
@@ -2364,7 +2363,6 @@ class TestPrivateConfigMigrations:
 
             # Inject multiple invalid configs into the config file
             self._inject_subdeck_configs_to_file(
-                {"subdeck_id": subdeck1_id, "due_date": None},  # None due date
                 {"subdeck_id": subdeck1_id, "due_date": "invalid-date"},  # Invalid format
                 {"subdeck_id": subdeck2_id, "due_date": "2025/01/01"},  # Wrong format (slashes)
                 {"subdeck_id": fake_subdeck_id, "due_date": "2025-12-31"},  # Non-existent subdeck

@@ -121,7 +121,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
-        remove_block_exam_subdeck_config(self.subdeck_config)
+        set_subdeck_due_date(self.subdeck_config.subdeck_id, None)
         self.accept()
 
     def _on_set_new_due_date(self):

@@ -131,7 +131,7 @@ def _move_credentials_to_profile_config(
 
 
 def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> None:
-    """Remove invalid block exam subdeck configs (non-existent subdecks, missing/invalid due dates)."""
+    """Remove invalid block exam subdeck configs (non-existent subdecks, invalid due date formats)."""
 
     block_exams_subdecks = private_config_dict.get("block_exams_subdecks", [])
     if not block_exams_subdecks:
@@ -146,8 +146,8 @@ def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> N
         subdeck_id = subdeck.get("subdeck_id", None)
         due_date = subdeck.get("due_date", None)
 
-        # Validate due_date format (should be YYYY-MM-DD)
-        is_valid_due_date = False
+        # Validate due_date format (should be YYYY-MM-DD or None)
+        is_valid_due_date = due_date is None
         if due_date is not None:
             try:
                 datetime.strptime(due_date, "%Y-%m-%d")
@@ -157,7 +157,7 @@ def _remove_invalid_block_exams_subdecks_configs(private_config_dict: Dict) -> N
 
         # Keep only configs where:
         # 1. Subdeck exists in Anki collection
-        # 2. Has a valid due date
+        # 2. Has a valid due date (including None)
         if subdeck_id in all_anki_deck_ids and is_valid_due_date:
             filtered_subdecks.append(subdeck)
         else:
