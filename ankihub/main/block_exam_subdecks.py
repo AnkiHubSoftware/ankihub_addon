@@ -169,9 +169,8 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     today = date.today()
 
     for subdeck_config in config.get_block_exam_subdecks():
-        if subdeck_config.due_date is None:
+        if not subdeck_config.due_date:
             continue
-
         due_date = datetime.strptime(subdeck_config.due_date, "%Y-%m-%d").date()
 
         if today >= due_date:
