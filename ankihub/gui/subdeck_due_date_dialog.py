@@ -122,6 +122,7 @@ class SubdeckDueDateDialog(QDialog):
         """Handle keeping subdeck unchanged."""
         set_subdeck_due_date(self.subdeck_config.subdeck_id, None, origin_hint=self.subdeck_config.config_origin)
         self.accept()
+        tooltip(f"<b>{self.subdeck_name}</b> kept with no due date set.", parent=aqt.mw)
 
     def _on_set_new_due_date(self):
         """Handle setting a new due date."""
