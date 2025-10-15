@@ -15,7 +15,6 @@ from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
-    remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
 from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
@@ -214,6 +213,12 @@ class DatePickerDialog(QDialog):
         qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
+        # Remove due date button (only show if subdeck has a due date)
+        if self.initial_due_date:
+            remove_due_date_button = QPushButton("Remove due date")
+            qconnect(remove_due_date_button.clicked, self._on_remove_due_date)
+            button_layout.addWidget(remove_due_date_button)
+
         # Confirm button
         confirm_button = QPushButton("Save")
         qconnect(confirm_button.clicked, self._on_confirm)
@@ -238,6 +243,11 @@ class DatePickerDialog(QDialog):
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
         self.accept()
 
+    def _on_remove_due_date(self):
+        """Handle removing the due date from the subdeck."""
+        config.remove_block_exam_subdeck(self.subdeck_id)
+        self.accept()
+
 
 def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     """Handle an expired subdeck by showing the due date dialog.
@@ -249,7 +259,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
-        remove_block_exam_subdeck_config(subdeck_config)
+        config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
         _show_next_expired_subdeck_dialog()
         return
 

@@ -208,7 +208,7 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config if exists", subdeck_id=subdeck_id)
         if subdeck_config:
-            remove_block_exam_subdeck_config(subdeck_config)
+            config.remove_block_exam_subdeck(subdeck_id)
         return 0
 
     root_deck_id = get_root_deck_id_from_subdeck(subdeck_id)
@@ -227,7 +227,7 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
     LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
 
     if subdeck_config:
-        remove_block_exam_subdeck_config(subdeck_config)
+        config.remove_block_exam_subdeck(subdeck_id)
 
     return note_count
 
@@ -267,15 +267,6 @@ def set_subdeck_due_date(
         old_due_date=old_due_date,
         new_due_date=new_due_date,
     )
-
-
-def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> None:
-    """Remove a block exam subdeck configuration.
-
-    Args:
-        subdeck_config: Configuration to remove
-    """
-    config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
 
 
 def get_exam_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
