@@ -532,7 +532,7 @@ class _Config:
         current = self.get_block_exam_subdecks()
         existing = next((c for c in current if c.subdeck_id == subdeck_id), None)
 
-        effective_origin = (existing and existing.config_origin) or origin_hint
+        effective_origin = existing.config_origin if (existing and existing.config_origin) else origin_hint
 
         updated = BlockExamSubdeckConfig(
             subdeck_id=subdeck_id,
