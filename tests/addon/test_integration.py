@@ -8569,8 +8569,8 @@ class TestBlockExamSubdecks:
             assert not was_renamed
 
             # Verify subdeck was created but no configuration was saved
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            full_name = f"{anki_deck_name}::No Date Subdeck"
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+            full_name = f"{root_deck_name}::No Date Subdeck"
             subdeck = aqt.mw.col.decks.by_name(full_name)
             assert subdeck is not None
 
@@ -8629,8 +8629,8 @@ class TestBlockExamSubdecks:
             assert added_count == 2
 
             # Verify notes are actually in the subdeck
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
-            full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+            full_subdeck_name = f"{root_deck_name}::{subdeck_name}"
             subdeck = aqt.mw.col.decks.by_name(full_subdeck_name)
             notes_in_subdeck = aqt.mw.col.find_notes(f'"deck:{full_subdeck_name}"')
             assert len(notes_in_subdeck) == 2
@@ -8652,24 +8652,25 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 "Mixed Subdeck",
                 due_date,
                 origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Create 3 notes in parent deck
-            note1 = add_anki_note(anki_did=deck_config.anki_id)
-            note2 = add_anki_note(anki_did=deck_config.anki_id)
-            note3 = add_anki_note(anki_did=deck_config.anki_id)
+            note1 = add_anki_note(anki_did=root_deck_id)
+            note2 = add_anki_note(anki_did=root_deck_id)
+            note3 = add_anki_note(anki_did=root_deck_id)
 
             # Move 2 notes to subdeck first
             first_added = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
@@ -8680,7 +8681,7 @@ class TestBlockExamSubdecks:
             # Now try to add all 3 notes - only note3 should be moved
             all_note_ids = [note1.id, note2.id, note3.id]
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 all_note_ids,
                 due_date,
@@ -8691,8 +8692,8 @@ class TestBlockExamSubdecks:
             assert added_count == 1
 
             # Verify all 3 notes are in the subdeck
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            full_subdeck_name = f"{anki_deck_name}::{subdeck_name}"
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+            full_subdeck_name = f"{root_deck_name}::{subdeck_name}"
             notes_in_subdeck = aqt.mw.col.find_notes(f'"deck:{full_subdeck_name}"')
             assert len(notes_in_subdeck) == 3
             assert note1.id in notes_in_subdeck
@@ -8711,19 +8712,20 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 "Unsuspend Test Subdeck",
                 due_date,
                 origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Create notes and suspend their cards
-            note1 = add_anki_note(anki_did=deck_config.anki_id)
-            note2 = add_anki_note(anki_did=deck_config.anki_id)
+            note1 = add_anki_note(anki_did=root_deck_id)
+            note2 = add_anki_note(anki_did=root_deck_id)
 
             # Suspend all cards
             card1 = note1.cards()[0]
@@ -8736,7 +8738,7 @@ class TestBlockExamSubdecks:
 
             # Add notes to subdeck with unsuspend_notes=True
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
@@ -8764,19 +8766,20 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 "No Unsuspend Subdeck",
                 due_date,
                 origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Create notes and suspend their cards
-            note1 = add_anki_note(anki_did=deck_config.anki_id)
-            note2 = add_anki_note(anki_did=deck_config.anki_id)
+            note1 = add_anki_note(anki_did=root_deck_id)
+            note2 = add_anki_note(anki_did=root_deck_id)
 
             # Suspend all cards
             card1 = note1.cards()[0]
@@ -8789,7 +8792,7 @@ class TestBlockExamSubdecks:
 
             # Add notes to subdeck without unsuspend parameter (defaults to False)
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
@@ -8817,20 +8820,21 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
 
             # Create a subdeck
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 "Partial Unsuspend Subdeck",
                 due_date,
                 origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Create 3 notes
-            note1 = add_anki_note(anki_did=deck_config.anki_id)
-            note2 = add_anki_note(anki_did=deck_config.anki_id)
-            note3 = add_anki_note(anki_did=deck_config.anki_id)
+            note1 = add_anki_note(anki_did=root_deck_id)
+            note2 = add_anki_note(anki_did=root_deck_id)
+            note3 = add_anki_note(anki_did=root_deck_id)
 
             # Suspend all cards
             card1 = note1.cards()[0]
@@ -8840,7 +8844,7 @@ class TestBlockExamSubdecks:
 
             # Add first 2 notes to subdeck without unsuspending
             first_added = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
@@ -8855,7 +8859,7 @@ class TestBlockExamSubdecks:
             # Now add all 3 notes with unsuspend_notes=True
             # Only note3 should be moved, but all 3 should be unsuspended
             added_count = add_notes_to_block_exam_subdeck(
-                deck_config.anki_id,
+                root_deck_id,
                 subdeck_name,
                 [note1.id, note2.id, note3.id],
                 due_date,
@@ -8970,10 +8974,11 @@ class TestBlockExamSubdecks:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
-            main_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
+            root_deck_id = deck_config.anki_id
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
 
             # Create a regular subdeck manually (not through create_block_exam_subdeck)
-            subdeck_name = f"{main_deck_name}::Regular Subdeck"
+            subdeck_name = f"{root_deck_name}::Regular Subdeck"
             subdeck_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(subdeck_name).id)
 
             # Verify no config exists initially
@@ -9108,11 +9113,12 @@ class TestBlockExamSubdeckDialog:
             mocker.patch("aqt.mw.col.decks.children", return_value=[])
 
             deck_config = config.deck_config(ah_did)
-            dialog = BlockExamSubdeckDialog(deck_config.anki_id, self.note_ids, parent=None)
+            root_deck_id = deck_config.anki_id
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
 
             # Check dialog was created and configured properly
-            assert dialog.root_deck_id == deck_config.anki_id
+            assert dialog.root_deck_id == root_deck_id
             assert dialog.note_ids == self.note_ids
             assert dialog.parent() is None
 
@@ -9133,17 +9139,18 @@ class TestBlockExamSubdeckDialog:
 
             # Create some test subdecks
             deck_config = config.deck_config(ah_did)
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            subdeck1_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 1").id)
-            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2")
-            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck 2::Nested")
+            root_deck_id = deck_config.anki_id
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+            subdeck1_id = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(f"{root_deck_name}::Test Subdeck 1").id)
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{root_deck_name}::Test Subdeck 2")
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{root_deck_name}::Test Subdeck 2::Nested")
 
             # Add block exam configuration for one of them
             config.upsert_block_exam_subdeck(
                 subdeck1_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
             )
 
-            dialog = BlockExamSubdeckDialog(deck_config.anki_id, self.note_ids, parent=None)
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
 
             # Should show choose screen since subdecks exist
@@ -9165,10 +9172,11 @@ class TestBlockExamSubdeckDialog:
 
             # Create a test subdeck
             deck_config = config.deck_config(ah_did)
-            anki_deck_name = aqt.mw.col.decks.name_if_exists(deck_config.anki_id)
-            aqt.mw.col.decks.add_normal_deck_with_name(f"{anki_deck_name}::Test Subdeck").id
+            root_deck_id = deck_config.anki_id
+            root_deck_name = aqt.mw.col.decks.name_if_exists(root_deck_id)
+            aqt.mw.col.decks.add_normal_deck_with_name(f"{root_deck_name}::Test Subdeck").id
 
-            dialog = BlockExamSubdeckDialog(deck_config.anki_id, self.note_ids, parent=None)
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
 
             # Should be on choose screen
@@ -9200,7 +9208,8 @@ class TestBlockExamSubdeckDialog:
             mocker.patch("aqt.mw.col.decks.children", return_value=[])
 
             deck_config = config.deck_config(ah_did)
-            dialog = BlockExamSubdeckDialog(deck_config.anki_id, self.note_ids, parent=None)
+            root_deck_id = deck_config.anki_id
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
             qtbot.addWidget(dialog)
 
             # Should be on create screen
@@ -9263,7 +9272,6 @@ class TestCheckBlockExamSubdeckDueDates:
     def test_check_block_exam_subdeck_due_dates_with_expired(
         self,
         anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid,
     ):
         """Test function identifies expired subdecks correctly."""
         with anki_session_with_addon_data.profile_loaded():

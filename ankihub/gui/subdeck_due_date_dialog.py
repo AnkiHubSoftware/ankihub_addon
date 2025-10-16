@@ -231,7 +231,9 @@ class DatePickerDialog(QDialog):
 
         self.selected_date = selected_date_str
 
-        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        set_subdeck_due_date(
+            self.subdeck_id, selected_date_str, origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+        )
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
         self.accept()

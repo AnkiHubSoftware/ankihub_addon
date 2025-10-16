@@ -41,6 +41,11 @@ def create_block_exam_subdeck(
         due_date: Due date for the subdeck in YYYY-MM-DD format, or None
         origin_hint: Origin of this subdeck creation
 
+    Args:
+        root_deck_id: The ID of the root deck
+        subdeck_name: Name of the subdeck (without parent deck prefix)
+        due_date: Due date for the subdeck in YYYY-MM-DD format
+
     Returns:
         Tuple of (actual_subdeck_name, was_renamed)
         was_renamed is True if the name was modified to avoid conflicts
