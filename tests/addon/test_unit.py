@@ -3493,14 +3493,12 @@ class TestMoveSubdeckToMainDeck:
 
     @patch("ankihub.main.block_exam_subdecks.note_ids_in_deck_hierarchy")
     @patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
-    @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_move_subdeck_to_main_deck_success(
         self,
         mock_config,
         mock_aqt,
-        mock_remove_config,
         mock_move_notes,
         mock_note_ids_in_deck_hierarchy,
     ):
@@ -3523,16 +3521,14 @@ class TestMoveSubdeckToMainDeck:
         mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
-        mock_remove_config.assert_called_once_with(subdeck_config)
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
 
-    @patch("ankihub.main.block_exam_subdecks.remove_block_exam_subdeck_config")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
     def test_move_subdeck_to_main_deck_subdeck_not_found(
         self,
         mock_config,
         mock_aqt,
-        mock_remove_config,
     ):
         """Test handling when subdeck not found in Anki."""
         mock_aqt.mw.col.decks.get.return_value = False
@@ -3543,7 +3539,7 @@ class TestMoveSubdeckToMainDeck:
         result = move_subdeck_to_main_deck(DeckId(456))
 
         assert result == 0  # Should return 0 when subdeck not found
-        mock_remove_config.assert_called_once_with(subdeck_config)
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
 
 
 class TestSetSubdeckDueDate:
@@ -3594,9 +3590,9 @@ class TestHandleExpiredSubdeck:
         mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_aqt.mw)
         mock_dialog.show.assert_called_once()
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.remove_block_exam_subdeck_config")
+    @patch("ankihub.gui.subdeck_due_date_dialog.config")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_not_found(self, mock_aqt, mock_remove_config):
+    def test_handle_expired_subdeck_not_found(self, mock_aqt, mock_config):
         """Test handling when expired subdeck not found in Anki."""
         mock_aqt.mw.col.decks.get.return_value = False
 
@@ -3604,7 +3600,7 @@ class TestHandleExpiredSubdeck:
 
         handle_expired_subdeck(subdeck_config)
 
-        mock_remove_config.assert_called_once_with(subdeck_config)
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
 
 
 class TestCheckAndHandleBlockExamSubdeckDueDates:
