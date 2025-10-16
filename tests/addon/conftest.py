@@ -37,7 +37,7 @@ from ..fixtures import (  # noqa F401
 )
 
 try:
-    import pytest_forked
+    import pytest_forked  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover
     pytest_forked = None
 
