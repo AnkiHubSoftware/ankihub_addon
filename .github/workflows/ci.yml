@@ -50,9 +50,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml --retries 2
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append --retries 2
-          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append --retries 2
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append
+          xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m performance --cov-report=xml --cov-append
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
