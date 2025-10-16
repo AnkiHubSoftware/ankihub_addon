@@ -3590,7 +3590,7 @@ class TestHandleExpiredSubdeck:
         mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_aqt.mw)
         mock_dialog.show.assert_called_once()
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.config")
+    @patch("ankihub.gui.subdeck_due_date_dialog.config", create=True)
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
     def test_handle_expired_subdeck_not_found(self, mock_aqt, mock_config):
         """Test handling when expired subdeck not found in Anki."""
