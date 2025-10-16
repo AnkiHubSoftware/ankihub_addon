@@ -17,7 +17,7 @@ from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
+from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 
 
 @dataclass
@@ -152,7 +152,6 @@ class DatePickerDialog(QDialog):
         self.subdeck_id = subdeck_id
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_id)
         self.initial_due_date = initial_due_date
-        self.selected_date: Optional[str] = None
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -234,20 +233,17 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-
-        self.selected_date = selected_date_str
-
-        set_subdeck_due_date(
-            self.subdeck_id, selected_date_str, origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
-        )
+        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        self.accept()
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
-        self.accept()
 
     def _on_remove_due_date(self):
         """Handle removing the due date from the subdeck."""
         config.remove_block_exam_subdeck(self.subdeck_id)
         self.accept()
+
+        tooltip(f"Due date removed for <strong>{self.subdeck_name}</strong>", parent=aqt.mw)
 
 
 def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:

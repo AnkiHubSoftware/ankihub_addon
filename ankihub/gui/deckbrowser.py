@@ -103,7 +103,7 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
 
     initial_due_date = config.get_block_exam_subdeck_due_date(subdeck_did)
 
-    action.setToolTip("Change the due date of this subdeck.")
+    action.setToolTip("Set the due date of this subdeck.")
     qconnect(
         action.triggered,
         lambda: _open_date_picker_dialog_for_subdeck(subdeck_did, initial_due_date),
