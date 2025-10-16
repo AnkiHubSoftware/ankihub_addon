@@ -1,7 +1,11 @@
+import inspect
 import json
 import os
+import re
 import shutil
+import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Type
@@ -31,6 +35,12 @@ from ..fixtures import (  # noqa F401
     next_deterministic_uuid,
     set_feature_flag_state,
 )
+
+try:
+    import pytest_forked  # type: ignore[import-untyped]
+except Exception:  # pragma: no cover
+    pytest_forked = None
+
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -166,3 +176,168 @@ def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
 def pytest_set_filtered_exceptions() -> List[Type[Exception]]:
     """Tests which raise one of these will be retried by pytest-retry."""
     return [DataError]
+
+
+# Crash rerun functionality
+# This provides automatic retry for tests that crash (segfault/SIGSEGV) rather than failing normally.
+# Usage: pytest --crash-reruns=2 will retry crashed tests up to 2 times.
+# The retry information is visible in standard pytest output via report annotations.
+
+
+def pytest_addoption(parser):
+    """Add command-line options for crash rerun functionality."""
+    g = parser.getgroup("crash-reruns")
+    g.addoption(
+        "--crash-reruns",
+        action="store",
+        type=int,
+        default=0,
+        help="Rerun a test up to N times only if it crashed (SIGSEGV/segfault).",
+    )
+    g.addoption(
+        "--crash-reruns-delay",
+        action="store",
+        type=float,
+        default=0.0,
+        help="Seconds to sleep between crash reruns.",
+    )
+
+
+CRASH_PATTERN = re.compile(
+    r"(?i)\b(CRASHED|Segmentation fault|SIGSEGV|Crashed with exit code\s*-?11|"
+    r"worker .* (crashed|died)|node down)\b"
+)
+
+
+def _reports_indicate_crash(reports) -> bool:
+    """
+    Check if test reports indicate a crash (segfault/SIGSEGV) rather than a normal failure.
+
+    Args:
+        reports: List of pytest TestReport objects
+
+    Returns:
+        True if any report indicates a crash, False otherwise
+    """
+    for rep in reports or ():
+        if getattr(rep, "outcome", None) == "failed":
+            text = getattr(rep, "longreprtext", None)
+            if not text:
+                # fall back to stringifying longrepr if needed
+                text = str(getattr(rep, "longrepr", "") or "")
+            if CRASH_PATTERN.search(text):
+                return True
+    return False
+
+
+def _annotate_reports(reports, text: str) -> None:
+    """
+    Add a crash-reruns section to test reports to make retry info visible in pytest output.
+
+    This allows crash-rerun information to appear in standard test output without
+    needing -s or special flags, making it visible in CI logs and test reports.
+
+    Args:
+        reports: List of pytest TestReport objects
+        text: Message to display in the crash-reruns section
+    """
+    for rep in reports or []:
+        if hasattr(rep, "sections"):
+            rep.sections.append(("crash-reruns", text))
+
+
+def _run_isolated(item, nextitem):
+    """
+    Run a single test in a forked subprocess using pytest-forked.
+
+    This provides process isolation so that crashes (segfaults) in one test
+    don't bring down the entire test suite.
+
+    Args:
+        item: The pytest test item to run
+        nextitem: The next test item (may be None)
+
+    Returns:
+        List of pytest TestReport objects from the forked test run
+
+    Raises:
+        RuntimeError: If pytest-forked is not installed
+    """
+    if pytest_forked is None:
+        # Safety guard: we rely on pytest-forked for isolation.
+        raise RuntimeError("pytest-forked must be installed for --crash-reruns")
+
+    fn = pytest_forked.forked_run_report
+    sig = None
+    try:
+        sig = inspect.signature(fn)
+    except Exception:
+        pass
+
+    # Support both historical and newer signatures.
+    if sig and len(sig.parameters) >= 2:
+        return fn(item, nextitem)
+    else:
+        return fn(item)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_protocol(item, nextitem):
+    """
+    Hook to handle test execution with crash-aware retries.
+
+    When --crash-reruns is specified, this hook takes over the test protocol
+    to automatically retry tests that crash (segfault/SIGSEGV). Normal test
+    failures are not retried.
+
+    The retry information is added to test reports and visible in standard
+    pytest output under the "crash-reruns" section.
+
+    Args:
+        item: The pytest test item to run
+        nextitem: The next test item (may be None)
+
+    Returns:
+        None to let pytest handle normally (when --crash-reruns=0)
+        True to indicate we've handled the protocol (when --crash-reruns>0)
+    """
+    reruns = item.config.getoption("--crash-reruns")
+    if reruns <= 0:
+        return  # let pytest handle as usual
+
+    delay = float(item.config.getoption("--crash-reruns-delay") or 0.0)
+    attempts_left = int(reruns) + 1  # first run + N retries on crash
+    last_reports = None
+
+    while attempts_left > 0:
+        attempts_left -= 1
+        reports = _run_isolated(item, nextitem)
+        last_reports = reports
+
+        if not _reports_indicate_crash(reports):
+            break  # normal pass/fail: stop retrying
+        if attempts_left <= 0:
+            # Annotate final report when retries are exhausted
+            _annotate_reports(reports, f"Test crashed after {reruns + 1} attempts; no more retries available")
+            break
+
+        tried = (item.config.getoption("--crash-reruns") + 1) - attempts_left
+        retry_msg = f"[crash-reruns] {item.nodeid} crashed; retrying (attempt {tried + 1}/{reruns + 1})"
+
+        # Annotate reports to make retry visible in standard output
+        _annotate_reports(reports, f"Test crashed; scheduling retry (attempt {tried + 1}/{reruns + 1})")
+
+        # Also print to stderr for real-time monitoring
+        print(f"\n{retry_msg}\n", file=sys.stderr, flush=True)
+
+        tr = item.config.pluginmanager.getplugin("terminalreporter")
+        if tr:
+            tr.write_line(retry_msg)
+
+        if delay:
+            time.sleep(delay)
+
+    # Emit the final set of reports ourselves and stop further processing
+    for rep in last_reports or ():
+        item.ihook.pytest_runtest_logreport(report=rep)
+    return True  # tell pytest we've handled the protocol
