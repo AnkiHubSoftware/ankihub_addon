@@ -118,9 +118,11 @@ def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
 
 
 def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
-    # Only show the menu actions for subdecks (not top-level decks)
-    if not aqt.mw.col.decks.parents(DeckId(deck_id)):
-        return  # Skip top-level decks
+    did = DeckId(deck_id)
+
+    # Only show the menu actions for subdecks which are not filtered decks
+    if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
+        return
 
     def on_access_granted(_: dict) -> None:
         menu.setToolTipsVisible(True)
@@ -135,8 +137,8 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
         font.setPointSize(10)
         label_action.setFont(font)
 
-        _setup_update_subdeck_due_date(menu, DeckId(deck_id))
-        _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
+        _setup_update_subdeck_due_date(menu, did)
+        _setup_remove_block_exam_subdeck(menu, did)
 
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
