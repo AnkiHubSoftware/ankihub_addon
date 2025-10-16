@@ -18,7 +18,7 @@ from ..main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
+from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
 
 
 @dataclass
