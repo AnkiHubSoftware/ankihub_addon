@@ -21,7 +21,11 @@ from ..db.db import NOTE_NOT_DELETED_CONDITION
 from ..db.models import AnkiHubNote
 from ..settings import config
 from .block_exam_subdecks import get_exam_subdecks
-from .utils import move_notes_to_decks_while_respecting_odid, nids_in_deck_but_not_in_subdeck, note_ids_in_decks
+from .utils import (
+    move_notes_to_decks_while_respecting_odid,
+    nids_in_deck_but_not_in_subdeck,
+    note_ids_in_decks,
+)
 
 # root tag for tags that indicate which subdeck a note belongs to
 SUBDECK_TAG = "AnkiHub_Subdeck"
@@ -289,3 +293,36 @@ def _subdeck_name_to_tag(deck_name: str) -> str:
     result = re.sub("_+", "_", result)
 
     return result
+
+
+def get_tag_based_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
+    """Get subdecks that are tag-based.
+
+    A subdeck is considered tag-based if there exists at least one note anywhere
+    in the collection with a subdeck tag matching the subdeck's path.
+
+    Args:
+        root_deck_id: The root deck ID
+
+    Returns:
+        List of (subdeck_name, subdeck_id) tuples for tag-based subdecks.
+    """
+
+    # Get all child decks
+    child_decks = aqt.mw.col.decks.children(root_deck_id)
+
+    tag_based_subdecks = []
+
+    for subdeck_name, subdeck_id in child_decks:
+        # Get subdeck path relative to root
+        full_subdeck_name = aqt.mw.col.decks.name(subdeck_id)
+        subdeck_path = full_subdeck_name.split("::", maxsplit=1)[1]
+
+        # Check if any notes have subdeck tags matching this path
+        tag_pattern = f"^{SUBDECK_TAG}::[^:]+::{re.escape(subdeck_path)}$"
+        matching_nids = aqt.mw.col.find_notes(f'tag:"re:{tag_pattern}"')
+
+        if matching_nids:
+            tag_based_subdecks.append((subdeck_name, subdeck_id))
+
+    return tag_based_subdecks

@@ -158,6 +158,7 @@ from ankihub.main.subdecks import (
     SUBDECK_TAG,
     add_subdeck_tags_to_notes,
     deck_contains_subdeck_tags,
+    get_tag_based_subdecks,
 )
 from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
@@ -660,6 +661,42 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+def test_get_tag_based_subdecks(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    add_anki_note: AddAnkiNote,
+):
+    """Test that get_tag_based_subdecks identifies subdecks with matching subdeck tags."""
+    with anki_session_with_addon_data.profile_loaded():
+        # Install an AnkiHub deck with subdecks enabled
+        ah_did = install_ah_deck(anki_deck_name="TestDeck")
+        config.set_subdecks(ah_did, True)
+        root_deck_id = config.deck_config(ah_did).anki_id
+
+        # Create subdecks
+        create_anki_deck("TestDeck::SubA")
+        create_anki_deck("TestDeck::SubA::SubB")
+        create_anki_deck("TestDeck::SubC")
+
+        # Add notes with subdeck tags
+        note1 = add_anki_note()
+        note1.tags = [f"{SUBDECK_TAG}::AnkiHubDeckName::SubA"]
+        aqt.mw.col.update_note(note1)
+
+        note2 = add_anki_note()
+        note2.tags = [f"{SUBDECK_TAG}::AnkiHubDeckName::SubA::SubB"]
+        aqt.mw.col.update_note(note2)
+
+        # Get tag-based subdecks
+        tag_based_subdecks = get_tag_based_subdecks(root_deck_id)
+        subdeck_names = [name for name, _ in tag_based_subdecks]
+
+        # Should find SubA and SubA::SubB, but not SubC (no matching tags)
+        assert "TestDeck::SubA" in subdeck_names
+        assert "TestDeck::SubA::SubB" in subdeck_names
+        assert "TestDeck::SubC" not in subdeck_names
 
 
 class TestAnkiHubSignOut:
