@@ -9,7 +9,7 @@ from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
-from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
+from ..main.block_exam_subdecks import dissolve_block_exam_subdeck, get_subdeck_name_without_parent
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import config
 from .operations.user_details import check_user_feature_access
@@ -70,7 +70,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        note_count = move_subdeck_to_main_deck(subdeck_id)
+        note_count = dissolve_block_exam_subdeck(subdeck_id)
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)

@@ -33,7 +33,7 @@ from ankihub.gui.subdeck_due_date_dialog import (
     handle_expired_subdeck,
 )
 from ankihub.main.block_exam_subdecks import (
-    move_subdeck_to_main_deck,
+    dissolve_block_exam_subdeck,
     set_subdeck_due_date,
 )
 from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
@@ -3488,21 +3488,21 @@ class TestDeckImportSummaryDialog:
         assert "see this topic" in message
 
 
-class TestMoveSubdeckToMainDeck:
-    """Tests for move_subdeck_to_main_deck function."""
+class TestDissolveBlockExamSubdeck:
+    """Tests for dissolve_block_exam_subdeck function."""
 
     @patch("ankihub.main.block_exam_subdecks.note_ids_in_deck_hierarchy")
     @patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_move_subdeck_to_main_deck_success(
+    def test_dissolve_block_exam_subdeck_success(
         self,
         mock_config,
         mock_aqt,
         mock_move_notes,
         mock_note_ids_in_deck_hierarchy,
     ):
-        """Test successfully moving subdeck to main deck."""
+        """Test successfully dissolving a block exam subdeck."""
         # Setup mocks
         mock_subdeck = {"name": "Test Deck::Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
@@ -3512,20 +3512,75 @@ class TestMoveSubdeckToMainDeck:
         mock_parent_deck = {"name": "Test Deck", "id": 123}
         mock_aqt.mw.col.decks.parents.return_value = [mock_parent_deck]
 
+        # Mock config.get_deck_uuid_by_did to return None (no AnkiHub deck)
+        mock_config.get_deck_uuid_by_did.return_value = None
+
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
         mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        result = move_subdeck_to_main_deck(DeckId(456))
+        result = dissolve_block_exam_subdeck(DeckId(456))
 
         assert result == 3  # Should return the number of notes moved
         mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
         mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
         mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
         mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
+        # Verify get_deck_uuid_by_did was called with root_deck_id
+        mock_config.get_deck_uuid_by_did.assert_called_once_with(123)
+
+    @patch("ankihub.main.subdecks.build_subdecks_and_move_cards_to_them")
+    @patch("ankihub.main.block_exam_subdecks.note_ids_in_deck_hierarchy")
+    @patch("ankihub.main.block_exam_subdecks.move_notes_to_decks_while_respecting_odid")
+    @patch("ankihub.main.block_exam_subdecks.aqt")
+    @patch("ankihub.main.block_exam_subdecks.config")
+    def test_dissolve_subdeck_with_subdecks_enabled(
+        self,
+        mock_config,
+        mock_aqt,
+        mock_move_notes,
+        mock_note_ids_in_deck_hierarchy,
+        mock_build_subdecks,
+    ):
+        """Test dissolving subdeck that belongs to an AnkiHub deck rebuilds subdecks."""
+        # Setup mocks
+        mock_subdeck = {"name": "Test Deck::Subdeck", "id": 456}
+        mock_aqt.mw.col.decks.get.return_value = mock_subdeck
+        mock_note_ids_in_deck_hierarchy.return_value = [1, 2, 3]
+
+        # Mock the parent deck
+        mock_parent_deck = {"name": "Test Deck", "id": 123}
+        mock_aqt.mw.col.decks.parents.return_value = [mock_parent_deck]
+
+        # Mock AnkiHub deck ID (indicates this is an AnkiHub deck)
+        test_ah_did = uuid.uuid4()
+        mock_config.get_deck_uuid_by_did.return_value = test_ah_did
+
+        # Mock deck_config to return a config with subdecks_enabled=True
+        mock_deck_config = Mock()
+        mock_deck_config.subdecks_enabled = True
+        mock_config.deck_config.return_value = mock_deck_config
+
+        subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
+        mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
+
+        result = dissolve_block_exam_subdeck(DeckId(456))
+
+        # Verify normal operations happened
+        assert result == 3
+        mock_note_ids_in_deck_hierarchy.assert_called_once_with(456)
+        mock_move_notes.assert_called_once_with({1: 123, 2: 123, 3: 123})
+        mock_aqt.mw.col.decks.remove.assert_called_once_with([456])
+        mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
+        # Verify get_deck_uuid_by_did was called with root_deck_id
+        mock_config.get_deck_uuid_by_did.assert_called_once_with(123)
+        # Verify deck_config was called with test_ah_did
+        mock_config.deck_config.assert_called_once_with(test_ah_did)
+        # Verify subdeck rebuilding was called
+        mock_build_subdecks.assert_called_once_with(test_ah_did, [1, 2, 3])
 
     @patch("ankihub.main.block_exam_subdecks.aqt")
     @patch("ankihub.main.block_exam_subdecks.config")
-    def test_move_subdeck_to_main_deck_subdeck_not_found(
+    def test_dissolve_subdeck_not_found(
         self,
         mock_config,
         mock_aqt,
@@ -3536,7 +3591,7 @@ class TestMoveSubdeckToMainDeck:
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
         mock_config.get_block_exam_subdeck_config.return_value = subdeck_config
 
-        result = move_subdeck_to_main_deck(DeckId(456))
+        result = dissolve_block_exam_subdeck(DeckId(456))
 
         assert result == 0  # Should return 0 when subdeck not found
         mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
@@ -3590,7 +3645,7 @@ class TestHandleExpiredSubdeck:
         mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_aqt.mw)
         mock_dialog.show.assert_called_once()
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.config", create=True)
+    @patch("ankihub.gui.subdeck_due_date_dialog.config")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
     def test_handle_expired_subdeck_not_found(self, mock_aqt, mock_config):
         """Test handling when expired subdeck not found in Anki."""

@@ -68,7 +68,7 @@ from ankihub.main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
-    move_subdeck_to_main_deck,
+    dissolve_block_exam_subdeck,
     set_subdeck_due_date,
 )
 
@@ -8994,13 +8994,13 @@ class TestBlockExamSubdecks:
             saved_due_date = subdeck_config.due_date if subdeck_config else None
             assert saved_due_date == due_date
 
-    def test_move_subdeck_to_main_deck_with_nested_subdecks(
+    def test_dissolve_block_exam_subdeck_with_nested_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         add_anki_note: AddAnkiNote,
     ):
-        """Test moving a subdeck with nested children moves all notes to main deck."""
+        """Test dissolving a subdeck with nested children moves all notes to main deck."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             deck_config = config.deck_config(ah_did)
@@ -9029,8 +9029,8 @@ class TestBlockExamSubdecks:
             assert note_subdeck.cards()[0].did == subdeck_id
             assert note_nested.cards()[0].did == nested_subdeck_id
 
-            # Move subdeck to main deck
-            result = move_subdeck_to_main_deck(subdeck_id)
+            # Dissolve subdeck
+            result = dissolve_block_exam_subdeck(subdeck_id)
 
             # Verify return value - should be 2 notes (subdeck + nested)
             assert result == 2
@@ -9052,12 +9052,12 @@ class TestBlockExamSubdecks:
             subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
             assert subdeck_config is None
 
-    def test_move_subdeck_to_main_deck_without_config(
+    def test_dissolve_block_exam_subdeck_without_config(
         self,
         anki_session_with_addon_data: AnkiSession,
         add_anki_note: AddAnkiNote,
     ):
-        """Test removing a regular subdeck that doesn't have a BlockExamSubdeckConfig."""
+        """Test dissolving a regular subdeck that doesn't have a BlockExamSubdeckConfig."""
         with anki_session_with_addon_data.profile_loaded():
             main_deck_id = create_anki_deck("Test Deck")
             main_deck_name = aqt.mw.col.decks.name_if_exists(main_deck_id)
@@ -9073,8 +9073,8 @@ class TestBlockExamSubdecks:
             subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
             assert subdeck_config is None
 
-            # Move subdeck to main deck (should work without config)
-            result = move_subdeck_to_main_deck(subdeck_id)
+            # Dissolve subdeck (should work without config)
+            result = dissolve_block_exam_subdeck(subdeck_id)
 
             # Verify return value - should be 1 note
             assert result == 1
@@ -9086,17 +9086,17 @@ class TestBlockExamSubdecks:
             # Verify subdeck was deleted
             assert aqt.mw.col.decks.id_for_name(subdeck_name) is None
 
-    def test_move_subdeck_to_main_deck_with_root_deck(
+    def test_dissolve_block_exam_subdeck_with_root_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
-        """Test calling move_subdeck_to_main_deck on a root deck only removes config."""
+        """Test calling dissolve_block_exam_subdeck on a root deck raises ValueError."""
         with anki_session_with_addon_data.profile_loaded():
             root_deck_id = create_anki_deck("Test Deck")
 
             with pytest.raises(ValueError, match="The provided deck isn't a subdeck."):
-                # Call move_subdeck_to_main_deck on the root deck
-                move_subdeck_to_main_deck(root_deck_id)
+                # Call dissolve_block_exam_subdeck on the root deck
+                dissolve_block_exam_subdeck(root_deck_id)
 
 
 class TestBlockExamSubdeckDialog:
