@@ -192,15 +192,17 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
-    """Move all notes from a subdeck back to the root deck (or subdeck-tag based subdecks), delete the subdeck,
-    and remove its configuration (if it exists).
+def dissolve_block_exam_subdeck(subdeck_id: DeckId) -> int:
+    """Remove a block exam subdeck and move its notes back to the root deck.
+
+    If the root deck is an AnkiHub deck with subdecks enabled, notes will be
+    redistributed to tag-based subdecks after being moved to the root deck.
 
     Args:
         subdeck_id: The Anki subdeck ID
 
     Returns:
-        The number of notes moved to the root deck
+        The number of notes moved from the subdeck
 
     Raises:
         ValueError: If the provided deck is a root deck (not a subdeck)

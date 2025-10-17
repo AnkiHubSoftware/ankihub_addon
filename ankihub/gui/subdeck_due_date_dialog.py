@@ -13,8 +13,8 @@ from aqt.utils import tooltip
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
+    dissolve_block_exam_subdeck,
     get_subdeck_name_without_parent,
-    move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
 from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
@@ -113,7 +113,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
+        note_count = dissolve_block_exam_subdeck(self.subdeck_config.subdeck_id)
         tooltip(f"{note_count} notes merged into the parent deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
