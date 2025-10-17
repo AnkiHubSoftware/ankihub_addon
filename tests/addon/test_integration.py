@@ -9030,7 +9030,10 @@ class TestBlockExamSubdecks:
             assert note_nested.cards()[0].did == nested_subdeck_id
 
             # Move subdeck to main deck
-            move_subdeck_to_main_deck(subdeck_id)
+            result = move_subdeck_to_main_deck(subdeck_id)
+
+            # Verify return value - should be 2 notes (subdeck + nested)
+            assert result == 2
 
             # Verify all notes from subdeck hierarchy moved to main deck
             note_main = aqt.mw.col.get_note(note_main.id)
@@ -9071,7 +9074,10 @@ class TestBlockExamSubdecks:
             assert subdeck_config is None
 
             # Move subdeck to main deck (should work without config)
-            move_subdeck_to_main_deck(subdeck_id)
+            result = move_subdeck_to_main_deck(subdeck_id)
+
+            # Verify return value - should be 1 note
+            assert result == 1
 
             # Verify note was moved to main deck
             note = aqt.mw.col.get_note(note.id)

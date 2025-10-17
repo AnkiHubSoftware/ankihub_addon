@@ -15,10 +15,9 @@ from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
-    remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
+from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 
 
 @dataclass
@@ -114,8 +113,8 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
-        tooltip(f"'{self.subdeck_name}' moved to main deck", parent=aqt.mw)
+        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
+        tooltip(f"{note_count} notes merged into the parent deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
 
@@ -123,6 +122,7 @@ class SubdeckDueDateDialog(QDialog):
         """Handle keeping subdeck unchanged."""
         set_subdeck_due_date(self.subdeck_config.subdeck_id, None, origin_hint=self.subdeck_config.config_origin)
         self.accept()
+        tooltip(f"<b>{self.subdeck_name}</b> kept with no due date set.", parent=aqt.mw)
 
     def _on_set_new_due_date(self):
         """Handle setting a new due date."""
@@ -152,7 +152,6 @@ class DatePickerDialog(QDialog):
         self.subdeck_id = subdeck_id
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_id)
         self.initial_due_date = initial_due_date
-        self.selected_date: Optional[str] = None
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -169,7 +168,7 @@ class DatePickerDialog(QDialog):
         main_layout.setSpacing(12)
 
         # Title
-        title_label = QLabel("Reschedule due date")
+        title_label = QLabel("Set due date")
         title_font = title_label.font()
         title_font.setBold(True)
         title_font.setPointSize(title_font.pointSize() + 2)
@@ -214,6 +213,12 @@ class DatePickerDialog(QDialog):
         qconnect(cancel_button.clicked, self.reject)
         button_layout.addWidget(cancel_button)
 
+        # Remove due date button (only show if subdeck has a due date)
+        if self.initial_due_date:
+            remove_due_date_button = QPushButton("Remove due date")
+            qconnect(remove_due_date_button.clicked, self._on_remove_due_date)
+            button_layout.addWidget(remove_due_date_button)
+
         # Confirm button
         confirm_button = QPushButton("Save")
         qconnect(confirm_button.clicked, self._on_confirm)
@@ -228,15 +233,17 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-
-        self.selected_date = selected_date_str
-
-        set_subdeck_due_date(
-            self.subdeck_id, selected_date_str, origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
-        )
+        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        self.accept()
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
+
+    def _on_remove_due_date(self):
+        """Handle removing the due date from the subdeck."""
+        config.remove_block_exam_subdeck(self.subdeck_id)
         self.accept()
+
+        tooltip(f"Due date removed for <strong>{self.subdeck_name}</strong>", parent=aqt.mw)
 
 
 def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
@@ -249,7 +256,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
-        remove_block_exam_subdeck_config(subdeck_config)
+        config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
         _show_next_expired_subdeck_dialog()
         return
 

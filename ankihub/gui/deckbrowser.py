@@ -7,7 +7,7 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
-from aqt.qt import QDialog, QDialogButtonBox
+from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -70,24 +70,24 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        move_subdeck_to_main_deck(subdeck_id)
+        note_count = move_subdeck_to_main_deck(subdeck_id)
         aqt.mw.deckBrowser.refresh()
 
-        show_tooltip("Subdeck removed and notes moved to main deck", parent=aqt.mw)
+        show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)
 
     show_dialog(
         text=(
             "<span style='font-size: 16px; font-weight: bold;'>"
-            "Are you sure you want to remove the subdeck?"
+            "Are you sure you want to merge this subdeck?"
             "</span>"
             "<br><br>"
-            f"Removing the subdeck <b>{subdeck_name}</b> will move all its notes, "
+            f"Merging the subdeck <b>{subdeck_name}</b> will move all its notes, "
             "including those from nested subdecks, back to the main deck."
         ),
         title="AnkiHub | Subdecks",
         buttons=[
             ("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
-            ("Remove subdeck", QDialogButtonBox.ButtonRole.AcceptRole),
+            ("Merge subdeck", QDialogButtonBox.ButtonRole.AcceptRole),
         ],
         default_button_idx=1,
         callback=on_button_clicked,
@@ -99,11 +99,11 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
 
 
 def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
-    action = menu.addAction("Ankihub: Update due date")
+    action = menu.addAction("Set due date")
 
     initial_due_date = config.get_block_exam_subdeck_due_date(subdeck_did)
 
-    action.setToolTip("Change the due date of this subdeck.")
+    action.setToolTip("Set the due date of this subdeck.")
     qconnect(
         action.triggered,
         lambda: _open_date_picker_dialog_for_subdeck(subdeck_did, initial_due_date),
@@ -111,21 +111,34 @@ def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
 
 
 def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
-    action = menu.addAction("Ankihub: Remove subdeck")
+    action = menu.addAction("Merge into parent deck")
 
     action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
     qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_did))
 
 
 def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
-    # Only show the menu actions for subdecks (not top-level decks)
-    if not aqt.mw.col.decks.parents(DeckId(deck_id)):
-        return  # Skip top-level decks
+    did = DeckId(deck_id)
+
+    # Only show the menu actions for subdecks which are not filtered decks
+    if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
+        return
 
     def on_access_granted(_: dict) -> None:
         menu.setToolTipsVisible(True)
-        _setup_update_subdeck_due_date(menu, DeckId(deck_id))
-        _setup_remove_block_exam_subdeck(menu, DeckId(deck_id))
+
+        menu.addSeparator()
+
+        # Add AnkiHub section header
+        label_action = menu.addAction("ANKIHUB")
+        label_action.setEnabled(False)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        label_action.setFont(font)
+
+        _setup_update_subdeck_due_date(menu, did)
+        _setup_remove_block_exam_subdeck(menu, did)
 
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
