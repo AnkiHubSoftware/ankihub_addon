@@ -37,7 +37,7 @@ from ankihub.main.block_exam_subdecks import (
     remove_block_exam_subdeck_config,
     set_subdeck_due_date,
 )
-from ankihub.settings import BlockExamSubdeckConfig
+from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
 
 from ..factories import (
     AnkiHubImportResultFactory,
@@ -2349,10 +2349,14 @@ class TestPrivateConfigMigrations:
             valid_due_date1 = "2025-12-31"
             valid_due_date2 = "2026-01-15"
             config.upsert_block_exam_subdeck(
-                BlockExamSubdeckConfig(subdeck_id=DeckId(subdeck1_id), due_date=valid_due_date1)
+                DeckId(subdeck1_id),
+                due_date=valid_due_date1,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
             config.upsert_block_exam_subdeck(
-                BlockExamSubdeckConfig(subdeck_id=DeckId(subdeck2_id), due_date=valid_due_date2)
+                DeckId(subdeck2_id),
+                due_date=valid_due_date2,
+                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             )
 
             # Verify valid configs were added
@@ -3549,12 +3553,20 @@ class TestSetSubdeckDueDate:
     def test_set_subdeck_due_date_success(self, mock_config, mock_aqt):
         """Test successfully setting a new due date."""
         mock_aqt.mw.col.decks.get.return_value = {"name": "Test Subdeck"}  # Mock subdeck exists
-        mock_config.get_block_exam_subdeck_due_date.return_value = "2024-12-31"
 
-        set_subdeck_due_date(DeckId(456), "2025-06-15")
+        # Mock existing config to return an old due date
+        existing_config = BlockExamSubdeckConfig(
+            subdeck_id=DeckId(456),
+            due_date="2024-12-31",
+            config_origin=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+        )
+        mock_config.get_block_exam_subdeck_config.return_value = existing_config
 
-        expected_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2025-06-15")
-        mock_config.upsert_block_exam_subdeck.assert_called_once_with(expected_config)
+        set_subdeck_due_date(DeckId(456), "2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+
+        mock_config.upsert_block_exam_subdeck.assert_called_once_with(
+            DeckId(456), due_date="2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+        )
 
 
 class TestRemoveBlockExamSubdeckConfig:

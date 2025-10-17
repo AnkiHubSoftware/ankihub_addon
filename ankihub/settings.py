@@ -114,6 +114,13 @@ class BehaviorOnRemoteNoteDeleted(Enum):
     NEVER_DELETE = "Never"
 
 
+class BlockExamSubdeckConfigOrigin(Enum):
+    """How the block exam subdeck config was created."""
+
+    SMART_SEARCH_DIALOG = "smart_search_dialog"
+    DECK_CONTEXT_MENU = "deck_context_menu"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
@@ -172,6 +179,7 @@ class DeckExtensionConfig(DataClassJSONMixin):
 class BlockExamSubdeckConfig(DataClassJSONMixin):
     subdeck_id: DeckId
     due_date: Optional[str] = None  # YYYY-MM-DD format
+    config_origin: Optional[BlockExamSubdeckConfigOrigin] = None
 
 
 @dataclass
@@ -502,14 +510,40 @@ class _Config:
         )
         return subdeck_config
 
-    def upsert_block_exam_subdeck(self, config_item: BlockExamSubdeckConfig) -> None:
-        """Add or update a block exam subdeck configuration."""
+    def upsert_block_exam_subdeck(
+        self,
+        subdeck_id: DeckId,
+        *,
+        due_date: Optional[str],
+        origin_hint: BlockExamSubdeckConfigOrigin,
+    ) -> BlockExamSubdeckConfig:
+        """Add or update a block exam subdeck configuration.
+
+        Preserves existing config_origin if one exists, otherwise uses origin_hint.
+
+        Args:
+            subdeck_id: The Anki subdeck ID
+            due_date: Due date in YYYY-MM-DD format, or None
+            origin_hint: Origin to use if creating a new config
+
+        Returns:
+            The upserted configuration
+        """
         current = self.get_block_exam_subdecks()
-        # Remove existing entry with same subdeck_id
-        current = [c for c in current if c.subdeck_id != config_item.subdeck_id]
-        current.append(config_item)
-        self._private_config.block_exams_subdecks = current
+        existing = next((c for c in current if c.subdeck_id == subdeck_id), None)
+
+        effective_origin = existing.config_origin if (existing and existing.config_origin) else origin_hint
+
+        updated = BlockExamSubdeckConfig(
+            subdeck_id=subdeck_id,
+            due_date=due_date,
+            config_origin=effective_origin,
+        )
+
+        self._private_config.block_exams_subdecks = [c for c in current if c.subdeck_id != subdeck_id] + [updated]
         self._update_private_config()
+
+        return updated
 
     def get_block_exam_subdeck_due_date(self, subdeck_id: DeckId) -> Optional[str]:
         """Get due date for a specific block exam subdeck."""
