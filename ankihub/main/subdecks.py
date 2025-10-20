@@ -295,34 +295,38 @@ def _subdeck_name_to_tag(deck_name: str) -> str:
     return result
 
 
-def get_tag_based_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
-    """Get subdecks that are tag-based.
+def is_tag_based_subdeck(subdeck_id: DeckId) -> bool:
+    """Check if a subdeck is tag-based.
 
     A subdeck is considered tag-based if there exists at least one note anywhere
     in the collection with a subdeck tag matching the subdeck's path.
 
     Args:
-        root_deck_id: The root deck ID
+        subdeck_id: The subdeck ID to check
 
     Returns:
-        List of (subdeck_name, subdeck_id) tuples for tag-based subdecks.
+        True if the subdeck is tag-based, False otherwise.
     """
+    # TODO We need to restrict the notes to those belonging to the AnkiHub deck somehow
+    # or restrict the subdeck tags.
+    # Otherwise there could be false positives if there are multiple AnkiHub decks
+    # with subdecks and notes from one deck have subdeck tags matching subdecks
+    # of another deck.
+    # We can probably use note_ids_in_deck_hierarchy
+    # It's probably better to use tag-information from the ankihub_db instead
+    # Or both?
 
-    # Get all child decks
-    child_decks = aqt.mw.col.decks.children(root_deck_id)
+    # Get subdeck path relative to root
+    full_subdeck_name = aqt.mw.col.decks.name(subdeck_id)
 
-    tag_based_subdecks = []
+    # Check if this is a subdeck (has a parent)
+    if "::" not in full_subdeck_name:
+        return False
 
-    for subdeck_name, subdeck_id in child_decks:
-        # Get subdeck path relative to root
-        full_subdeck_name = aqt.mw.col.decks.name(subdeck_id)
-        subdeck_path = full_subdeck_name.split("::", maxsplit=1)[1]
+    subdeck_path = full_subdeck_name.split("::", maxsplit=1)[1]
 
-        # Check if any notes have subdeck tags matching this path
-        tag_pattern = f"^{SUBDECK_TAG}::[^:]+::{re.escape(subdeck_path)}$"
-        matching_nids = aqt.mw.col.find_notes(f'tag:"re:{tag_pattern}"')
+    # Check if any notes have subdeck tags matching this path
+    tag_pattern = f"^{SUBDECK_TAG}::[^:]+::{re.escape(subdeck_path)}$"
+    matching_nids = aqt.mw.col.find_notes(f'tag:"re:{tag_pattern}"')
 
-        if matching_nids:
-            tag_based_subdecks.append((subdeck_name, subdeck_id))
-
-    return tag_based_subdecks
+    return bool(matching_nids)

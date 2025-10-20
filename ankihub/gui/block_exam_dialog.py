@@ -28,6 +28,7 @@ from ..main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
 )
+from ..main.subdecks import is_tag_based_subdeck
 from ..settings import BlockExamSubdeckConfigOrigin, config
 from .utils import clear_layout
 
@@ -368,19 +369,19 @@ class BlockExamSubdeckDialog(QDialog):
         """Populate the subdeck list widget."""
         self.subdeck_list.clear()
 
-        # Get ALL subdecks under the root deck (including nested ones)
-        all_subdecks = []
-
-        for deck_name, deck_id in aqt.mw.col.decks.children(self.root_deck_id):
-            subdeck_path = deck_name[len(self.root_deck["name"]) + 2 :]
-            all_subdecks.append((subdeck_path, deck_id))
+        # Get ALL subdecks under the root deck (including nested ones), excluding tag-based subdecks
+        all_subdecks = [
+            (deck_name, deck_id)
+            for deck_name, deck_id in aqt.mw.col.decks.children(self.root_deck_id)
+            if not is_tag_based_subdeck(deck_id)  # Skip tag-based subdecks
+        ]
 
         # Sort subdecks alphabetically by name
         all_subdecks.sort(key=lambda x: x[0].lower())
 
         # Add all subdecks to the list
         for subdeck_name, subdeck_id in all_subdecks:
-            item = QListWidgetItem(subdeck_name)
+            item = QListWidgetItem(subdeck_name[len(self.root_deck["name"]) + 2 :])
             item.setData(Qt.ItemDataRole.UserRole, subdeck_id)
 
             # Mark block exam subdecks differently (optional visual indication)
