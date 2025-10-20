@@ -283,7 +283,6 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     LOGGER.info(
         "subdeck_reminder_dialog_shown",
         action_source="due_date_reminder_dialog",
-        subdeck_id=subdeck_config.subdeck_id,
         subdeck_name=get_subdeck_name_without_parent(subdeck_config.subdeck_id),
         subdeck_full_name=subdeck["name"],
         ankihub_deck_id=ah_did,
