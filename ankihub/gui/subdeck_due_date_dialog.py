@@ -121,7 +121,12 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
-        set_subdeck_due_date(self.subdeck_config.subdeck_id, None, origin_hint=self.subdeck_config.config_origin)
+        set_subdeck_due_date(
+            self.subdeck_config.subdeck_id,
+            None,
+            origin_hint=self.subdeck_config.config_origin,
+            action_source="due_date_reminder_dialog",
+        )
         self.accept()
         tooltip(f"<b>{self.subdeck_name}</b> kept with no due date set.", parent=aqt.mw)
 
@@ -135,6 +140,7 @@ class SubdeckDueDateDialog(QDialog):
             self.subdeck_config.subdeck_id,
             self.subdeck_config.due_date,
             parent=self,
+            action_source="due_date_reminder_dialog",
         )
         qconnect(date_picker_dialog.accepted, self.accept)
         date_picker_dialog.show()
@@ -148,11 +154,13 @@ class DatePickerDialog(QDialog):
         subdeck_id: DeckId,
         initial_due_date: Optional[str] = None,
         parent=None,
+        action_source: Optional[str] = None,
     ):
         super().__init__(parent)
         self.subdeck_id = subdeck_id
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_id)
         self.initial_due_date = initial_due_date
+        self.action_source = action_source
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -234,7 +242,12 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        set_subdeck_due_date(
+            self.subdeck_id,
+            selected_date_str,
+            BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU,
+            action_source=self.action_source,
+        )
         self.accept()
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)

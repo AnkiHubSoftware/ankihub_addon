@@ -245,7 +245,10 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
 
 
 def set_subdeck_due_date(
-    subdeck_id: DeckId, new_due_date: Optional[str], origin_hint: BlockExamSubdeckConfigOrigin
+    subdeck_id: DeckId,
+    new_due_date: Optional[str],
+    origin_hint: BlockExamSubdeckConfigOrigin,
+    action_source: Optional[str] = None,
 ) -> None:
     """Set or clear the due date for a block exam subdeck.
 
@@ -273,11 +276,16 @@ def set_subdeck_due_date(
         origin_hint=origin_hint,
     )
 
+    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
     LOGGER.info(
-        "Updated subdeck due date",
+        "subdeck_due_date_changed",
+        action_source=action_source,
+        ankihub_deck_id=ah_did,
         subdeck_id=subdeck_id,
+        subdeck_name=get_subdeck_name_without_parent(subdeck_id),
+        subdeck_full_name=subdeck["name"],
         old_due_date=old_due_date,
-        new_due_date=new_due_date,
+        due_date=new_due_date,
     )
 
 

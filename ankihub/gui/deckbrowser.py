@@ -59,6 +59,7 @@ def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: O
         subdeck_id=subdeck_id,
         initial_due_date=initial_due_date,
         parent=aqt.mw,
+        action_source="deck_context_menu",
     )
     _dialog_state.dialog.show()
 
