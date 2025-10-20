@@ -76,7 +76,7 @@ def create_block_exam_subdeck(
     aqt.mw.col.decks.update(subdeck)
 
     # Save configuration
-    config.upsert_block_exam_subdeck(
+    subdeck_config = config.upsert_block_exam_subdeck(
         subdeck_id,
         due_date=due_date,
         origin_hint=origin_hint,
@@ -90,7 +90,7 @@ def create_block_exam_subdeck(
         ankihub_deck_id=config.get_deck_uuid_by_did(root_deck_id),
         subdeck_name=subdeck_name,
         subdeck_full_name=subdeck["name"],
-        subdeck_id=subdeck_id,
+        subdeck_config=subdeck_config.to_dict(),
         due_date=due_date,
         was_renamed=was_renamed,
     )
@@ -159,7 +159,7 @@ def add_notes_to_block_exam_subdeck(
             unsuspend_cards(parent=aqt.mw, card_ids=card_ids).run_in_background()
 
     # Update configuration
-    config.upsert_block_exam_subdeck(
+    subdeck_config = config.upsert_block_exam_subdeck(
         subdeck["id"],
         due_date=due_date,
         origin_hint=origin_hint,
@@ -172,6 +172,7 @@ def add_notes_to_block_exam_subdeck(
         ankihub_deck_id=ah_did,
         subdeck_name=subdeck_name,
         subdeck_full_name=subdeck["name"],
+        subdeck_config=subdeck_config.to_dict(),
         requested_count=len(note_ids),
         actually_moved=len(notes_to_move),
         due_date=due_date,
@@ -249,9 +250,9 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[str] =
         "subdeck_merged_into_main_deck",
         action_source=action_source,
         ankihub_deck_id=ah_did,
-        subdeck_id=subdeck_id,
         subdeck_name=get_subdeck_name_without_parent(subdeck_id),
         subdeck_full_name=subdeck["name"],
+        subdeck_config=subdeck_config.to_dict() if subdeck_config else None,
         due_date=subdeck_config.due_date if subdeck_config else None,
     )
 
@@ -284,7 +285,7 @@ def set_subdeck_due_date(
     existing_config = config.get_block_exam_subdeck_config(subdeck_id)
     old_due_date = existing_config.due_date if existing_config else None
 
-    config.upsert_block_exam_subdeck(
+    subdeck_config = config.upsert_block_exam_subdeck(
         subdeck_id,
         due_date=new_due_date,
         origin_hint=origin_hint,
@@ -295,9 +296,9 @@ def set_subdeck_due_date(
         "subdeck_due_date_changed",
         action_source=action_source,
         ankihub_deck_id=ah_did,
-        subdeck_id=subdeck_id,
         subdeck_name=get_subdeck_name_without_parent(subdeck_id),
         subdeck_full_name=subdeck["name"],
+        subdeck_config=subdeck_config.to_dict(),
         old_due_date=old_due_date,
         due_date=new_due_date,
     )
