@@ -9,8 +9,9 @@ from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
-from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
+from ..main.block_exam_subdecks import dissolve_block_exam_subdeck, get_subdeck_name_without_parent
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
+from ..main.subdecks import is_tag_based_subdeck
 from ..settings import config
 from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import DatePickerDialog
@@ -70,7 +71,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        note_count = move_subdeck_to_main_deck(subdeck_id)
+        note_count = dissolve_block_exam_subdeck(subdeck_id)
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)
@@ -98,23 +99,30 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
     )
 
 
-def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId) -> None:
+def _setup_update_subdeck_due_date(menu: QMenu, subdeck_did: DeckId, is_tag_based: bool) -> None:
     action = menu.addAction("Set due date")
 
-    initial_due_date = config.get_block_exam_subdeck_due_date(subdeck_did)
+    if is_tag_based:
+        action.setEnabled(False)
+        action.setToolTip("This subdeck is tag-based and cannot be managed as a block exam subdeck.")
+    else:
+        initial_due_date = config.get_block_exam_subdeck_due_date(subdeck_did)
+        action.setToolTip("Set the due date of this subdeck.")
+        qconnect(
+            action.triggered,
+            lambda: _open_date_picker_dialog_for_subdeck(subdeck_did, initial_due_date),
+        )
 
-    action.setToolTip("Set the due date of this subdeck.")
-    qconnect(
-        action.triggered,
-        lambda: _open_date_picker_dialog_for_subdeck(subdeck_did, initial_due_date),
-    )
 
-
-def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId) -> None:
+def _setup_remove_block_exam_subdeck(menu: QMenu, subdeck_did: DeckId, is_tag_based: bool) -> None:
     action = menu.addAction("Merge into parent deck")
 
-    action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
-    qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_did))
+    if is_tag_based:
+        action.setEnabled(False)
+        action.setToolTip("This subdeck is tag-based and cannot be managed as a block exam subdeck.")
+    else:
+        action.setToolTip("Deletes the subdeck and moves all notes back into the main deck.")
+        qconnect(action.triggered, lambda: _open_remove_block_exam_subdeck_dialog(subdeck_did))
 
 
 def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
@@ -137,8 +145,9 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
         font.setPointSize(10)
         label_action.setFont(font)
 
-        _setup_update_subdeck_due_date(menu, did)
-        _setup_remove_block_exam_subdeck(menu, did)
+        is_tag_based = is_tag_based_subdeck(did)
+        _setup_update_subdeck_due_date(menu, did, is_tag_based)
+        _setup_remove_block_exam_subdeck(menu, did, is_tag_based)
 
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",

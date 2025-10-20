@@ -11,7 +11,10 @@ from aqt.operations.scheduling import unsuspend_cards
 
 from .. import LOGGER
 from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
-from .utils import move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
+from .utils import (
+    move_notes_to_decks_while_respecting_odid,
+    note_ids_in_deck_hierarchy,
+)
 
 
 def get_root_deck_id_from_subdeck(subdeck_id: DeckId) -> DeckId:
@@ -189,15 +192,17 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
-    """Move all notes from a subdeck back to the root deck, delete the subdeck,
-    and remove its configuration (if it exists).
+def dissolve_block_exam_subdeck(subdeck_id: DeckId) -> int:
+    """Remove a block exam subdeck and move its notes back to the root deck.
+
+    If the root deck is an AnkiHub deck with subdecks enabled, notes will be
+    redistributed to tag-based subdecks after being moved to the root deck.
 
     Args:
         subdeck_id: The Anki subdeck ID
 
     Returns:
-        The number of notes moved to the root deck
+        The number of notes moved from the subdeck
 
     Raises:
         ValueError: If the provided deck is a root deck (not a subdeck)
@@ -223,6 +228,14 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
         LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=note_count)
 
     aqt.mw.col.decks.remove([subdeck_id])
+
+    # If the root deck is managed by AnkiHub and has subdecks enabled, move notes to subdecks
+    # based on subdeck tags
+    ah_did = config.get_deck_uuid_by_did(root_deck_id)
+    if ah_did and config.deck_config(ah_did).subdecks_enabled and note_ids:
+        from .subdecks import build_subdecks_and_move_cards_to_them
+
+        build_subdecks_and_move_cards_to_them(ah_did, note_ids)
 
     LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
 
