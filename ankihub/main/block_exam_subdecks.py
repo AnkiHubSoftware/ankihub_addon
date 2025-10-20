@@ -54,6 +54,7 @@ def create_block_exam_subdeck(
     root_deck_id: DeckId,
     subdeck_name: str,
     due_date: Optional[str],
+    *,
     origin_hint: BlockExamSubdeckConfigOrigin,
     action_source: Optional[ActionSource] = None,
 ) -> Tuple[str, bool]:
@@ -122,6 +123,7 @@ def add_notes_to_block_exam_subdeck(
     subdeck_name: str,
     note_ids: List[NoteId],
     due_date: Optional[str],
+    *,
     origin_hint: BlockExamSubdeckConfigOrigin,
     unsuspend_notes: bool = False,
     action_source: Optional[ActionSource] = None,
@@ -221,7 +223,7 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[ActionSource] = None) -> int:
+def move_subdeck_to_main_deck(subdeck_id: DeckId, *, action_source: Optional[ActionSource] = None) -> int:
     """Move all notes from a subdeck back to the root deck, delete the subdeck,
     and remove its configuration (if it exists).
 
@@ -274,6 +276,7 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[Action
 def set_subdeck_due_date(
     subdeck_id: DeckId,
     new_due_date: Optional[str],
+    *,
     origin_hint: BlockExamSubdeckConfigOrigin,
     action_source: Optional[ActionSource] = None,
 ) -> None:

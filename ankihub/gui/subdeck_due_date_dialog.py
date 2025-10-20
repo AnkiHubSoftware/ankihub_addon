@@ -154,6 +154,7 @@ class SubdeckDueDatePickerDialog(QDialog):
     def __init__(
         self,
         subdeck_id: DeckId,
+        *,
         origin_hint: BlockExamSubdeckConfigOrigin,
         initial_due_date: Optional[str] = None,
         parent=None,
