@@ -3569,10 +3569,14 @@ class TestSetSubdeckDueDate:
 class TestHandleExpiredSubdeck:
     """Tests for handle_expired_subdeck function."""
 
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_root_deck_id_from_subdeck")
     @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_name_without_parent")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateDialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class, mock_get_name):
+    @patch("ankihub.gui.subdeck_due_date_dialog.config")
+    def test_handle_expired_subdeck_success(
+        self, mock_config, mock_aqt, mock_dialog_class, mock_get_name, mock_get_root_deck_id
+    ):
         """Test successfully handling an expired subdeck."""
         subdeck_name = "Exam Subdeck"
         mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
@@ -3582,6 +3586,8 @@ class TestHandleExpiredSubdeck:
         mock_dialog_class.return_value = mock_dialog
 
         mock_get_name.return_value = subdeck_name
+        mock_get_root_deck_id.return_value = DeckId(123)
+        mock_config.get_deck_uuid_by_did.return_value = "test-uuid"
 
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
 
