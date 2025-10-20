@@ -16,7 +16,7 @@ from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
 )
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import config
+from ..settings import ActionSource, config
 from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import DatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
@@ -50,7 +50,7 @@ def setup() -> None:
         ah_did = config.get_deck_uuid_by_did(root_deck_id)
         LOGGER.info(
             "block_exam_subdeck_deleted",
-            action_source="deck_context_menu",
+            action_source=ActionSource.DECK_CONTEXT_MENU,
             ankihub_deck_id=ah_did,
             subdeck_name=get_subdeck_name_without_parent(did),
             subdeck_full_name=subdeck["name"],
@@ -91,7 +91,7 @@ def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: O
         subdeck_id=subdeck_id,
         initial_due_date=initial_due_date,
         parent=aqt.mw,
-        action_source="deck_context_menu",
+        action_source=ActionSource.DECK_CONTEXT_MENU,
     )
     _dialog_state.dialog.show()
 
@@ -103,7 +103,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        note_count = move_subdeck_to_main_deck(subdeck_id, action_source="deck_context_menu")
+        note_count = move_subdeck_to_main_deck(subdeck_id, action_source=ActionSource.DECK_CONTEXT_MENU)
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)

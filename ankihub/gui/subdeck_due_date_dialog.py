@@ -18,7 +18,7 @@ from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
+from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 
 
 @dataclass
@@ -38,7 +38,7 @@ class SubdeckDueDateDialog(QDialog):
         super().__init__(parent)
         self.subdeck_config = subdeck_config
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
-        self.action_source = "due_date_reminder_dialog"
+        self.action_source = ActionSource.DUE_DATE_REMINDER
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -155,7 +155,7 @@ class DatePickerDialog(QDialog):
         subdeck_id: DeckId,
         initial_due_date: Optional[str] = None,
         parent=None,
-        action_source: Optional[str] = None,
+        action_source: Optional[ActionSource] = None,
     ):
         super().__init__(parent)
         self.subdeck_id = subdeck_id
@@ -282,7 +282,7 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_config.subdeck_id))
     LOGGER.info(
         "subdeck_reminder_dialog_shown",
-        action_source="due_date_reminder_dialog",
+        action_source=ActionSource.DUE_DATE_REMINDER,
         subdeck_name=get_subdeck_name_without_parent(subdeck_config.subdeck_id),
         subdeck_full_name=subdeck["name"],
         ankihub_deck_id=ah_did,

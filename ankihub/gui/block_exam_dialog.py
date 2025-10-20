@@ -28,7 +28,7 @@ from ..main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
     create_block_exam_subdeck,
 )
-from ..settings import BlockExamSubdeckConfigOrigin, config
+from ..settings import ActionSource, BlockExamSubdeckConfigOrigin, config
 from .utils import clear_layout
 
 
@@ -46,7 +46,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_name: Optional[str] = None
         self.selected_subdeck_id: Optional[DeckId] = None
 
-        self.action_source = "smart_search_flow"
+        self.action_source = ActionSource.SMART_SEARCH
 
         self.setModal(True)
         self.setMinimumWidth(440)

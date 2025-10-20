@@ -121,6 +121,14 @@ class BlockExamSubdeckConfigOrigin(Enum):
     DECK_CONTEXT_MENU = "deck_context_menu"
 
 
+class ActionSource(Enum):
+    """Source of user actions for telemetry logging."""
+
+    SMART_SEARCH = "smart_search_flow"
+    DECK_CONTEXT_MENU = "deck_context_menu"
+    DUE_DATE_REMINDER = "due_date_reminder_dialog"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId

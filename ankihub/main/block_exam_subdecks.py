@@ -10,7 +10,7 @@ from anki.utils import ids2str
 from aqt.operations.scheduling import unsuspend_cards
 
 from .. import LOGGER
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
+from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
 from .utils import move_notes_to_decks_while_respecting_odid, note_ids_in_deck_hierarchy
 
 
@@ -32,7 +32,7 @@ def create_block_exam_subdeck(
     subdeck_name: str,
     due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
-    action_source: Optional[str] = None,
+    action_source: Optional[ActionSource] = None,
 ) -> Tuple[str, bool]:
     """Create a new block exam subdeck and its configuration.
 
@@ -105,7 +105,7 @@ def add_notes_to_block_exam_subdeck(
     due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
     unsuspend_notes: bool = False,
-    action_source: Optional[str] = None,
+    action_source: Optional[ActionSource] = None,
 ) -> int:
     """Add notes to a block exam subdeck and create/update its configuration.
 
@@ -207,7 +207,7 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[str] = None) -> int:
+def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[ActionSource] = None) -> int:
     """Move all notes from a subdeck back to the root deck, delete the subdeck,
     and remove its configuration (if it exists).
 
@@ -263,7 +263,7 @@ def set_subdeck_due_date(
     subdeck_id: DeckId,
     new_due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
-    action_source: Optional[str] = None,
+    action_source: Optional[ActionSource] = None,
 ) -> None:
     """Set or clear the due date for a block exam subdeck.
 
