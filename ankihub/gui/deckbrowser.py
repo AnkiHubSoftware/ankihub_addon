@@ -9,7 +9,12 @@ from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
-from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
+from .. import LOGGER
+from ..main.block_exam_subdecks import (
+    get_root_deck_id_from_subdeck,
+    get_subdeck_name_without_parent,
+    move_subdeck_to_main_deck,
+)
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import config
 from .operations.user_details import check_user_feature_access
@@ -30,6 +35,28 @@ _dialog_state = _DatePickerDialogState()
 def setup() -> None:
     """Ask the user if they want to unsubscribe from the AnkiHub deck when they delete the associated Anki deck."""
 
+    def _before_anki_deck_deleted(did: DeckId) -> None:
+        """Log subdeck deletion before the deck is deleted."""
+        # Check if this is a subdeck (has parents) and not a filtered deck
+        if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
+            return
+
+        subdeck_config = config.get_block_exam_subdeck_config(did)
+        if not subdeck_config:
+            return
+
+        subdeck = aqt.mw.col.decks.get(did)
+        root_deck_id = get_root_deck_id_from_subdeck(did)
+        ah_did = config.get_deck_uuid_by_did(root_deck_id)
+        LOGGER.info(
+            "block_exam_subdeck_deleted",
+            action_source="deck_context_menu",
+            ankihub_deck_id=ah_did,
+            subdeck_name=get_subdeck_name_without_parent(did),
+            subdeck_full_name=subdeck["name"],
+            subdeck_config=subdeck_config.to_dict(),
+        )
+
     def _after_anki_deck_deleted(did: DeckId) -> None:
         deck_ankihub_id = config.get_deck_uuid_by_did(did)
         if not deck_ankihub_id:
@@ -47,6 +74,11 @@ def setup() -> None:
         ):
             unsubscribe_from_deck_and_uninstall(deck_ankihub_id)
 
+    aqt.mw.deckBrowser._delete = wrap(  # type: ignore
+        old=aqt.mw.deckBrowser._delete,
+        new=_before_anki_deck_deleted,
+        pos="before",
+    )
     aqt.mw.deckBrowser._delete = wrap(  # type: ignore
         old=aqt.mw.deckBrowser._delete,
         new=_after_anki_deck_deleted,
