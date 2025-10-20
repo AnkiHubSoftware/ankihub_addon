@@ -189,12 +189,15 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
+def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
     """Move all notes from a subdeck back to the root deck, delete the subdeck,
     and remove its configuration (if it exists).
 
     Args:
         subdeck_id: The Anki subdeck ID
+
+    Returns:
+        The number of notes moved to the root deck
 
     Raises:
         ValueError: If the provided deck is a root deck (not a subdeck)
@@ -205,24 +208,28 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> None:
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config if exists", subdeck_id=subdeck_id)
         if subdeck_config:
-            remove_block_exam_subdeck_config(subdeck_config)
-        return
+            config.remove_block_exam_subdeck(subdeck_id)
+        return 0
 
     root_deck_id = get_root_deck_id_from_subdeck(subdeck_id)
     if root_deck_id == subdeck_id:
         raise ValueError("The provided deck isn't a subdeck.")
 
     note_ids = note_ids_in_deck_hierarchy(subdeck_id)
+    note_count = len(note_ids) if note_ids else 0
+
     if note_ids:
         move_notes_to_decks_while_respecting_odid({nid: root_deck_id for nid in note_ids})
-        LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=len(note_ids))
+        LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=note_count)
 
     aqt.mw.col.decks.remove([subdeck_id])
 
     LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
 
     if subdeck_config:
-        remove_block_exam_subdeck_config(subdeck_config)
+        config.remove_block_exam_subdeck(subdeck_id)
+
+    return note_count
 
 
 def set_subdeck_due_date(
@@ -260,15 +267,6 @@ def set_subdeck_due_date(
         old_due_date=old_due_date,
         new_due_date=new_due_date,
     )
-
-
-def remove_block_exam_subdeck_config(subdeck_config: BlockExamSubdeckConfig) -> None:
-    """Remove a block exam subdeck configuration.
-
-    Args:
-        subdeck_config: Configuration to remove
-    """
-    config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
 
 
 def get_exam_subdecks(root_deck_id: DeckId) -> list[tuple[str, DeckId]]:
