@@ -44,6 +44,7 @@ def get_subdeck_log_context(subdeck_id: DeckId, action_source: Optional[ActionSo
     return {
         "action_source": action_source,
         "ankihub_deck_id": config.get_deck_uuid_by_did(root_deck_id),
+        "subdeck_id": subdeck_id,
         "subdeck_name": get_subdeck_name_without_parent(subdeck_id),
         "subdeck_full_name": subdeck["name"],
         "subdeck_config": subdeck_config.to_dict() if subdeck_config else None,
