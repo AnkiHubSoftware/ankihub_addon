@@ -38,6 +38,7 @@ class SubdeckDueDateDialog(QDialog):
         super().__init__(parent)
         self.subdeck_config = subdeck_config
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
+        self.action_source = "due_date_reminder_dialog"
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -114,7 +115,7 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
+        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id, action_source=self.action_source)
         tooltip(f"{note_count} notes merged into the parent deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
@@ -125,7 +126,7 @@ class SubdeckDueDateDialog(QDialog):
             self.subdeck_config.subdeck_id,
             None,
             origin_hint=self.subdeck_config.config_origin,
-            action_source="due_date_reminder_dialog",
+            action_source=self.action_source,
         )
         self.accept()
         tooltip(f"<b>{self.subdeck_name}</b> kept with no due date set.", parent=aqt.mw)
@@ -140,7 +141,7 @@ class SubdeckDueDateDialog(QDialog):
             self.subdeck_config.subdeck_id,
             self.subdeck_config.due_date,
             parent=self,
-            action_source="due_date_reminder_dialog",
+            action_source=self.action_source,
         )
         qconnect(date_picker_dialog.accepted, self.accept)
         date_picker_dialog.show()

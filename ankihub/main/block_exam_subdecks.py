@@ -201,7 +201,7 @@ def check_block_exam_subdeck_due_dates() -> List[BlockExamSubdeckConfig]:
     return expired_subdecks
 
 
-def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
+def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[str] = None) -> int:
     """Move all notes from a subdeck back to the root deck, delete the subdeck,
     and remove its configuration (if it exists).
 
@@ -236,10 +236,19 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId) -> int:
 
     aqt.mw.col.decks.remove([subdeck_id])
 
-    LOGGER.info("Successfully moved subdeck to root deck", subdeck_name=subdeck["name"])
-
     if subdeck_config:
         config.remove_block_exam_subdeck(subdeck_id)
+
+    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
+    LOGGER.info(
+        "subdeck_merged_into_main_deck",
+        action_source=action_source,
+        ankihub_deck_id=ah_did,
+        subdeck_id=subdeck_id,
+        subdeck_name=get_subdeck_name_without_parent(subdeck_id),
+        subdeck_full_name=subdeck["name"],
+        due_date=subdeck_config.due_date if subdeck_config else None,
+    )
 
     return note_count
 

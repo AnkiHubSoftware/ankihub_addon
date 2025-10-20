@@ -71,7 +71,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        note_count = move_subdeck_to_main_deck(subdeck_id)
+        note_count = move_subdeck_to_main_deck(subdeck_id, action_source="deck_context_menu")
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)
