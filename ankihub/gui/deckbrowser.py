@@ -16,9 +16,9 @@ from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
 )
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import ActionSource, config
+from ..settings import ActionSource, BlockExamSubdeckConfigOrigin, config
 from .operations.user_details import check_user_feature_access
-from .subdeck_due_date_dialog import DatePickerDialog
+from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
 
 
@@ -80,8 +80,9 @@ def setup() -> None:
 
 
 def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: Optional[str]) -> None:
-    _dialog_state.dialog = DatePickerDialog(
+    _dialog_state.dialog = SubdeckDueDatePickerDialog(
         subdeck_id=subdeck_id,
+        origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU,
         initial_due_date=initial_due_date,
         parent=aqt.mw,
         action_source=ActionSource.DECK_CONTEXT_MENU,
