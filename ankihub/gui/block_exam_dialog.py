@@ -451,6 +451,7 @@ class BlockExamSubdeckDialog(QDialog):
             name,
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            creation_source="smart_search_flow",
         )
 
         # Add notes to the new subdeck
@@ -525,6 +526,7 @@ class BlockExamSubdeckDialog(QDialog):
             conflicting_name,
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            creation_source="smart_search_flow",
         )
 
         added_count = add_notes_to_block_exam_subdeck(

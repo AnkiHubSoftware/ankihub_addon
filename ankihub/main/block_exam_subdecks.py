@@ -32,6 +32,7 @@ def create_block_exam_subdeck(
     subdeck_name: str,
     due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
+    action_source: Optional[str] = None,
 ) -> Tuple[str, bool]:
     """Create a new block exam subdeck and its configuration.
 
@@ -81,9 +82,19 @@ def create_block_exam_subdeck(
         origin_hint=origin_hint,
     )
 
-    LOGGER.info("Created block exam subdeck", subdeck_name=subdeck_name, subdeck_id=subdeck_id, due_date=due_date)
+    was_renamed = subdeck_name != original_name
 
-    return subdeck_name, subdeck_name != original_name
+    LOGGER.info(
+        "block_exam_subdeck_created",
+        action_source=action_source,
+        ankihub_deck_id=config.get_deck_uuid_by_did(root_deck_id),
+        subdeck_name=subdeck_name,
+        subdeck_id=subdeck_id,
+        due_date=due_date,
+        was_renamed=was_renamed,
+    )
+
+    return subdeck_name, was_renamed
 
 
 def add_notes_to_block_exam_subdeck(
