@@ -105,6 +105,7 @@ def add_notes_to_block_exam_subdeck(
     due_date: Optional[str],
     origin_hint: BlockExamSubdeckConfigOrigin,
     unsuspend_notes: bool = False,
+    action_source: Optional[str] = None,
 ) -> int:
     """Add notes to a block exam subdeck and create/update its configuration.
 
@@ -164,9 +165,13 @@ def add_notes_to_block_exam_subdeck(
         origin_hint=origin_hint,
     )
 
+    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
     LOGGER.info(
-        "Added notes to block exam subdeck",
+        "block_exam_subdeck_notes_added",
+        action_source=action_source,
+        ankihub_deck_id=ah_did,
         subdeck_name=subdeck_name,
+        subdeck_full_name=subdeck["name"],
         requested_count=len(note_ids),
         actually_moved=len(notes_to_move),
         due_date=due_date,

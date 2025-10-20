@@ -46,6 +46,8 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_name: Optional[str] = None
         self.selected_subdeck_id: Optional[DeckId] = None
 
+        self.action_source = "smart_search_flow"
+
         self.setModal(True)
         self.setMinimumWidth(440)
 
@@ -451,7 +453,7 @@ class BlockExamSubdeckDialog(QDialog):
             name,
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
-            creation_source="smart_search_flow",
+            action_source=self.action_source,
         )
 
         # Add notes to the new subdeck
@@ -462,6 +464,7 @@ class BlockExamSubdeckDialog(QDialog):
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+            action_source=self.action_source,
         )
 
         # Show success message
@@ -494,6 +497,7 @@ class BlockExamSubdeckDialog(QDialog):
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+            action_source=self.action_source,
         )
 
         tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
@@ -526,7 +530,7 @@ class BlockExamSubdeckDialog(QDialog):
             conflicting_name,
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
-            creation_source="smart_search_flow",
+            action_source=self.action_source,
         )
 
         added_count = add_notes_to_block_exam_subdeck(
@@ -536,6 +540,7 @@ class BlockExamSubdeckDialog(QDialog):
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+            action_source=self.action_source,
         )
 
         tooltip(f"{added_count} note(s) added to '{actual_name}'")
@@ -563,6 +568,7 @@ class BlockExamSubdeckDialog(QDialog):
             due_date,
             origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
             unsuspend_notes=self.unsuspend_checkbox.isChecked(),
+            action_source=self.action_source,
         )
 
         # Show success message and close
