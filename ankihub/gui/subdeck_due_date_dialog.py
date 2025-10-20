@@ -13,7 +13,7 @@ from aqt.utils import tooltip
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
     check_block_exam_subdeck_due_dates,
-    get_root_deck_id_from_subdeck,
+    get_subdeck_log_context,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
@@ -279,13 +279,9 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.show()
 
-    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_config.subdeck_id))
     LOGGER.info(
         "subdeck_reminder_dialog_shown",
-        action_source=ActionSource.DUE_DATE_REMINDER,
-        subdeck_name=get_subdeck_name_without_parent(subdeck_config.subdeck_id),
-        subdeck_full_name=subdeck["name"],
-        ankihub_deck_id=ah_did,
+        **get_subdeck_log_context(subdeck_config.subdeck_id, ActionSource.DUE_DATE_REMINDER),
         due_date=subdeck_config.due_date,
     )
 

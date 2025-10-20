@@ -27,6 +27,29 @@ def get_root_deck_id_from_subdeck(subdeck_id: DeckId) -> DeckId:
     return parents[0]["id"] if parents else subdeck_id
 
 
+def get_subdeck_log_context(subdeck_id: DeckId, action_source: Optional[ActionSource] = None) -> dict:
+    """Get common logging context for subdeck operations.
+
+    Args:
+        subdeck_id: The ID of the subdeck
+        action_source: Source of the action triggering the log
+
+    Returns:
+        Dictionary with common logging fields for subdeck operations
+    """
+    subdeck = aqt.mw.col.decks.get(subdeck_id)
+    root_deck_id = get_root_deck_id_from_subdeck(subdeck_id)
+    subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
+
+    return {
+        "action_source": action_source,
+        "ankihub_deck_id": config.get_deck_uuid_by_did(root_deck_id),
+        "subdeck_name": get_subdeck_name_without_parent(subdeck_id),
+        "subdeck_full_name": subdeck["name"],
+        "subdeck_config": subdeck_config.to_dict() if subdeck_config else None,
+    }
+
+
 def create_block_exam_subdeck(
     root_deck_id: DeckId,
     subdeck_name: str,
@@ -76,7 +99,7 @@ def create_block_exam_subdeck(
     aqt.mw.col.decks.update(subdeck)
 
     # Save configuration
-    subdeck_config = config.upsert_block_exam_subdeck(
+    config.upsert_block_exam_subdeck(
         subdeck_id,
         due_date=due_date,
         origin_hint=origin_hint,
@@ -86,11 +109,7 @@ def create_block_exam_subdeck(
 
     LOGGER.info(
         "block_exam_subdeck_created",
-        action_source=action_source,
-        ankihub_deck_id=config.get_deck_uuid_by_did(root_deck_id),
-        subdeck_name=subdeck_name,
-        subdeck_full_name=subdeck["name"],
-        subdeck_config=subdeck_config.to_dict(),
+        **get_subdeck_log_context(subdeck_id, action_source),
         due_date=due_date,
         was_renamed=was_renamed,
     )
@@ -159,20 +178,15 @@ def add_notes_to_block_exam_subdeck(
             unsuspend_cards(parent=aqt.mw, card_ids=card_ids).run_in_background()
 
     # Update configuration
-    subdeck_config = config.upsert_block_exam_subdeck(
+    config.upsert_block_exam_subdeck(
         subdeck["id"],
         due_date=due_date,
         origin_hint=origin_hint,
     )
 
-    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
     LOGGER.info(
         "block_exam_subdeck_notes_added",
-        action_source=action_source,
-        ankihub_deck_id=ah_did,
-        subdeck_name=subdeck_name,
-        subdeck_full_name=subdeck["name"],
-        subdeck_config=subdeck_config.to_dict(),
+        **get_subdeck_log_context(subdeck_id, action_source),
         requested_count=len(note_ids),
         actually_moved=len(notes_to_move),
         due_date=due_date,
@@ -220,11 +234,10 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[Action
     Raises:
         ValueError: If the provided deck is a root deck (not a subdeck)
     """
-    subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
-
     subdeck = aqt.mw.col.decks.get(subdeck_id, default=False)
     if not subdeck:
         LOGGER.warning("Subdeck not found, removing config if exists", subdeck_id=subdeck_id)
+        subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
         if subdeck_config:
             config.remove_block_exam_subdeck(subdeck_id)
         return 0
@@ -232,6 +245,9 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[Action
     root_deck_id = get_root_deck_id_from_subdeck(subdeck_id)
     if root_deck_id == subdeck_id:
         raise ValueError("The provided deck isn't a subdeck.")
+
+    # Capture log context before deletion
+    log_context = get_subdeck_log_context(subdeck_id, action_source)
 
     note_ids = note_ids_in_deck_hierarchy(subdeck_id)
     note_count = len(note_ids) if note_ids else 0
@@ -242,17 +258,13 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, action_source: Optional[Action
 
     aqt.mw.col.decks.remove([subdeck_id])
 
+    subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
     if subdeck_config:
         config.remove_block_exam_subdeck(subdeck_id)
 
-    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
     LOGGER.info(
         "subdeck_merged_into_main_deck",
-        action_source=action_source,
-        ankihub_deck_id=ah_did,
-        subdeck_name=get_subdeck_name_without_parent(subdeck_id),
-        subdeck_full_name=subdeck["name"],
-        subdeck_config=subdeck_config.to_dict() if subdeck_config else None,
+        **log_context,
         due_date=subdeck_config.due_date if subdeck_config else None,
     )
 
@@ -285,20 +297,15 @@ def set_subdeck_due_date(
     existing_config = config.get_block_exam_subdeck_config(subdeck_id)
     old_due_date = existing_config.due_date if existing_config else None
 
-    subdeck_config = config.upsert_block_exam_subdeck(
+    config.upsert_block_exam_subdeck(
         subdeck_id,
         due_date=new_due_date,
         origin_hint=origin_hint,
     )
 
-    ah_did = config.get_deck_uuid_by_did(get_root_deck_id_from_subdeck(subdeck_id))
     LOGGER.info(
         "subdeck_due_date_changed",
-        action_source=action_source,
-        ankihub_deck_id=ah_did,
-        subdeck_name=get_subdeck_name_without_parent(subdeck_id),
-        subdeck_full_name=subdeck["name"],
-        subdeck_config=subdeck_config.to_dict(),
+        **get_subdeck_log_context(subdeck_id, action_source),
         old_due_date=old_due_date,
         due_date=new_due_date,
     )

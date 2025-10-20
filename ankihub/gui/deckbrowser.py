@@ -11,7 +11,7 @@ from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
-    get_root_deck_id_from_subdeck,
+    get_subdeck_log_context,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
 )
@@ -45,16 +45,9 @@ def setup() -> None:
         if not subdeck_config:
             return
 
-        subdeck = aqt.mw.col.decks.get(did)
-        root_deck_id = get_root_deck_id_from_subdeck(did)
-        ah_did = config.get_deck_uuid_by_did(root_deck_id)
         LOGGER.info(
             "block_exam_subdeck_deleted",
-            action_source=ActionSource.DECK_CONTEXT_MENU,
-            ankihub_deck_id=ah_did,
-            subdeck_name=get_subdeck_name_without_parent(did),
-            subdeck_full_name=subdeck["name"],
-            subdeck_config=subdeck_config.to_dict(),
+            **get_subdeck_log_context(did, ActionSource.DECK_CONTEXT_MENU),
         )
 
     def _after_anki_deck_deleted(did: DeckId) -> None:
