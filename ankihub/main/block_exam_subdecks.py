@@ -89,6 +89,7 @@ def create_block_exam_subdeck(
         action_source=action_source,
         ankihub_deck_id=config.get_deck_uuid_by_did(root_deck_id),
         subdeck_name=subdeck_name,
+        subdeck_full_name=subdeck["name"],
         subdeck_id=subdeck_id,
         due_date=due_date,
         was_renamed=was_renamed,
