@@ -184,7 +184,8 @@ class ActionSource(Enum):
 
     SMART_SEARCH = "smart_search"
     DECK_CONTEXT_MENU = "deck_context_menu"
-    DUE_DATE_REMINDER = "due_date_reminder_dialog"
+    DUE_DATE_REMINDER_DIRECT = "due_date_reminder.direct"  # Action in reminder dialog itself
+    DUE_DATE_REMINDER_PICKER = "due_date_reminder.picker"  # Action in picker opened from reminder
 
 
 @dataclass
