@@ -206,6 +206,7 @@ def _on_startup_after_ankiweb_sync() -> None:
         if config.get_feature_flags().get("block_exam_subdecks"):
             check_and_handle_block_exam_subdeck_due_dates()
 
+    # Fetch the feature flags to make sure they are loaded before checking the block exam subdeck due dates.
     update_feature_flags_in_background(on_done=maybe_check_block_exam_subdeck_due_dates)
 
 
