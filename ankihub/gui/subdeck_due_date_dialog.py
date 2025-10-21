@@ -18,7 +18,7 @@ from ..main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
-from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
+from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckOrigin, config
 
 
 @dataclass
@@ -155,7 +155,7 @@ class SubdeckDueDatePickerDialog(QDialog):
         self,
         subdeck_id: DeckId,
         *,
-        origin_hint: BlockExamSubdeckConfigOrigin,
+        origin_hint: BlockExamSubdeckOrigin,
         initial_due_date: Optional[str] = None,
         parent=None,
         action_source: Optional[ActionSource] = None,

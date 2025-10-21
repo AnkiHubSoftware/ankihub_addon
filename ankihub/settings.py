@@ -114,21 +114,6 @@ class BehaviorOnRemoteNoteDeleted(Enum):
     NEVER_DELETE = "Never"
 
 
-class BlockExamSubdeckConfigOrigin(Enum):
-    """How the block exam subdeck config was created."""
-
-    SMART_SEARCH_DIALOG = "smart_search_dialog"
-    DECK_CONTEXT_MENU = "deck_context_menu"
-
-
-class ActionSource(Enum):
-    """Source of user actions for telemetry logging."""
-
-    SMART_SEARCH = "smart_search_flow"
-    DECK_CONTEXT_MENU = "deck_context_menu"
-    DUE_DATE_REMINDER = "due_date_reminder_dialog"
-
-
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
@@ -183,11 +168,30 @@ class DeckExtensionConfig(DataClassJSONMixin):
     )
 
 
+class BlockExamSubdeckOrigin(Enum):
+    """How the block exam subdeck config was created.
+
+    Note: The subdeck itself may have existed before being configured as a block exam subdeck.
+    This tracks where the block exam configuration originated from.
+    """
+
+    SMART_SEARCH = "smart_search"
+    DECK_CONTEXT_MENU = "deck_context_menu"
+
+
+class ActionSource(Enum):
+    """Source of user actions for telemetry logging."""
+
+    SMART_SEARCH = "smart_search"
+    DECK_CONTEXT_MENU = "deck_context_menu"
+    DUE_DATE_REMINDER = "due_date_reminder_dialog"
+
+
 @dataclass
 class BlockExamSubdeckConfig(DataClassJSONMixin):
     subdeck_id: DeckId
     due_date: Optional[str] = None  # YYYY-MM-DD format
-    config_origin: Optional[BlockExamSubdeckConfigOrigin] = None
+    config_origin: Optional[BlockExamSubdeckOrigin] = None
 
 
 @dataclass
@@ -523,7 +527,7 @@ class _Config:
         subdeck_id: DeckId,
         *,
         due_date: Optional[str],
-        origin_hint: BlockExamSubdeckConfigOrigin,
+        origin_hint: BlockExamSubdeckOrigin,
     ) -> BlockExamSubdeckConfig:
         """Add or update a block exam subdeck configuration.
 
