@@ -257,7 +257,6 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, *, action_source: Optional[Act
 
     if note_ids:
         move_notes_to_decks_while_respecting_odid({nid: root_deck_id for nid in note_ids})
-        LOGGER.info("Moved notes from subdeck to root deck", subdeck_name=subdeck["name"], note_count=note_count)
 
     aqt.mw.col.decks.remove([subdeck_id])
 
@@ -268,6 +267,7 @@ def move_subdeck_to_main_deck(subdeck_id: DeckId, *, action_source: Optional[Act
     LOGGER.info(
         "subdeck_merged_into_main_deck",
         **log_context,
+        note_count=note_count,
         due_date=subdeck_config.due_date if subdeck_config else None,
     )
 
