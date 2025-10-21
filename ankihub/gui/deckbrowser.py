@@ -9,11 +9,16 @@ from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
-from ..main.block_exam_subdecks import get_subdeck_name_without_parent, move_subdeck_to_main_deck
+from .. import LOGGER
+from ..main.block_exam_subdecks import (
+    get_subdeck_log_context,
+    get_subdeck_name_without_parent,
+    move_subdeck_to_main_deck,
+)
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import config
+from ..settings import ActionSource, BlockExamSubdeckOrigin, config
 from .operations.user_details import check_user_feature_access
-from .subdeck_due_date_dialog import DatePickerDialog
+from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
 
 
@@ -29,6 +34,21 @@ _dialog_state = _DatePickerDialogState()
 
 def setup() -> None:
     """Ask the user if they want to unsubscribe from the AnkiHub deck when they delete the associated Anki deck."""
+
+    def _before_anki_deck_deleted(did: DeckId) -> None:
+        """Log subdeck deletion before the deck is deleted."""
+        # Check if this is a subdeck (has parents) and not a filtered deck
+        if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
+            return
+
+        subdeck_config = config.get_block_exam_subdeck_config(did)
+        if not subdeck_config:
+            return
+
+        LOGGER.info(
+            "block_exam_subdeck_deleted",
+            **get_subdeck_log_context(did, ActionSource.DECK_CONTEXT_MENU),
+        )
 
     def _after_anki_deck_deleted(did: DeckId) -> None:
         deck_ankihub_id = config.get_deck_uuid_by_did(did)
@@ -49,16 +69,23 @@ def setup() -> None:
 
     aqt.mw.deckBrowser._delete = wrap(  # type: ignore
         old=aqt.mw.deckBrowser._delete,
+        new=_before_anki_deck_deleted,
+        pos="before",
+    )
+    aqt.mw.deckBrowser._delete = wrap(  # type: ignore
+        old=aqt.mw.deckBrowser._delete,
         new=_after_anki_deck_deleted,
     )
     setup_subdeck_ankihub_options()
 
 
 def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: Optional[str]) -> None:
-    _dialog_state.dialog = DatePickerDialog(
+    _dialog_state.dialog = SubdeckDueDatePickerDialog(
         subdeck_id=subdeck_id,
+        origin_hint=BlockExamSubdeckOrigin.DECK_CONTEXT_MENU,
         initial_due_date=initial_due_date,
         parent=aqt.mw,
+        action_source=ActionSource.DECK_CONTEXT_MENU,
     )
     _dialog_state.dialog.show()
 
@@ -70,7 +97,7 @@ def _open_remove_block_exam_subdeck_dialog(subdeck_id: DeckId) -> None:
         if button_index != 1:
             return
 
-        note_count = move_subdeck_to_main_deck(subdeck_id)
+        note_count = move_subdeck_to_main_deck(subdeck_id, action_source=ActionSource.DECK_CONTEXT_MENU)
         aqt.mw.deckBrowser.refresh()
 
         show_tooltip(f"{note_count} notes merged into the main deck", parent=aqt.mw)

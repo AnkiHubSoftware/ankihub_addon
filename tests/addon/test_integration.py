@@ -222,7 +222,7 @@ from ankihub.settings import (
     MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
-    BlockExamSubdeckConfigOrigin,
+    BlockExamSubdeckOrigin,
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
@@ -4604,7 +4604,7 @@ def _setup_protected_deck_hierarchy(
         # Register core deck as exam subdeck
         core_id = aqt.mw.col.decks.id_for_name(core_name)
         config.upsert_block_exam_subdeck(
-            core_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            core_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
         )
     elif deck_type == "filtered":
         # Create parent as normal deck
@@ -4741,7 +4741,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
             exam_subdeck_name = "Testdeck::ExamSubdeck"
             exam_subdeck_id = create_anki_deck(exam_subdeck_name)
             config.upsert_block_exam_subdeck(
-                exam_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                exam_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             # Create a note with subdeck tags directly in the exam subdeck
@@ -8497,7 +8497,7 @@ class TestBlockExamSubdecks:
             # Test creating a new subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
             subdeck_name, was_renamed = create_block_exam_subdeck(
-                root_deck_id, "Test Subdeck", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                root_deck_id, "Test Subdeck", due_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             assert subdeck_name == "Test Subdeck"
@@ -8533,7 +8533,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "Test Subdeck",
                 due_date=None,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             assert subdeck_name1 == "Test Subdeck"
             assert not was_renamed1
@@ -8543,7 +8543,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "Test Subdeck",
                 due_date=None,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             assert subdeck_name2 == "Test Subdeck (1)"
             assert was_renamed2
@@ -8563,7 +8563,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "No Date Subdeck",
                 due_date=None,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             assert subdeck_name == "No Date Subdeck"
             assert not was_renamed
@@ -8590,7 +8590,7 @@ class TestBlockExamSubdecks:
                     fake_deck_id,
                     "Test Subdeck",
                     due_date=None,
-                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                    origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
                 )
 
     def test_add_notes_to_block_exam_subdeck(
@@ -8607,7 +8607,7 @@ class TestBlockExamSubdecks:
             # Create a subdeck first
             due_date = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                root_deck_id, "Notes Subdeck", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                root_deck_id, "Notes Subdeck", due_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             # Create some notes
@@ -8622,7 +8622,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 note_ids,
                 new_due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Verify return value shows 2 notes were moved
@@ -8660,7 +8660,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "Mixed Subdeck",
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Create 3 notes in parent deck
@@ -8674,7 +8674,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             assert first_added == 2
 
@@ -8685,7 +8685,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 all_note_ids,
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Verify return value shows only 1 note was moved (note3)
@@ -8720,7 +8720,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "Unsuspend Test Subdeck",
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Create notes and suspend their cards
@@ -8742,7 +8742,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
                 unsuspend_notes=True,
             )
 
@@ -8774,7 +8774,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "No Unsuspend Subdeck",
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Create notes and suspend their cards
@@ -8796,7 +8796,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             assert added_count == 2
@@ -8828,7 +8828,7 @@ class TestBlockExamSubdecks:
                 root_deck_id,
                 "Partial Unsuspend Subdeck",
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Create 3 notes
@@ -8848,7 +8848,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 [note1.id, note2.id],
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             assert first_added == 2
 
@@ -8863,7 +8863,7 @@ class TestBlockExamSubdecks:
                 subdeck_name,
                 [note1.id, note2.id, note3.id],
                 due_date,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
                 unsuspend_notes=True,
             )
 
@@ -8890,7 +8890,7 @@ class TestBlockExamSubdecks:
                     "Non-existent",
                     [NoteId(1), NoteId(2), NoteId(3)],
                     due_date=None,
-                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                    origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
                 )
 
     def test_add_notes_subdeck_not_found(
@@ -8910,7 +8910,7 @@ class TestBlockExamSubdecks:
                     "Non-existent Subdeck",
                     [NoteId(1), NoteId(2), NoteId(3)],
                     due_date=None,
-                    origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                    origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
                 )
 
     def test_config_methods(
@@ -8924,7 +8924,7 @@ class TestBlockExamSubdecks:
             # Test adding configuration
             test_subdeck_id = DeckId(999)
             config.upsert_block_exam_subdeck(
-                test_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                test_subdeck_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             # Test retrieving configuration
@@ -8932,13 +8932,13 @@ class TestBlockExamSubdecks:
             assert len(configs) == 1
             assert configs[0].subdeck_id == test_subdeck_id
             assert configs[0].due_date == "2024-12-31"
-            assert configs[0].config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            assert configs[0].config_origin == BlockExamSubdeckOrigin.SMART_SEARCH
 
             # Test getting config by subdeck_id
             subdeck_config = config.get_block_exam_subdeck_config(test_subdeck_id)
             assert subdeck_config is not None
             assert subdeck_config.due_date == "2024-12-31"
-            assert subdeck_config.config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+            assert subdeck_config.config_origin == BlockExamSubdeckOrigin.SMART_SEARCH
 
             # Test getting config for non-existent
             subdeck_config = config.get_block_exam_subdeck_config(DeckId(888))
@@ -8946,14 +8946,14 @@ class TestBlockExamSubdecks:
 
             # Test updating existing configuration (should preserve origin)
             config.upsert_block_exam_subdeck(
-                test_subdeck_id, due_date="2025-01-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+                test_subdeck_id, due_date="2025-01-15", origin_hint=BlockExamSubdeckOrigin.DECK_CONTEXT_MENU
             )
 
             # Should still only have one config but with updated date and preserved origin
             configs = config.get_block_exam_subdecks()
             assert len(configs) == 1
             assert configs[0].due_date == "2025-01-15"
-            assert configs[0].config_origin == BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG  # Origin preserved
+            assert configs[0].config_origin == BlockExamSubdeckOrigin.SMART_SEARCH  # Origin preserved
 
             # Test removing configuration
             config.remove_block_exam_subdeck(test_subdeck_id)
@@ -8987,7 +8987,7 @@ class TestBlockExamSubdecks:
 
             # Set due date on the regular subdeck
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-            set_subdeck_due_date(subdeck_id, due_date, origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+            set_subdeck_due_date(subdeck_id, due_date, origin_hint=BlockExamSubdeckOrigin.DECK_CONTEXT_MENU)
 
             # Verify config was created with the due date
             subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
@@ -9010,7 +9010,7 @@ class TestBlockExamSubdecks:
             # Create subdeck hierarchy: Main::Block Exam::Nested
             due_date = (date.today() + timedelta(days=7)).strftime("%Y-%m-%d")
             subdeck_name, _ = create_block_exam_subdeck(
-                main_deck_id, "Block Exam", due_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                main_deck_id, "Block Exam", due_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             subdeck_full_name = f"{main_deck_name}::{subdeck_name}"
@@ -9153,7 +9153,7 @@ class TestBlockExamSubdeckDialog:
 
             # Add block exam configuration for one of them
             config.upsert_block_exam_subdeck(
-                subdeck1_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                subdeck1_id, due_date="2024-12-31", origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
@@ -9266,10 +9266,10 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             config.upsert_block_exam_subdeck(
-                DeckId(100), due_date=future_date1, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                DeckId(100), due_date=future_date1, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
             config.upsert_block_exam_subdeck(
-                DeckId(200), due_date=future_date2, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                DeckId(200), due_date=future_date2, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             expired = check_block_exam_subdeck_due_dates()
@@ -9288,13 +9288,13 @@ class TestCheckBlockExamSubdeckDueDates:
 
             # Add configurations
             config.upsert_block_exam_subdeck(
-                DeckId(1), due_date=past_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                DeckId(1), due_date=past_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
             config.upsert_block_exam_subdeck(
-                DeckId(2), due_date=today_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                DeckId(2), due_date=today_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
             config.upsert_block_exam_subdeck(
-                DeckId(3), due_date=future_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
+                DeckId(3), due_date=future_date, origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH
             )
 
             expired = check_block_exam_subdeck_due_dates()
