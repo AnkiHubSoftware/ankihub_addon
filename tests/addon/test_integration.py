@@ -66,8 +66,8 @@ from ankihub.gui.optimize_fsrs_dialog import (
 )
 from ankihub.main.block_exam_subdecks import (
     add_notes_to_block_exam_subdeck,
-    check_block_exam_subdeck_due_dates,
     create_block_exam_subdeck,
+    get_expired_block_exam_subdecks,
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
@@ -9239,10 +9239,10 @@ class TestBlockExamSubdeckDialog:
             assert dialog.create_button.isEnabled() is True  # Button state is only based on non-empty text
 
 
-class TestCheckBlockExamSubdeckDueDates:
-    """Tests for check_block_exam_subdeck_due_dates function."""
+class TestGetExpiredBlockExamSubdecks:
+    """Tests for get_expired_block_exam_subdecks function."""
 
-    def test_check_block_exam_subdeck_due_dates_no_subdecks(
+    def test_get_expired_block_exam_subdecks_no_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
@@ -9251,10 +9251,10 @@ class TestCheckBlockExamSubdeckDueDates:
             # Ensure no existing configurations
             config._private_config.block_exams_subdecks = []
 
-            expired = check_block_exam_subdeck_due_dates()
+            expired = get_expired_block_exam_subdecks()
             assert expired == []
 
-    def test_check_block_exam_subdeck_due_dates_none_expired(
+    def test_get_expired_block_exam_subdecks_none_expired(
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
@@ -9272,10 +9272,10 @@ class TestCheckBlockExamSubdeckDueDates:
                 DeckId(200), due_date=future_date2, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
             )
 
-            expired = check_block_exam_subdeck_due_dates()
+            expired = get_expired_block_exam_subdecks()
             assert expired == []
 
-    def test_check_block_exam_subdeck_due_dates_with_expired(
+    def test_get_expired_block_exam_subdecks_with_expired(
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
@@ -9297,7 +9297,7 @@ class TestCheckBlockExamSubdeckDueDates:
                 DeckId(3), due_date=future_date, origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG
             )
 
-            expired = check_block_exam_subdeck_due_dates()
+            expired = get_expired_block_exam_subdecks()
 
             # Should return the two expired subdecks
             assert len(expired) == 2

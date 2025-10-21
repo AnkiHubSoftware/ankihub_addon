@@ -201,7 +201,12 @@ def _on_startup_after_ankiweb_sync() -> None:
     """Run tasks after startup AnkiWeb sync completes (or immediately if there is no auto sync)."""
     maybe_show_fsrs_optimization_reminder()
     maybe_show_enable_fsrs_reminder()
-    check_and_handle_block_exam_subdeck_due_dates()
+
+    def maybe_check_block_exam_subdeck_due_dates() -> None:
+        if config.get_feature_flags().get("block_exam_subdecks"):
+            check_and_handle_block_exam_subdeck_due_dates()
+
+    update_feature_flags_in_background(on_done=maybe_check_block_exam_subdeck_due_dates)
 
 
 def _general_setup() -> None:

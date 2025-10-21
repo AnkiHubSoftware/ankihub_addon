@@ -3607,7 +3607,7 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
     """Tests for check_and_handle_block_exam_subdeck_due_dates function."""
 
     @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
-    @patch("ankihub.gui.subdeck_due_date_dialog.check_block_exam_subdeck_due_dates")
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_expired_block_exam_subdecks")
     def test_check_and_handle_no_expired_subdecks(
         self,
         mock_check_due_dates,
@@ -3621,7 +3621,7 @@ class TestCheckAndHandleBlockExamSubdeckDueDates:
         mock_check_due_dates.assert_called_once()
         mock_handle_expired.assert_not_called()
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.check_block_exam_subdeck_due_dates")
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_expired_block_exam_subdecks")
     @patch("ankihub.gui.subdeck_due_date_dialog.handle_expired_subdeck")
     def test_check_and_handle_with_expired_subdecks(
         self,

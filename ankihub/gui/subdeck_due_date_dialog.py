@@ -12,7 +12,7 @@ from aqt.utils import tooltip
 
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
-    check_block_exam_subdeck_due_dates,
+    get_expired_block_exam_subdecks,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
@@ -276,7 +276,7 @@ def _show_next_expired_subdeck_dialog() -> None:
 
 def check_and_handle_block_exam_subdeck_due_dates() -> None:
     """Check for expired block exam subdecks and handle each one."""
-    expired_subdecks = check_block_exam_subdeck_due_dates()
+    expired_subdecks = get_expired_block_exam_subdecks()
     if not expired_subdecks:
         return
 

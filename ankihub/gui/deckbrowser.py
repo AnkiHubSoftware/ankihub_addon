@@ -124,6 +124,9 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
         return
 
+    if not config.get_feature_flags().get("block_exam_subdecks"):
+        return
+
     def on_access_granted(_: dict) -> None:
         menu.setToolTipsVisible(True)
 

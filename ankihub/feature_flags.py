@@ -1,6 +1,6 @@
 """Feature flags are used to enable/disable features on the client side. The flags are fetched from the server."""
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import aqt
 
@@ -15,17 +15,20 @@ from .settings import config
 _feature_flags_update_callbacks: List[Callable[[], None]] = []
 
 
-def update_feature_flags_in_background() -> None:
-    def on_done(_: None) -> None:
+def update_feature_flags_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
+    def _on_done(_: None) -> None:
         LOGGER.info("Set up feature flags.")
 
         for callback in _feature_flags_update_callbacks:
             aqt.mw.taskman.run_on_main(callback)
 
+        if on_done:
+            aqt.mw.taskman.run_on_main(on_done)
+
     AddonQueryOp(
         parent=aqt.mw,
         op=lambda _: _setup_feature_flags(),
-        success=on_done,
+        success=_on_done,
     ).without_collection().run_in_background()
 
 
