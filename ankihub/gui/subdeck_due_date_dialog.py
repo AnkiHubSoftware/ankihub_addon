@@ -13,11 +13,12 @@ from aqt.utils import tooltip
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
     get_expired_block_exam_subdecks,
+    get_subdeck_log_context,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
-from ..settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin, config
+from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckOrigin, config
 
 
 @dataclass
@@ -37,6 +38,7 @@ class SubdeckDueDateDialog(QDialog):
         super().__init__(parent)
         self.subdeck_config = subdeck_config
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_config.subdeck_id)
+        self.action_source = ActionSource.DUE_DATE_REMINDER_DIRECT
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -113,14 +115,19 @@ class SubdeckDueDateDialog(QDialog):
 
     def _on_move_to_main_deck(self):
         """Handle moving subdeck to main deck."""
-        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id)
+        note_count = move_subdeck_to_main_deck(self.subdeck_config.subdeck_id, action_source=self.action_source)
         tooltip(f"{note_count} notes merged into the parent deck", parent=aqt.mw)
         self.accept()
         aqt.mw.deckBrowser.refresh()
 
     def _on_keep_as_is(self):
         """Handle keeping subdeck unchanged."""
-        set_subdeck_due_date(self.subdeck_config.subdeck_id, None, origin_hint=self.subdeck_config.config_origin)
+        set_subdeck_due_date(
+            self.subdeck_config.subdeck_id,
+            None,
+            origin_hint=self.subdeck_config.config_origin,
+            action_source=self.action_source,
+        )
         self.accept()
         tooltip(f"<b>{self.subdeck_name}</b> kept with no due date set.", parent=aqt.mw)
 
@@ -130,28 +137,35 @@ class SubdeckDueDateDialog(QDialog):
 
     def _show_date_picker(self):
         """Show date picker dialog."""
-        date_picker_dialog = DatePickerDialog(
-            self.subdeck_config.subdeck_id,
-            self.subdeck_config.due_date,
+        date_picker_dialog = SubdeckDueDatePickerDialog(
+            subdeck_id=self.subdeck_config.subdeck_id,
+            initial_due_date=self.subdeck_config.due_date,
             parent=self,
+            origin_hint=self.subdeck_config.config_origin,
+            action_source=ActionSource.DUE_DATE_REMINDER_PICKER,
         )
         qconnect(date_picker_dialog.accepted, self.accept)
         date_picker_dialog.show()
 
 
-class DatePickerDialog(QDialog):
-    """Dialog for selecting a new due date."""
+class SubdeckDueDatePickerDialog(QDialog):
+    """Dialog for selecting a new due date for a subdeck."""
 
     def __init__(
         self,
         subdeck_id: DeckId,
+        *,
+        origin_hint: BlockExamSubdeckOrigin,
         initial_due_date: Optional[str] = None,
         parent=None,
+        action_source: Optional[ActionSource] = None,
     ):
         super().__init__(parent)
         self.subdeck_id = subdeck_id
         self.subdeck_name = get_subdeck_name_without_parent(subdeck_id)
         self.initial_due_date = initial_due_date
+        self.action_source = action_source
+        self.origin_hint = origin_hint
 
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -233,14 +247,24 @@ class DatePickerDialog(QDialog):
     def _on_confirm(self):
         """Handle confirming the selected date."""
         selected_date_str = self.date_input.date().toString("yyyy-MM-dd")
-        set_subdeck_due_date(self.subdeck_id, selected_date_str, BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        set_subdeck_due_date(
+            self.subdeck_id,
+            new_due_date=selected_date_str,
+            origin_hint=self.origin_hint,
+            action_source=self.action_source,
+        )
         self.accept()
 
         tooltip(f"Due date for <strong>{self.subdeck_name}</strong> updated successfully", parent=aqt.mw)
 
     def _on_remove_due_date(self):
         """Handle removing the due date from the subdeck."""
-        config.remove_block_exam_subdeck(self.subdeck_id)
+        set_subdeck_due_date(
+            self.subdeck_id,
+            new_due_date=None,
+            origin_hint=self.origin_hint,
+            action_source=self.action_source,
+        )
         self.accept()
 
         tooltip(f"Due date removed for <strong>{self.subdeck_name}</strong>", parent=aqt.mw)
@@ -263,6 +287,12 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     dialog = SubdeckDueDateDialog(subdeck_config, parent=aqt.mw)
     qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
     dialog.show()
+
+    LOGGER.info(
+        "subdeck_reminder_dialog_shown",
+        **get_subdeck_log_context(subdeck_config.subdeck_id, ActionSource.DUE_DATE_REMINDER_DIRECT),
+        due_date=subdeck_config.due_date,
+    )
 
 
 def _show_next_expired_subdeck_dialog() -> None:

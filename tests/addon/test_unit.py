@@ -36,7 +36,7 @@ from ankihub.main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
     set_subdeck_due_date,
 )
-from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckConfigOrigin
+from ankihub.settings import BlockExamSubdeckConfig, BlockExamSubdeckOrigin
 
 from ..factories import (
     AnkiHubImportResultFactory,
@@ -2350,12 +2350,12 @@ class TestPrivateConfigMigrations:
             config.upsert_block_exam_subdeck(
                 DeckId(subdeck1_id),
                 due_date=valid_due_date1,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
             config.upsert_block_exam_subdeck(
                 DeckId(subdeck2_id),
                 due_date=valid_due_date2,
-                origin_hint=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+                origin_hint=BlockExamSubdeckOrigin.SMART_SEARCH,
             )
 
             # Verify valid configs were added
@@ -3555,24 +3555,24 @@ class TestSetSubdeckDueDate:
         existing_config = BlockExamSubdeckConfig(
             subdeck_id=DeckId(456),
             due_date="2024-12-31",
-            config_origin=BlockExamSubdeckConfigOrigin.SMART_SEARCH_DIALOG,
+            config_origin=BlockExamSubdeckOrigin.SMART_SEARCH,
         )
         mock_config.get_block_exam_subdeck_config.return_value = existing_config
 
-        set_subdeck_due_date(DeckId(456), "2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU)
+        set_subdeck_due_date(DeckId(456), "2025-06-15", origin_hint=BlockExamSubdeckOrigin.DECK_CONTEXT_MENU)
 
         mock_config.upsert_block_exam_subdeck.assert_called_once_with(
-            DeckId(456), due_date="2025-06-15", origin_hint=BlockExamSubdeckConfigOrigin.DECK_CONTEXT_MENU
+            DeckId(456), due_date="2025-06-15", origin_hint=BlockExamSubdeckOrigin.DECK_CONTEXT_MENU
         )
 
 
 class TestHandleExpiredSubdeck:
     """Tests for handle_expired_subdeck function."""
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_name_without_parent")
+    @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_log_context")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateDialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class, mock_get_name):
+    def test_handle_expired_subdeck_success(self, mock_aqt, mock_dialog_class, mock_get_log_context):
         """Test successfully handling an expired subdeck."""
         subdeck_name = "Exam Subdeck"
         mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
@@ -3581,7 +3581,7 @@ class TestHandleExpiredSubdeck:
         mock_dialog = MagicMock()
         mock_dialog_class.return_value = mock_dialog
 
-        mock_get_name.return_value = subdeck_name
+        mock_get_log_context.return_value = {}
 
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
 
