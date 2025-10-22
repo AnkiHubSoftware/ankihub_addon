@@ -27,7 +27,7 @@ class _DueDateReminderDialogState:
     queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
-_due_date_reminder_dialog_state = _DueDateReminderDialogState()
+_reminder_dialog_state = _DueDateReminderDialogState()
 
 
 class SubdeckDueDateReminderDialog(QDialog):
@@ -276,8 +276,8 @@ def _show_next_due_date_reminder_dialog() -> None:
     subdeck_config = None
     found_valid_subdeck = False
 
-    while _due_date_reminder_dialog_state.queue:
-        subdeck_config = _due_date_reminder_dialog_state.queue.pop(0)
+    while _reminder_dialog_state.queue:
+        subdeck_config = _reminder_dialog_state.queue.pop(0)
         subdeck = aqt.mw.col.decks.get(subdeck_config.subdeck_id, default=False)
         if subdeck:
             found_valid_subdeck = True
@@ -292,13 +292,13 @@ def _show_next_due_date_reminder_dialog() -> None:
         subdeck_config = None
 
     if not found_valid_subdeck or not subdeck_config:
-        _due_date_reminder_dialog_state.dialog = None
+        _reminder_dialog_state.dialog = None
         return
 
     # Create dialog for this subdeck
     dialog = SubdeckDueDateReminderDialog(subdeck_config, parent=aqt.mw)
 
-    _due_date_reminder_dialog_state.dialog = dialog
+    _reminder_dialog_state.dialog = dialog
 
     # When dialog is closed, show the next one in the queue
     qconnect(dialog.finished, lambda _: QTimer.singleShot(0, _show_next_due_date_reminder_dialog))
@@ -326,7 +326,7 @@ def maybe_show_subdeck_due_date_reminders() -> None:
     if not config.get_feature_flags().get("block_exam_subdecks"):
         return
 
-    if _due_date_reminder_dialog_state.dialog:
+    if _reminder_dialog_state.dialog:
         LOGGER.info("Due date reminder dialog already active, skipping")
         return
 
@@ -334,5 +334,5 @@ def maybe_show_subdeck_due_date_reminders() -> None:
     if not expired_subdecks:
         return
 
-    _due_date_reminder_dialog_state.queue = expired_subdecks
+    _reminder_dialog_state.queue = expired_subdecks
     _show_next_due_date_reminder_dialog()
