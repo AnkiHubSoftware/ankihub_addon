@@ -42,7 +42,7 @@ def get_subdeck_log_context(subdeck_id: DeckId, action_source: Optional[ActionSo
     subdeck_config = config.get_block_exam_subdeck_config(subdeck_id)
 
     return {
-        "action_source": action_source,
+        "action_source": action_source.value if action_source else None,
         "ankihub_deck_id": config.get_deck_uuid_by_did(root_deck_id),
         "subdeck_id": subdeck_id,
         "subdeck_name": get_subdeck_name_without_parent(subdeck_id),
