@@ -3636,7 +3636,7 @@ class TestShowSubdeckDueDateReminders:
         set_feature_flag_state("block_exam_subdecks", is_active=True)
 
         from ankihub.gui.subdeck_due_date_dialog import (
-            _due_date_reminder_dialog_state,
+            _reminder_dialog_state,
             _show_next_due_date_reminder_dialog,
         )
 
@@ -3656,15 +3656,15 @@ class TestShowSubdeckDueDateReminders:
         assert actual_call_arg.subdeck_id == DeckId(1)
         assert actual_call_arg.due_date == "2023-01-01"
         # Verify the second subdeck is still in the queue waiting to be shown
-        assert len(_due_date_reminder_dialog_state.queue) == 1
-        assert _due_date_reminder_dialog_state.queue[0].subdeck_id == DeckId(2)
+        assert len(_reminder_dialog_state.queue) == 1
+        assert _reminder_dialog_state.queue[0].subdeck_id == DeckId(2)
 
         # Simulate the first dialog finishing
         _show_next_due_date_reminder_dialog()
 
         # Now the second subdeck should have been handled and queue should be empty
         assert mock_show_reminder.call_count == 2
-        assert len(_due_date_reminder_dialog_state.queue) == 0
+        assert len(_reminder_dialog_state.queue) == 0
 
         # Calling again should do nothing (queue is empty)
         _show_next_due_date_reminder_dialog()

@@ -28,7 +28,7 @@ class _DueDateReminderDialogState:
     queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
-_due_date_reminder_dialog_state = _DueDateReminderDialogState()
+_reminder_dialog_state = _DueDateReminderDialogState()
 
 
 class SubdeckDueDateReminderDialog(QDialog):
@@ -297,10 +297,10 @@ def show_subdeck_due_date_reminder(subdeck_config: BlockExamSubdeckConfig) -> No
 
 def _show_next_due_date_reminder_dialog() -> None:
     """Show the next due date reminder dialog from the queue."""
-    if not _due_date_reminder_dialog_state.queue:
+    if not _reminder_dialog_state.queue:
         return
 
-    next_subdeck = _due_date_reminder_dialog_state.queue.pop(0)
+    next_subdeck = _reminder_dialog_state.queue.pop(0)
     show_subdeck_due_date_reminder(next_subdeck)
 
 
@@ -314,5 +314,5 @@ def maybe_show_subdeck_due_date_reminders() -> None:
     if not expired_subdecks:
         return
 
-    _due_date_reminder_dialog_state.queue = expired_subdecks
+    _reminder_dialog_state.queue = expired_subdecks
     _show_next_due_date_reminder_dialog()
