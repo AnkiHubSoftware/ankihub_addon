@@ -307,8 +307,6 @@ def _show_next_due_date_reminder_dialog() -> None:
 def maybe_show_subdeck_due_date_reminders() -> None:
     """Show due date reminder dialogs for any expired block exam subdecks."""
 
-    LOGGER.warning("Checking for expired block exam subdecks to show due date reminders.")
-
     if not config.get_feature_flags().get("block_exam_subdecks"):
         return
 
