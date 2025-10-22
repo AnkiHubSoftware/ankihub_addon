@@ -23,6 +23,8 @@ from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckOri
 
 @dataclass
 class _DueDateReminderDialogState:
+    """Manages sequential display of due date reminder dialogs with a queue."""
+
     dialog: "SubdeckDueDateReminderDialog | None" = None
     queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
 
@@ -44,6 +46,7 @@ class SubdeckDueDateReminderDialog(QDialog):
         self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(400)
         self.resize(440, 300)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)  # Delete on close to prevent memory leaks
 
         self._setup_ui()
 
@@ -171,6 +174,7 @@ class SubdeckDueDatePickerDialog(QDialog):
         self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(221)
         self.resize(400, 221)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)  # Delete on close to prevent memory leaks
 
         self._setup_ui()
 
@@ -304,7 +308,6 @@ def _show_next_due_date_reminder_dialog() -> None:
     qconnect(dialog.finished, lambda _: QTimer.singleShot(0, _show_next_due_date_reminder_dialog))
 
     # Show the dialog
-    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()

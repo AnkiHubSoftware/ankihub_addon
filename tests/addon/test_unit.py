@@ -3576,8 +3576,7 @@ class TestShowNextDueDateReminderDialog:
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
     def test_show_next_due_date_reminder_dialog_success(self, mock_aqt, mock_dialog_class, mock_get_log_context):
         """Test successfully showing a due date reminder dialog from the queue."""
-        subdeck_name = "Exam Subdeck"
-        mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
+        mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
 
         mock_dialog = MagicMock()
