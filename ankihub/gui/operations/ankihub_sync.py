@@ -18,7 +18,7 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...gui.operations import AddonQueryOp
-from ...gui.subdeck_due_date_dialog import check_and_handle_block_exam_subdeck_due_dates
+from ...gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
@@ -231,7 +231,7 @@ def _refresh_ui_then_schedule_post_sync_tasks() -> None:
         aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
         aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
         _maybe_send_daily_review_summaries()
-        aqt.mw.taskman.run_on_main(check_and_handle_block_exam_subdeck_due_dates)
+        aqt.mw.taskman.run_on_main(maybe_show_subdeck_due_date_reminders)
 
     # Schedule the tasks after the next focus change, to ensure the UI is refreshed before running heavy tasks
     gui_hooks.focus_did_change.append(_run_once_on_focus)

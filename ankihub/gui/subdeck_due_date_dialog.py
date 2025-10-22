@@ -12,7 +12,7 @@ from aqt.utils import tooltip
 
 from .. import LOGGER
 from ..main.block_exam_subdecks import (
-    check_block_exam_subdeck_due_dates,
+    get_expired_block_exam_subdecks,
     get_subdeck_log_context,
     get_subdeck_name_without_parent,
     move_subdeck_to_main_deck,
@@ -22,17 +22,17 @@ from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckOri
 
 
 @dataclass
-class _SubdeckDueDateDialogState:
-    """State for managing sequential SubdeckDueDate dialogs."""
+class _DueDateReminderDialogState:
+    """State for managing sequential due date reminder dialogs."""
 
     queue: list[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
-_subdeck_due_date_dialog_state = _SubdeckDueDateDialogState()
+_reminder_dialog_state = _DueDateReminderDialogState()
 
 
-class SubdeckDueDateDialog(QDialog):
-    """Dialog shown when a block exam subdeck's due date is reached."""
+class SubdeckDueDateReminderDialog(QDialog):
+    """Reminder dialog shown when a block exam subdeck's due date has been reached."""
 
     def __init__(self, subdeck_config: BlockExamSubdeckConfig, parent=None):
         super().__init__(parent)
@@ -270,8 +270,8 @@ class SubdeckDueDatePickerDialog(QDialog):
         tooltip(f"Due date removed for <strong>{self.subdeck_name}</strong>", parent=aqt.mw)
 
 
-def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
-    """Handle an expired subdeck by showing the due date dialog.
+def show_subdeck_due_date_reminder(subdeck_config: BlockExamSubdeckConfig) -> None:
+    """Show a due date reminder dialog for an expired subdeck.
 
     Args:
         subdeck_config: Configuration of the expired subdeck
@@ -281,11 +281,11 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     if not subdeck:
         LOGGER.warning("Expired subdeck not found, removing config", subdeck_id=subdeck_config.subdeck_id)
         config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
-        _show_next_expired_subdeck_dialog()
+        _show_next_due_date_reminder_dialog()
         return
 
-    dialog = SubdeckDueDateDialog(subdeck_config, parent=aqt.mw)
-    qconnect(dialog.finished, _show_next_expired_subdeck_dialog)
+    dialog = SubdeckDueDateReminderDialog(subdeck_config, parent=aqt.mw)
+    qconnect(dialog.finished, _show_next_due_date_reminder_dialog)
     dialog.show()
 
     LOGGER.info(
@@ -295,20 +295,24 @@ def handle_expired_subdeck(subdeck_config: BlockExamSubdeckConfig) -> None:
     )
 
 
-def _show_next_expired_subdeck_dialog() -> None:
-    """Show the next expired subdeck dialog from the queue."""
-    if not _subdeck_due_date_dialog_state.queue:
+def _show_next_due_date_reminder_dialog() -> None:
+    """Show the next due date reminder dialog from the queue."""
+    if not _reminder_dialog_state.queue:
         return
 
-    next_subdeck = _subdeck_due_date_dialog_state.queue.pop(0)
-    handle_expired_subdeck(next_subdeck)
+    next_subdeck = _reminder_dialog_state.queue.pop(0)
+    show_subdeck_due_date_reminder(next_subdeck)
 
 
-def check_and_handle_block_exam_subdeck_due_dates() -> None:
-    """Check for expired block exam subdecks and handle each one."""
-    expired_subdecks = check_block_exam_subdeck_due_dates()
+def maybe_show_subdeck_due_date_reminders() -> None:
+    """Show due date reminder dialogs for any expired block exam subdecks."""
+
+    if not config.get_feature_flags().get("block_exam_subdecks"):
+        return
+
+    expired_subdecks = get_expired_block_exam_subdecks()
     if not expired_subdecks:
         return
 
-    _subdeck_due_date_dialog_state.queue = expired_subdecks
-    _show_next_expired_subdeck_dialog()
+    _reminder_dialog_state.queue = expired_subdecks
+    _show_next_due_date_reminder_dialog()
