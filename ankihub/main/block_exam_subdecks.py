@@ -200,7 +200,7 @@ def add_notes_to_block_exam_subdeck(
 
 
 def get_expired_block_exam_subdecks() -> List[BlockExamSubdeckConfig]:
-    """Check for block exam subdecks that are past their due date.
+    """Get block exam subdeck configurations whose due date has passed or is today.
 
     Returns:
         List of expired subdeck configurations
