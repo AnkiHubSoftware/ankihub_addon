@@ -290,7 +290,7 @@ def _show_next_due_date_reminder_dialog() -> None:
         # If subdeck no longer exists, remove the config and continue to next
         config.remove_block_exam_subdeck(subdeck_config.subdeck_id)
         LOGGER.warning(
-            "Expired subdeck not found, removed its config",
+            "expired_subdeck_not_found",
             subdeck_id=subdeck_config.subdeck_id,
         )
         subdeck_config = None
@@ -330,7 +330,7 @@ def maybe_show_subdeck_due_date_reminders() -> None:
         return
 
     if _reminder_dialog_state.dialog:
-        LOGGER.info("Due date reminder dialog already active, skipping")
+        LOGGER.info("subdeck_reminder_dialog_already_active")
         return
 
     expired_subdecks = get_expired_block_exam_subdecks()
