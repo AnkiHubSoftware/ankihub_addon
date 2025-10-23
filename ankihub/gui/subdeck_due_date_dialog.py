@@ -45,7 +45,6 @@ class SubdeckDueDateReminderDialog(QDialog):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Subdecks")
         self.setMinimumWidth(400)
-        self.resize(440, 300)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)  # Delete on close to prevent memory leaks
 
         self._setup_ui()
@@ -246,8 +245,7 @@ class SubdeckDueDatePickerDialog(QDialog):
         # Focus on date input
         self.date_input.setFocus()
 
-        # Defer adjustSize to next event loop iteration so layout is fully calculated
-        QTimer.singleShot(0, self.adjustSize)
+        self.adjustSize()
 
     def _on_confirm(self):
         """Handle confirming the selected date."""
