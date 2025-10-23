@@ -29,8 +29,8 @@ from requests import Response
 from requests_mock import Mocker
 
 from ankihub.gui.subdeck_due_date_dialog import (
+    _show_next_due_date_reminder_dialog,
     maybe_show_subdeck_due_date_reminders,
-    show_subdeck_due_date_reminder,
 )
 from ankihub.main.block_exam_subdecks import (
     move_subdeck_to_main_deck,
@@ -117,6 +117,7 @@ from ankihub.gui.operations.deck_installation import (
 )
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+from ankihub.gui.subdeck_due_date_dialog import _reminder_dialog_state
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -3567,16 +3568,15 @@ class TestSetSubdeckDueDate:
         )
 
 
-class TestShowSubdeckDueDateReminder:
-    """Tests for show_subdeck_due_date_reminder function."""
+class TestShowNextDueDateReminderDialog:
+    """Tests for _show_next_due_date_reminder_dialog function."""
 
     @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_log_context")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateReminderDialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_show_subdeck_due_date_reminder_success(self, mock_aqt, mock_dialog_class, mock_get_log_context):
-        """Test successfully showing a due date reminder for an expired subdeck."""
-        subdeck_name = "Exam Subdeck"
-        mock_subdeck = {"name": f"Test Deck::{subdeck_name}", "id": 456}
+    def test_show_next_due_date_reminder_dialog_success(self, mock_aqt, mock_dialog_class, mock_get_log_context):
+        """Test successfully showing a due date reminder dialog from the queue."""
+        mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
 
         mock_dialog = MagicMock()
@@ -3585,34 +3585,39 @@ class TestShowSubdeckDueDateReminder:
         mock_get_log_context.return_value = {}
 
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
+        _reminder_dialog_state.queue = [subdeck_config]
 
-        show_subdeck_due_date_reminder(subdeck_config)
+        _show_next_due_date_reminder_dialog()
 
         mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_aqt.mw)
         mock_dialog.show.assert_called_once()
+        assert _reminder_dialog_state.queue == []
 
     @patch("ankihub.gui.subdeck_due_date_dialog.config", create=True)
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_show_subdeck_due_date_reminder_not_found(self, mock_aqt, mock_config):
-        """Test handling when expired subdeck not found in Anki."""
+    def test_show_next_due_date_reminder_dialog_subdeck_not_found(self, mock_aqt, mock_config):
+        """Test handling when subdeck in queue no longer exists in Anki."""
         mock_aqt.mw.col.decks.get.return_value = False
 
         subdeck_config = BlockExamSubdeckConfig(subdeck_id=DeckId(456), due_date="2024-12-31")
+        _reminder_dialog_state.queue = [subdeck_config]
 
-        show_subdeck_due_date_reminder(subdeck_config)
+        _show_next_due_date_reminder_dialog()
 
         mock_config.remove_block_exam_subdeck.assert_called_once_with(DeckId(456))
+        assert _reminder_dialog_state.queue == []
+        assert _reminder_dialog_state.dialog is None
 
 
 class TestShowSubdeckDueDateReminders:
-    """Tests for show_subdeck_due_date_reminders function."""
+    """Tests for maybe_show_subdeck_due_date_reminders function."""
 
-    @patch("ankihub.gui.subdeck_due_date_dialog.show_subdeck_due_date_reminder")
+    @patch("ankihub.gui.subdeck_due_date_dialog._show_next_due_date_reminder_dialog")
     @patch("ankihub.gui.subdeck_due_date_dialog.get_expired_block_exam_subdecks")
     def test_show_subdeck_due_date_reminders_with_no_expired_subdecks(
         self,
         mock_check_due_dates,
-        mock_show_reminder,
+        mock_show_next,
         set_feature_flag_state: SetFeatureFlagState,
     ):
         """Test function does not show any reminders when no subdecks are expired."""
@@ -3622,23 +3627,18 @@ class TestShowSubdeckDueDateReminders:
         maybe_show_subdeck_due_date_reminders()
 
         mock_check_due_dates.assert_called_once()
-        mock_show_reminder.assert_not_called()
+        mock_show_next.assert_not_called()
 
     @patch("ankihub.gui.subdeck_due_date_dialog.get_expired_block_exam_subdecks")
-    @patch("ankihub.gui.subdeck_due_date_dialog.show_subdeck_due_date_reminder")
+    @patch("ankihub.gui.subdeck_due_date_dialog._show_next_due_date_reminder_dialog")
     def test_show_subdeck_due_date_reminders_with_expired_subdecks(
         self,
-        mock_show_reminder,
+        mock_show_next,
         mock_check_due_dates,
         set_feature_flag_state: SetFeatureFlagState,
     ):
-        """Test function shows reminder for first expired subdeck, queues the rest, and processes them sequentially."""
+        """Test function populates queue and calls _show_next_due_date_reminder_dialog."""
         set_feature_flag_state("block_exam_subdecks", is_active=True)
-
-        from ankihub.gui.subdeck_due_date_dialog import (
-            _reminder_dialog_state,
-            _show_next_due_date_reminder_dialog,
-        )
 
         expired_subdecks = [
             BlockExamSubdeckConfig(subdeck_id=DeckId(1), due_date="2023-01-01"),
@@ -3649,23 +3649,7 @@ class TestShowSubdeckDueDateReminders:
         maybe_show_subdeck_due_date_reminders()
 
         mock_check_due_dates.assert_called_once()
-        # Only the first subdeck is handled immediately; the rest are queued
-        assert mock_show_reminder.call_count == 1
-        # Check the actual call argument
-        actual_call_arg = mock_show_reminder.call_args[0][0]
-        assert actual_call_arg.subdeck_id == DeckId(1)
-        assert actual_call_arg.due_date == "2023-01-01"
-        # Verify the second subdeck is still in the queue waiting to be shown
-        assert len(_reminder_dialog_state.queue) == 1
-        assert _reminder_dialog_state.queue[0].subdeck_id == DeckId(2)
-
-        # Simulate the first dialog finishing
-        _show_next_due_date_reminder_dialog()
-
-        # Now the second subdeck should have been handled and queue should be empty
-        assert mock_show_reminder.call_count == 2
-        assert len(_reminder_dialog_state.queue) == 0
-
-        # Calling again should do nothing (queue is empty)
-        _show_next_due_date_reminder_dialog()
-        assert mock_show_reminder.call_count == 2  # Should not increment
+        # Verify the queue is populated with all expired subdecks
+        assert _reminder_dialog_state.queue == expired_subdecks
+        # Verify _show_next_due_date_reminder_dialog was called to start the flow
+        mock_show_next.assert_called_once()

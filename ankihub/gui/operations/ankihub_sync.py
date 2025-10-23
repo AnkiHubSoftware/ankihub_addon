@@ -10,7 +10,7 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
-from aqt import QWidget, gui_hooks
+from aqt import QTimer
 from aqt.qt import qconnect
 from aqt.sync import get_sync_status
 
@@ -207,34 +207,21 @@ def _on_sync_done(on_done: Callable[[Future], None]) -> None:
     else:
         on_done(future_with_result(None))
 
-    _refresh_ui_then_schedule_post_sync_tasks()
+    aqt.mw.reset()
+
+    QTimer.singleShot(0, _schedule_post_sync_tasks)  # Delay to allow UI to update first
 
     LOGGER.info("Sync with AnkiHub done.")
     config.log_private_config()
 
 
-def _refresh_ui_then_schedule_post_sync_tasks() -> None:
-    """Refresh UI now; schedule post-sync work to begin on the next focus change."""
+def _schedule_post_sync_tasks() -> None:
+    LOGGER.info("Scheduling post-sync tasks.")
 
-    # aqt.mw.reset() refreshes the Anki UI, but some UI elements are only
-    # marked for refresh and won't actually update until they receive focus.
-    aqt.mw.reset()
-
-    def _run_once_on_focus(new: QWidget, old: QWidget) -> None:
-        if new is None:
-            return
-
-        # Ensure this fires only once
-        gui_hooks.focus_did_change.remove(_run_once_on_focus)
-
-        # Schedule tasks
-        aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
-        aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
-        _maybe_send_daily_review_summaries()
-        aqt.mw.taskman.run_on_main(maybe_show_subdeck_due_date_reminders)
-
-    # Schedule the tasks after the next focus change, to ensure the UI is refreshed before running heavy tasks
-    gui_hooks.focus_did_change.append(_run_once_on_focus)
+    aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done)
+    aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
+    _maybe_send_daily_review_summaries()
+    aqt.mw.taskman.run_on_main(maybe_show_subdeck_due_date_reminders)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
