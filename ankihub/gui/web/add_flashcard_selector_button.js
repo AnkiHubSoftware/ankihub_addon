@@ -207,8 +207,8 @@ function waitForElm(selector) {
 
 
 if (window.location.href.includes("congrats")) {
-    renderFlashCardSelectorButtonOnCongrats();
     waitForElm(".congrats").then(() => {
+        renderFlashCardSelectorButtonOnCongrats();
         document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}").style.display = "flex";
     })
 } else {
