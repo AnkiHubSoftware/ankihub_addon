@@ -19,7 +19,12 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 #### Set up a virtual environment and VSCode
 
 -   Install uv: https://docs.astral.sh/uv/getting-started/installation/
--   Set up project environment and install dependencies: `uv sync --dev --group aqt --group bundle` or `just install` (if you have [just](https://github.com/casey/just) installed).
+-   Set up project environment and install dependencies:
+    -   **Default (most systems):** `uv sync --group dev --group aqt --group bundle` or `just install`
+    -   **For glibc 2.35 systems (e.g., PopOS 22.04):** `uv sync --group dev --group aqt_25_2_7 --group bundle` or `just install aqt_25_2_7`
+    -   **Legacy Anki (2.1.56):** `uv sync --group dev --group aqt_legacy --group bundle` or `just install aqt_legacy`
+
+    (Requires [just](https://github.com/casey/just) for the `just install` commands)
 -   Copy `.vscode.dist` as `.vscode`.
 -   Open VSCode in this repo: `code .`
 -   Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
