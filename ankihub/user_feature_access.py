@@ -158,32 +158,3 @@ def check_user_feature_access(
         op = op.failure(on_failure)
 
     op.run_in_background()
-
-
-def fetch_user_details_in_background() -> None:
-    """Fetch user details from the server in the background.
-
-    Updates the cached user details dict in config. If not logged in, clears the cache.
-    """
-
-    def _on_done(_: None) -> None:
-        LOGGER.info("user_details_fetched_in_background")
-
-    def _fetch_user_details() -> None:
-        if not config.is_logged_in():
-            config.save_username("")
-            config.save_user_id(None)
-            return
-
-        client = AnkiHubClient()
-        try:
-            user_details = client.get_user_details()
-            config.set_user_details(user_details)
-        except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-            LOGGER.warning("failed_to_fetch_user_details_on_demand", exception=str(exc))
-
-    AddonQueryOp(
-        parent=aqt.mw,
-        op=lambda _: _fetch_user_details(),
-        success=_on_done,
-    ).without_collection().run_in_background()
