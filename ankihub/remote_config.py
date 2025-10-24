@@ -65,7 +65,7 @@ def _fetch_feature_flags_and_user_details() -> None:
         config.set_feature_flags(feature_flags_dict)
         LOGGER.info("feature_flags_fetched_from_server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning("failed_to_fetch_feature_flags", exception=exc)
+        LOGGER.warning("failed_to_fetch_feature_flags", exception=str(exc))
         # Keep the existing cached values
 
     # Fetch user details (for offline support)
@@ -74,7 +74,7 @@ def _fetch_feature_flags_and_user_details() -> None:
         config.set_user_details(user_details)
         LOGGER.info("user_details_fetched_from_server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning("failed_to_fetch_user_details", exception=exc)
+        LOGGER.warning("failed_to_fetch_user_details", exception=str(exc))
         # Keep the existing cached values
 
 
