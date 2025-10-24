@@ -171,17 +171,17 @@ from ankihub.main.utils import (
     note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
 )
-from ankihub.remote_config import (
-    _state,
-    add_feature_flags_update_callback,
-    fetch_remote_config_in_background,
-)
 from ankihub.settings import (
     ANKIWEB_ID,
     BehaviorOnRemoteNoteDeleted,
     DatadogLogHandler,
     config,
     log_file_path,
+)
+from ankihub.user_feature_access import (
+    _state,
+    add_feature_flags_update_callback,
+    refresh_user_feature_access_in_background,
 )
 
 
@@ -1773,9 +1773,9 @@ class TestFeatureFlags:
         _state.feature_flag_update_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
-        MockAnkiHubClient = mocker.patch("ankihub.remote_config.AnkiHubClient")
-        mock_logger = mocker.patch("ankihub.remote_config.LOGGER")
-        mock_config = mocker.patch("ankihub.remote_config.config")
+        MockAnkiHubClient = mocker.patch("ankihub.user_feature_access.AnkiHubClient")
+        mock_logger = mocker.patch("ankihub.user_feature_access.LOGGER")
+        mock_config = mocker.patch("ankihub.user_feature_access.config")
 
         mock_anki_hub_client = MockAnkiHubClient.return_value
         feature_flags_dict = {"flag1": True, "flag2": False}
@@ -1783,7 +1783,7 @@ class TestFeatureFlags:
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
         mock_anki_hub_client.get_user_details.return_value = user_details_dict
 
-        fetch_remote_config_in_background()
+        refresh_user_feature_access_in_background()
 
         qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 

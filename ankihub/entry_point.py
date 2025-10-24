@@ -35,10 +35,6 @@ from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
-from .remote_config import (
-    fetch_remote_config_in_background,
-    setup_periodic_remote_config_refresh,
-)
 from .settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -46,6 +42,10 @@ from .settings import (
     config,
     setup_logger,
     setup_profile_data_folder,
+)
+from .user_feature_access import (
+    refresh_user_feature_access_in_background,
+    setup_periodic_user_feature_access_refresh,
 )
 
 CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = bool(re.match(r"24\.06\.", ANKI_VERSION))
@@ -131,14 +131,14 @@ def _on_profile_did_open() -> None:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
-    # Fetch remote config after the general setup.
-    # This is because other setup functions can add callbacks which react to the remote config getting fetched.
-    # If this function is called earlier, the remote config might be fetched before the callbacks are added,
+    # Refresh user feature access after the general setup.
+    # This is because other setup functions can add callbacks which react to feature access changes.
+    # If this function is called earlier, the feature access might be refreshed before the callbacks are added,
     # which would cause the callbacks to not be called.
-    fetch_remote_config_in_background()
+    refresh_user_feature_access_in_background()
 
-    # Set up periodic refresh to pick up remote config changes.
-    setup_periodic_remote_config_refresh(interval_minutes=60)
+    # Set up periodic refresh to keep user feature access up-to-date.
+    setup_periodic_user_feature_access_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
@@ -212,8 +212,8 @@ def _on_startup_after_ankiweb_sync() -> None:
         maybe_show_enable_fsrs_reminder()
         maybe_show_subdeck_due_date_reminders()
 
-    # Fetch remote config to make sure it is loaded when the functions check for it.
-    fetch_remote_config_in_background(on_done=maybe_show_reminders)
+    # Refresh user feature access to make sure it is loaded when the functions check for it.
+    refresh_user_feature_access_in_background(on_done=maybe_show_reminders)
 
 
 def _general_setup() -> None:
@@ -271,8 +271,8 @@ def _general_setup() -> None:
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
-    config.token_change_hook.append(fetch_remote_config_in_background)
-    LOGGER.info("Set up fetching of remote config on token change.")
+    config.token_change_hook.append(refresh_user_feature_access_in_background)
+    LOGGER.info("Set up refreshing of user feature access on token change.")
 
 
 def _copy_web_media_to_media_folder() -> None:

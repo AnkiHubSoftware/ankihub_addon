@@ -31,8 +31,8 @@ from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modified_note_type
-from ankihub.remote_config import _fetch_feature_flags_and_user_details
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
+from ankihub.user_feature_access import _fetch_feature_flags_and_user_details
 
 
 @fixture

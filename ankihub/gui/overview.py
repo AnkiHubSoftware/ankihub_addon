@@ -18,8 +18,8 @@ from ..gui.flashcard_selector_dialog import (
     FlashCardSelectorDialog,
     show_flashcard_selector,
 )
-from ..remote_config import add_feature_flags_update_callback
 from ..settings import config
+from ..user_feature_access import add_feature_flags_update_callback
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter

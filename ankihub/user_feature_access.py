@@ -1,8 +1,10 @@
-"""Feature flags and user details are fetched from the server to enable/disable features and check user access.
+"""Manage user feature access state by fetching feature flags and user details from the server.
 
-Feature flags control client-side feature availability.
-User details include feature access flags (e.g., has_flashcard_selector_access) for gating premium features.
-Both are cached locally and refreshed periodically.
+This module refreshes the user's feature access state, which is determined by:
+- Feature flags: Which features are enabled on the server
+- User details: Which features this specific user has access to (e.g., has_flashcard_selector_access)
+
+Both are cached locally and refreshed periodically to keep feature-gated UI elements current.
 """
 
 from dataclasses import dataclass, field
@@ -29,10 +31,11 @@ class _PeriodicRefreshState:
 _state = _PeriodicRefreshState()
 
 
-def fetch_remote_config_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
-    """Fetch remote config (feature flags and user details) from the server in the background.
+def refresh_user_feature_access_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
+    """Refresh user feature access state (feature flags and user details) from the server in the background.
 
-    This fetches both feature flags (for feature gating) and user details (for access checks).
+    This fetches both feature flags (to know which features are enabled on the server)
+    and user details (to know which features this user has access to).
     Cached values are preserved if the server is unreachable.
 
     Args:
@@ -87,13 +90,11 @@ def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
     _state.feature_flag_update_callbacks.append(callback)
 
 
-def setup_periodic_remote_config_refresh(interval_minutes: int = 60) -> None:
-    """Set up periodic refresh of feature flags and user details during long Anki sessions.
+def setup_periodic_user_feature_access_refresh(interval_minutes: int = 60) -> None:
+    """Set up periodic refresh of user feature access state during long Anki sessions.
 
-    This allows feature-flagged UI elements to appear when flags are enabled on the server,
-    and keeps user details fresh for offline access checks. Since all UI elements auto-refresh via
-    hooks (overview_did_refresh, reviewer_did_show_question, etc.), no teardown logic is needed
-    when flags are disabled.
+    This refreshes both feature flags (server-side feature availability) and user details
+    (user's access to features) so feature-gated UI elements are kept up-to-date.
 
     Args:
         interval_minutes: How often to refresh from the server (default: 60 minutes)
@@ -103,7 +104,7 @@ def setup_periodic_remote_config_refresh(interval_minutes: int = 60) -> None:
         return
 
     _state.timer = QTimer()
-    _state.timer.timeout.connect(lambda: fetch_remote_config_in_background())
+    _state.timer.timeout.connect(lambda: refresh_user_feature_access_in_background())
     _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info("periodic_refresh_setup", interval_minutes=interval_minutes)
