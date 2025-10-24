@@ -322,12 +322,6 @@ class _Config:
         self._private_config.user_details["username"] = username
         self._update_private_config()
 
-    def save_user_id(self, user_id: Optional[int]):
-        if not self._private_config.user_details:
-            self._private_config.user_details = {}
-        self._private_config.user_details["id"] = user_id
-        self._update_private_config()
-
     def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
         self.deck_config(ankihub_did).latest_update = latest_update
         self._update_private_config()
