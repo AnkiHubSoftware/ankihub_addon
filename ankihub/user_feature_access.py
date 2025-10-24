@@ -108,3 +108,82 @@ def setup_periodic_user_feature_access_refresh(interval_minutes: int = 60) -> No
     _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info("periodic_refresh_setup", interval_minutes=interval_minutes)
+
+
+def check_user_feature_access(
+    feature_key: str,
+    on_access_granted: Callable[[dict], None],
+    on_access_denied: Optional[Callable[[dict], None]] = None,
+    on_failure: Optional[Callable[[Exception], None]] = None,
+    parent=None,
+    use_cached: bool = False,
+) -> None:
+    """Check user feature access, optionally using cached values for offline support.
+
+    Args:
+        feature_key: The key in user_details to check (e.g., "has_flashcard_selector_access")
+        on_access_granted: Callback to call if user has access, receives user_details dict
+        on_access_denied: Optional callback to call if user doesn't have access, receives user_details dict
+        on_failure: Optional callback to call if fetching user details fails, receives exception
+        parent: Parent widget for the operation (defaults to aqt.mw)
+        use_cached: If True, use cached user details (for offline support).
+                    If False, fetch fresh user details from server (default behavior).
+    """
+
+    # Use cached values if requested (for offline support)
+    if use_cached:
+        cached_details = config.get_user_details()
+        if cached_details:
+            if cached_details.get(feature_key):
+                on_access_granted(cached_details)
+            elif on_access_denied:
+                on_access_denied(cached_details)
+            return
+        # If no cache available, fall through to fresh fetch
+
+    # Fetch fresh user details from server
+    def on_fetched_user_details(user_details: dict) -> None:
+        if user_details.get(feature_key):
+            on_access_granted(user_details)
+        elif on_access_denied:
+            on_access_denied(user_details)
+
+    op = AddonQueryOp(
+        op=lambda _: AnkiHubClient().get_user_details(),
+        success=on_fetched_user_details,
+        parent=parent or aqt.mw,
+    ).without_collection()
+
+    if on_failure:
+        op = op.failure(on_failure)
+
+    op.run_in_background()
+
+
+def fetch_user_details_in_background() -> None:
+    """Fetch user details from the server in the background.
+
+    Updates the cached user details dict in config. If not logged in, clears the cache.
+    """
+
+    def _on_done(_: None) -> None:
+        LOGGER.info("user_details_fetched_in_background")
+
+    def _fetch_user_details() -> None:
+        if not config.is_logged_in():
+            config.save_username("")
+            config.save_user_id(None)
+            return
+
+        client = AnkiHubClient()
+        try:
+            user_details = client.get_user_details()
+            config.set_user_details(user_details)
+        except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
+            LOGGER.warning("failed_to_fetch_user_details_on_demand", exception=str(exc))
+
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _fetch_user_details(),
+        success=_on_done,
+    ).without_collection().run_in_background()

@@ -172,7 +172,6 @@ from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
-from ankihub.gui.operations.user_details import check_user_feature_access
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
@@ -232,6 +231,7 @@ from ankihub.settings import (
     profile_files_path,
     url_flashcard_selector,
 )
+from ankihub.user_feature_access import check_user_feature_access
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"

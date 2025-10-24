@@ -30,7 +30,6 @@ from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .gui.operations.ankihub_sync import setup_full_sync_patch
-from .gui.operations.user_details import fetch_user_details_in_background
 from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from .main.note_deletion import handle_notes_deleted_from_webapp
@@ -187,8 +186,6 @@ def _after_profile_setup() -> None:
     # just a temporary fix for notes that were already manually deleted on the webapp.
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
-
-    fetch_user_details_in_background()
 
     media_sync.allow_background_threads()
 
