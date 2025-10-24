@@ -180,7 +180,7 @@ from ankihub.settings import (
 )
 from ankihub.user_state import (
     _state,
-    add_feature_flags_update_callback,
+    add_user_state_refreshed_callback,
     refresh_user_state_in_background,
 )
 
@@ -1770,7 +1770,7 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
-        _state.callbacks.clear()
+        _state.user_state_refreshed_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
         MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
@@ -1795,10 +1795,10 @@ class TestFeatureFlags:
         mock_config.set_feature_flags.assert_called_with(feature_flags_dict)
         mock_config.set_user_details.assert_called_with(user_details_dict)
 
-    def test_add_feature_flags_update_callback(self):
+    def test_add_user_state_refreshed_callback(self):
         callback = MagicMock()
-        add_feature_flags_update_callback(callback)
-        assert callback in _state.callbacks
+        add_user_state_refreshed_callback(callback)
+        assert callback in _state.user_state_refreshed_callbacks
 
 
 class TestRetainNidsWithAHNoteType:

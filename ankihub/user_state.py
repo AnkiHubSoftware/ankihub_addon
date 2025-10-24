@@ -22,10 +22,10 @@ from .settings import config
 
 @dataclass
 class _PeriodicRefreshState:
-    """Module state managing a periodic refresh timer and feature flag callbacks."""
+    """Module state managing a periodic refresh timer and callbacks for when user state is refreshed."""
 
     timer: Optional[QTimer] = None
-    callbacks: List[Callable[[], None]] = field(default_factory=list)
+    user_state_refreshed_callbacks: List[Callable[[], None]] = field(default_factory=list)
 
 
 _state = _PeriodicRefreshState()
@@ -45,7 +45,7 @@ def refresh_user_state_in_background(on_done: Optional[Callable[[], None]] = Non
     def _on_done(_: None) -> None:
         LOGGER.info("feature_flags_and_user_details_fetched")
 
-        for callback in _state.callbacks:
+        for callback in _state.user_state_refreshed_callbacks:
             aqt.mw.taskman.run_on_main(callback)
 
         if on_done:
@@ -81,13 +81,13 @@ def _fetch_feature_flags_and_user_details() -> None:
         # Keep the existing cached values
 
 
-def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
-    """Add a callback to be called when feature flags are updated.
+def add_user_state_refreshed_callback(callback: Callable[[], None]) -> None:
+    """Add a callback to be called when user state (feature flags and user details) is refreshed.
 
     Args:
-        callback: Function to call after feature flags are fetched
+        callback: Function to call after user state is refreshed
     """
-    _state.callbacks.append(callback)
+    _state.user_state_refreshed_callbacks.append(callback)
 
 
 def setup_periodic_user_state_refresh(interval_minutes: int = 60) -> None:
