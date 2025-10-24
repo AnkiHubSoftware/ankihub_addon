@@ -14,11 +14,11 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from .. import LOGGER
-from ..remote_config import add_feature_flags_update_callback
 from ..gui.flashcard_selector_dialog import (
     FlashCardSelectorDialog,
     show_flashcard_selector,
 )
+from ..remote_config import add_feature_flags_update_callback
 from ..settings import config
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs

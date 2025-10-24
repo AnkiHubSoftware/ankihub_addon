@@ -89,11 +89,6 @@ from ankihub.ankihub_client.models import (  # type: ignore
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
-from ankihub.remote_config import (
-    _feature_flags_update_callbacks,
-    add_feature_flags_update_callback,
-    update_feature_flags_and_user_details_in_background,
-)
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
@@ -175,6 +170,11 @@ from ankihub.main.utils import (
     note_type_name_without_ankihub_modifications,
     note_type_with_updated_templates_and_css,
     retain_nids_with_ah_note_type,
+)
+from ankihub.remote_config import (
+    _state,
+    add_feature_flags_update_callback,
+    update_feature_flags_and_user_details_in_background,
 )
 from ankihub.settings import (
     ANKIWEB_ID,
@@ -1770,7 +1770,7 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
-        _feature_flags_update_callbacks.clear()
+        _state.feature_flag_update_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
         MockAnkiHubClient = mocker.patch("ankihub.remote_config.AnkiHubClient")
@@ -1799,7 +1799,7 @@ class TestFeatureFlags:
     def test_add_feature_flags_update_callback(self):
         callback = MagicMock()
         add_feature_flags_update_callback(callback)
-        assert callback in _feature_flags_update_callbacks
+        assert callback in _state.feature_flag_update_callbacks
 
 
 class TestRetainNidsWithAHNoteType:

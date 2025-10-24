@@ -5,6 +5,7 @@ User details include feature access flags (e.g., has_flashcard_selector_access) 
 Both are cached locally and refreshed periodically for offline support.
 """
 
+from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
 import aqt
@@ -16,12 +17,16 @@ from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .gui.operations import AddonQueryOp
 from .settings import config
 
-# List of callbacks that are called when the feature flags are updated.
-# This can e.g. be used to update the UI once the feature flags are fetched.
-_feature_flags_update_callbacks: List[Callable[[], None]] = []
 
-# Timer for periodic refresh
-_periodic_refresh_timer: Optional[QTimer] = None
+@dataclass
+class _PeriodicRefreshState:
+    """Module state managing periodic refresh timer and feature flag callbacks."""
+
+    timer: Optional[QTimer] = None
+    feature_flag_update_callbacks: List[Callable[[], None]] = field(default_factory=list)
+
+
+_state = _PeriodicRefreshState()
 
 
 def update_feature_flags_and_user_details_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
@@ -33,10 +38,11 @@ def update_feature_flags_and_user_details_in_background(on_done: Optional[Callab
     Args:
         on_done: Optional callback to run after the fetch completes
     """
+
     def _on_done(_: None) -> None:
         LOGGER.info("Fetched feature flags and user details.")
 
-        for callback in _feature_flags_update_callbacks:
+        for callback in _state.feature_flag_update_callbacks:
             aqt.mw.taskman.run_on_main(callback)
 
         if on_done:
@@ -57,19 +63,23 @@ def _fetch_feature_flags_and_user_details() -> None:
     try:
         feature_flags_dict = client.get_feature_flags()
         config.set_feature_flags(feature_flags_dict)
-        LOGGER.info("Feature flags fetched from server", feature_flags=feature_flags_dict)
+        LOGGER.info("Feature flags fetched from server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning(f"Failed to fetch feature flags: {exc}. Using cached values.", feature_flags=config.get_feature_flags())
-        # Keep the existing cached values - do not overwrite with empty dict
+        LOGGER.warning(
+            f"Failed to fetch feature flags: {exc}. Using cached values.", feature_flags=config.get_feature_flags()
+        )
+        # Keep the existing cached values
 
-    # Fetch user details (for offline support in deck browser context menu)
+    # Fetch user details (for offline support)
     try:
         user_details = client.get_user_details()
         config.set_user_details(user_details)
-        LOGGER.info("User details fetched from server", user_id=user_details.get("id"))
+        LOGGER.info("User details fetched from server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning(f"Failed to fetch user details: {exc}. Using cached values.", user_details=config.get_user_details())
-        # Keep the existing cached values - do not overwrite with empty dict
+        LOGGER.warning(
+            f"Failed to fetch user details: {exc}. Using cached values.", user_details=config.get_user_details()
+        )
+        # Keep the existing cached values
 
 
 def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
@@ -78,7 +88,7 @@ def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
     Args:
         callback: Function to call after feature flags are fetched
     """
-    _feature_flags_update_callbacks.append(callback)
+    _state.feature_flag_update_callbacks.append(callback)
 
 
 def setup_periodic_refresh(interval_minutes: int = 60) -> None:
@@ -92,16 +102,12 @@ def setup_periodic_refresh(interval_minutes: int = 60) -> None:
     Args:
         interval_minutes: How often to refresh from the server (default: 60 minutes)
     """
-    global _periodic_refresh_timer
-
     # Don't set up multiple timers
-    if _periodic_refresh_timer is not None:
+    if _state.timer is not None:
         return
 
-    _periodic_refresh_timer = QTimer()
-    _periodic_refresh_timer.timeout.connect(
-        lambda: update_feature_flags_and_user_details_in_background()
-    )
-    _periodic_refresh_timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
+    _state.timer = QTimer()
+    _state.timer.timeout.connect(lambda: update_feature_flags_and_user_details_in_background())
+    _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info(f"Set up periodic refresh every {interval_minutes} minutes")

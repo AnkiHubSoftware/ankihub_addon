@@ -12,10 +12,6 @@ from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
 from .db import ankihub_db
-from .remote_config import (
-    setup_periodic_refresh,
-    update_feature_flags_and_user_details_in_background,
-)
 from .gui import (
     browser,
     deck_options,
@@ -39,6 +35,10 @@ from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
+from .remote_config import (
+    setup_periodic_refresh,
+    update_feature_flags_and_user_details_in_background,
+)
 from .settings import (
     ADDON_VERSION,
     ANKI_VERSION,

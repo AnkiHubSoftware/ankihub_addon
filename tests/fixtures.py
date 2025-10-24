@@ -27,11 +27,11 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
-from ankihub.remote_config import _fetch_feature_flags_and_user_details
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modified_note_type
+from ankihub.remote_config import _fetch_feature_flags_and_user_details
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 
 
