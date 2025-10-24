@@ -33,17 +33,14 @@ def update_feature_flags_in_background(on_done: Optional[Callable[[], None]] = N
 
 
 def _setup_feature_flags() -> None:
-    """Fetch feature flags from the server. If the server is not reachable, use the default values."""
-    feature_flags_dict = {}
+    """Fetch feature flags from the server. If the server is not reachable, use cached values."""
     try:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
-    except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.error(f"Failed to fetch feature flags: {exc}. Using default values.")
-    else:
         config.set_feature_flags(feature_flags_dict)
-
-    config.set_feature_flags(feature_flags_dict)
-    LOGGER.info("Feature flags", feature_flags=feature_flags_dict)
+        LOGGER.info("Feature flags fetched from server", feature_flags=feature_flags_dict)
+    except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
+        LOGGER.warning(f"Failed to fetch feature flags: {exc}. Using cached values.", feature_flags=config.get_feature_flags())
+        # Keep the existing cached values - do not overwrite with empty dict
 
 
 def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
