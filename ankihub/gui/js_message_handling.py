@@ -22,6 +22,7 @@ from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
+from .tutorial import OnboardingTutorial
 from .utils import robust_filter
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -36,8 +37,8 @@ OPEN_LINK_PYCMD = "ankihub_open_link"
 TERMS_AGREEMENT_NOT_ACCEPTED = "terms_agreement_not_accepted"
 TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
 ADD_TO_BLOCK_EXAM_SUBDECK = "ankihub_add_to_block_exam_subdeck"
-
 OPEN_CONFIG_PYCMD = "ankihub_open_config"
+START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
 
 POST_MESSAGE_TO_ANKIHUB_JS_PATH = Path(__file__).parent / "web/post_message_to_ankihub_js.js"
 
@@ -156,6 +157,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw).show()
 
         return (True, None)
+    elif message == START_ONBOARDING_PYCMD:
+        OnboardingTutorial().start()
 
     return handled
 

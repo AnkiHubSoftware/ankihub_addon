@@ -9,6 +9,7 @@ from aqt.qt import QCheckBox, QDialogButtonBox, QStyle
 from ... import LOGGER
 from ...ankihub_client import Deck
 from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
+from ...gui.tutorial import prompt_for_onboarding_tutorial
 from ...settings import ANKI_INT_VERSION, config
 from ..messages import messages
 from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
@@ -101,6 +102,7 @@ def _on_button_clicked(
             use_recommended_settings=is_recommended_deck_settings_checked,
         )
         on_done(future_with_result(None))
+        prompt_for_onboarding_tutorial()
         return
 
     # Download the new decks

@@ -7,6 +7,7 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
+from aqt.deckbrowser import DeckBrowser
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
@@ -17,6 +18,7 @@ from ..main.block_exam_subdecks import (
 )
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ActionSource, BlockExamSubdeckOrigin, config
+from .js_message_handling import START_ONBOARDING_PYCMD
 from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
@@ -77,6 +79,7 @@ def setup() -> None:
         new=_after_anki_deck_deleted,
     )
     setup_subdeck_ankihub_options()
+    setup_onboarding_options()
 
 
 def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: Optional[str]) -> None:
@@ -178,3 +181,24 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
 
 def setup_subdeck_ankihub_options() -> None:
     gui_hooks.deck_browser_will_show_options_menu.append(_initialize_subdeck_context_menu_actions)
+
+
+def _add_onboarding_button(deckbrowser: DeckBrowser) -> None:
+    deckbrowser.bottom.web.eval(
+        """
+(() => {
+    const lastButton = document.querySelector("button:last-of-type");
+    const button = document.createElement('button');
+    button.textContent = 'Start AnkiHub Onboarding';
+    button.addEventListener('click', () => pycmd('%s'));
+    lastButton.insertAdjacentElement('afterend', button);
+})();
+"""
+        % START_ONBOARDING_PYCMD
+    )
+
+
+def setup_onboarding_options() -> None:
+    gui_hooks.deck_browser_did_render.append(_add_onboarding_button)
+    # Work around hooks not being run on first render
+    aqt.mw.deckBrowser.refresh()
