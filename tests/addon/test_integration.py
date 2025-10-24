@@ -7180,6 +7180,9 @@ class TestAnkiHubAIInReviewer:
 
             aqt.mw.reviewer.show()
 
+            # Clear token to simulate not logged in user
+            config.save_token("")
+
             display_login_mock = mocker.patch("ankihub.gui.reviewer.AnkiHubLogin.display_login")
             self._click_ankihub_ai_button()
             qtbot.wait_until(lambda: display_login_mock.called)
