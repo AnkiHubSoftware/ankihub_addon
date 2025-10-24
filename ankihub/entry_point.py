@@ -42,9 +42,9 @@ from .settings import (
     setup_logger,
     setup_profile_data_folder,
 )
-from .user_feature_access import (
-    refresh_user_feature_access_in_background,
-    setup_periodic_user_feature_access_refresh,
+from .user_state import (
+    refresh_user_state_in_background,
+    setup_periodic_user_state_refresh,
 )
 
 CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = bool(re.match(r"24\.06\.", ANKI_VERSION))
@@ -134,10 +134,10 @@ def _on_profile_did_open() -> None:
     # This is because other setup functions can add callbacks which react to feature access changes.
     # If this function is called earlier, the feature access might be refreshed before the callbacks are added,
     # which would cause the callbacks to not be called.
-    refresh_user_feature_access_in_background()
+    refresh_user_state_in_background()
 
-    # Set up periodic refresh to keep user feature access up-to-date.
-    setup_periodic_user_feature_access_refresh(interval_minutes=60)
+    # Set up periodic refresh to keep user state up-to-date.
+    setup_periodic_user_state_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
@@ -209,8 +209,8 @@ def _on_startup_after_ankiweb_sync() -> None:
         maybe_show_enable_fsrs_reminder()
         maybe_show_subdeck_due_date_reminders()
 
-    # Refresh user feature access to make sure it is loaded when the functions check for it.
-    refresh_user_feature_access_in_background(on_done=maybe_show_reminders)
+    # Refresh user state to make sure it is loaded when the functions check for it.
+    refresh_user_state_in_background(on_done=maybe_show_reminders)
 
 
 def _general_setup() -> None:
@@ -268,8 +268,8 @@ def _general_setup() -> None:
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
-    config.token_change_hook.append(refresh_user_feature_access_in_background)
-    LOGGER.info("Set up refreshing of user feature access on token change.")
+    config.token_change_hook.append(refresh_user_state_in_background)
+    LOGGER.info("Set up refreshing of user state on token change.")
 
 
 def _copy_web_media_to_media_folder() -> None:

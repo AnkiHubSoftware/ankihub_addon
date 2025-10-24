@@ -13,7 +13,7 @@ from ..settings import (
     url_flashcard_selector_embed,
     url_plans_page,
 )
-from ..user_feature_access import check_user_feature_access
+from ..user_state import check_user_feature_access
 from .utils import show_dialog
 
 

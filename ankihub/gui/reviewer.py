@@ -29,7 +29,7 @@ from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import Resource, mh_tag_to_resource
 from ..settings import config, url_login
-from ..user_feature_access import check_user_feature_access
+from ..user_state import check_user_feature_access
 from .config_dialog import get_config_dialog_manager
 from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import (

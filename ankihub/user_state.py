@@ -25,14 +25,14 @@ class _PeriodicRefreshState:
     """Module state managing a periodic refresh timer and feature flag callbacks."""
 
     timer: Optional[QTimer] = None
-    feature_flag_update_callbacks: List[Callable[[], None]] = field(default_factory=list)
+    callbacks: List[Callable[[], None]] = field(default_factory=list)
 
 
 _state = _PeriodicRefreshState()
 
 
-def refresh_user_feature_access_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
-    """Refresh user feature access state (feature flags and user details) from the server in the background.
+def refresh_user_state_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
+    """Refresh user state (feature flags and user details) from the server in the background.
 
     This fetches both feature flags (to know which features are enabled on the server)
     and user details (to know which features this user has access to).
@@ -45,7 +45,7 @@ def refresh_user_feature_access_in_background(on_done: Optional[Callable[[], Non
     def _on_done(_: None) -> None:
         LOGGER.info("feature_flags_and_user_details_fetched")
 
-        for callback in _state.feature_flag_update_callbacks:
+        for callback in _state.callbacks:
             aqt.mw.taskman.run_on_main(callback)
 
         if on_done:
@@ -87,11 +87,11 @@ def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
     Args:
         callback: Function to call after feature flags are fetched
     """
-    _state.feature_flag_update_callbacks.append(callback)
+    _state.callbacks.append(callback)
 
 
-def setup_periodic_user_feature_access_refresh(interval_minutes: int = 60) -> None:
-    """Set up periodic refresh of user feature access state during long Anki sessions.
+def setup_periodic_user_state_refresh(interval_minutes: int = 60) -> None:
+    """Set up periodic refresh of user state during long Anki sessions.
 
     This refreshes both feature flags (server-side feature availability) and user details
     (user's access to features) so feature-gated UI elements are kept up-to-date.
@@ -104,7 +104,7 @@ def setup_periodic_user_feature_access_refresh(interval_minutes: int = 60) -> No
         return
 
     _state.timer = QTimer()
-    _state.timer.timeout.connect(lambda: refresh_user_feature_access_in_background())
+    _state.timer.timeout.connect(lambda: refresh_user_state_in_background())
     _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info("periodic_refresh_setup", interval_minutes=interval_minutes)

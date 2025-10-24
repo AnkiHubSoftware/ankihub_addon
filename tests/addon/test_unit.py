@@ -178,10 +178,10 @@ from ankihub.settings import (
     config,
     log_file_path,
 )
-from ankihub.user_feature_access import (
+from ankihub.user_state import (
     _state,
     add_feature_flags_update_callback,
-    refresh_user_feature_access_in_background,
+    refresh_user_state_in_background,
 )
 
 
@@ -1770,12 +1770,12 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
-        _state.feature_flag_update_callbacks.clear()
+        _state.callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
-        MockAnkiHubClient = mocker.patch("ankihub.user_feature_access.AnkiHubClient")
-        mock_logger = mocker.patch("ankihub.user_feature_access.LOGGER")
-        mock_config = mocker.patch("ankihub.user_feature_access.config")
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_logger = mocker.patch("ankihub.user_state.LOGGER")
+        mock_config = mocker.patch("ankihub.user_state.config")
 
         mock_anki_hub_client = MockAnkiHubClient.return_value
         feature_flags_dict = {"flag1": True, "flag2": False}
@@ -1783,7 +1783,7 @@ class TestFeatureFlags:
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
         mock_anki_hub_client.get_user_details.return_value = user_details_dict
 
-        refresh_user_feature_access_in_background()
+        refresh_user_state_in_background()
 
         qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 
@@ -1798,7 +1798,7 @@ class TestFeatureFlags:
     def test_add_feature_flags_update_callback(self):
         callback = MagicMock()
         add_feature_flags_update_callback(callback)
-        assert callback in _state.feature_flag_update_callbacks
+        assert callback in _state.callbacks
 
 
 class TestRetainNidsWithAHNoteType:

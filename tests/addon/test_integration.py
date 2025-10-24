@@ -231,7 +231,7 @@ from ankihub.settings import (
     profile_files_path,
     url_flashcard_selector,
 )
-from ankihub.user_feature_access import check_user_feature_access
+from ankihub.user_state import check_user_feature_access
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"

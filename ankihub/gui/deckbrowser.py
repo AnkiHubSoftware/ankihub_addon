@@ -17,7 +17,7 @@ from ..main.block_exam_subdecks import (
 )
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ActionSource, BlockExamSubdeckOrigin, config
-from ..user_feature_access import check_user_feature_access
+from ..user_state import check_user_feature_access
 from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
 
