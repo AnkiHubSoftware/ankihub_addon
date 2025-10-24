@@ -1808,6 +1808,9 @@ class TestFeatureFlags:
         config.set_feature_flags(cached_feature_flags)
         config.set_user_details(cached_user_details)
 
+        # Mock is_logged_in to return True (user is logged in)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=True)
+
         # Mock client to raise an exception (server unreachable)
         MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
         mock_anki_hub_client = MockAnkiHubClient.return_value
@@ -1840,6 +1843,9 @@ class TestFeatureFlags:
         config.set_feature_flags(cached_feature_flags)
         config.set_user_details(cached_user_details)
 
+        # Mock is_logged_in to return True (user is logged in)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=True)
+
         # Mock client: feature flags succeed, user details fail
         MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
         mock_anki_hub_client = MockAnkiHubClient.return_value
@@ -1859,6 +1865,29 @@ class TestFeatureFlags:
 
         # Assert user details kept cached value (fetch failed)
         assert config.get_user_details() == cached_user_details
+
+    def test_logout_clears_caches(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that logging out clears both feature flags and user details caches."""
+        # Set up initial cached values (simulating previous login)
+        cached_feature_flags = {"flag1": True, "flag2": False}
+        cached_user_details = {"id": 123, "username": "testuser"}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock is_logged_in to return False (user is logged out)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=False)
+
+        mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state (simulating what happens when token_change_hook fires on logout)
+        refresh_user_state_in_background()
+
+        # Wait until both caches are cleared
+        qtbot.wait_until(lambda: config.get_feature_flags() == {} and config.get_user_details() == {})
+
+        # Assert both caches are cleared
+        assert config.get_feature_flags() == {}
+        assert config.get_user_details() == {}
 
 
 class TestRetainNidsWithAHNoteType:

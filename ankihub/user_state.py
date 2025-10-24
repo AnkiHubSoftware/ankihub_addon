@@ -59,7 +59,18 @@ def refresh_user_state_in_background(on_done: Optional[Callable[[], None]] = Non
 
 
 def _fetch_feature_flags_and_user_details() -> None:
-    """Fetch feature flags and user details from the server. If the server is not reachable, use cached values."""
+    """Fetch feature flags and user details from the server.
+
+    - If user is logged out, clears both feature flags and user details caches.
+    - If server is unreachable, preserves existing cached values (for offline support).
+    - Logs warnings for failures instead of raising exceptions.
+    """
+    # Clear caches when user is logged out to prevent cached data from previous login
+    if not config.is_logged_in():
+        config.set_feature_flags({})
+        config.set_user_details({})
+        return
+
     client = AnkiHubClient()
 
     # Fetch feature flags
