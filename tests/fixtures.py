@@ -108,6 +108,10 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
             new_get_feature_flags,
         )
 
+        # Ensure user is logged in before fetching feature flags (required for the logout check)
+        if not config.is_logged_in():
+            config.save_token("test_token")
+
         # this is needed so that the feature flags are reloaded
         _fetch_feature_flags_and_user_details()
 
