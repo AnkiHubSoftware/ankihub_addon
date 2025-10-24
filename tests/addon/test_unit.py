@@ -1800,6 +1800,66 @@ class TestFeatureFlags:
         add_user_state_refreshed_callback(callback)
         assert callback in _state.user_state_refreshed_callbacks
 
+    def test_offline_scenario_preserves_cached_feature_flags(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that cached feature flags are preserved when server is unreachable."""
+        # Set up initial cached values
+        cached_feature_flags = {"flag1": True, "flag2": False}
+        cached_user_details = {"id": 123, "username": "test", "has_feature": True}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock client to raise an exception (server unreachable)
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        original_exc = Exception("Server unreachable")
+        mock_anki_hub_client.get_feature_flags.side_effect = AnkiHubRequestException(original_exc)
+        mock_anki_hub_client.get_user_details.side_effect = AnkiHubRequestException(original_exc)
+
+        mock_logger = mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state (should fail silently and keep cache)
+        refresh_user_state_in_background()
+
+        qtbot.wait_until(lambda: len(mock_logger.warning.mock_calls) >= 2)
+
+        # Assert cached values are still intact
+        assert config.get_feature_flags() == cached_feature_flags
+        assert config.get_user_details() == cached_user_details
+
+        # Assert warning logs were made (not error)
+        warning_calls = [str(call) for call in mock_logger.warning.mock_calls]
+        assert any("failed_to_fetch_feature_flags" in str(c) for c in warning_calls)
+        assert any("failed_to_fetch_user_details" in str(c) for c in warning_calls)
+
+    def test_offline_scenario_partial_failure(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that partial failures preserve their respective caches."""
+        # Set up initial cached values
+        cached_feature_flags = {"flag1": True}
+        cached_user_details = {"id": 123, "username": "test"}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock client: feature flags succeed, user details fail
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        new_feature_flags = {"flag1": False, "flag2": True}
+        mock_anki_hub_client.get_feature_flags.return_value = new_feature_flags
+        original_exc = Exception("User details unavailable")
+        mock_anki_hub_client.get_user_details.side_effect = AnkiHubRequestException(original_exc)
+
+        mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state
+        refresh_user_state_in_background()
+
+        # Wait until feature flags are updated (fetch succeeded)
+        qtbot.wait_until(lambda: config.get_feature_flags() == new_feature_flags)
+
+        # Assert user details kept cached value (fetch failed)
+        assert config.get_user_details() == cached_user_details
+
 
 class TestRetainNidsWithAHNoteType:
     def test_retain_one_ah_note(

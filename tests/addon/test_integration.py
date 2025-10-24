@@ -9583,3 +9583,82 @@ class TestCheckUserFeatureAccess:
         # Assert other callbacks were not called
         on_access_granted_mock.assert_not_called()
         on_access_denied_mock.assert_not_called()
+
+    def test_with_use_cached_and_cached_data_available(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that use_cached=True uses cached data without making a server request."""
+        # Set up cached user details in config
+        cached_user_details = {
+            self.FEATURE_KEY: True,
+            "username": "testuser",
+        }
+        config.set_user_details(cached_user_details)
+
+        # Mock the client (should not be called)
+        mock_get_user_details = self._mock_get_user_details(mocker, return_value={})
+
+        # Call check_user_feature_access with use_cached=True
+        with qtbot.wait_callback() as on_access_granted:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted,
+                parent=aqt.mw,
+                use_cached=True,
+            )
+
+        # Assert callback was called immediately with cached data
+        on_access_granted.assert_called_with(cached_user_details)
+        # Assert the client was NOT called (offline support)
+        mock_get_user_details.assert_not_called()
+
+    def test_with_use_cached_and_no_cached_data(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that use_cached=True falls back to fetch when cache is empty."""
+        # Clear any cached data
+        config.set_user_details({})
+
+        # Mock the client to return fresh user details
+        fresh_user_details = {
+            self.FEATURE_KEY: True,
+            "username": "newuser",
+        }
+        self._mock_get_user_details(mocker, return_value=fresh_user_details)
+
+        # Call check_user_feature_access with use_cached=True but no cache available
+        with qtbot.wait_callback() as on_access_granted:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted,
+                parent=aqt.mw,
+                use_cached=True,
+            )
+
+        # Assert callback was called with fresh data (fetched from server)
+        on_access_granted.assert_called_with(fresh_user_details)
+
+    def test_with_use_cached_and_access_denied(self, qtbot: QtBot, mocker: MockerFixture):
+        """Test that use_cached=True respects access denial from cached data."""
+        # Set up cached user details with access denied
+        cached_user_details = {
+            self.FEATURE_KEY: False,
+        }
+        config.set_user_details(cached_user_details)
+
+        # Mock the client (should not be called)
+        self._mock_get_user_details(mocker, return_value={})
+
+        # Track callbacks
+        on_access_granted_mock = Mock()
+
+        # Call check_user_feature_access with use_cached=True
+        with qtbot.wait_callback() as on_access_denied:
+            check_user_feature_access(
+                feature_key=self.FEATURE_KEY,
+                on_access_granted=on_access_granted_mock,
+                on_access_denied=on_access_denied,
+                parent=aqt.mw,
+                use_cached=True,
+            )
+
+        # Assert on_access_denied was called
+        on_access_denied.assert_called_with(cached_user_details)
+        # Assert on_access_granted was not called
+        on_access_granted_mock.assert_not_called()
