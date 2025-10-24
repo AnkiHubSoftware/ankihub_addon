@@ -218,6 +218,7 @@ class PrivateConfig(DataClassJSONMixin):
     last_sent_summary_date: Optional[date] = None
     show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
+    user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
@@ -369,6 +370,13 @@ class _Config:
 
     def get_feature_flags(self) -> Optional[dict]:
         return self._private_config.feature_flags
+
+    def set_user_details(self, user_details: Optional[dict]):
+        self._private_config.user_details = user_details
+        self._update_private_config()
+
+    def get_user_details(self) -> Optional[dict]:
+        return self._private_config.user_details
 
     def add_deck(
         self,

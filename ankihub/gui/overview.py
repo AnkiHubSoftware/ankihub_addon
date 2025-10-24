@@ -14,7 +14,7 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from .. import LOGGER
-from ..feature_flags import add_feature_flags_update_callback
+from ..remote_config import add_feature_flags_update_callback
 from ..gui.flashcard_selector_dialog import (
     FlashCardSelectorDialog,
     show_flashcard_selector,

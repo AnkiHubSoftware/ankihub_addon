@@ -89,10 +89,10 @@ from ankihub.ankihub_client.models import (  # type: ignore
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
-from ankihub.feature_flags import (
+from ankihub.remote_config import (
     _feature_flags_update_callbacks,
     add_feature_flags_update_callback,
-    update_feature_flags_in_background,
+    update_feature_flags_and_user_details_in_background,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
@@ -1773,24 +1773,28 @@ class TestFeatureFlags:
         _feature_flags_update_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
-        MockAnkiHubClient = mocker.patch("ankihub.feature_flags.AnkiHubClient")
-        mock_logger = mocker.patch("ankihub.feature_flags.LOGGER")
-        mock_config = mocker.patch("ankihub.feature_flags.config")
+        MockAnkiHubClient = mocker.patch("ankihub.remote_config.AnkiHubClient")
+        mock_logger = mocker.patch("ankihub.remote_config.LOGGER")
+        mock_config = mocker.patch("ankihub.remote_config.config")
 
         mock_anki_hub_client = MockAnkiHubClient.return_value
         feature_flags_dict = {"flag1": True, "flag2": False}
+        user_details_dict = {"id": 123, "username": "test"}
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
+        mock_anki_hub_client.get_user_details.return_value = user_details_dict
 
-        update_feature_flags_in_background()
+        update_feature_flags_and_user_details_in_background()
 
         mock_logger_expected_calls = [
-            call.info("Feature flags", feature_flags=feature_flags_dict),
-            call.info("Set up feature flags."),
+            call.info("Feature flags fetched from server", feature_flags=feature_flags_dict),
+            call.info("User details fetched from server", user_id=123),
+            call.info("Fetched feature flags and user details."),
         ]
-        qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 2)
+        qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 
         mock_logger.assert_has_calls(mock_logger_expected_calls, any_order=True)
         mock_config.set_feature_flags.assert_called_with(feature_flags_dict)
+        mock_config.set_user_details.assert_called_with(user_details_dict)
 
     def test_add_feature_flags_update_callback(self):
         callback = MagicMock()

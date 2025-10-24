@@ -12,9 +12,9 @@ from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
 from .db import ankihub_db
-from .feature_flags import (
-    setup_periodic_feature_flag_refresh,
-    update_feature_flags_in_background,
+from .remote_config import (
+    setup_periodic_refresh,
+    update_feature_flags_and_user_details_in_background,
 )
 from .gui import (
     browser,
@@ -131,16 +131,16 @@ def _on_profile_did_open() -> None:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
-    # Call setup_feature_flags_in_background after the general setup.
+    # Fetch feature flags and user details after the general setup.
     # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
     # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
     # which would cause the callbacks to not be called.
-    update_feature_flags_in_background()
+    update_feature_flags_and_user_details_in_background()
 
-    # Set up periodic refresh to pick up feature flag changes during long Anki sessions.
-    # This is called after the first feature flag fetch and after all callbacks are registered.
-    setup_periodic_feature_flag_refresh(interval_minutes=60)
-    LOGGER.info("Set up periodic feature flag refresh.")
+    # Set up periodic refresh to pick up remote config changes during long Anki sessions.
+    # This is called after the first fetch and after all callbacks are registered.
+    setup_periodic_refresh(interval_minutes=60)
+    LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
 def _on_profile_will_close() -> None:
@@ -213,8 +213,8 @@ def _on_startup_after_ankiweb_sync() -> None:
         maybe_show_enable_fsrs_reminder()
         maybe_show_subdeck_due_date_reminders()
 
-    # Fetch feature flags to make sure they are loaded when the functions check for them.
-    update_feature_flags_in_background(on_done=maybe_show_reminders)
+    # Fetch feature flags and user details to make sure they are loaded when the functions check for them.
+    update_feature_flags_and_user_details_in_background(on_done=maybe_show_reminders)
 
 
 def _general_setup() -> None:
@@ -272,8 +272,7 @@ def _general_setup() -> None:
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
-    config.token_change_hook.append(update_feature_flags_in_background)
-    config.token_change_hook.append(fetch_user_details_in_background)
+    config.token_change_hook.append(update_feature_flags_and_user_details_in_background)
     LOGGER.info("Set up fetching of feature flags and user details on token change.")
 
 

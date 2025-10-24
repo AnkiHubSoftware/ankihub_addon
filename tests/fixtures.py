@@ -27,7 +27,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
-from ankihub.feature_flags import _setup_feature_flags
+from ankihub.remote_config import _fetch_feature_flags_and_user_details
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
@@ -108,8 +108,8 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
             new_get_feature_flags,
         )
 
-        # this is needed so that the feature flags are reloaded for the feature_flags singleton
-        _setup_feature_flags()
+        # this is needed so that the feature flags are reloaded
+        _fetch_feature_flags_and_user_details()
 
     return set_feature_flag_state_inner
 

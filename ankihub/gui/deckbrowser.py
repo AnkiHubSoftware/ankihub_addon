@@ -173,6 +173,7 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
         on_access_granted=on_access_granted,
+        use_cached=True,  # Use cached values for offline support
     )
 
 

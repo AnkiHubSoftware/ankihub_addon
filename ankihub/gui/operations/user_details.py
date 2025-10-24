@@ -48,9 +48,10 @@ def check_user_feature_access(
     on_access_denied: Optional[Callable[[dict], None]] = None,
     on_failure: Optional[Callable[[Exception], None]] = None,
     parent=None,
+    use_cached: bool = False,
 ) -> None:
     """
-    Fetches user details and executes callbacks based on feature access.
+    Check user feature access, optionally using cached values for offline support.
 
     Args:
         feature_key: The key in user_details to check (e.g., "has_flashcard_selector_access")
@@ -58,8 +59,22 @@ def check_user_feature_access(
         on_access_denied: Optional callback to call if user doesn't have access, receives user_details dict
         on_failure: Optional callback to call if fetching user details fails, receives exception
         parent: Parent widget for the operation (defaults to aqt.mw)
+        use_cached: If True, use cached user details (for offline support in deck browser).
+                    If False, fetch fresh user details from server (default behavior).
     """
 
+    # Use cached values if requested (for offline support)
+    if use_cached:
+        cached_details = config.get_user_details()
+        if cached_details:
+            if cached_details.get(feature_key):
+                on_access_granted(cached_details)
+            elif on_access_denied:
+                on_access_denied(cached_details)
+            return
+        # If no cache available, fall through to fresh fetch
+
+    # Fetch fresh user details from server
     def on_fetched_user_details(user_details: dict) -> None:
         if user_details.get(feature_key):
             on_access_granted(user_details)
