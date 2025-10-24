@@ -98,21 +98,10 @@ def setup_periodic_refresh(interval_minutes: int = 60) -> None:
     if _periodic_refresh_timer is not None:
         return
 
-    def refresh_and_reschedule() -> None:
-        """Refresh remote config and schedule the next refresh."""
-        LOGGER.debug(f"Periodic refresh triggered")
-
-        def schedule_next() -> None:
-            """Schedule the next timer after this refresh completes."""
-            _periodic_refresh_timer.start(interval_minutes * 60 * 1000)
-            LOGGER.debug(f"Next refresh scheduled in {interval_minutes} minutes")
-
-        update_feature_flags_and_user_details_in_background(on_done=schedule_next)
-
-    # Create a single-shot timer that triggers the first refresh and reschedules itself
     _periodic_refresh_timer = QTimer()
-    _periodic_refresh_timer.setSingleShot(True)
-    _periodic_refresh_timer.timeout.connect(refresh_and_reschedule)
+    _periodic_refresh_timer.timeout.connect(
+        lambda: update_feature_flags_and_user_details_in_background()
+    )
     _periodic_refresh_timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info(f"Set up periodic refresh every {interval_minutes} minutes")
