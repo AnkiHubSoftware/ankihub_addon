@@ -136,10 +136,6 @@ def _on_profile_did_open() -> None:
     # which would cause the callbacks to not be called.
     refresh_user_state_in_background()
 
-    # Set up periodic refresh to keep user state up-to-date.
-    setup_periodic_user_state_refresh(interval_minutes=60)
-    LOGGER.info("Set up periodic refresh of feature flags and user details.")
-
 
 def _on_profile_will_close() -> None:
     media_sync.stop_background_threads()
@@ -270,6 +266,9 @@ def _general_setup() -> None:
 
     config.token_change_hook.append(refresh_user_state_in_background)
     LOGGER.info("Set up refreshing of user state on token change.")
+
+    setup_periodic_user_state_refresh(interval_minutes=60)
+    LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
 def _copy_web_media_to_media_folder() -> None:
