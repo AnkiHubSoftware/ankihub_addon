@@ -174,7 +174,7 @@ from ankihub.main.utils import (
 from ankihub.remote_config import (
     _state,
     add_feature_flags_update_callback,
-    update_feature_flags_and_user_details_in_background,
+    fetch_remote_config_in_background,
 )
 from ankihub.settings import (
     ANKIWEB_ID,
@@ -1783,7 +1783,7 @@ class TestFeatureFlags:
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
         mock_anki_hub_client.get_user_details.return_value = user_details_dict
 
-        update_feature_flags_and_user_details_in_background()
+        fetch_remote_config_in_background()
 
         qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 

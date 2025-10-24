@@ -36,8 +36,8 @@ from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .remote_config import (
-    setup_periodic_refresh,
-    update_feature_flags_and_user_details_in_background,
+    fetch_remote_config_in_background,
+    setup_periodic_remote_config_refresh,
 )
 from .settings import (
     ADDON_VERSION,
@@ -131,15 +131,14 @@ def _on_profile_did_open() -> None:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
-    # Fetch feature flags and user details after the general setup.
-    # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
-    # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
+    # Fetch remote config after the general setup.
+    # This is because other setup functions can add callbacks which react to the remote config getting fetched.
+    # If this function is called earlier, the remote config might be fetched before the callbacks are added,
     # which would cause the callbacks to not be called.
-    update_feature_flags_and_user_details_in_background()
+    fetch_remote_config_in_background()
 
-    # Set up periodic refresh to pick up remote config changes during long Anki sessions.
-    # This is called after the first fetch and after all callbacks are registered.
-    setup_periodic_refresh(interval_minutes=60)
+    # Set up periodic refresh to pick up remote config changes.
+    setup_periodic_remote_config_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
@@ -213,8 +212,8 @@ def _on_startup_after_ankiweb_sync() -> None:
         maybe_show_enable_fsrs_reminder()
         maybe_show_subdeck_due_date_reminders()
 
-    # Fetch feature flags and user details to make sure they are loaded when the functions check for them.
-    update_feature_flags_and_user_details_in_background(on_done=maybe_show_reminders)
+    # Fetch remote config to make sure it is loaded when the functions check for it.
+    fetch_remote_config_in_background(on_done=maybe_show_reminders)
 
 
 def _general_setup() -> None:
@@ -272,8 +271,8 @@ def _general_setup() -> None:
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
-    config.token_change_hook.append(update_feature_flags_and_user_details_in_background)
-    LOGGER.info("Set up fetching of feature flags and user details on token change.")
+    config.token_change_hook.append(fetch_remote_config_in_background)
+    LOGGER.info("Set up fetching of remote config on token change.")
 
 
 def _copy_web_media_to_media_folder() -> None:

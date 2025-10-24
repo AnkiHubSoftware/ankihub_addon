@@ -20,7 +20,7 @@ from .settings import config
 
 @dataclass
 class _PeriodicRefreshState:
-    """Module state managing periodic refresh timer and feature flag callbacks."""
+    """Module state managing a periodic refresh timer and feature flag callbacks."""
 
     timer: Optional[QTimer] = None
     feature_flag_update_callbacks: List[Callable[[], None]] = field(default_factory=list)
@@ -29,10 +29,10 @@ class _PeriodicRefreshState:
 _state = _PeriodicRefreshState()
 
 
-def update_feature_flags_and_user_details_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
-    """Fetch feature flags and user details from the server in the background.
+def fetch_remote_config_in_background(on_done: Optional[Callable[[], None]] = None) -> None:
+    """Fetch remote config (feature flags and user details) from the server in the background.
 
-    This updates both feature flags (for feature gating) and user details (for access checks).
+    This fetches both feature flags (for feature gating) and user details (for access checks).
     Cached values are preserved if the server is unreachable.
 
     Args:
@@ -87,7 +87,7 @@ def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
     _state.feature_flag_update_callbacks.append(callback)
 
 
-def setup_periodic_refresh(interval_minutes: int = 60) -> None:
+def setup_periodic_remote_config_refresh(interval_minutes: int = 60) -> None:
     """Set up periodic refresh of feature flags and user details during long Anki sessions.
 
     This allows feature-flagged UI elements to appear when flags are enabled on the server,
@@ -103,7 +103,7 @@ def setup_periodic_refresh(interval_minutes: int = 60) -> None:
         return
 
     _state.timer = QTimer()
-    _state.timer.timeout.connect(lambda: update_feature_flags_and_user_details_in_background())
+    _state.timer.timeout.connect(lambda: fetch_remote_config_in_background())
     _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
     LOGGER.info("periodic_refresh_setup", interval_minutes=interval_minutes)
