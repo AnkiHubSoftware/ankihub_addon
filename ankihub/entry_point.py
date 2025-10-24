@@ -12,7 +12,10 @@ from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
 from .db import ankihub_db
-from .feature_flags import update_feature_flags_in_background
+from .feature_flags import (
+    setup_periodic_feature_flag_refresh,
+    update_feature_flags_in_background,
+)
 from .gui import (
     browser,
     deck_options,
@@ -133,6 +136,11 @@ def _on_profile_did_open() -> None:
     # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
     # which would cause the callbacks to not be called.
     update_feature_flags_in_background()
+
+    # Set up periodic refresh to pick up feature flag changes during long Anki sessions.
+    # This is called after the first feature flag fetch and after all callbacks are registered.
+    setup_periodic_feature_flag_refresh(interval_minutes=60)
+    LOGGER.info("Set up periodic feature flag refresh.")
 
 
 def _on_profile_will_close() -> None:
