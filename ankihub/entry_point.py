@@ -12,7 +12,6 @@ from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
 from .db import ankihub_db
-from .feature_flags import update_feature_flags_in_background
 from .gui import (
     browser,
     deck_options,
@@ -31,7 +30,6 @@ from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .gui.operations.ankihub_sync import setup_full_sync_patch
-from .gui.operations.user_details import fetch_user_details_in_background
 from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
 from .main.note_deletion import handle_notes_deleted_from_webapp
@@ -43,6 +41,10 @@ from .settings import (
     config,
     setup_logger,
     setup_profile_data_folder,
+)
+from .user_state import (
+    refresh_user_state_in_background,
+    setup_periodic_user_state_refresh,
 )
 
 CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = bool(re.match(r"24\.06\.", ANKI_VERSION))
@@ -128,11 +130,11 @@ def _on_profile_did_open() -> None:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
-    # Call setup_feature_flags_in_background after the general setup.
-    # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
-    # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
+    # Refresh user feature access after the general setup.
+    # This is because other setup functions can add callbacks which react to feature access changes.
+    # If this function is called earlier, the feature access might be refreshed before the callbacks are added,
     # which would cause the callbacks to not be called.
-    update_feature_flags_in_background()
+    refresh_user_state_in_background()
 
 
 def _on_profile_will_close() -> None:
@@ -181,8 +183,6 @@ def _after_profile_setup() -> None:
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
 
-    fetch_user_details_in_background()
-
     media_sync.allow_background_threads()
 
     if aqt.mw.can_auto_sync():
@@ -205,8 +205,8 @@ def _on_startup_after_ankiweb_sync() -> None:
         maybe_show_enable_fsrs_reminder()
         maybe_show_subdeck_due_date_reminders()
 
-    # Fetch feature flags to make sure they are loaded when the functions check for them.
-    update_feature_flags_in_background(on_done=maybe_show_reminders)
+    # Refresh user state to make sure it is loaded when the functions check for it.
+    refresh_user_state_in_background(on_done=maybe_show_reminders)
 
 
 def _general_setup() -> None:
@@ -264,9 +264,11 @@ def _general_setup() -> None:
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
-    config.token_change_hook.append(update_feature_flags_in_background)
-    config.token_change_hook.append(fetch_user_details_in_background)
-    LOGGER.info("Set up fetching of feature flags and user details on token change.")
+    config.token_change_hook.append(refresh_user_state_in_background)
+    LOGGER.info("Set up refreshing of user state on token change.")
+
+    setup_periodic_user_state_refresh(interval_minutes=60)
+    LOGGER.info("Set up periodic refresh of feature flags and user details.")
 
 
 def _copy_web_media_to_media_folder() -> None:

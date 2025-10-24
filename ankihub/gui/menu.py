@@ -252,6 +252,8 @@ def _sign_out_action():
         AnkiHubClient().signout()
     finally:
         config.save_token("")
+        config.set_feature_flags({})
+        config.set_user_details({})
         tooltip("Signed out of AnkiHub!", parent=aqt.mw)
 
 
