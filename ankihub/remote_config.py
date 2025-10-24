@@ -2,7 +2,7 @@
 
 Feature flags control client-side feature availability.
 User details include feature access flags (e.g., has_flashcard_selector_access) for gating premium features.
-Both are cached locally and refreshed periodically for offline support.
+Both are cached locally and refreshed periodically.
 """
 
 from dataclasses import dataclass, field
@@ -40,7 +40,7 @@ def update_feature_flags_and_user_details_in_background(on_done: Optional[Callab
     """
 
     def _on_done(_: None) -> None:
-        LOGGER.info("Fetched feature flags and user details.")
+        LOGGER.info("feature_flags_and_user_details_fetched")
 
         for callback in _state.feature_flag_update_callbacks:
             aqt.mw.taskman.run_on_main(callback)
@@ -63,22 +63,18 @@ def _fetch_feature_flags_and_user_details() -> None:
     try:
         feature_flags_dict = client.get_feature_flags()
         config.set_feature_flags(feature_flags_dict)
-        LOGGER.info("Feature flags fetched from server")
+        LOGGER.info("feature_flags_fetched_from_server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning(
-            f"Failed to fetch feature flags: {exc}. Using cached values.", feature_flags=config.get_feature_flags()
-        )
+        LOGGER.warning("failed_to_fetch_feature_flags", exception=exc)
         # Keep the existing cached values
 
     # Fetch user details (for offline support)
     try:
         user_details = client.get_user_details()
         config.set_user_details(user_details)
-        LOGGER.info("User details fetched from server")
+        LOGGER.info("user_details_fetched_from_server")
     except (AnkiHubRequestException, AnkiHubHTTPError) as exc:
-        LOGGER.warning(
-            f"Failed to fetch user details: {exc}. Using cached values.", user_details=config.get_user_details()
-        )
+        LOGGER.warning("failed_to_fetch_user_details", exception=exc)
         # Keep the existing cached values
 
 
@@ -110,4 +106,4 @@ def setup_periodic_refresh(interval_minutes: int = 60) -> None:
     _state.timer.timeout.connect(lambda: update_feature_flags_and_user_details_in_background())
     _state.timer.start(interval_minutes * 60 * 1000)  # Convert minutes to milliseconds
 
-    LOGGER.info(f"Set up periodic refresh every {interval_minutes} minutes")
+    LOGGER.info("periodic_refresh_setup", interval_minutes=interval_minutes)

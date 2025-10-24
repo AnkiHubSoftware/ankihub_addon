@@ -10,7 +10,7 @@ from logging import LogRecord
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import aqt
 import pytest
@@ -1785,14 +1785,13 @@ class TestFeatureFlags:
 
         update_feature_flags_and_user_details_in_background()
 
-        mock_logger_expected_calls = [
-            call.info("Feature flags fetched from server", feature_flags=feature_flags_dict),
-            call.info("User details fetched from server", user_id=123),
-            call.info("Fetched feature flags and user details."),
-        ]
         qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 
-        mock_logger.assert_has_calls(mock_logger_expected_calls, any_order=True)
+        # Check that all expected log calls were made
+        log_calls = [str(call) for call in mock_logger.info.mock_calls]
+        assert any("feature_flags_fetched_from_server" in str(c) for c in log_calls)
+        assert any("user_details_fetched_from_server" in str(c) for c in log_calls)
+        assert any("feature_flags_and_user_details_fetched" in str(c) for c in log_calls)
         mock_config.set_feature_flags.assert_called_with(feature_flags_dict)
         mock_config.set_user_details.assert_called_with(user_details_dict)
 
