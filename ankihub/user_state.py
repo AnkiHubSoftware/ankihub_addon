@@ -1,10 +1,12 @@
-"""Manage user feature access state by fetching feature flags and user details from the server.
+"""Manage user state by fetching feature flags and user details from the server.
 
-This module refreshes the user's feature access state, which is determined by:
-- Feature flags: Which features are enabled on the server
-- User details: Which features this specific user has access to (e.g., has_flashcard_selector_access)
+This module refreshes the user's state, which consists of:
+- Feature flags: Which features are enabled on the server (e.g., flashcard_selector_enabled)
+- User details: User-specific data including username, user_id, and feature access flags
+  (e.g., has_flashcard_selector_access)
 
-Both are cached locally and refreshed periodically to keep feature-gated UI elements current.
+Both are cached locally and refreshed periodically to reduce API requests and support offline usage.
+The caches are cleared when the user logs out to prevent data leakage between different logins.
 """
 
 from dataclasses import dataclass, field
