@@ -82,7 +82,7 @@ def _fetch_feature_flags_and_user_details() -> None:
         LOGGER.warning("failed_to_fetch_feature_flags", exception=str(exc))
         # Keep the existing cached values
 
-    # Fetch user details (for offline support)
+    # Fetch user details
     try:
         user_details = client.get_user_details()
         config.set_user_details(user_details)
