@@ -18,7 +18,6 @@ from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import Deck, UserDeckRelation
 from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
-from ...gui.tutorial import prompt_for_onboarding_tutorial
 from ...main.deck_options import create_or_reset_deck_preset
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.subdecks import deck_contains_subdeck_tags
@@ -160,6 +159,8 @@ def _show_deck_import_summary_dialog_inner(
         else:
             intro_deck_config = config.deck_config(config.intro_deck_id)
             if intro_deck_config and intro_deck_config.name in ankihub_deck_names:
+                from ...gui.tutorial import prompt_for_onboarding_tutorial
+
                 prompt_for_onboarding_tutorial()
 
     show_dialog(

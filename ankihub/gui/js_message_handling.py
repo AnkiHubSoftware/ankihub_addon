@@ -22,7 +22,6 @@ from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
-from .tutorial import OnboardingTutorial
 from .utils import robust_filter
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -158,6 +157,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message == START_ONBOARDING_PYCMD:
+        from .tutorial import OnboardingTutorial
+
         OnboardingTutorial().start()
 
     return handled
