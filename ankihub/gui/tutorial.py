@@ -43,6 +43,7 @@ class TutorialStep:
     show_primary_button: bool = True
     primary_button_label: str = "Next"
     button_callback: Optional[Callable[[], None]] = None
+    block_target_click: bool = False
 
     def __post_init__(self):
         if not self.target_context:
@@ -92,6 +93,7 @@ class Tutorial:
             "currentStep": self.current_step,
             "stepCount": len(self.steps),
             "position": "bottom",
+            "blockTargetClick": step.block_target_click,
             "primaryButton": {
                 "show": step.show_primary_button,
                 "label": step.primary_button_label,
@@ -104,7 +106,13 @@ class Tutorial:
         self._call_js_function_with_options(tooltip_web, "showAnkiHubTutorialModal", tooltip_options)
         if step.target and step.tooltip_context != step.target_context:
             self._call_js_function_with_options(
-                target_web, "highlightAnkiHubTutorialTarget", {"target": step.target, "currentStep": self.current_step}
+                target_web,
+                "highlightAnkiHubTutorialTarget",
+                {
+                    "target": step.target,
+                    "currentStep": self.current_step,
+                    "blockTargetClick": step.block_target_click,
+                },
             )
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
@@ -240,6 +248,7 @@ class OnboardingTutorial(Tutorial):
                 target="#decks",
                 tooltip_context=mw.deckBrowser,
                 target_context=mw.toolbar,
+                block_target_click=True,
             )
         ]
 

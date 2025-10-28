@@ -13,6 +13,7 @@ function showAnkiHubTutorialModal({
     position = "bottom",
     primaryButton = { show: true, label: "Next" },
     showArrow = true,
+    blockTargetClick = false,
 }) {
     destroyAnkiHubTutorialModal();
     let footer = `<span>${currentStep} of ${stepCount}</span>`;
@@ -26,14 +27,24 @@ function showAnkiHubTutorialModal({
         target,
         position,
         showArrow,
+        blockTargetClick,
     });
     modal.show();
     window.ankihubTutorialModal = modal;
 }
 
-function highlightAnkiHubTutorialTarget({ target, currentStep }) {
+function highlightAnkiHubTutorialTarget({
+    target,
+    currentStep,
+    blockTargetClick = false,
+}) {
     destroyAnkiHubTutorialModal();
-    var modal = new AnkiHubModal({ body: "", footer: "", target });
+    var modal = new AnkiHubModal({
+        body: "",
+        footer: "",
+        target,
+        blockTargetClick,
+    });
     modal.show();
     window.ankihubTutorialModal = modal;
     if (window.ankihubTutorialTargetResizeHandler) {

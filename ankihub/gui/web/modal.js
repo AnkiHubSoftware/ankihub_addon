@@ -9,6 +9,7 @@ class AnkiHubModal {
             position: "center",
             arrowPosition: "top",
             showArrow: true,
+            blockTargetClick: false,
             ...options,
         };
 
@@ -379,6 +380,15 @@ class AnkiHubModal {
             "data-original-z-index",
             originalZIndex
         );
+        if (this.options.blockTargetClick) {
+            const originalPointerEvents =
+                this.targetElement.style.pointerEvents;
+            this.targetElement.style.pointerEvents = "none";
+            this.targetElement.setAttribute(
+                "data-original-pointer-events",
+                originalPointerEvents
+            );
+        }
         // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
         this.targetElement.parentElement.style.backdropFilter = "none";
     }
@@ -395,6 +405,15 @@ class AnkiHubModal {
             this.targetElement.removeAttribute("data-original-z-index");
         } else {
             this.targetElement.style.zIndex = "";
+        }
+        const originalPointerEvents = this.targetElement.getAttribute(
+            "data-original-pointer-events"
+        );
+        if (originalPointerEvents) {
+            this.targetElement.style.pointerEvents = originalPointerEvents;
+            this.targetElement.removeAttribute("data-original-pointer-events");
+        } else {
+            this.targetElement.style.pointerEvents = "";
         }
         this.targetElement = null;
     }
