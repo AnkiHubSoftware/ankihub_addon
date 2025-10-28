@@ -1,13 +1,12 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
-from aqt.deckbrowser import DeckBrowser
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
@@ -22,6 +21,9 @@ from .js_message_handling import START_ONBOARDING_PYCMD
 from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
+
+if TYPE_CHECKING:
+    from aqt.deckbrowser import DeckBrowser
 
 
 @dataclass
@@ -183,7 +185,7 @@ def setup_subdeck_ankihub_options() -> None:
     gui_hooks.deck_browser_will_show_options_menu.append(_initialize_subdeck_context_menu_actions)
 
 
-def _add_onboarding_button(deckbrowser: DeckBrowser) -> None:
+def _add_onboarding_button(deckbrowser: "DeckBrowser") -> None:
     deckbrowser.bottom.web.eval(
         """
 (() => {
