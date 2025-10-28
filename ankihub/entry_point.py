@@ -22,7 +22,6 @@ from .gui import (
     overview,
     progress,
     reviewer,
-    tutorial,
 )
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
