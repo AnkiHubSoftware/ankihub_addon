@@ -80,11 +80,10 @@ class Tutorial:
     def refresh_initial_webviews(self) -> None:
         pass
 
-    def _call_js_function_with_options(self, web: AnkiWebView, function: str, options: dict[str, Any]) -> None:
-        js = f"{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
-        web.eval(js)
+    def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
+        return f"{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
 
-    def _render_tooltip(self) -> None:
+    def _render_tooltip(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
         if step.shown_callback:
             step.shown_callback()
@@ -104,14 +103,17 @@ class Tutorial:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
         if not step.target:
             tooltip_options["showArrow"] = False
-        self._call_js_function_with_options(tooltip_web, "showAnkiHubTutorialModal", tooltip_options)
+        js = self._render_js_function_with_options("showAnkiHubTutorialModal", tooltip_options)
+        if eval_js:
+            tooltip_web.eval(js)
+        return js
 
-    def _render_highlight(self) -> None:
+    def _render_highlight(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
         target_web = webview_for_context(step.target_context)
+        js = ""
         if step.target and step.tooltip_context != step.target_context:
-            self._call_js_function_with_options(
-                target_web,
+            js = self._render_js_function_with_options(
                 "highlightAnkiHubTutorialTarget",
                 {
                     "target": step.target,
@@ -119,15 +121,21 @@ class Tutorial:
                     "blockTargetClick": step.block_target_click,
                 },
             )
+            if eval_js:
+                target_web.eval(js)
+        return js
 
-    def _render_backdrop(self) -> None:
+    def _backdrop_js(self) -> str:
+        return "addAnkiHubTutorialBackdrop()"
+
+    def _render_backdrop(self) -> str:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                web.eval("addAnkiHubTutorialBackdrop()")
+                web.eval(self._backdrop_js())
 
     def show_current(self) -> None:
         self._render_tooltip()
@@ -174,15 +182,16 @@ class Tutorial:
         web_content.js.append(f"{web_base}/modal.js")
         web_content.js.append(f"{web_base}/tutorial.js")
         if not self._show_timer:
-            def render() -> None:
-                step = self.steps[self.current_step - 1]
-                if step.tooltip_context == context:
-                    self._render_tooltip()
-                if step.target_context == context:
-                    self._render_highlight()
-                if context in self.extra_backdrop_contexts:
-                    self._render_backdrop()
-            mw.progress.single_shot(100, render)
+            step = self.steps[self.current_step - 1]
+            js = ""
+            if step.tooltip_context == context:
+                js = self._render_tooltip(False)
+            elif step.target_context == context:
+                js = self._render_highlight(False)
+            elif context in self.extra_backdrop_contexts:
+                js = self._backdrop_js()
+            if js:
+                web_content.body += f"<script>{js}</script>"
         self._loadded_context_types.add(type(context))
 
     def _on_webview_did_receive_js_message(
@@ -248,6 +257,8 @@ class Tutorial:
                 self._show_timer = None
                 self.show_current()
 
+        if self._show_timer:
+            self._show_timer.deleteLater()
         self._show_timer = mw.progress.timer(delay, task, repeat=True, parent=mw)
 
 
