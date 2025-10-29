@@ -58,6 +58,8 @@ class Tutorial:
         self.name = ""
         self.current_step = 1
         self._loadded_context_types: Set[Type[Any]] = set()
+        self._show_timer: Optional[QTimer] = None
+
 
     @property
     def contexts(self) -> Tuple[Any, ...]:
@@ -82,12 +84,11 @@ class Tutorial:
         js = f"{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
         web.eval(js)
 
-    def show_current(self) -> None:
+    def _render_tooltip(self) -> None:
         step = self.steps[self.current_step - 1]
         if step.shown_callback:
             step.shown_callback()
         tooltip_web = webview_for_context(step.tooltip_context)
-        target_web = webview_for_context(step.target_context)
         tooltip_options = {
             "body": step.body,
             "currentStep": self.current_step,
@@ -104,6 +105,10 @@ class Tutorial:
         if not step.target:
             tooltip_options["showArrow"] = False
         self._call_js_function_with_options(tooltip_web, "showAnkiHubTutorialModal", tooltip_options)
+
+    def _render_highlight(self) -> None:
+        step = self.steps[self.current_step - 1]
+        target_web = webview_for_context(step.target_context)
         if step.target and step.tooltip_context != step.target_context:
             self._call_js_function_with_options(
                 target_web,
@@ -114,10 +119,20 @@ class Tutorial:
                     "blockTargetClick": step.block_target_click,
                 },
             )
+
+    def _render_backdrop(self) -> None:
+        step = self.steps[self.current_step - 1]
+        tooltip_web = webview_for_context(step.tooltip_context)
+        target_web = webview_for_context(step.target_context)
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
                 web.eval("addAnkiHubTutorialBackdrop()")
+
+    def show_current(self) -> None:
+        self._render_tooltip()
+        self._render_highlight()
+        self._render_backdrop()
 
     def start(self) -> None:
         global active_tutorial
@@ -158,6 +173,16 @@ class Tutorial:
         web_content.css.append(f"{web_base}/modal.css")
         web_content.js.append(f"{web_base}/modal.js")
         web_content.js.append(f"{web_base}/tutorial.js")
+        if not self._show_timer:
+            def render() -> None:
+                step = self.steps[self.current_step - 1]
+                if step.tooltip_context == context:
+                    self._render_tooltip()
+                if step.target_context == context:
+                    self._render_highlight()
+                if context in self.extra_backdrop_contexts:
+                    self._render_backdrop()
+            mw.progress.single_shot(100, render)
         self._loadded_context_types.add(type(context))
 
     def _on_webview_did_receive_js_message(
@@ -207,7 +232,6 @@ class Tutorial:
         self.current_step += 1
 
         # Wait for a maximum of 2 seconds for the webviews to load then show the next step
-        timer: QTimer
         delay = 50
         time_passed = 0
 
@@ -219,10 +243,12 @@ class Tutorial:
                 type(next_step.tooltip_context) in self._loadded_context_types
                 and type(next_step.target_context) in self._loadded_context_types
             ) or time_passed >= 2000:
-                timer.deleteLater()
+                if self._show_timer:
+                    self._show_timer.deleteLater()
+                self._show_timer = None
                 self.show_current()
 
-        timer = mw.progress.timer(delay, task, repeat=True, parent=mw)
+        self._show_timer = mw.progress.timer(delay, task, repeat=True, parent=mw)
 
 
 class OnboardingTutorial(Tutorial):
