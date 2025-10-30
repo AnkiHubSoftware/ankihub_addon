@@ -1002,13 +1002,12 @@ class DatadogLogHandler(logging.Handler):
                     self.flush(in_background=True)
 
     def _send_logs_to_datadog(self, records: List[logging.LogRecord]) -> None:
-        platform_str = platform.platform()
         body = [
             {
                 "ddsource": "anki_addon",
                 "ddtags": (
                     f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION},"
-                    f"platform:{platform_str},server:{config.server()}"
+                    f"platform:{platform.platform()},server:{config.server()}"
                 ),
                 "hostname": socket.gethostname(),
                 "service": "ankihub_addon",
