@@ -261,8 +261,8 @@ class _Config:
         if anking_deck_id_from_env_var := os.getenv("ANKING_DECK_ID"):
             self.anking_deck_id = uuid.UUID(anking_deck_id_from_env_var)
 
-    def server(self) -> str:
-        """Returns which server the client is configured to connect to.
+    def ankihub_server(self) -> str:
+        """Returns which AnkiHub server the client is configured to connect to.
 
         Returns:
             "production" if connecting to production server
@@ -1007,7 +1007,7 @@ class DatadogLogHandler(logging.Handler):
                 "ddsource": "anki_addon",
                 "ddtags": (
                     f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION},"
-                    f"platform:{platform.platform()},server:{config.server()}"
+                    f"platform:{platform.platform()},ankihub_server:{config.ankihub_server()}"
                 ),
                 "hostname": socket.gethostname(),
                 "service": "ankihub_addon",
