@@ -458,6 +458,7 @@ def _report_exception(exception: BaseException, context: Dict[str, Dict[str, Any
         scope.level = "error"
         scope.user = {"id": config.username_or_email()}
         scope.set_tag("os", sys.platform)
+        scope.set_tag("server", config.server())
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})
         scope.set_context("anki version", {"version": ANKI_VERSION})
