@@ -43,7 +43,11 @@ bundle = [
 ]
 aqt = ["aqt[qt]==25.9.2"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
-aqt_25_2_7 = ["aqt==25.2.7"]
+aqt_25_2_7 = [
+  "aqt==25.2.7",
+  "PyQt6==6.7.*",
+  "PyQt6-WebEngine==6.7.*",
+]
 
 [tool.uv]
 conflicts = [
