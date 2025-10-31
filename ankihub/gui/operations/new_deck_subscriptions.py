@@ -101,6 +101,9 @@ def _on_button_clicked(
             use_recommended_settings=is_recommended_deck_settings_checked,
         )
         on_done(future_with_result(None))
+        from ...gui.tutorial import prompt_for_onboarding_tutorial
+
+        prompt_for_onboarding_tutorial()
         return
 
     # Download the new decks
