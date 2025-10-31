@@ -14,12 +14,12 @@ from aqt.webview import AnkiWebView
 from jinja2 import Template
 
 from .. import LOGGER
-from ..feature_flags import add_feature_flags_update_callback
 from ..gui.flashcard_selector_dialog import (
     FlashCardSelectorDialog,
     show_flashcard_selector,
 )
 from ..settings import config
+from ..user_state import add_user_state_refreshed_callback
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter
@@ -41,8 +41,8 @@ def setup() -> None:
     _maybe_add_flashcard_selector_button()
 
     # The button is only added when the feature flag is enabled. The feature flag is fetched in the background,
-    # so we might need to add the button when the feature flag is fetched.
-    add_feature_flags_update_callback(_maybe_add_flashcard_selector_button)
+    # so we might need to add the button when the user state is refreshed.
+    add_user_state_refreshed_callback(_maybe_add_flashcard_selector_button)
 
     webview_did_receive_js_message.append(_handle_flashcard_selector_py_commands)
 

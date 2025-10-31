@@ -27,12 +27,12 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
-from ankihub.feature_flags import _setup_feature_flags
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modified_note_type
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
+from ankihub.user_state import _fetch_feature_flags_and_user_details
 
 
 @fixture
@@ -108,8 +108,12 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
             new_get_feature_flags,
         )
 
-        # this is needed so that the feature flags are reloaded for the feature_flags singleton
-        _setup_feature_flags()
+        # Ensure user is logged in before fetching feature flags
+        if not config.is_logged_in():
+            config.save_token("test_token")
+
+        # this is needed so that the feature flags are reloaded
+        _fetch_feature_flags_and_user_details()
 
     return set_feature_flag_state_inner
 

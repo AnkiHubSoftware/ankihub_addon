@@ -17,8 +17,8 @@ from ..main.block_exam_subdecks import (
 )
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ActionSource, BlockExamSubdeckOrigin, config
+from ..user_state import check_user_feature_access
 from .js_message_handling import START_ONBOARDING_PYCMD
-from .operations.user_details import check_user_feature_access
 from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
 from .utils import ask_user, show_dialog, show_tooltip
 
@@ -178,6 +178,7 @@ def _initialize_subdeck_context_menu_actions(menu: QMenu, deck_id: int) -> None:
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
         on_access_granted=on_access_granted,
+        use_cached=True,  # Use cached values for offline support
     )
 
 
