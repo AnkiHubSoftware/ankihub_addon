@@ -260,6 +260,21 @@ class _Config:
         if anking_deck_id_from_env_var := os.getenv("ANKING_DECK_ID"):
             self.anking_deck_id = uuid.UUID(anking_deck_id_from_env_var)
 
+    def ankihub_server(self) -> str:
+        """Returns which AnkiHub server the client is configured to connect to.
+
+        Returns:
+            "production" if connecting to production server
+            "staging" if connecting to staging server
+            "custom" for any other URL (e.g., local development)
+        """
+        if self.app_url == STAGING_APP_URL:
+            return "staging"
+        elif self.app_url == DEFAULT_APP_URL:
+            return "production"
+        else:
+            return "custom"
+
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config
         self._private_config_path = private_config_path()
@@ -994,7 +1009,10 @@ class DatadogLogHandler(logging.Handler):
         body = [
             {
                 "ddsource": "anki_addon",
-                "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION},platform:{platform.platform()}",
+                "ddtags": (
+                    f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION},"
+                    f"platform:{platform.platform()},ankihub_server:{config.ankihub_server()}"
+                ),
                 "hostname": socket.gethostname(),
                 "service": "ankihub_addon",
                 "username": config.username_or_email(),
