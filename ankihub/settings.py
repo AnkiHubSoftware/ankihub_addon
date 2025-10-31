@@ -204,8 +204,6 @@ class UIConfig(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class PrivateConfig(DataClassJSONMixin):
-    user_id: Optional[int] = None
-    username: Optional[str] = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
     deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(default_factory=dict)
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
@@ -218,6 +216,7 @@ class PrivateConfig(DataClassJSONMixin):
     last_sent_summary_date: Optional[date] = None
     show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
+    user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
 
 
@@ -318,11 +317,9 @@ class _Config:
         aqt.mw.pm.profile["thirdPartyAnkiHubUsername"] = user_email
 
     def save_username(self, username: str):
-        self._private_config.username = username
-        self._update_private_config()
-
-    def save_user_id(self, user_id: Optional[int]):
-        self._private_config.user_id = user_id
+        if not self._private_config.user_details:
+            self._private_config.user_details = {}
+        self._private_config.user_details["username"] = username
         self._update_private_config()
 
     def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
@@ -369,6 +366,13 @@ class _Config:
 
     def get_feature_flags(self) -> Optional[dict]:
         return self._private_config.feature_flags
+
+    def set_user_details(self, user_details: Optional[dict]):
+        self._private_config.user_details = user_details
+        self._update_private_config()
+
+    def get_user_details(self) -> Optional[dict]:
+        return self._private_config.user_details
 
     def add_deck(
         self,
@@ -455,13 +459,13 @@ class _Config:
         return aqt.mw.pm.profile.get("thirdPartyAnkiHubUsername")
 
     def username(self) -> Optional[str]:
-        return self._private_config.username
+        return self._private_config.user_details.get("username")
 
     def username_or_email(self) -> Optional[str]:
         return self.username() or self.user()
 
     def user_id(self) -> Optional[int]:
-        return self._private_config.user_id
+        return self._private_config.user_details.get("id")
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui

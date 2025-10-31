@@ -10,7 +10,7 @@ from logging import LogRecord
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import aqt
 import pytest
@@ -89,11 +89,6 @@ from ankihub.ankihub_client.models import (  # type: ignore
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
-from ankihub.feature_flags import (
-    _feature_flags_update_callbacks,
-    add_feature_flags_update_callback,
-    update_feature_flags_in_background,
-)
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
@@ -182,6 +177,11 @@ from ankihub.settings import (
     DatadogLogHandler,
     config,
     log_file_path,
+)
+from ankihub.user_state import (
+    _state,
+    add_user_state_refreshed_callback,
+    refresh_user_state_in_background,
 )
 
 
@@ -1770,32 +1770,124 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
-        _feature_flags_update_callbacks.clear()
+        _state.user_state_refreshed_callbacks.clear()
 
     def test_update_feature_flags_in_background(self, mocker: MockerFixture, qtbot: QtBot):
-        MockAnkiHubClient = mocker.patch("ankihub.feature_flags.AnkiHubClient")
-        mock_logger = mocker.patch("ankihub.feature_flags.LOGGER")
-        mock_config = mocker.patch("ankihub.feature_flags.config")
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_logger = mocker.patch("ankihub.user_state.LOGGER")
+        mock_config = mocker.patch("ankihub.user_state.config")
 
         mock_anki_hub_client = MockAnkiHubClient.return_value
         feature_flags_dict = {"flag1": True, "flag2": False}
+        user_details_dict = {"id": 123, "username": "test"}
         mock_anki_hub_client.get_feature_flags.return_value = feature_flags_dict
+        mock_anki_hub_client.get_user_details.return_value = user_details_dict
 
-        update_feature_flags_in_background()
+        refresh_user_state_in_background()
 
-        mock_logger_expected_calls = [
-            call.info("Feature flags", feature_flags=feature_flags_dict),
-            call.info("Set up feature flags."),
-        ]
-        qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 2)
+        qtbot.wait_until(lambda: len(mock_logger.info.mock_calls) == 3)
 
-        mock_logger.assert_has_calls(mock_logger_expected_calls, any_order=True)
+        # Check that all expected log calls were made
+        log_calls = [str(call) for call in mock_logger.info.mock_calls]
+        assert any("feature_flags_fetched_from_server" in str(c) for c in log_calls)
+        assert any("user_details_fetched_from_server" in str(c) for c in log_calls)
+        assert any("feature_flags_and_user_details_fetched" in str(c) for c in log_calls)
         mock_config.set_feature_flags.assert_called_with(feature_flags_dict)
+        mock_config.set_user_details.assert_called_with(user_details_dict)
 
-    def test_add_feature_flags_update_callback(self):
+    def test_add_user_state_refreshed_callback(self):
         callback = MagicMock()
-        add_feature_flags_update_callback(callback)
-        assert callback in _feature_flags_update_callbacks
+        add_user_state_refreshed_callback(callback)
+        assert callback in _state.user_state_refreshed_callbacks
+
+    def test_offline_scenario_preserves_cached_feature_flags(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that cached feature flags are preserved when server is unreachable."""
+        # Set up initial cached values
+        cached_feature_flags = {"flag1": True, "flag2": False}
+        cached_user_details = {"id": 123, "username": "test", "has_feature": True}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock is_logged_in to return True (user is logged in)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=True)
+
+        # Mock client to raise an exception (server unreachable)
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        original_exc = Exception("Server unreachable")
+        mock_anki_hub_client.get_feature_flags.side_effect = AnkiHubRequestException(original_exc)
+        mock_anki_hub_client.get_user_details.side_effect = AnkiHubRequestException(original_exc)
+
+        mock_logger = mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state (should fail silently and keep cache)
+        refresh_user_state_in_background()
+
+        qtbot.wait_until(lambda: len(mock_logger.warning.mock_calls) >= 2)
+
+        # Assert cached values are still intact
+        assert config.get_feature_flags() == cached_feature_flags
+        assert config.get_user_details() == cached_user_details
+
+        # Assert warning logs were made (not error)
+        warning_calls = [str(call) for call in mock_logger.warning.mock_calls]
+        assert any("failed_to_fetch_feature_flags" in str(c) for c in warning_calls)
+        assert any("failed_to_fetch_user_details" in str(c) for c in warning_calls)
+
+    def test_offline_scenario_partial_failure(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that partial failures preserve their respective caches."""
+        # Set up initial cached values
+        cached_feature_flags = {"flag1": True}
+        cached_user_details = {"id": 123, "username": "test"}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock is_logged_in to return True (user is logged in)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=True)
+
+        # Mock client: feature flags succeed, user details fail
+        MockAnkiHubClient = mocker.patch("ankihub.user_state.AnkiHubClient")
+        mock_anki_hub_client = MockAnkiHubClient.return_value
+
+        new_feature_flags = {"flag1": False, "flag2": True}
+        mock_anki_hub_client.get_feature_flags.return_value = new_feature_flags
+        original_exc = Exception("User details unavailable")
+        mock_anki_hub_client.get_user_details.side_effect = AnkiHubRequestException(original_exc)
+
+        mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state
+        refresh_user_state_in_background()
+
+        # Wait until feature flags are updated (fetch succeeded)
+        qtbot.wait_until(lambda: config.get_feature_flags() == new_feature_flags)
+
+        # Assert user details kept cached value (fetch failed)
+        assert config.get_user_details() == cached_user_details
+
+    def test_logout_clears_caches(self, mocker: MockerFixture, qtbot: QtBot):
+        """Test that logging out clears both feature flags and user details caches."""
+        # Set up initial cached values (simulating previous login)
+        cached_feature_flags = {"flag1": True, "flag2": False}
+        cached_user_details = {"id": 123, "username": "testuser"}
+        config.set_feature_flags(cached_feature_flags)
+        config.set_user_details(cached_user_details)
+
+        # Mock is_logged_in to return False (user is logged out)
+        mocker.patch("ankihub.user_state.config.is_logged_in", return_value=False)
+
+        mocker.patch("ankihub.user_state.LOGGER")
+
+        # Refresh user state (simulating what happens when token_change_hook fires on logout)
+        refresh_user_state_in_background()
+
+        # Wait until both caches are cleared
+        qtbot.wait_until(lambda: config.get_feature_flags() == {} and config.get_user_details() == {})
+
+        # Assert both caches are cleared
+        assert config.get_feature_flags() == {}
+        assert config.get_user_details() == {}
 
 
 class TestRetainNidsWithAHNoteType:
