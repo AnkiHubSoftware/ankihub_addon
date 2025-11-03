@@ -76,6 +76,7 @@ def setup() -> None:
     DeckBrowser._delete = wrap(  # type: ignore
         old=DeckBrowser._delete,
         new=_after_anki_deck_deleted,
+        pos="after",
     )
     setup_subdeck_ankihub_options()
 
