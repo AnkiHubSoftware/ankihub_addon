@@ -7,6 +7,7 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
+from aqt.deckbrowser import DeckBrowser
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
@@ -35,7 +36,7 @@ _dialog_state = _DatePickerDialogState()
 def setup() -> None:
     """Ask the user if they want to unsubscribe from the AnkiHub deck when they delete the associated Anki deck."""
 
-    def _before_anki_deck_deleted(did: DeckId) -> None:
+    def _before_anki_deck_deleted(self, did: DeckId) -> None:
         """Log subdeck deletion before the deck is deleted."""
         # Check if this is a subdeck (has parents) and not a filtered deck
         if not aqt.mw.col.decks.parents(did) or aqt.mw.col.decks.is_filtered(did):
@@ -50,7 +51,7 @@ def setup() -> None:
             **get_subdeck_log_context(did, ActionSource.DECK_CONTEXT_MENU),
         )
 
-    def _after_anki_deck_deleted(did: DeckId) -> None:
+    def _after_anki_deck_deleted(self, did: DeckId) -> None:
         deck_ankihub_id = config.get_deck_uuid_by_did(did)
         if not deck_ankihub_id:
             return
@@ -67,13 +68,13 @@ def setup() -> None:
         ):
             unsubscribe_from_deck_and_uninstall(deck_ankihub_id)
 
-    aqt.mw.deckBrowser._delete = wrap(  # type: ignore
-        old=aqt.mw.deckBrowser._delete,
+    DeckBrowser._delete = wrap(  # type: ignore
+        old=DeckBrowser._delete,
         new=_before_anki_deck_deleted,
         pos="before",
     )
-    aqt.mw.deckBrowser._delete = wrap(  # type: ignore
-        old=aqt.mw.deckBrowser._delete,
+    DeckBrowser._delete = wrap(  # type: ignore
+        old=DeckBrowser._delete,
         new=_after_anki_deck_deleted,
     )
     setup_subdeck_ankihub_options()
