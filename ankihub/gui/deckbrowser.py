@@ -7,7 +7,6 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
-from aqt.deckbrowser import DeckBrowser
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
@@ -35,6 +34,7 @@ _dialog_state = _DatePickerDialogState()
 
 def setup() -> None:
     """Ask the user if they want to unsubscribe from the AnkiHub deck when they delete the associated Anki deck."""
+    from aqt.deckbrowser import DeckBrowser
 
     def _before_anki_deck_deleted(self, did: DeckId) -> None:
         """Log subdeck deletion before the deck is deleted."""
