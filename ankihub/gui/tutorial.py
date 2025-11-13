@@ -4,21 +4,47 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, Optional, Set, Tuple, Type, Union
 
-from aqt import QTimer, gui_hooks, mw
+from aqt import dialogs, gui_hooks, mw
+from aqt.browser.browser import Browser
 from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
-from aqt.qt import QDialogButtonBox
+from aqt.qt import (
+    QDialogButtonBox,
+    QSize,
+    Qt,
+    QTimer,
+    QVBoxLayout,
+    QWidget,
+    qconnect,
+)
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
 from aqt.webview import AnkiWebView, WebContent
 
+from ..gui.overlay_dialog import OverlayDialog
 from ..gui.utils import show_dialog
 from ..settings import config
 
 PRIMARY_BUTTON_CLICKED_PYCMD = "ankihub_tutorial_primary_button_clicked"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
 MODAL_CLOSED_PYCMD = "ankihub_modal_closed"
+
+
+class TutorialOverlayDialog(OverlayDialog):
+    def setup_ui(self) -> None:
+        self.setMinimumSize(QSize(500, 400))
+        vbox = QVBoxLayout()
+        self.setLayout(vbox)
+        self.web = AnkiWebView(self)
+        self.web.set_bridge_command(self.web.defaultOnBridgeCmd, self)
+        vbox.addWidget(self.web)
+        self.refresh()
+        qconnect(self.finished, lambda: self.web.cleanup())
+
+    def refresh(self) -> None:
+        self.web.stdHtml("", css=[], js=[], default_css=False, context=self)
+        self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
 
 
 def webview_for_context(context: Any) -> AnkiWebView:
@@ -28,6 +54,8 @@ def webview_for_context(context: Any) -> AnkiWebView:
         return mw.bottomWeb
     if isinstance(context, (Toolbar, TopToolbar)):
         return mw.toolbar.web
+    if isinstance(context, (TutorialOverlayDialog,)):
+        return context.web
     else:
         assert False, f"Webview context of type {type(context)} is not handled"
 
@@ -59,7 +87,6 @@ class Tutorial:
         self.current_step = 1
         self._loadded_context_types: Set[Type[Any]] = set()
         self._show_timer: Optional[QTimer] = None
-
 
     @property
     def contexts(self) -> Tuple[Any, ...]:
@@ -249,9 +276,13 @@ class Tutorial:
             time_passed += delay
             next_step = self.steps[self.current_step - 1]
             if (
-                type(next_step.tooltip_context) in self._loadded_context_types
-                and type(next_step.target_context) in self._loadded_context_types
-            ) or time_passed >= 2000:
+                (
+                    type(next_step.tooltip_context) in self._loadded_context_types
+                    and type(next_step.target_context) in self._loadded_context_types
+                )
+                or time_passed >= 2000
+                or isinstance(next_step, QTutorialStep)
+            ):
                 if self._show_timer:
                     self._show_timer.deleteLater()
                 self._show_timer = None
@@ -426,3 +457,62 @@ def prompt_for_onboarding_tutorial() -> None:
         default_button_idx=1,
         callback=lambda button_index: _on_take_tour_button_clicked(button_index),
     )
+
+
+@dataclass
+class QTutorialStep(TutorialStep):
+    target: Optional[Union[str, Callable[[], str]]] = ""
+    tooltip_context: Optional[Any] = None
+    parent_widget: Optional[QWidget] = None
+    qt_target: Optional[QWidget] = None
+
+
+class QtTutorial(Tutorial):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def show_current(self) -> None:
+        step = self.steps[self.current_step - 1]
+        overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
+        overlay.show()
+        step.tooltip_context = overlay
+        step.target_context = overlay
+        step.target = "body"
+        step.hidden_callback = lambda: overlay.close()
+        super().show_current()
+
+    @property
+    def contexts(self) -> Tuple[Any, ...]:
+        return (TutorialOverlayDialog,)
+
+    @property
+    def initial_contexts(self) -> Tuple[Any, ...]:
+        return (TutorialOverlayDialog,)
+
+    def refresh_initial_webviews(self) -> None:
+        TutorialOverlayDialog(mw, mw).close()
+
+
+class QtTutorialDemo(QtTutorial):
+    def __init__(self) -> None:
+        super().__init__()
+        self.browser: Browser
+
+    def start(self) -> None:
+        self.browser = dialogs.open("Browser", mw)
+        return super().start()
+
+    @cached_property
+    def steps(self) -> list[QTutorialStep]:
+        return [
+            QTutorialStep(
+                "step 1",
+                parent_widget=self.browser,
+                qt_target=self.browser.form.tableView,
+            ),
+            QTutorialStep(
+                "step 2",
+                parent_widget=self.browser,
+                qt_target=self.browser.form.fieldsArea,
+            ),
+        ]
