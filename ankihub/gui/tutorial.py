@@ -468,9 +468,6 @@ class QTutorialStep(TutorialStep):
 
 
 class QtTutorial(Tutorial):
-    def __init__(self) -> None:
-        super().__init__()
-
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
         overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
