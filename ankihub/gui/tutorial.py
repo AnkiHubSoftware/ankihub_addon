@@ -37,6 +37,7 @@ class TutorialOverlayDialog(OverlayDialog):
         vbox = QVBoxLayout()
         self.setLayout(vbox)
         self.web = AnkiWebView(self)
+        self.web.disable_zoom()
         self.web.set_bridge_command(self.web.defaultOnBridgeCmd, self)
         vbox.addWidget(self.web)
         self.refresh()
