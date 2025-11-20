@@ -44,7 +44,7 @@ class OverlayDialog(QDialog):
         target_center_global_x = target_global_pos.x() + target_size.width() // 2
         target_center_global_y = target_global_pos.y() + target_size.height() // 2
         dialog_center_global_x = target_center_global_x - dialog_size.width() // 2
-        dialog_center_global_y = target_center_global_y - dialog_size.height() // 2
+        dialog_center_global_y = target_center_global_y
         dialog_global_pos = QPoint(dialog_center_global_x, dialog_center_global_y)
         x = dialog_global_pos.x()
         y = dialog_global_pos.y()
