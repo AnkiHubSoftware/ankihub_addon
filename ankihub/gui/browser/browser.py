@@ -50,6 +50,7 @@ from aqt.utils import showInfo, showWarning, tooltip, tr
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
 from ...db import ankihub_db
+from ...gui.tutorial import QtTutorialDemo
 from ...gui.webview import AnkiHubWebViewDialog
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
@@ -546,6 +547,10 @@ def _on_browser_menus_did_init(browser: Browser):
         lambda: _on_reset_optional_tags_action(browser),
     )
     menu.addAction(reset_optional_tags_action)
+
+    tutorial_action = QAction("Start Tutorial", browser)
+    qconnect(tutorial_action.triggered, lambda: QtTutorialDemo().start())
+    menu.addAction(tutorial_action)
 
 
 def _on_reset_deck_action(browser: Browser):
