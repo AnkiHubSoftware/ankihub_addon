@@ -503,13 +503,18 @@ class QtTutorialDemo(QtTutorial):
     def steps(self) -> list[QTutorialStep]:
         return [
             QTutorialStep(
-                "step 1",
+                "Notes list",
                 parent_widget=self.browser,
                 qt_target=self.browser.form.tableView,
             ),
             QTutorialStep(
-                "step 2",
+                "Editor",
                 parent_widget=self.browser,
                 qt_target=self.browser.form.fieldsArea,
+            ),
+            QTutorialStep(
+                "Sidebar",
+                parent_widget=self.browser,
+                qt_target=self.browser.sidebar.searchBar,
             ),
         ]
