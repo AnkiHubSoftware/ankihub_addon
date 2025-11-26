@@ -6,7 +6,6 @@ from typing import Any, Callable, Optional, Set, Tuple, Type, Union
 
 from aqt import dialogs, gui_hooks, mw
 from aqt.browser.browser import Browser
-from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
 from aqt.qt import (
@@ -49,6 +48,8 @@ class TutorialOverlayDialog(OverlayDialog):
 
 
 def webview_for_context(context: Any) -> AnkiWebView:
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
     if isinstance(context, (DeckBrowser, Reviewer, Overview)):
         return mw.web
     if isinstance(context, (BottomBar, DeckBrowserBottomBar, OverviewBottomBar, ReviewerBottomBar)):
@@ -300,6 +301,8 @@ class OnboardingTutorial(Tutorial):
 
     @property
     def contexts(self) -> Tuple[Any, ...]:
+        from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
         return (
             DeckBrowser,
             Overview,
@@ -428,6 +431,8 @@ class OnboardingTutorial(Tutorial):
 
     @property
     def initial_contexts(self) -> Tuple[Any, ...]:
+        from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
         return (
             DeckBrowser,
             TopToolbar,
