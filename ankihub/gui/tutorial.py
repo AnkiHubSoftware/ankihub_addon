@@ -9,7 +9,6 @@ from aqt.browser.browser import Browser
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
 from aqt.qt import (
-    QDialogButtonBox,
     QSize,
     Qt,
     QTimer,
@@ -22,7 +21,6 @@ from aqt.toolbar import BottomBar, Toolbar, TopToolbar
 from aqt.webview import AnkiWebView, WebContent
 
 from ..gui.overlay_dialog import OverlayDialog
-from ..gui.utils import show_dialog
 from ..settings import config
 
 PRIMARY_BUTTON_CLICKED_PYCMD = "ankihub_tutorial_primary_button_clicked"
@@ -449,20 +447,21 @@ def prompt_for_onboarding_tutorial() -> None:
     if active_tutorial:
         return
 
-    def _on_take_tour_button_clicked(button_index: int) -> None:
-        if button_index == 1:
-            OnboardingTutorial().start()
+    from aqt.deckbrowser import DeckBrowser
 
-    show_dialog(
-        text="Find your way in the app with this onboarding tour.",
-        title="📚 First time with Anki?",
-        buttons=[
-            ("Close", QDialogButtonBox.ButtonRole.RejectRole),
-            ("Take tour", QDialogButtonBox.ButtonRole.AcceptRole),
-        ],
-        default_button_idx=1,
-        callback=lambda button_index: _on_take_tour_button_clicked(button_index),
-    )
+    def on_webview_will_set_content(web_content: WebContent, context: Optional[object] = None) -> None:
+        print("on_webview_will_set_content", context)
+        if not isinstance(context, DeckBrowser):
+            return
+        web_base = f"/_addons/{mw.addonManager.addonFromModule(__name__)}/gui/web"
+        web_content.css.append(f"{web_base}/modal.css")
+        web_content.js.append(f"{web_base}/modal.js")
+        web_content.js.append(f"{web_base}/tutorial.js")
+        web_content.body += "<script>promptForAnkiHubOnboarding()</script>"
+        gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
+
+    gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
+    mw.deckBrowser.refresh()
 
 
 @dataclass

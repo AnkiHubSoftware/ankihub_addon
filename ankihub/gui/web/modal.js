@@ -86,6 +86,7 @@ class AnkiHubModal {
                 --ah-modal-close-hover: #f3f4f6;
                 --ah-modal-close-text: #6b7280;
                 --ah-modal-primary-button-bg: #4F46E5;
+                --ah-modal-secondary-button-bg: #E7000B;
             }
             :host-context(.night_mode) {
                 --ah-modal-bg: #1f2937;
@@ -95,6 +96,7 @@ class AnkiHubModal {
                 --ah-modal-close-hover: #374151;
                 --ah-modal-close-text: #d1d5db;
                 --ah-modal-primary-button-bg: #818CF8;
+                --ah-modal-secondary-button-bg: #FF6467;
             }
             .ah-modal-backdrop {
                 position: fixed;
@@ -160,14 +162,19 @@ class AnkiHubModal {
                 outline: 2px solid #4f46e5;
                 outline-offset: 2px;
             }
-            .ah-primary-button {
-                background-color: var(--ah-modal-primary-button-bg);
+            .ah-button {
                 color: #ffffff;
                 border: none;
                 padding: 10px 20px;
                 border-radius: 8px;
                 cursor: pointer;
                 transition: background-color 0.2s ease;
+            }
+            .ah-primary-button {
+                background-color: var(--ah-modal-primary-button-bg);
+            }
+            .ah-secondary-button {
+                background-color: var(--ah-modal-secondary-button-bg);
             }
             .ah-modal-body {
                 padding: 20px;
@@ -470,16 +477,16 @@ class AnkiHubModal {
             typeof top === "string"
                 ? top
                 : Math.max(
-                      10,
-                      Math.min(top, viewportHeight - modalRect.height - 10)
-                  );
+                    10,
+                    Math.min(top, viewportHeight - modalRect.height - 10)
+                );
         const finalLeft =
             typeof left === "string"
                 ? left
                 : Math.max(
-                      10,
-                      Math.min(left, viewportWidth - modalRect.width - 10)
-                  );
+                    10,
+                    Math.min(left, viewportWidth - modalRect.width - 10)
+                );
         this._positionModal(finalTop, finalLeft, transform);
 
         this.updateArrowPosition();

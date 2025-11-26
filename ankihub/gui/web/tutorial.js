@@ -5,6 +5,23 @@ function destroyAnkiHubTutorialModal() {
     }
 }
 
+function promptForAnkiHubOnboarding() {
+    destroyAnkiHubTutorialModal();
+    const body = `
+<h2>📚 First time with Anki?</h2>
+<p>Find your way in the app with this onboarding tour.</p>
+    `;
+    const footer = `<button class="ah-button ah-secondary-button" onclick="destroyAnkiHubTutorialModal()">Close</button><button class="ah-button ah-primary-button" onclick="pycmd('ankihub_start_onboarding')">Take tour</button>`;
+
+    const modal = new AnkiHubModal({
+        body,
+        footer,
+        showArrow: false,
+    });
+    modal.show();
+    window.ankihubTutorialModal = modal;
+}
+
 function showAnkiHubTutorialModal({
     body,
     currentStep,
@@ -18,7 +35,7 @@ function showAnkiHubTutorialModal({
     destroyAnkiHubTutorialModal();
     let footer = `<span>${currentStep} of ${stepCount}</span>`;
     if (primaryButton.show) {
-        footer += `<button class="ah-primary-button" onclick="pycmd('ankihub_tutorial_primary_button_clicked')">${primaryButton.label}</button>`;
+        footer += `<button class="ah-button ah-primary-button" onclick="pycmd('ankihub_tutorial_primary_button_clicked')">${primaryButton.label}</button>`;
     }
 
     const modal = new AnkiHubModal({
