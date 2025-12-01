@@ -203,5 +203,3 @@ def _add_onboarding_button(deckbrowser: "DeckBrowser") -> None:
 
 def setup_onboarding_options() -> None:
     gui_hooks.deck_browser_did_render.append(_add_onboarding_button)
-    # Work around hooks not being run on first render
-    aqt.mw.deckBrowser.refresh()
