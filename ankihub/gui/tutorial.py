@@ -9,7 +9,6 @@ from aqt.browser.browser import Browser
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
 from aqt.qt import (
-    QSize,
     Qt,
     QTimer,
     QVBoxLayout,
@@ -30,8 +29,8 @@ MODAL_CLOSED_PYCMD = "ankihub_modal_closed"
 
 class TutorialOverlayDialog(OverlayDialog):
     def setup_ui(self) -> None:
-        self.setMinimumSize(QSize(500, 400))
         vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
         self.web = AnkiWebView(self)
         self.web.disable_zoom()
@@ -41,8 +40,44 @@ class TutorialOverlayDialog(OverlayDialog):
         qconnect(self.finished, lambda: self.web.cleanup())
 
     def refresh(self) -> None:
-        self.web.stdHtml("", css=[], js=[], default_css=False, context=self)
+        web_base = f"/_addons/{mw.addonManager.addonFromModule(__name__)}/gui/web"
+        self.web.stdHtml(
+            "<div id=target></div>",
+            css=[f"{web_base}/overlay.css"],
+            js=[],
+            default_css=False,
+            context=self,
+        )
         self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
+
+    def on_position(self) -> None:
+        super().on_position()
+        target = self.target
+        geom = target.contentsRect()
+        target_global_top_left = target.mapToGlobal(geom.topLeft())
+        target_global_bottom_right = target.mapToGlobal(geom.bottomRight())
+        webview_top_left = self.web.mapFromGlobal(target_global_top_left)
+        webview_bottom_right = self.web.mapFromGlobal(target_global_bottom_right)
+        top = webview_top_left.y()
+        left = webview_top_left.x()
+        width = webview_bottom_right.x() - left
+        height = webview_bottom_right.y() - top
+        # Clamp height to webview's visible area to prevent scrollbars
+        webview_height = self.web.height()
+        max_height = webview_height - top
+        height = min(height, max_height)
+        self.web.eval(
+            """
+(() => {
+    const target = document.getElementById('target');
+    target.style.top = '%(top)dpx';
+    target.style.left = '%(left)dpx';
+    target.style.width = '%(width)dpx';
+    target.style.height = '%(height)dpx';
+})();
+        """
+            % dict(top=top, left=left, width=width, height=height)
+        )
 
 
 def webview_for_context(context: Any) -> AnkiWebView:
@@ -72,6 +107,7 @@ class TutorialStep:
     primary_button_label: str = "Next"
     button_callback: Optional[Callable[[], None]] = None
     block_target_click: bool = False
+    tooltip_position = "bottom"
 
     def __post_init__(self):
         if not self.target_context:
@@ -87,6 +123,7 @@ class Tutorial:
         self.current_step = 1
         self._loadded_context_types: Set[Type[Any]] = set()
         self._show_timer: Optional[QTimer] = None
+        self.apply_backdrop = True
 
     @property
     def contexts(self) -> Tuple[Any, ...]:
@@ -119,12 +156,13 @@ class Tutorial:
             "body": step.body,
             "currentStep": self.current_step,
             "stepCount": len(self.steps),
-            "position": "bottom",
+            "position": step.tooltip_position,
             "blockTargetClick": step.block_target_click,
             "primaryButton": {
                 "show": step.show_primary_button,
                 "label": step.primary_button_label,
             },
+            "backdrop": self.apply_backdrop,
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
@@ -198,6 +236,8 @@ class Tutorial:
             *[webview_for_context(context) for context in self.extra_backdrop_contexts],
         ):
             web.eval("if(typeof destroyAnkiHubTutorialModal !== 'undefined') destroyAnkiHubTutorialModal()")
+        if last_step.hidden_callback:
+            last_step.hidden_callback()
         global active_tutorial
         active_tutorial = None
 
@@ -470,16 +510,21 @@ class QTutorialStep(TutorialStep):
     tooltip_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
     qt_target: Optional[QWidget] = None
+    tooltip_position = "center"
 
 
 class QtTutorial(Tutorial):
+    def __init__(self) -> None:
+        super().__init__()
+        self.apply_backdrop = False
+
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
         overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
         overlay.show()
         step.tooltip_context = overlay
         step.target_context = overlay
-        step.target = "body"
+        step.target = "#target"
         step.hidden_callback = lambda: overlay.close()
         super().show_current()
 

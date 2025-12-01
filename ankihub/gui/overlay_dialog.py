@@ -2,7 +2,6 @@ from aqt.qt import (
     QDialog,
     QEvent,
     QMoveEvent,
-    QPoint,
     QResizeEvent,
     Qt,
     QWidget,
@@ -19,7 +18,7 @@ class OverlayDialog(QDialog):
         self.target = target
         self.setup_ui()
         self._install_event_filter()
-        self._position_relative_to_target()
+        self.on_position()
         qconnect(self.finished, self._on_finished)
 
     def setup_ui(self) -> None:
@@ -34,25 +33,15 @@ class OverlayDialog(QDialog):
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         if obj in self._tracked_widgets:
             if isinstance(event, (QMoveEvent, QResizeEvent, QWindowStateChangeEvent)):
-                self._position_relative_to_target()
+                self.on_position()
         return super().eventFilter(obj, event)
 
-    def _position_relative_to_target(self) -> None:
-        target_global_pos = self.target.mapToGlobal(self.target.rect().topLeft())
-        target_size = self.target.size()
-        dialog_size = self.size()
-        target_center_global_x = target_global_pos.x() + target_size.width() // 2
-        target_center_global_y = target_global_pos.y() + target_size.height() // 2
-        dialog_center_global_x = target_center_global_x - dialog_size.width() // 2
-        dialog_center_global_y = target_center_global_y
-        dialog_global_pos = QPoint(dialog_center_global_x, dialog_center_global_y)
-        x = dialog_global_pos.x()
-        y = dialog_global_pos.y()
-        self.move(x, y)
+    def on_position(self) -> None:
+        self.setGeometry(self.parentWidget().geometry())
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self._position_relative_to_target()
+        self.on_position()
 
     def _on_finished(self) -> None:
         for widget in self._tracked_widgets:

@@ -5,6 +5,7 @@ class AnkiHubModal {
             footer: "",
             showCloseButton: true,
             closeOnBackdropClick: false,
+            backdrop: true,
             target: null,
             position: "center",
             arrowPosition: "top",
@@ -104,7 +105,7 @@ class AnkiHubModal {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                backdrop-filter: brightness(0.5);
+                ${this.options.backdrop ? 'backdrop-filter: brightness(0.5);' : ''}
                 z-index: 10000;
                 opacity: 0;
                 transition: opacity 0.2s ease-in-out;
@@ -377,16 +378,18 @@ class AnkiHubModal {
         }
     }
 
+    spotlightClasses() {
+        let classes = ["ah-spotlight-active"];
+        if (this.options.backdrop) {
+            classes.push("ah-with-backdrop");
+        }
+        return classes;
+    }
+
     applySpotlight() {
         if (!this.options.target) return;
 
-        this.targetElement.classList.add("ah-spotlight-active");
-        const originalZIndex = this.targetElement.style.zIndex;
-        this.targetElement.style.zIndex = "10001";
-        this.targetElement.setAttribute(
-            "data-original-z-index",
-            originalZIndex
-        );
+        this.targetElement.classList.add(...this.spotlightClasses());
         if (this.options.blockTargetClick) {
             const originalPointerEvents =
                 this.targetElement.style.pointerEvents;
@@ -402,17 +405,7 @@ class AnkiHubModal {
 
     removeSpotlight() {
         if (!this.targetElement) return;
-
-        this.targetElement.classList.remove("ah-spotlight-active");
-        const originalZIndex = this.targetElement.getAttribute(
-            "data-original-z-index"
-        );
-        if (originalZIndex) {
-            this.targetElement.style.zIndex = originalZIndex;
-            this.targetElement.removeAttribute("data-original-z-index");
-        } else {
-            this.targetElement.style.zIndex = "";
-        }
+        this.targetElement.classList.remove(...this.spotlightClasses());
         const originalPointerEvents = this.targetElement.getAttribute(
             "data-original-pointer-events"
         );

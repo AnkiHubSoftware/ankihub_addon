@@ -31,6 +31,7 @@ function showAnkiHubTutorialModal({
     primaryButton = { show: true, label: "Next" },
     showArrow = true,
     blockTargetClick = false,
+    backdrop = true,
 }) {
     destroyAnkiHubTutorialModal();
     let footer = `<span>${currentStep} of ${stepCount}</span>`;
@@ -45,6 +46,7 @@ function showAnkiHubTutorialModal({
         position,
         showArrow,
         blockTargetClick,
+        backdrop,
     });
     modal.show();
     window.ankihubTutorialModal = modal;
