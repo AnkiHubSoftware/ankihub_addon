@@ -1,7 +1,10 @@
+from typing import Optional, Set
+
 from aqt.qt import (
     QDialog,
     QEvent,
     QMoveEvent,
+    QObject,
     QResizeEvent,
     Qt,
     QWidget,
@@ -12,7 +15,7 @@ from aqt.qt import (
 
 class OverlayDialog(QDialog):
     def __init__(self, parent: QWidget, target: QWidget) -> None:
-        self._tracked_widgets = set()
+        self._tracked_widgets: Set[QWidget] = set()
         super().__init__(parent, Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.target = target
@@ -30,7 +33,7 @@ class OverlayDialog(QDialog):
         self.target.installEventFilter(self)
         self.parentWidget().installEventFilter(self)
 
-    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
+    def eventFilter(self, obj: Optional[QObject], event: QEvent) -> bool:
         if obj in self._tracked_widgets:
             if isinstance(event, (QMoveEvent, QResizeEvent, QWindowStateChangeEvent)):
                 self.on_position()

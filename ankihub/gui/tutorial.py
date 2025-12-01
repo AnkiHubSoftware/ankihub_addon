@@ -2,7 +2,7 @@ import json
 from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Optional, Set, Tuple, Type, Union
+from typing import Any, Callable, Optional, Set, Tuple, Type, Union, cast
 
 import aqt
 from aqt import dialogs, gui_hooks
@@ -194,7 +194,7 @@ class Tutorial:
     def _backdrop_js(self) -> str:
         return "addAnkiHubTutorialBackdrop()"
 
-    def _render_backdrop(self) -> str:
+    def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
@@ -520,13 +520,17 @@ class QtTutorial(Tutorial):
         self.apply_backdrop = False
 
     def show_current(self) -> None:
-        step = self.steps[self.current_step - 1]
+        step = cast(QTutorialStep, self.steps[self.current_step - 1])
         overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
         overlay.show()
         step.tooltip_context = overlay
         step.target_context = overlay
         step.target = "#target"
-        step.hidden_callback = lambda: overlay.close()
+
+        def close_overlay() -> None:
+            overlay.close()
+
+        step.hidden_callback = close_overlay
         super().show_current()
 
     @property
@@ -551,7 +555,7 @@ class QtTutorialDemo(QtTutorial):
         return super().start()
 
     @cached_property
-    def steps(self) -> list[QTutorialStep]:
+    def steps(self) -> list[TutorialStep]:
         return [
             QTutorialStep(
                 "Notes list",
