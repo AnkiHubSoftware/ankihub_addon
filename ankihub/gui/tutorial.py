@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, Optional, Set, Tuple, Type, Union
 
-from aqt import dialogs, gui_hooks, mw
+import aqt
+from aqt import dialogs, gui_hooks
 from aqt.browser.browser import Browser
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
@@ -40,7 +41,7 @@ class TutorialOverlayDialog(OverlayDialog):
         qconnect(self.finished, lambda: self.web.cleanup())
 
     def refresh(self) -> None:
-        web_base = f"/_addons/{mw.addonManager.addonFromModule(__name__)}/gui/web"
+        web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
         self.web.stdHtml(
             "<div id=target></div>",
             css=[f"{web_base}/overlay.css"],
@@ -84,11 +85,11 @@ def webview_for_context(context: Any) -> AnkiWebView:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
     if isinstance(context, (DeckBrowser, Reviewer, Overview)):
-        return mw.web
+        return aqt.mw.web
     if isinstance(context, (BottomBar, DeckBrowserBottomBar, OverviewBottomBar, ReviewerBottomBar)):
-        return mw.bottomWeb
+        return aqt.mw.bottomWeb
     if isinstance(context, (Toolbar, TopToolbar)):
-        return mw.toolbar.web
+        return aqt.mw.toolbar.web
     if isinstance(context, (TutorialOverlayDialog,)):
         return context.web
     else:
@@ -222,7 +223,7 @@ class Tutorial:
                 initial_contexts_loaded += 1
             if initial_contexts_loaded == len(initial_contexts):
                 gui_hooks.webview_will_set_content.remove(_on_initial_webview_will_set_content)
-            mw.progress.single_shot(100, self.show_current)
+            aqt.mw.progress.single_shot(100, self.show_current)
 
         gui_hooks.webview_will_set_content.append(_on_initial_webview_will_set_content)
         self.refresh_initial_webviews()
@@ -244,7 +245,7 @@ class Tutorial:
     def _on_webview_will_set_content(self, web_content: WebContent, context: Optional[object] = None) -> None:
         if not isinstance(context, self.contexts):
             return
-        web_base = f"/_addons/{mw.addonManager.addonFromModule(__name__)}/gui/web"
+        web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
         web_content.css.append(f"{web_base}/modal.css")
         web_content.js.append(f"{web_base}/modal.js")
         web_content.js.append(f"{web_base}/tutorial.js")
@@ -330,7 +331,7 @@ class Tutorial:
 
         if self._show_timer:
             self._show_timer.deleteLater()
-        self._show_timer = mw.progress.timer(delay, task, repeat=True, parent=mw)
+        self._show_timer = aqt.mw.progress.timer(delay, task, repeat=True, parent=aqt.mw)
 
 
 class OnboardingTutorial(Tutorial):
@@ -356,14 +357,14 @@ class OnboardingTutorial(Tutorial):
             TutorialStep(
                 body="<b>Decks</b> is where you will find your subscribed decks.",
                 target="#decks",
-                tooltip_context=mw.deckBrowser,
-                target_context=mw.toolbar,
+                tooltip_context=aqt.mw.deckBrowser,
+                target_context=aqt.mw.toolbar,
                 block_target_click=True,
             )
         ]
 
         def on_overview_will_render_content(overview: Overview, content: OverviewContent) -> None:
-            did = mw.col.decks.id(content.deck)
+            did = aqt.mw.col.decks.id(content.deck)
             intro_deck_config = config.deck_config(config.intro_deck_id)
             if intro_deck_config and did == intro_deck_config.anki_id:
                 self.next()
@@ -380,7 +381,7 @@ class OnboardingTutorial(Tutorial):
                 TutorialStep(
                     body="We've already subscribed you to this deck.<br><br>Click on it to open.",
                     target=f"[id='{intro_deck_config.anki_id}']",
-                    tooltip_context=mw.deckBrowser,
+                    tooltip_context=aqt.mw.deckBrowser,
                     shown_callback=on_intro_step_shown,
                     hidden_callback=on_intro_step_hidden,
                     show_primary_button=False,
@@ -405,7 +406,7 @@ class OnboardingTutorial(Tutorial):
                     "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
                     "Right now you can just <b>click on the button bellow</b>.",
                     target=".deck",
-                    tooltip_context=mw.deckBrowser,
+                    tooltip_context=aqt.mw.deckBrowser,
                     show_primary_button=True,
                     primary_button_label="Sync with AnkiHub",
                     button_callback=on_sync_with_ankihub_button_clicked,
@@ -415,7 +416,7 @@ class OnboardingTutorial(Tutorial):
                 TutorialStep(
                     body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
                     target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
-                    tooltip_context=mw.deckBrowser,
+                    tooltip_context=aqt.mw.deckBrowser,
                     shown_callback=on_intro_step_shown,
                     hidden_callback=on_intro_step_hidden,
                     show_primary_button=False,
@@ -426,7 +427,7 @@ class OnboardingTutorial(Tutorial):
             TutorialStep(
                 body="This deck will help you understand the basics of card reviewing.",
                 target="",
-                tooltip_context=mw.overview,
+                tooltip_context=aqt.mw.overview,
             )
         )
         steps.append(
@@ -436,7 +437,7 @@ class OnboardingTutorial(Tutorial):
                 "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
                 "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
                 target="td",
-                tooltip_context=mw.overview,
+                tooltip_context=aqt.mw.overview,
             )
         )
 
@@ -455,7 +456,7 @@ class OnboardingTutorial(Tutorial):
             TutorialStep(
                 "Click this button and start practicing card reviewing now!",
                 target="#study",
-                tooltip_context=mw.overview,
+                tooltip_context=aqt.mw.overview,
                 shown_callback=on_study_step_shown,
                 hidden_callback=on_study_step_hidden,
                 show_primary_button=False,
@@ -465,7 +466,7 @@ class OnboardingTutorial(Tutorial):
 
     @property
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
-        return (mw.deckBrowser, mw.overview, mw.deckBrowser.bottom, mw.toolbar)
+        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
 
     @property
     def initial_contexts(self) -> Tuple[Any, ...]:
@@ -478,9 +479,9 @@ class OnboardingTutorial(Tutorial):
         )
 
     def refresh_initial_webviews(self) -> None:
-        mw.deckBrowser.refresh()
-        mw.toolbar.draw()
-        mw.deckBrowser.bottom.draw()
+        aqt.mw.deckBrowser.refresh()
+        aqt.mw.toolbar.draw()
+        aqt.mw.deckBrowser.bottom.draw()
 
 
 def prompt_for_onboarding_tutorial() -> None:
@@ -493,7 +494,7 @@ def prompt_for_onboarding_tutorial() -> None:
         print("on_webview_will_set_content", context)
         if not isinstance(context, DeckBrowser):
             return
-        web_base = f"/_addons/{mw.addonManager.addonFromModule(__name__)}/gui/web"
+        web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
         web_content.css.append(f"{web_base}/modal.css")
         web_content.js.append(f"{web_base}/modal.js")
         web_content.js.append(f"{web_base}/tutorial.js")
@@ -501,7 +502,7 @@ def prompt_for_onboarding_tutorial() -> None:
         gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
 
     gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
-    mw.deckBrowser.refresh()
+    aqt.mw.deckBrowser.refresh()
 
 
 @dataclass
@@ -537,7 +538,7 @@ class QtTutorial(Tutorial):
         return (TutorialOverlayDialog,)
 
     def refresh_initial_webviews(self) -> None:
-        TutorialOverlayDialog(mw, mw).close()
+        TutorialOverlayDialog(aqt.mw, aqt.mw).close()
 
 
 class QtTutorialDemo(QtTutorial):
@@ -546,7 +547,7 @@ class QtTutorialDemo(QtTutorial):
         self.browser: Browser
 
     def start(self) -> None:
-        self.browser = dialogs.open("Browser", mw)
+        self.browser = dialogs.open("Browser", aqt.mw)
         return super().start()
 
     @cached_property
