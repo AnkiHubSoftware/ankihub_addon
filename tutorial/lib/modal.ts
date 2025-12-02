@@ -1,4 +1,34 @@
-class AnkiHubModal {
+import { bridgeCommand } from "./bridgecommand";
+
+export type ModalPosition = "top" | "bottom" | "left" | "right" | "center";
+export type ArrowPosition = "top" | "bottom" | "left" | "right";
+
+type ModalOptions = {
+    body: string | HTMLElement,
+    footer: string | HTMLElement,
+    showCloseButton: boolean,
+    closeOnBackdropClick: boolean,
+    backdrop: boolean,
+    target: string | HTMLElement | null,
+    position: ModalPosition,
+    arrowPosition: ArrowPosition,
+    showArrow: boolean,
+    blockTargetClick: boolean,
+};
+
+export class Modal {
+    
+    options: ModalOptions;
+    isVisible: boolean = false;
+    targetElement: HTMLElement | null  = null;
+    modalElement!: HTMLElement;
+    backdropElement!: HTMLElement;
+    arrowElement: HTMLElement | null = null;
+    shadowRoot!: ShadowRoot;
+    hostElement!: HTMLDivElement;
+    resizeHandler!: () => void;
+    resizeTimeout: number | null = null;
+
     constructor(options = {}) {
         this.options = {
             body: "",
@@ -13,13 +43,6 @@ class AnkiHubModal {
             blockTargetClick: false,
             ...options,
         };
-
-        this.isVisible = false;
-        this.targetElement = null;
-        this.modalElement = null;
-        this.backdropElement = null;
-        this.shadowRoot = null;
-        this.arrowElement = null;
         this.createModal();
         this.bindEvents();
     }
@@ -64,7 +87,7 @@ class AnkiHubModal {
             footer.className = "ah-modal-footer";
             if (typeof this.options.footer === "string") {
                 footer.innerHTML = this.options.footer;
-            } else if (this.options.footer instanceof Element) {
+            } else if (this.options.footer instanceof HTMLElement) {
                 footer.appendChild(this.options.footer);
             }
             modalContent.appendChild(footer);
@@ -296,7 +319,7 @@ class AnkiHubModal {
         if (closeButton) {
             closeButton.addEventListener("click", () => {
                 this.close();
-                pycmd("ankihub_modal_closed");
+                bridgeCommand("ankihub_modal_closed");
             });
         }
         this.backdropElement.addEventListener("click", (e) => {
@@ -387,7 +410,7 @@ class AnkiHubModal {
     }
 
     applySpotlight() {
-        if (!this.options.target) return;
+        if (!this.targetElement) return;
 
         this.targetElement.classList.add(...this.spotlightClasses());
         if (this.options.blockTargetClick) {
@@ -400,7 +423,9 @@ class AnkiHubModal {
             );
         }
         // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
-        this.targetElement.parentElement.style.backdropFilter = "none";
+        if(this.targetElement.parentElement) {
+            this.targetElement.parentElement.style.backdropFilter = "none";
+        }
     }
 
     removeSpotlight() {
@@ -418,16 +443,16 @@ class AnkiHubModal {
         this.targetElement = null;
     }
 
-    _positionModal(top, left, transform) {
+    _positionModal(top: number | string, left: number| string, transform: string) {
         this.modalElement.style.position = "fixed";
         // FIXME: add margin depending on arrow position if external target
-        this.modalElement.style.top = `${top + 10}px`;
+        this.modalElement.style.top = `${typeof top === "string" ? top : (top + 10)}px`;
         this.modalElement.style.left = `${left}px`;
         this.modalElement.style.transform = transform;
     }
 
     positionModal() {
-        if (!this.options.target) {
+        if (!this.targetElement) {
             return;
         }
 
@@ -485,7 +510,7 @@ class AnkiHubModal {
         this.updateArrowPosition();
     }
 
-    setModalPosition(top, left, transform = "") {
+    setModalPosition(top: number | string, left: number | string, transform = "") {
         this._positionModal(top, left, transform);
     }
 }

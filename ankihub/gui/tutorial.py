@@ -146,7 +146,7 @@ class Tutorial:
         pass
 
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
-        return f"{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
+        return f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
 
     def _render_tooltip(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
@@ -169,7 +169,7 @@ class Tutorial:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
         if not step.target:
             tooltip_options["showArrow"] = False
-        js = self._render_js_function_with_options("showAnkiHubTutorialModal", tooltip_options)
+        js = self._render_js_function_with_options("showTutorialModal", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)
         return js
@@ -180,7 +180,7 @@ class Tutorial:
         js = ""
         if step.target and step.tooltip_context != step.target_context:
             js = self._render_js_function_with_options(
-                "highlightAnkiHubTutorialTarget",
+                "highlightTutorialTarget",
                 {
                     "target": step.target,
                     "currentStep": self.current_step,
@@ -192,7 +192,7 @@ class Tutorial:
         return js
 
     def _backdrop_js(self) -> str:
-        return "addAnkiHubTutorialBackdrop()"
+        return "AnkiHub.addTutorialBackdrop()"
 
     def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -236,7 +236,9 @@ class Tutorial:
             webview_for_context(last_step.target_context),
             *[webview_for_context(context) for context in self.extra_backdrop_contexts],
         ):
-            web.eval("if(typeof destroyAnkiHubTutorialModal !== 'undefined') destroyAnkiHubTutorialModal()")
+            web.eval(
+                "if(typeof AnkiHub.destroyActiveTutorialModal !== 'undefined') AnkiHub.destroyActiveTutorialModal()"
+            )
         if last_step.hidden_callback:
             last_step.hidden_callback()
         global active_tutorial
@@ -246,9 +248,9 @@ class Tutorial:
         if not isinstance(context, self.contexts):
             return
         web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
-        web_content.css.append(f"{web_base}/modal.css")
-        web_content.js.append(f"{web_base}/modal.js")
-        web_content.js.append(f"{web_base}/tutorial.js")
+        web_content.css.append(f"{web_base}/lib/tutorial.css")
+        web_content.js.append(f"{web_base}/lib/tutorial.js")
+
         if not self._show_timer:
             step = self.steps[self.current_step - 1]
             js = ""
@@ -283,7 +285,7 @@ class Tutorial:
             transform = f"translateX(calc(-50% + {width / 2}px))"
             if current_step == self.current_step:
                 step = self.steps[current_step - 1]
-                target_js = f"positionAnkiHubTutorialTarget({{top: {top}, left: {left}, transform: '{transform}'}});"
+                target_js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, transform: '{transform}'}});"
                 tooltip_web = webview_for_context(step.tooltip_context)
                 tooltip_web.eval(target_js)
             return True, None
@@ -299,7 +301,9 @@ class Tutorial:
             webview_for_context(step.target_context),
             *[webview_for_context(context) for context in self.extra_backdrop_contexts],
         ):
-            web.eval("if(typeof destroyAnkiHubTutorialModal !== 'undefined') destroyAnkiHubTutorialModal()")
+            web.eval(
+                "if(typeof AnkiHub.destroyActiveTutorialModal !== 'undefined') AnkiHub.destroyActiveTutorialModal()"
+            )
 
         if step.hidden_callback:
             step.hidden_callback()
@@ -495,10 +499,9 @@ def prompt_for_onboarding_tutorial() -> None:
         if not isinstance(context, DeckBrowser):
             return
         web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
-        web_content.css.append(f"{web_base}/modal.css")
-        web_content.js.append(f"{web_base}/modal.js")
-        web_content.js.append(f"{web_base}/tutorial.js")
-        web_content.body += "<script>promptForAnkiHubOnboarding()</script>"
+        web_content.css.append(f"{web_base}/lib/tutorial.css")
+        web_content.js.append(f"{web_base}/lib/tutorial.js")
+        web_content.body += "<script>AnkiHub.promptForOnboardingTour()</script>"
         gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
 
     gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
