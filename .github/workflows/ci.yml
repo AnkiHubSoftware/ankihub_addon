@@ -15,9 +15,6 @@ on:
       - "main"
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
   test-addon:
     runs-on: ubuntu-latest

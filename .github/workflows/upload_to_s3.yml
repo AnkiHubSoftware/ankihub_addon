@@ -11,9 +11,6 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
 
-permissions:
-  contents: read
-
 jobs:
   upload_to_s3:
     runs-on: ubuntu-latest

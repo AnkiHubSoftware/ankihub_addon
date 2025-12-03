@@ -11,9 +11,6 @@ on:
       ANKIWEB_PASSWORD:
         required: true
 
-permissions:
-  contents: read
-
 jobs:
   upload-to-ankiweb:
     name: Upload to AnkiWeb
