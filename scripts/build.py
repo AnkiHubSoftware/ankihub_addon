@@ -46,6 +46,7 @@ subprocess.run(
     check=True,
 )
 shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
+subprocess.run([shutil.which("npm"), "install"], cwd=PROJECT_ROOT / "tutorial", check=True)
 subprocess.run([shutil.which("npm"), "run", "build"], cwd=PROJECT_ROOT / "tutorial", check=True)
 generate_manifest()
 
