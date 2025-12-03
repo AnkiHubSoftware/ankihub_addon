@@ -32,9 +32,9 @@ type ShowModalArgs = {
     body: string,
     currentStep: number,
     stepCount: number,
-    target: string | HTMLElement,
+    target: string,
     position?: string,
-    primaryButton?: {show: boolean, label: string},
+    primaryButton?: { show: boolean, label: string },
     showArrow?: boolean,
     blockTargetClick?: boolean,
     backdrop?: boolean,
@@ -56,7 +56,6 @@ export function showTutorialModal({
     if (primaryButton.show) {
         footer += `<button class="ah-button ah-primary-button" onclick="pycmd('ankihub_tutorial_primary_button_clicked')">${primaryButton.label}</button>`;
     }
-
     const modal = new Modal({
         body,
         footer,
@@ -98,10 +97,11 @@ export function highlightTutorialTarget({
         targetResizeHandler = null;
     }
     targetResizeHandler = () => {
-        const { top, left, width } =
+        if (!modal.targetElement) return;
+        const { top, left, width, height } =
             modal.targetElement!.getBoundingClientRect();
         bridgeCommand(
-            `ankihub_tutorial_target_resize:${currentStep}:${top}:${left}:${width}`
+            `ankihub_tutorial_target_resize:${currentStep}:${top}:${left}:${width}:${height}`
         );
     };
     window.addEventListener(
@@ -114,12 +114,13 @@ export function highlightTutorialTarget({
 type PositionTargetArgs = {
     top: number,
     left: number,
-    transform: string,
+    width: number,
+    height: number,
 };
 
-export function positionTutorialTarget({ top, left, transform }: PositionTargetArgs) {
+export function positionTutorialTarget({ top, left, width, height }: PositionTargetArgs) {
     if (activeModal) {
-        activeModal.setModalPosition(top, left, transform);
+        activeModal.setModalPosition(top, left, width, height);
     }
 }
 

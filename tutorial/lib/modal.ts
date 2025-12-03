@@ -1,3 +1,4 @@
+import { arrow, autoPlacement, autoUpdate, computePosition, offset, type ReferenceElement } from '@floating-ui/dom';
 import { bridgeCommand } from "./bridgecommand";
 
 export type ModalPosition = "top" | "bottom" | "left" | "right" | "center";
@@ -9,7 +10,7 @@ type ModalOptions = {
     showCloseButton: boolean,
     closeOnBackdropClick: boolean,
     backdrop: boolean,
-    target: string | HTMLElement | null,
+    target: string | null,
     position: ModalPosition,
     arrowPosition: ArrowPosition,
     showArrow: boolean,
@@ -17,16 +18,16 @@ type ModalOptions = {
 };
 
 export class Modal {
-    
+
     options: ModalOptions;
     isVisible: boolean = false;
-    targetElement: HTMLElement | null  = null;
+    targetElement: HTMLElement | null = null;
     modalElement!: HTMLElement;
     backdropElement!: HTMLElement;
     arrowElement: HTMLElement | null = null;
     shadowRoot!: ShadowRoot;
     hostElement!: HTMLDivElement;
-    resizeHandler!: () => void;
+    cleanUpdateHandler?: () => void;
     resizeTimeout: number | null = null;
 
     constructor(options = {}) {
@@ -95,6 +96,9 @@ export class Modal {
         this.modalElement.appendChild(modalContent);
         if (this.options.body) {
             this.backdropElement.appendChild(this.modalElement);
+            if (this.targetElement) {
+                this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
+            }
         }
         this.shadowRoot.appendChild(this.backdropElement);
     }
@@ -138,7 +142,8 @@ export class Modal {
                 pointer-events: auto;
             }
             .ah-modal-container {
-                position: relative;
+                box-sizing: border-box;
+                position: absolute;
                 max-width: 90vw;
                 max-height: 90vh;
                 width: auto;
@@ -255,38 +260,11 @@ export class Modal {
             }
             .ah-modal-arrow {
                 position: absolute;
-                width: 0;
-                height: 0;
-                border: 8px solid transparent;
-                z-index: 10002;
-            }
-            .ah-modal-arrow.ah-arrow-top {
-                bottom: 100%;
-                left: 50%;
-                transform: translateX(-50%);
-                border-bottom-color: var(--ah-modal-bg);
-                border-top: none;
-            }
-            .ah-modal-arrow.ah-arrow-bottom {
-                top: 100%;
-                left: 50%;
-                transform: translateX(-50%);
-                border-top-color: var(--ah-modal-bg);
-                border-bottom: none;
-            }
-            .ah-modal-arrow.ah-arrow-left {
-                right: 100%;
-                top: 50%;
-                transform: translateY(-50%);
-                border-right-color: var(--ah-modal-bg);
-                border-left: none;
-            }
-            .ah-modal-arrow.ah-arrow-right {
-                left: 100%;
-                top: 50%;
-                transform: translateY(-50%);
-                border-left-color: var(--ah-modal-bg);
-                border-right: none;
+                width: 20px;
+                height: 20px;
+                background: var(--ah-modal-bg);
+                pointer-events: none;
+                z-index: -1;
             }
         `;
         this.shadowRoot.appendChild(style);
@@ -297,19 +275,6 @@ export class Modal {
         this.arrowElement = document.createElement("div");
         this.arrowElement.className = "ah-modal-arrow";
         this.modalElement.appendChild(this.arrowElement);
-    }
-
-    updateArrowPosition() {
-        if (!this.arrowElement) return;
-        this.arrowElement.classList.remove(
-            "ah-arrow-top",
-            "ah-arrow-bottom",
-            "ah-arrow-left",
-            "ah-arrow-right"
-        );
-        this.arrowElement.classList.add(
-            `ah-arrow-${this.options.arrowPosition}`
-        );
     }
 
     bindEvents() {
@@ -330,19 +295,6 @@ export class Modal {
                 this.close();
             }
         });
-        this.resizeHandler = () => {
-            if (this.isVisible) {
-                if (this.resizeTimeout) {
-                    clearTimeout(this.resizeTimeout);
-                }
-                this.resizeTimeout = setTimeout(() => {
-                    this.positionModal();
-                    this.updateArrowPosition();
-                }, 16);
-            }
-        };
-        window.addEventListener("resize", this.resizeHandler);
-
         this.modalElement.addEventListener("click", (e) => {
             e.stopPropagation();
         });
@@ -360,8 +312,9 @@ export class Modal {
             this.applySpotlight();
         }
         this.createArrow();
-        this.positionModal();
-        this.updateArrowPosition();
+        if (this.targetElement) {
+            this.positionModal(this.targetElement);
+        }
         requestAnimationFrame(() => {
             this.backdropElement.classList.add("ah-modal-show");
         });
@@ -370,7 +323,7 @@ export class Modal {
 
     close() {
         if (!this.isVisible) return;
-
+        this.cleanUpdateHandler?.();
         this.removeSpotlight();
         if (this.arrowElement && this.arrowElement.parentNode) {
             this.arrowElement.parentNode.removeChild(this.arrowElement);
@@ -389,7 +342,6 @@ export class Modal {
 
     destroy() {
         this.close();
-        window.removeEventListener("resize", this.resizeHandler);
         this.removeSpotlight();
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
@@ -423,7 +375,7 @@ export class Modal {
             );
         }
         // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
-        if(this.targetElement.parentElement) {
+        if (this.targetElement.parentElement) {
             this.targetElement.parentElement.style.backdropFilter = "none";
         }
     }
@@ -443,74 +395,61 @@ export class Modal {
         this.targetElement = null;
     }
 
-    _positionModal(top: number | string, left: number| string, transform: string) {
-        this.modalElement.style.position = "fixed";
-        // FIXME: add margin depending on arrow position if external target
-        this.modalElement.style.top = `${typeof top === "string" ? top : (top + 10)}px`;
-        this.modalElement.style.left = `${left}px`;
-        this.modalElement.style.transform = transform;
+    _positionModal(y: number, x: number) {
+        this.modalElement.style.top = `${y}px`;
+        this.modalElement.style.left = `${x}px`;
     }
 
-    positionModal() {
-        if (!this.targetElement) {
-            return;
-        }
+    async positionModal(target: ReferenceElement) {
+        const arrowLength = this.arrowElement ? this.arrowElement.offsetWidth : 0;
+        const floatingOffset = Math.sqrt(2 * arrowLength ** 2) / 2;
 
-        const targetRect = this.targetElement.getBoundingClientRect();
-        const modalRect = this.modalElement.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        let top, left, transform;
-        switch (this.options.position) {
-            case "top":
-                top = targetRect.top - modalRect.height - 10;
-                left =
-                    targetRect.left + (targetRect.width - modalRect.width) / 2;
-                transform = "none";
-                break;
-            case "bottom":
-                top = targetRect.bottom + 10;
-                left =
-                    targetRect.left + (targetRect.width - modalRect.width) / 2;
-                transform = "none";
-                break;
-            case "left":
-                top =
-                    targetRect.top + (targetRect.height - modalRect.height) / 2;
-                left = targetRect.left - modalRect.width - 10;
-                transform = "none";
-                break;
-            case "right":
-                top =
-                    targetRect.top + (targetRect.height - modalRect.height) / 2;
-                left = targetRect.right + 10;
-                transform = "none";
-                break;
-            default:
-                top = "50%";
-                left = "50%";
-                transform = "translate(-50%, -50%)";
+        let middleware = [autoPlacement()];
+        if (this.arrowElement) {
+            middleware.push(offset(floatingOffset));
+            middleware.push(arrow({ element: this.arrowElement! }));
         }
-        const finalTop =
-            typeof top === "string"
-                ? top
-                : Math.max(
-                    10,
-                    Math.min(top, viewportHeight - modalRect.height - 10)
-                );
-        const finalLeft =
-            typeof left === "string"
-                ? left
-                : Math.max(
-                    10,
-                    Math.min(left, viewportWidth - modalRect.width - 10)
-                );
-        this._positionModal(finalTop, finalLeft, transform);
+        const { x, y, middlewareData, placement } = await computePosition(target, this.modalElement, {
+            middleware
+        });
+        this._positionModal(y, x);
+        const side = placement.split("-")[0];
+        const staticSide = {
+            top: "bottom",
+            right: "left",
+            bottom: "top",
+            left: "right"
+        }[side]!;
 
-        this.updateArrowPosition();
+        if (middlewareData.arrow) {
+            const { x, y } = middlewareData.arrow;
+            Object.assign(this.arrowElement!.style, {
+                left: x != null ? `${x}px` : "",
+                top: y != null ? `${y}px` : "",
+                [staticSide]: `${-arrowLength}px`,
+                right: "",
+                bottom: "",
+                [staticSide]: `${-arrowLength / 2}px`,
+                transform: "rotate(45deg)"
+            });
+        }
     }
 
-    setModalPosition(top: number | string, left: number | string, transform = "") {
-        this._positionModal(top, left, transform);
+    setModalPosition(top: number, left: number, width: number, height: number) {
+        let virtualElement = {
+            getBoundingClientRect() {
+                return {
+                    x: 0,
+                    y: 0,
+                    top,
+                    left,
+                    bottom: height,
+                    right: width,
+                    width,
+                    height,
+                };
+            }
+        };
+        this.positionModal(virtualElement);
     }
 }

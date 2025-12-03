@@ -10,6 +10,7 @@ from aqt.browser.browser import Browser
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
 from aqt.qt import (
+    QPoint,
     Qt,
     QTimer,
     QVBoxLayout,
@@ -282,12 +283,31 @@ class Tutorial:
             top = float(parts[2])
             left = float(parts[3])
             width = float(parts[4])
-            transform = f"translateX(calc(-50% + {width / 2}px))"
+            height = float(parts[5])
             if current_step == self.current_step:
                 step = self.steps[current_step - 1]
-                target_js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, transform: '{transform}'}});"
+                target_web = webview_for_context(step.target_context)
                 tooltip_web = webview_for_context(step.tooltip_context)
-                tooltip_web.eval(target_js)
+                target_coords = target_web.mapToGlobal(QPoint(0, 0))
+                tooltip_coords = tooltip_web.mapToGlobal(QPoint(0, 0))
+                tooltip_web_geom = tooltip_web.geometry()
+
+                if target_coords.y() - tooltip_coords.y() > 0:
+                    top = tooltip_web_geom.bottom()
+                    height = 0
+                elif target_coords.y() - tooltip_coords.y() < 0:
+                    top = 0
+                    height = 0
+
+                if target_coords.x() - tooltip_coords.x() > 0:
+                    left = tooltip_web_geom.right()
+                    width = 0
+                elif target_coords.x() - tooltip_coords.x() < 0:
+                    left = 0
+                    width = 0
+
+                js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, width: {width}, height: {height}}});"
+                tooltip_web.eval(js)
             return True, None
         elif message == MODAL_CLOSED_PYCMD:
             self.end()
