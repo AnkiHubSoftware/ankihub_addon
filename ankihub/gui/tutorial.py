@@ -109,7 +109,6 @@ class TutorialStep:
     primary_button_label: str = "Next"
     button_callback: Optional[Callable[[], None]] = None
     block_target_click: bool = False
-    tooltip_position = "bottom"
 
     def __post_init__(self):
         if not self.target_context:
@@ -158,7 +157,6 @@ class Tutorial:
             "body": step.body,
             "currentStep": self.current_step,
             "stepCount": len(self.steps),
-            "position": step.tooltip_position,
             "blockTargetClick": step.block_target_click,
             "primaryButton": {
                 "show": step.show_primary_button,
@@ -534,7 +532,6 @@ class QTutorialStep(TutorialStep):
     tooltip_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
     qt_target: Optional[QWidget] = None
-    tooltip_position = "center"
 
 
 class QtTutorial(Tutorial):

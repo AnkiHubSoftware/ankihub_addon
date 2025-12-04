@@ -1,9 +1,6 @@
 import { arrow, autoPlacement, autoUpdate, computePosition, offset, type ReferenceElement } from '@floating-ui/dom';
 import { bridgeCommand } from "./bridgecommand";
 
-export type ModalPosition = "top" | "bottom" | "left" | "right" | "center";
-export type ArrowPosition = "top" | "bottom" | "left" | "right";
-
 type ModalOptions = {
     body: string | HTMLElement,
     footer: string | HTMLElement,
@@ -11,8 +8,6 @@ type ModalOptions = {
     closeOnBackdropClick: boolean,
     backdrop: boolean,
     target: string | null,
-    position: ModalPosition,
-    arrowPosition: ArrowPosition,
     showArrow: boolean,
     blockTargetClick: boolean,
 };
@@ -38,8 +33,6 @@ export class Modal {
             closeOnBackdropClick: false,
             backdrop: true,
             target: null,
-            position: "center",
-            arrowPosition: "top",
             showArrow: true,
             blockTargetClick: false,
             ...options,
