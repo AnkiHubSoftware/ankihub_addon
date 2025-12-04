@@ -224,8 +224,11 @@ class Tutorial:
                 gui_hooks.webview_will_set_content.remove(_on_initial_webview_will_set_content)
             aqt.mw.progress.single_shot(100, self.show_current)
 
-        gui_hooks.webview_will_set_content.append(_on_initial_webview_will_set_content)
-        self.refresh_initial_webviews()
+        if initial_contexts:
+            gui_hooks.webview_will_set_content.append(_on_initial_webview_will_set_content)
+            self.refresh_initial_webviews()
+        else:
+            self.show_current()
 
     def end(self) -> None:
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
@@ -556,13 +559,6 @@ class QtTutorial(Tutorial):
     @property
     def contexts(self) -> Tuple[Any, ...]:
         return (TutorialOverlayDialog,)
-
-    @property
-    def initial_contexts(self) -> Tuple[Any, ...]:
-        return (TutorialOverlayDialog,)
-
-    def refresh_initial_webviews(self) -> None:
-        TutorialOverlayDialog(aqt.mw, aqt.mw).close()
 
 
 class QtTutorialDemo(QtTutorial):
