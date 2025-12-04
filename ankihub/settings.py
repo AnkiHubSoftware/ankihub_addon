@@ -1030,11 +1030,20 @@ class DatadogLogHandler(logging.Handler):
         compressed_body = gzip.compress(json.dumps(body).encode())
 
         try:
-            response = requests.post(
-                "https://http-intake.logs.datadoghq.com/api/v2/logs",
-                headers=headers,
-                data=compressed_body,
-            )
+            # Use a session with context manager to ensure proper connection cleanup
+            with requests.Session() as session:
+                response = session.post(
+                    "https://http-intake.logs.datadoghq.com/api/v2/logs",
+                    headers=headers,
+                    data=compressed_body,
+                )
+
+                if response.status_code != 202:  # pragma: no cover
+                    LOGGER.warning(
+                        "Unexpected status code when sending logs to Datadog.",
+                        status_code=response.status_code,
+                        response_text=response.text,
+                    )
         except (
             requests.exceptions.ConnectionError,
             requests.exceptions.Timeout,
@@ -1044,13 +1053,6 @@ class DatadogLogHandler(logging.Handler):
         except requests.exceptions.RequestException:  # pragma: no cover
             LOGGER.exception("An unexpected error occurred when sending logs to Datadog")
             return
-
-        if response.status_code != 202:  # pragma: no cover
-            LOGGER.warning(
-                "Unexpected status code when sending logs to Datadog.",
-                status_code=response.status_code,
-                response_text=response.text,
-            )
 
 
 version_file = Path(__file__).parent / "VERSION"
