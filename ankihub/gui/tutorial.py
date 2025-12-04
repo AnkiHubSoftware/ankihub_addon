@@ -2,11 +2,12 @@ import json
 from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Optional, Set, Tuple, Type, Union, cast
+from typing import Any, Callable, Optional, Set, Tuple, Type, Union
 
 import aqt
 from aqt import dialogs, gui_hooks
 from aqt.browser.browser import Browser
+from aqt.editor import Editor
 from aqt.main import MainWindowState
 from aqt.overview import Overview, OverviewBottomBar, OverviewContent
 from aqt.qt import (
@@ -91,6 +92,8 @@ def webview_for_context(context: Any) -> AnkiWebView:
         return aqt.mw.bottomWeb
     if isinstance(context, (Toolbar, TopToolbar)):
         return aqt.mw.toolbar.web
+    if isinstance(context, Editor):
+        return context.web
     if isinstance(context, (TutorialOverlayDialog,)):
         return context.web
     else:
@@ -100,9 +103,11 @@ def webview_for_context(context: Any) -> AnkiWebView:
 @dataclass
 class TutorialStep:
     body: str
-    target: Optional[Union[str, Callable[[], str]]]
-    tooltip_context: Any
+    target: Optional[Union[str, Callable[[], str]]] = ""
+    tooltip_context: Optional[Any] = None
     target_context: Optional[Any] = None
+    parent_widget: Optional[QWidget] = None
+    qt_target: Optional[QWidget] = None
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     show_primary_button: bool = True
@@ -128,7 +133,7 @@ class Tutorial:
 
     @property
     def contexts(self) -> Tuple[Any, ...]:
-        return tuple()
+        return (TutorialOverlayDialog,)
 
     @property
     def steps(self) -> list[TutorialStep]:
@@ -201,6 +206,19 @@ class Tutorial:
                 web.eval(self._backdrop_js())
 
     def show_current(self) -> None:
+        step = self.steps[self.current_step - 1]
+        if step.qt_target:
+            overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
+            overlay.show()
+            step.tooltip_context = overlay
+            step.target_context = overlay
+            step.target = "#target"
+
+            def close_overlay() -> None:
+                overlay.close()
+
+            step.hidden_callback = close_overlay
+
         self._render_tooltip()
         self._render_highlight()
         self._render_backdrop()
@@ -345,7 +363,7 @@ class Tutorial:
                     and type(next_step.target_context) in self._loadded_context_types
                 )
                 or time_passed >= 2000
-                or isinstance(next_step, QTutorialStep)
+                or next_step.qt_target
             ):
                 if self._show_timer:
                     self._show_timer.deleteLater()
@@ -527,61 +545,49 @@ def prompt_for_onboarding_tutorial() -> None:
     aqt.mw.deckBrowser.refresh()
 
 
-@dataclass
-class QTutorialStep(TutorialStep):
-    target: Optional[Union[str, Callable[[], str]]] = ""
-    tooltip_context: Optional[Any] = None
-    parent_widget: Optional[QWidget] = None
-    qt_target: Optional[QWidget] = None
-
-
-class QtTutorial(Tutorial):
+class QtTutorialDemo(Tutorial):
     def __init__(self) -> None:
         super().__init__()
-        self.apply_backdrop = False
-
-    def show_current(self) -> None:
-        step = cast(QTutorialStep, self.steps[self.current_step - 1])
-        overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
-        overlay.show()
-        step.tooltip_context = overlay
-        step.target_context = overlay
-        step.target = "#target"
-
-        def close_overlay() -> None:
-            overlay.close()
-
-        step.hidden_callback = close_overlay
-        super().show_current()
-
-    @property
-    def contexts(self) -> Tuple[Any, ...]:
-        return (TutorialOverlayDialog,)
-
-
-class QtTutorialDemo(QtTutorial):
-    def __init__(self) -> None:
-        super().__init__()
+        self.apply_backdrop = True
         self.browser: Browser
 
     def start(self) -> None:
         self.browser = dialogs.open("Browser", aqt.mw)
         return super().start()
 
+    @property
+    def contexts(self) -> Tuple[Any, ...]:
+        return (*super().contexts, Editor)
+
+    @property
+    def initial_contexts(self) -> Tuple[Any, ...]:
+        return (Editor,)
+
+    def refresh_initial_webviews(self) -> None:
+        # FIXME: Temporary hack
+        self.browser.editor.web.deleteLater()
+        self.browser.editor.add_webview()
+        self.browser.editor.setupWeb()
+
     @cached_property
     def steps(self) -> list[TutorialStep]:
         return [
-            QTutorialStep(
+            TutorialStep(
                 "Notes list",
                 parent_widget=self.browser,
                 qt_target=self.browser.form.tableView,
             ),
-            QTutorialStep(
+            TutorialStep(
                 "Editor",
                 parent_widget=self.browser,
                 qt_target=self.browser.form.fieldsArea,
             ),
-            QTutorialStep(
+            TutorialStep(
+                "View on AnkiHub",
+                tooltip_context=self.browser.editor,
+                target="#ankihub-btn-view-note",
+            ),
+            TutorialStep(
                 "Sidebar",
                 parent_widget=self.browser,
                 qt_target=self.browser.sidebar.searchBar,
