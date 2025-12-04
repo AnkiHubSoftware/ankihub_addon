@@ -22,7 +22,6 @@ export function promptForOnboardingTour() {
     const modal = new Modal({
         body,
         footer,
-        showArrow: false,
     });
     modal.show();
     activeModal = modal;
@@ -34,7 +33,6 @@ type ShowModalArgs = {
     stepCount: number,
     target: string,
     primaryButton?: { show: boolean, label: string },
-    showArrow?: boolean,
     blockTargetClick?: boolean,
     backdrop?: boolean,
 };
@@ -45,7 +43,6 @@ export function showTutorialModal({
     stepCount,
     target,
     primaryButton = { show: true, label: "Next" },
-    showArrow = true,
     blockTargetClick = false,
     backdrop = true,
 }: ShowModalArgs) {
@@ -58,7 +55,6 @@ export function showTutorialModal({
         body,
         footer,
         target,
-        showArrow,
         blockTargetClick,
         backdrop,
     });

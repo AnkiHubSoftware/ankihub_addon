@@ -166,8 +166,6 @@ class Tutorial:
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
-        if not step.target:
-            tooltip_options["showArrow"] = False
         js = self._render_js_function_with_options("showTutorialModal", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)

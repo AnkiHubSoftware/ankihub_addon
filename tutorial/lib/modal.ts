@@ -8,7 +8,6 @@ type ModalOptions = {
     closeOnBackdropClick: boolean,
     backdrop: boolean,
     target: string | null,
-    showArrow: boolean,
     blockTargetClick: boolean,
 };
 
@@ -33,7 +32,6 @@ export class Modal {
             closeOnBackdropClick: false,
             backdrop: true,
             target: null,
-            showArrow: true,
             blockTargetClick: false,
             ...options,
         };
@@ -264,7 +262,6 @@ export class Modal {
     }
 
     createArrow() {
-        if (!this.options.showArrow) return;
         this.arrowElement = document.createElement("div");
         this.arrowElement.className = "ah-modal-arrow";
         this.modalElement.appendChild(this.arrowElement);
@@ -304,8 +301,8 @@ export class Modal {
                     : this.options.target;
             this.applySpotlight();
         }
-        this.createArrow();
         if (this.targetElement) {
+            this.createArrow();
             this.positionModal(this.targetElement);
         }
         requestAnimationFrame(() => {
