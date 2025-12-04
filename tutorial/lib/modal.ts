@@ -2,8 +2,8 @@ import { arrow, autoPlacement, autoUpdate, computePosition, offset, type Referen
 import { bridgeCommand } from "./bridgecommand";
 
 type ModalOptions = {
-    body: string | HTMLElement,
-    footer: string | HTMLElement,
+    body: string | Node,
+    footer: string | Node | Node[],
     showCloseButton: boolean,
     closeOnBackdropClick: boolean,
     backdrop: boolean,
@@ -70,8 +70,8 @@ export class Modal {
         body.className = "ah-modal-body";
         if (typeof this.options.body === "string") {
             body.innerHTML = this.options.body;
-        } else if (this.options.body instanceof Element) {
-            body.appendChild(this.options.body);
+        } else if (this.options.body instanceof Node) {
+            body.append(this.options.body);
         }
         modalContent.appendChild(body);
         if (this.options.footer) {
@@ -79,8 +79,11 @@ export class Modal {
             footer.className = "ah-modal-footer";
             if (typeof this.options.footer === "string") {
                 footer.innerHTML = this.options.footer;
-            } else if (this.options.footer instanceof HTMLElement) {
-                footer.appendChild(this.options.footer);
+            } else if (this.options.footer instanceof Node) {
+                footer.append(this.options.footer);
+            }
+            else {
+                footer.append(...this.options.footer);
             }
             modalContent.appendChild(footer);
         }

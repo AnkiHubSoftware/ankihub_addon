@@ -17,7 +17,17 @@ export function promptForOnboardingTour() {
 <h2>📚 First time with Anki?</h2>
 <p>Find your way in the app with this onboarding tour.</p>
     `;
-    const footer = `<button class="ah-button ah-secondary-button" onclick="destroyAnkiHubTutorialModal()">Close</button><button class="ah-button ah-primary-button" onclick="pycmd('ankihub_start_onboarding')">Take tour</button>`;
+    const footer = [];
+    const secondaryButton = document.createElement("button");
+    secondaryButton.textContent = "Close";
+    secondaryButton.classList.add("ah-button", "ah-secondary-button");
+    secondaryButton.addEventListener("click", destroyActiveTutorialModal);
+    footer.push(secondaryButton);
+    const primaryButton = document.createElement("button");
+    primaryButton.textContent = "Take tour";
+    primaryButton.classList.add("ah-button", "ah-secondary-button");
+    primaryButton.addEventListener("click", () => bridgeCommand("ankihub_start_onboarding"));
+    footer.push(primaryButton);
 
     const modal = new Modal({
         body,
@@ -47,9 +57,16 @@ export function showTutorialModal({
     backdrop = true,
 }: ShowModalArgs) {
     destroyActiveTutorialModal();
-    let footer = `<span>${currentStep} of ${stepCount}</span>`;
+    const footer = [];
+    const stepSpan = document.createElement("span");
+    stepSpan.textContent = `${currentStep} of ${stepCount}`;
+    footer.push(stepSpan);
     if (primaryButton.show) {
-        footer += `<button class="ah-button ah-primary-button" onclick="pycmd('ankihub_tutorial_primary_button_clicked')">${primaryButton.label}</button>`;
+        const button = document.createElement("button");
+        button.textContent = primaryButton.label;
+        button.classList.add("ah-button", "ah-primary-button");
+        button.addEventListener("click", () => bridgeCommand("ankihub_tutorial_primary_button_clicked"));
+        footer.push(button);
     }
     const modal = new Modal({
         body,
