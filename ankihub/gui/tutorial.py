@@ -380,10 +380,7 @@ class OnboardingTutorial(Tutorial):
         ]
 
         def on_overview_did_refresh(overview: Overview) -> None:
-            did = aqt.mw.col.decks.get_current_id()
-            intro_deck_config = config.deck_config(config.intro_deck_id)
-            if intro_deck_config and did == intro_deck_config.anki_id:
-                self.next()
+            aqt.mw.progress.single_shot(100, self.next)
 
         def on_intro_step_shown() -> None:
             gui_hooks.overview_did_refresh.append(on_overview_did_refresh)
