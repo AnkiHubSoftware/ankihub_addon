@@ -89,7 +89,7 @@ def webview_for_context(context: Any) -> AnkiWebView:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
     if isinstance(context, AnkiQt):
-        return aqt.mw
+        return aqt.mw.web
     if isinstance(context, (DeckBrowser, Reviewer, Overview)):
         return aqt.mw.web
     if isinstance(context, (BottomBar, DeckBrowserBottomBar, OverviewBottomBar, ReviewerBottomBar)):
