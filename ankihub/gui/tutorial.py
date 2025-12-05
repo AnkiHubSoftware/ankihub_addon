@@ -1,4 +1,3 @@
-import functools
 import json
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -292,11 +291,7 @@ class Tutorial:
             last_step.target_context,
             *self.extra_backdrop_contexts,
         ):
-
-            def on_loaded(c: Any) -> None:
-                webview_for_context(c).eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
-
-            inject_tutorial_assets(context, functools.partial(on_loaded, context))
+            webview_for_context(context).eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
         if last_step.hidden_callback:
             last_step.hidden_callback()
         global active_tutorial
