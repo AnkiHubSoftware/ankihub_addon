@@ -1,13 +1,19 @@
 import { arrow, autoPlacement, autoUpdate, computePosition, offset, type ReferenceElement } from '@floating-ui/dom';
 import { bridgeCommand } from "./bridgecommand";
 
+function getTargetElement(target: string | HTMLElement): HTMLElement | null {
+    return typeof target === "string"
+        ? document.querySelector(target)
+        : target
+}
+
 type ModalOptions = {
     body: string | Node,
     footer: string | Node | Node[],
     showCloseButton: boolean,
     closeOnBackdropClick: boolean,
     backdrop: boolean,
-    target: string | null,
+    target: string | HTMLElement | null,
     blockTargetClick: boolean,
 };
 
@@ -90,8 +96,9 @@ export class Modal {
         this.modalElement.appendChild(modalContent);
         if (this.options.body) {
             this.backdropElement.appendChild(this.modalElement);
-            if (this.targetElement) {
-                this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
+            const target = this.options.target ? getTargetElement(this.options.target) : null;
+            if (target) {
+                this.cleanUpdateHandler = autoUpdate(target, this.modalElement, this.positionModal.bind(this, target));
             }
         }
         this.shadowRoot.appendChild(this.backdropElement);
@@ -298,10 +305,7 @@ export class Modal {
 
         document.body.appendChild(this.hostElement);
         if (this.options.target) {
-            this.targetElement =
-                typeof this.options.target === "string"
-                    ? document.querySelector(this.options.target)
-                    : this.options.target;
+            this.targetElement = getTargetElement(this.options.target);
             this.applySpotlight();
         }
         if (this.targetElement) {
