@@ -100,10 +100,18 @@ class NottorneyLoginDialog(QDialog):
             user_data = result.get("user", {})
             purchased_decks = result.get("purchased_decks", [])
 
-            if access_token:
-                config.save_nottorney_token(access_token)
-                config.save_nottorney_user_email(user_data.get("email", email))
-                config.save_nottorney_user_id(user_data.get("id", ""))
+            if not access_token:
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    "Login failed: No access token received from server.",
+                )
+                LOGGER.error("Login response missing access_token", email=email)
+                return
+
+            config.save_nottorney_token(access_token)
+            config.save_nottorney_user_email(user_data.get("email", email))
+            config.save_nottorney_user_id(user_data.get("id", ""))
 
             LOGGER.info(
                 "User logged into Nottorney",

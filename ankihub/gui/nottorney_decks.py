@@ -35,6 +35,7 @@ class NottorneyDecksDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("My Nottorney Decks")
         self.setMinimumSize(500, 400)
+        self._initialized = False
 
         token = config.nottorney_token()
         if not token:
@@ -46,6 +47,7 @@ class NottorneyDecksDialog(QDialog):
         self.decks: List[Dict] = []
         self._setup_ui()
         self._load_decks()
+        self._initialized = True
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -246,8 +248,12 @@ class NottorneyDecksDialog(QDialog):
             if login_dialog.exec() != QDialog.DialogCode.Accepted:
                 return None
 
-        if cls._window is None:
+        if cls._window is None or not getattr(cls._window, "_initialized", False):
             cls._window = cls(parent)
+            # If initialization failed, don't return the partially-initialized instance
+            if not getattr(cls._window, "_initialized", False):
+                cls._window = None
+                return None
         else:
             cls._window._load_decks()
             cls._window.activateWindow()
