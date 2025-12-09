@@ -244,8 +244,8 @@ class NottorneyDecksDialog(QDialog):
         if not config.is_nottorney_logged_in():
             from .nottorney_login import NottorneyLoginDialog
 
-            login_dialog = NottorneyLoginDialog.display_login(parent)
-            if login_dialog.exec() != QDialog.DialogCode.Accepted:
+            login_result = NottorneyLoginDialog.display_login(parent)
+            if login_result != QDialog.DialogCode.Accepted:
                 return None
 
         if cls._window is None or not getattr(cls._window, "_initialized", False):

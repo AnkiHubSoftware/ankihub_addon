@@ -156,7 +156,11 @@ class NottorneyLoginDialog(QDialog):
 
     @classmethod
     def display_login(cls, parent=None):
-        """Display the login dialog."""
+        """Display the login dialog.
+        
+        Returns:
+            The dialog result code (QDialog.DialogCode.Accepted or QDialog.DialogCode.Rejected)
+        """
         if cls._window is None:
             cls._window = cls(parent)
         else:
@@ -165,5 +169,5 @@ class NottorneyLoginDialog(QDialog):
             cls._window.raise_()
 
         LOGGER.info("Showed Nottorney login dialog.")
-        cls._window.exec()  # Modal dialog behavior
+        return cls._window.exec()  # Modal dialog behavior
 
