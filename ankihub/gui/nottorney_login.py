@@ -163,8 +163,7 @@ class NottorneyLoginDialog(QDialog):
             cls._window.clear_fields()
             cls._window.activateWindow()
             cls._window.raise_()
-            cls._window.show()
 
         LOGGER.info("Showed Nottorney login dialog.")
-        return cls._window
+        cls._window.exec()  # Modal dialog behavior
 

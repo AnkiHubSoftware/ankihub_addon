@@ -560,7 +560,7 @@ def _nottorney_login_setup(parent: QMenu):
     from .nottorney_login import NottorneyLoginDialog
 
     login_action = QAction("🔑 Nottorney Login", aqt.mw)
-    qconnect(login_action.triggered, lambda: NottorneyLoginDialog.display_login(aqt.mw).exec())
+    qconnect(login_action.triggered, lambda: NottorneyLoginDialog.display_login(aqt.mw))
     parent.addAction(login_action)
 
 
