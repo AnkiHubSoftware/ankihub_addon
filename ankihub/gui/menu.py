@@ -60,6 +60,11 @@ def refresh_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     menu_state.ankihub_menu.clear()
 
+    # Nottorney menu items
+    menu_state.ankihub_menu.addSeparator()
+    _nottorney_section_setup(parent=menu_state.ankihub_menu)
+    menu_state.ankihub_menu.addSeparator()
+
     if config.is_logged_in():
         _create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
         _subscribed_decks_setup(parent=menu_state.ankihub_menu)
@@ -539,3 +544,60 @@ def _media_sync_status_setup(parent: QMenu):
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
     media_sync.refresh_sync_status_text()
+
+
+def _nottorney_section_setup(parent: QMenu):
+    """Set up Nottorney menu section."""
+    if config.is_nottorney_logged_in():
+        _nottorney_decks_setup(parent=parent)
+        _nottorney_logout_setup(parent=parent)
+    else:
+        _nottorney_login_setup(parent=parent)
+
+
+def _nottorney_login_setup(parent: QMenu):
+    """Set up Nottorney login menu item."""
+    from .nottorney_login import NottorneyLoginDialog
+
+    login_action = QAction("🔑 Nottorney Login", aqt.mw)
+    qconnect(login_action.triggered, lambda: NottorneyLoginDialog.display_login(aqt.mw).exec())
+    parent.addAction(login_action)
+
+
+def _nottorney_decks_setup(parent: QMenu):
+    """Set up Nottorney decks menu item."""
+    from .nottorney_decks import NottorneyDecksDialog
+
+    decks_action = QAction("📚 My Purchased Decks", aqt.mw)
+    qconnect(decks_action.triggered, lambda: NottorneyDecksDialog.display_decks(aqt.mw))
+    parent.addAction(decks_action)
+
+
+def _nottorney_logout_setup(parent: QMenu):
+    """Set up Nottorney logout menu item."""
+
+    def _confirm_nottorney_logout():
+        confirm = ask_user(
+            "Are you sure you want to sign out of Nottorney?",
+            yes_button_label="Sign Out",
+            no_button_label="Cancel",
+        )
+        if not confirm:
+            return
+
+        from ..nottorney_client import NottorneyClient
+
+        try:
+            client = NottorneyClient(token=config.nottorney_token())
+            client.signout()
+        except Exception:
+            # Ignore errors during signout
+            pass
+        finally:
+            config.clear_nottorney_credentials()
+            tooltip("Signed out of Nottorney!", parent=aqt.mw)
+            LOGGER.info("User signed out of Nottorney")
+
+    logout_action = QAction("🔑 Nottorney Sign out", aqt.mw)
+    qconnect(logout_action.triggered, _confirm_nottorney_logout)
+    parent.addAction(logout_action)

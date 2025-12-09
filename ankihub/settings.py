@@ -218,6 +218,10 @@ class PrivateConfig(DataClassJSONMixin):
     feature_flags: dict = field(default_factory=dict)
     user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
+    # Nottorney authentication
+    nottorney_token: Optional[str] = None
+    nottorney_user_email: Optional[str] = None
+    nottorney_user_id: Optional[str] = None
 
 
 class _Config:
@@ -481,6 +485,44 @@ class _Config:
 
     def user_id(self) -> Optional[int]:
         return self._private_config.user_details.get("id")
+
+    def nottorney_token(self) -> Optional[str]:
+        """Get the Nottorney authentication token."""
+        return self._private_config.nottorney_token
+
+    def save_nottorney_token(self, token: str) -> None:
+        """Save the Nottorney authentication token."""
+        self._private_config.nottorney_token = token
+        self._update_private_config()
+
+    def save_nottorney_user_email(self, email: str) -> None:
+        """Save the Nottorney user email."""
+        self._private_config.nottorney_user_email = email
+        self._update_private_config()
+
+    def save_nottorney_user_id(self, user_id: str) -> None:
+        """Save the Nottorney user ID."""
+        self._private_config.nottorney_user_id = user_id
+        self._update_private_config()
+
+    def nottorney_user_email(self) -> Optional[str]:
+        """Get the Nottorney user email."""
+        return self._private_config.nottorney_user_email
+
+    def nottorney_user_id(self) -> Optional[str]:
+        """Get the Nottorney user ID."""
+        return self._private_config.nottorney_user_id
+
+    def is_nottorney_logged_in(self) -> bool:
+        """Check if user is logged into Nottorney."""
+        return bool(self._private_config.nottorney_token)
+
+    def clear_nottorney_credentials(self) -> None:
+        """Clear all Nottorney authentication credentials."""
+        self._private_config.nottorney_token = None
+        self._private_config.nottorney_user_email = None
+        self._private_config.nottorney_user_id = None
+        self._update_private_config()
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
