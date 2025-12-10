@@ -12,6 +12,6 @@ cd dist/release
 ../../scripts/calver.sh > VERSION
 
 # remove temporary files
-find . -name __pycache__ -or -regex ".*.py[cod]" -or -name .DS_Store -or -name ".pytest_cache" | xargs rm -rf
+find . -name __pycache__ -or -regex ".*.py[cod]" -or -name .DS_Store -or -name ".pytest_cache" or -name ".mypy_cache" | xargs rm -rf
 
 zip -r "../../ankihub.ankiaddon" . -x ./tests\*
