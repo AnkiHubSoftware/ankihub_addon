@@ -485,7 +485,7 @@ def prompt_for_onboarding_tutorial() -> None:
     if active_tutorial:
         return
 
-    inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval("AnkiHub.promptForOnboardingTour()"))
+    # inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval("AnkiHub.promptForOnboardingTour()"))
 
 
 class QtTutorialDemo(Tutorial):

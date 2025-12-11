@@ -83,7 +83,7 @@ def setup() -> None:
         pos="after",
     )
     setup_subdeck_ankihub_options()
-    setup_onboarding_options()
+    # setup_onboarding_options()
 
 
 def _open_date_picker_dialog_for_subdeck(subdeck_id: DeckId, initial_due_date: Optional[str]) -> None:
