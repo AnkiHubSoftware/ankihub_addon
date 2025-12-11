@@ -9665,3 +9665,60 @@ class TestCheckUserFeatureAccess:
         on_access_denied.assert_called_with(cached_user_details)
         # Assert on_access_granted was not called
         on_access_granted_mock.assert_not_called()
+
+
+class TestOnboarding:
+    def test_prompt_on_intro_deck_install_skip(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        ah_did = next_deterministic_uuid()
+        config.intro_deck_id = ah_did
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
+                button_index=0,
+            )
+            mocker.patch(
+                "ankihub.gui.operations.new_deck_subscriptions.download_and_install_decks",
+                side_effect=lambda *args, on_done, **kwargs: on_done(future_with_result(None)),
+            )
+            prompt_mock = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+            deck = DeckFactory.create(ah_did=ah_did)
+            with qtbot.wait_callback() as callback:
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
+            prompt_mock.assert_called_once()
+
+    def test_prompt_on_intro_deck_install(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        ah_did = next_deterministic_uuid()
+        config.intro_deck_id = ah_did
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            deck = DeckFactory.create(ah_did=ah_did)
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
+                button_index=1,
+            )
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.deck_installation.show_dialog",
+                button_index=1,
+            )
+            prompt_mock = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+            mock_download_and_install_deck_dependencies(deck=deck, notes_data=[], note_type=ankihub_basic_note_type)
+            with qtbot.wait_callback() as callback:
+                check_and_install_new_deck_subscriptions(subscribed_decks=[deck], on_done=callback)
+            prompt_mock.assert_called_once()
