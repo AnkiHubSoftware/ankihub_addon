@@ -2796,7 +2796,7 @@ class TestDatadogLogHandler:
         # Mock the requests.post call to always return a response with status code 202
         response = Mock()
         response.status_code = 202
-        post_mock = mocker.patch("requests.post", return_value=response)
+        post_mock = mocker.patch("requests.Session.post", return_value=response)
 
         # Create a DatadogLogHandler and a LogRecord
         handler = DatadogLogHandler()
@@ -2837,7 +2837,7 @@ class TestDatadogLogHandler:
         # Mock the requests.post call to always return a response with status code 202
         response = Mock()
         response.status_code = 202
-        post_mock = mocker.patch("requests.post", return_value=response)
+        post_mock = mocker.patch("requests.Session.post", return_value=response)
 
         # Create a DatadogLogHandler with a short flush interval and a LogRecord
         handler = DatadogLogHandler(send_interval=0.01)
