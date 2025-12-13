@@ -25,7 +25,6 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
     -   **Legacy Anki (2.1.56):** `uv sync --group dev --group aqt_legacy --group bundle` or `just install aqt_legacy`
 
     (Requires [just](https://github.com/casey/just) for the `just install` commands)
--   Copy `.vscode.dist` as `.vscode`.
 -   Open VSCode in this repo: `code .`
 -   Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
 -   Install [`direnv`](https://direnv.net/docs/installation.html).
@@ -63,6 +62,7 @@ This can be achieved using VSCode workspaces (https://code.visualstudio.com/docs
 
 -   Copy `ankihub.code-workspace.dev` to `ankihub.code-workspace`: `cp ankihub.code-workspace.dev ankihub.code-workspace`
 -   Replace the paths in `ankihub.code-workspace` as described by the comments in the file.
+-   You can put your custom settings and launch configurations under `settings` and `launch`.
 
 ### Development workflow
 
