@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
+from anki.errors import NotFoundError
+from anki.notes import NoteId
 from aqt.qt import QAction
 
 from .. import LOGGER
@@ -180,10 +182,32 @@ class _AnkiHubMediaSync:
         else:
             LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
+    def _media_referenced_by_notes(self, ah_did: uuid.UUID) -> Set[str]:
+        """Scan all notes in the AnkiHub deck and return the set of referenced media filenames."""
+        anki_nids: List[NoteId] = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+
+        media_names: Set[str] = set()
+        for nid in anki_nids:
+            try:
+                note = aqt.mw.col.get_note(nid)
+            except NotFoundError:
+                continue
+            flds = "".join(note.fields)
+            # Extract media references using Anki's files_in_str (handles latex)
+            media_names.update(aqt.mw.col.media.files_in_str(note.mid, flds))
+
+        return media_names
+
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
         media_list = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)
-        media_dir_path = Path(aqt.mw.col.media.dir())
+        if not media_list:
+            return []
 
+        referenced_media = self._media_referenced_by_notes(ah_did)
+        # Filter to only media that is both downloadable AND referenced by notes
+        media_list = [m for m in media_list if m.name in referenced_media]
+
+        media_dir_path = Path(aqt.mw.col.media.dir())
         result = [
             media.name
             for media in media_list
