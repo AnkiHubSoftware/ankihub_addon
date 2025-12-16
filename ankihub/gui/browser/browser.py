@@ -547,10 +547,6 @@ def _on_browser_menus_did_init(browser: Browser):
     )
     menu.addAction(reset_optional_tags_action)
 
-    # tutorial_action = QAction("Start Tutorial", browser)
-    # qconnect(tutorial_action.triggered, lambda: QtTutorialDemo().start())
-    # menu.addAction(tutorial_action)
-
 
 def _on_reset_deck_action(browser: Browser):
     if not config.deck_ids():
