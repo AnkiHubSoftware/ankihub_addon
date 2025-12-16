@@ -264,6 +264,9 @@ class _Config:
         if anking_deck_id_from_env_var := os.getenv("ANKING_DECK_ID"):
             self.anking_deck_id = uuid.UUID(anking_deck_id_from_env_var)
 
+        if intro_deck_id := os.getenv("INTRO_DECK_ID"):
+            self.intro_deck_id = uuid.UUID(intro_deck_id)
+
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.
 
