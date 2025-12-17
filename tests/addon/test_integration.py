@@ -6063,6 +6063,9 @@ class TestMediaSyncMediaDownload:
                 ],
             )
 
+            # Mock the _media_referenced_by_notes method to include the test media
+            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"image.png"})
+
             # Mock the client method for downloading media
             download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
 
@@ -6116,6 +6119,66 @@ class TestMediaSyncMediaDownload:
                 since=None,
             )
             download_media_mock.assert_not_called()
+
+    def test_download_media_with_filtering_by_referenced_media(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        """Test that media download now filters by media actually referenced in notes."""
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+
+            latest_media_update = datetime.now()
+            referenced_media = DeckMediaFactory.create(
+                name="referenced_image.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            unreferenced_media = DeckMediaFactory.create(
+                name="unreferenced_image.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+
+            get_deck_media_updates_mock = mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(
+                        media=[referenced_media, unreferenced_media], latest_update=latest_media_update
+                    ),
+                ],
+            )
+
+            # Mock the _media_referenced_by_notes method to return only one media file
+            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"referenced_image.png"})
+
+            download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
+
+            media_sync.start_media_download()
+            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+
+            # Assert the client methods were called with the correct arguments
+            get_deck_media_updates_mock.assert_called_once_with(
+                ah_did,
+                since=None,
+            )
+
+            # Should only download the referenced media, not the unreferenced one
+            download_media_mock.assert_called_once_with(["referenced_image.png"], ah_did)
+
+            # Assert that both media were added to the database (this happens before filtering)
+            db_media = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)
+            assert len(db_media) == 2
+            media_names = {m.name for m in db_media}
+            assert media_names == {"referenced_image.png", "unreferenced_image.png"}
 
 
 @fixture
