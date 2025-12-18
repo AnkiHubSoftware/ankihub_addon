@@ -2,7 +2,7 @@ import json
 from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Optional, Set, Type, Union
+from typing import Any, Callable, Optional, Union
 
 import aqt
 from aqt import dialogs, gui_hooks
@@ -13,7 +13,6 @@ from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QPoint,
     Qt,
-    QTimer,
     QVBoxLayout,
     QWidget,
     qconnect,
@@ -177,8 +176,6 @@ class Tutorial:
     def __init__(self) -> None:
         self.name = ""
         self.current_step = 1
-        self._loadded_context_types: Set[Type[Any]] = set()
-        self._show_timer: Optional[QTimer] = None
         self.apply_backdrop = True
 
     @property
