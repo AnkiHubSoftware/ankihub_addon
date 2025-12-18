@@ -13,10 +13,7 @@ export function destroyActiveTutorialModal() {
 
 export function promptForOnboardingTour() {
     destroyActiveTutorialModal();
-    const body = `
-<h2>📚 First time with Anki?</h2>
-<p>Find your way in the app with this onboarding tour.</p>
-    `;
+    const body = `<h2>📚 First time with Anki?</h2><p>Find your way in the app with this onboarding tour.</p>`;
     const footer = [];
     const secondaryButton = document.createElement("button");
     secondaryButton.textContent = "Close";
@@ -91,7 +88,7 @@ export function highlightTutorialTarget({
     blockTargetClick = false,
 }: HighlightTargetArgs) {
     destroyActiveTutorialModal();
-    var modal = new Modal({
+    const modal = new Modal({
         body: "",
         footer: "",
         target,
@@ -136,7 +133,7 @@ export function positionTutorialTarget({ top, left, width, height }: PositionTar
 
 export function addTutorialBackdrop() {
     destroyActiveTutorialModal();
-    var modal = new Modal({ body: "", footer: "" });
+    const modal = new Modal({ body: "", footer: "" });
     modal.show();
     activeModal = modal;
 }
