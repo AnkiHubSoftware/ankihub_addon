@@ -230,6 +230,7 @@ class _Config:
         self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
+        self.intro_deck_id: Optional[uuid.UUID] = None
 
     def setup_public_config_and_other_settings(self):
         migrate_public_config()
@@ -243,11 +244,14 @@ class _Config:
                 self.anking_deck_id = staging_anking_deck_id
             else:
                 self.anking_deck_id = uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
+            self.intro_deck_id = uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
+
         else:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
+            self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
         # Override urls with environment variables if they are set.
         if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
@@ -259,6 +263,9 @@ class _Config:
 
         if anking_deck_id_from_env_var := os.getenv("ANKING_DECK_ID"):
             self.anking_deck_id = uuid.UUID(anking_deck_id_from_env_var)
+
+        if intro_deck_id := os.getenv("INTRO_DECK_ID"):
+            self.intro_deck_id = uuid.UUID(intro_deck_id)
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.

@@ -36,8 +36,8 @@ OPEN_LINK_PYCMD = "ankihub_open_link"
 TERMS_AGREEMENT_NOT_ACCEPTED = "terms_agreement_not_accepted"
 TERMS_AGREEMENT_ACCEPTED = "terms_agreement_accepted"
 ADD_TO_BLOCK_EXAM_SUBDECK = "ankihub_add_to_block_exam_subdeck"
-
 OPEN_CONFIG_PYCMD = "ankihub_open_config"
+START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
 
 POST_MESSAGE_TO_ANKIHUB_JS_PATH = Path(__file__).parent / "web/post_message_to_ankihub_js.js"
 
