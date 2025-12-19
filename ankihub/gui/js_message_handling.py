@@ -156,11 +156,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw).show()
 
         return (True, None)
-    elif message == START_ONBOARDING_PYCMD:
-        from .tutorial import OnboardingTutorial
-
-        OnboardingTutorial().start()
-        return (True, None)
 
     return handled
 

@@ -1,14 +1,11 @@
 import json
-from concurrent.futures import Future
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Any, Callable, Optional, Union
 
 import aqt
-from aqt import dialogs, gui_hooks
-from aqt.browser.browser import Browser
+from aqt import gui_hooks
 from aqt.editor import Editor
-from aqt.main import AnkiQt, MainWindowState
+from aqt.main import AnkiQt
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QPoint,
@@ -22,7 +19,6 @@ from aqt.toolbar import BottomBar, Toolbar, TopToolbar
 from aqt.webview import AnkiWebView
 
 from ..gui.overlay_dialog import OverlayDialog
-from ..settings import config
 
 PRIMARY_BUTTON_CLICKED_PYCMD = "ankihub_tutorial_primary_button_clicked"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
@@ -358,164 +354,3 @@ class Tutorial:
         self.current_step += 1
 
         self.show_current()
-
-
-class OnboardingTutorial(Tutorial):
-    def __init__(self) -> None:
-        super().__init__()
-
-    @cached_property
-    def steps(self) -> list[TutorialStep]:
-        steps = [
-            TutorialStep(
-                body="<b>Decks</b> is where you will find your subscribed decks.",
-                target="#decks",
-                tooltip_context=aqt.mw.deckBrowser,
-                target_context=aqt.mw.toolbar,
-                block_target_click=True,
-            )
-        ]
-
-        def on_overview_did_refresh(overview: Overview) -> None:
-            aqt.mw.progress.single_shot(100, self.next)
-
-        def on_intro_step_shown() -> None:
-            gui_hooks.overview_did_refresh.append(on_overview_did_refresh)
-
-        def on_intro_step_hidden() -> None:
-            gui_hooks.overview_did_refresh.remove(on_overview_did_refresh)
-
-        intro_deck_config = config.deck_config(config.intro_deck_id)
-        if intro_deck_config:
-            steps.append(
-                TutorialStep(
-                    body="We've already subscribed you to this deck.<br><br>Click on it to open.",
-                    target=f"[id='{intro_deck_config.anki_id}']",
-                    tooltip_context=aqt.mw.deckBrowser,
-                    shown_callback=on_intro_step_shown,
-                    hidden_callback=on_intro_step_hidden,
-                    show_primary_button=False,
-                )
-            )
-        else:
-
-            def on_sync_with_ankihub_done(future: Future) -> None:
-                future.result()
-                self.next()
-
-            def on_sync_with_ankihub_button_clicked() -> None:
-                from ..gui.operations.ankihub_sync import sync_with_ankihub
-
-                sync_with_ankihub(on_sync_with_ankihub_done)
-
-            steps.append(
-                TutorialStep(
-                    body="There is no deck here, but we've already subscribed you to "
-                    "the <b>Getting Started with Anki</b> deck.<br><br>"
-                    "To make a deck you are subscribed to appear here, "
-                    "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
-                    "Right now you can just <b>click on the button bellow</b>.",
-                    target=".deck",
-                    tooltip_context=aqt.mw.deckBrowser,
-                    show_primary_button=True,
-                    primary_button_label="Sync with AnkiHub",
-                    button_callback=on_sync_with_ankihub_button_clicked,
-                )
-            )
-            steps.append(
-                TutorialStep(
-                    body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
-                    target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
-                    tooltip_context=aqt.mw.deckBrowser,
-                    shown_callback=on_intro_step_shown,
-                    hidden_callback=on_intro_step_hidden,
-                    show_primary_button=False,
-                )
-            )
-
-        steps.append(
-            TutorialStep(
-                body="This deck will help you understand the basics of card reviewing.",
-                target="",
-                tooltip_context=aqt.mw.overview,
-            )
-        )
-        steps.append(
-            TutorialStep(
-                "These daily stats show you:<br><ul>"
-                "<li><b>New</b>: new cards to study</li>"
-                "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
-                "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
-                target="td",
-                tooltip_context=aqt.mw.overview,
-            )
-        )
-
-        def on_state_did_change(new_state: MainWindowState, old_state: MainWindowState) -> None:
-            if new_state == "review":
-                self.next()
-
-        def on_study_step_shown() -> None:
-            gui_hooks.state_did_change.append(on_state_did_change)
-
-        def on_study_step_hidden() -> None:
-            gui_hooks.state_did_change.remove(on_state_did_change)
-
-        steps.append(
-            TutorialStep(
-                "Click this button and start practicing card reviewing now!",
-                target="#study",
-                tooltip_context=aqt.mw.overview,
-                shown_callback=on_study_step_shown,
-                hidden_callback=on_study_step_hidden,
-                show_primary_button=False,
-            )
-        )
-        return steps
-
-    @property
-    def extra_backdrop_contexts(self) -> tuple[Any, ...]:
-        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
-
-
-def prompt_for_onboarding_tutorial() -> None:
-    if active_tutorial or not config.get_feature_flags().get("addon_tours", False):
-        return
-
-    inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval("AnkiHub.promptForOnboardingTour()"))
-
-
-class QtTutorialDemo(Tutorial):
-    def __init__(self) -> None:
-        super().__init__()
-        self.apply_backdrop = True
-        self.browser: Browser
-
-    def start(self) -> None:
-        self.browser = dialogs.open("Browser", aqt.mw)
-        return super().start()
-
-    @cached_property
-    def steps(self) -> list[TutorialStep]:
-        return [
-            TutorialStep(
-                "Notes list",
-                parent_widget=self.browser,
-                qt_target=self.browser.form.tableView,
-            ),
-            TutorialStep(
-                "Editor",
-                parent_widget=self.browser,
-                qt_target=self.browser.form.fieldsArea,
-            ),
-            TutorialStep(
-                "View on AnkiHub",
-                tooltip_context=self.browser.editor,
-                target="#ankihub-btn-view-note",
-            ),
-            TutorialStep(
-                "Sidebar",
-                parent_widget=self.browser,
-                qt_target=self.browser.sidebar.searchBar,
-            ),
-        ]

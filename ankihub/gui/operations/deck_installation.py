@@ -156,13 +156,6 @@ def _show_deck_import_summary_dialog_inner(
         if button_index == 0:
             DeckManagementDialog.display_subscribe_window()
 
-        else:
-            intro_deck_config = config.deck_config(config.intro_deck_id)
-            if intro_deck_config and intro_deck_config.name in ankihub_deck_names:
-                from ...gui.tutorial import prompt_for_onboarding_tutorial
-
-                prompt_for_onboarding_tutorial()
-
     show_dialog(
         message,
         title="AnkiHub | Deck Import Summary",
