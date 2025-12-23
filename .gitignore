@@ -163,6 +163,7 @@ ankihub/media_export/*
 
 # web repo
 ankihub/ankihub_web/*
+ankihub/django/app/templates/cotton/v1/
 
 # envrc
 .envrc
