@@ -45,6 +45,8 @@ runs:
 
     - name: Build
       run: |
+        # force git to use ssh
+        git config --global url."git@github.com:".insteadOf "https://github.com/"
         uv run ./scripts/build.py
       shell: bash
       env:
