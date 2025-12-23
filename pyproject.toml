@@ -40,6 +40,8 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
+  "django>=4.2.27",
+  "django-cotton>=2.5.1",
 ]
 aqt = ["aqt[qt]==25.9.2"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
