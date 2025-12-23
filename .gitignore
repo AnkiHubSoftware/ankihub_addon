@@ -161,6 +161,9 @@ ankihub/media_import/*
 # media_export
 ankihub/media_export/*
 
+# web repo
+ankihub/ankihub_web/*
+
 # envrc
 .envrc
 /ankihub.code-workspace

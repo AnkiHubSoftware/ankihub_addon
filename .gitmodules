@@ -7,3 +7,7 @@
 [submodule "ankihub/gui/ankiaddonconfig"]
 	path = ankihub/gui/ankiaddonconfig
 	url = https://github.com/RisingOrange/ankiaddonconfig.git
+[submodule "ankihub_web"]
+	path = ankihub_web
+	url = https://github.com/AnkiHubSoftware/ankihub
+	branch = main
