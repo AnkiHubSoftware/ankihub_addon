@@ -32,6 +32,7 @@ from .errors import upload_logs_and_data_in_background, upload_logs_in_backgroun
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.deck_creation import create_collaborative_deck
+from .tutorial import OnboardingTutorial
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -446,6 +447,14 @@ def _config_setup(parent: QMenu) -> None:
 def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
+
+    if config.get_feature_flags().get("addon_tours", False):
+        q_onboarding_action = QAction("Start onboarding tour", help_menu)
+        qconnect(
+            q_onboarding_action.triggered,
+            lambda: OnboardingTutorial().start(),
+        )
+        help_menu.addAction(q_onboarding_action)
 
     # && is an escaped & in qt
     q_notion_action = QAction("Documentation", help_menu)
