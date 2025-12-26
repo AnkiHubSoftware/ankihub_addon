@@ -233,7 +233,7 @@ class _AnkiHubMediaSync:
             return
 
         try:
-            self._status_action.setText(f"🔃️ Media Sync: {text}")
+            self._status_action.setText(f"🔃️ Media sync: {text}")
         except RuntimeError:
             LOGGER.warning("Could not set text of media sync status action because the object was deleted.")
 
