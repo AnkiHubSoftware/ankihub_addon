@@ -230,7 +230,7 @@ class AnkiHubLogin(QWidget):
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
-    q_action = QAction("🛠️ Create AnkiHub Deck", parent=parent)
+    q_action = QAction("🛠️ Create AnkiHub deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck)
     parent.addAction(q_action)
 
@@ -314,7 +314,7 @@ def _ankihub_login_setup(parent: QMenu) -> None:
 
 
 def _subscribed_decks_setup(parent: QMenu):
-    q_action = QAction("📚 Deck Management", aqt.mw)
+    q_action = QAction("📚 Deck management", aqt.mw)
     qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
@@ -464,7 +464,7 @@ def _ankihub_help_setup(parent: QMenu):
     )
     help_menu.addAction(q_notion_action)
 
-    q_get_help_action = QAction("Get Help", help_menu)
+    q_get_help_action = QAction("Get help", help_menu)
     qconnect(
         q_get_help_action.triggered,
         lambda: openLink("https://community.ankihub.net/c/support"),
