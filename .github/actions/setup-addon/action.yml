@@ -8,6 +8,8 @@ inputs:
     required: false
   qt_package:
     required: false
+  ankihub_ssh_key:
+    required: true
 runs:
   using: "composite"
   steps:
@@ -36,8 +38,15 @@ runs:
         sudo apt-get -y install libgl1 libegl1 libdbus-1-3 libnss3 libxdamage1 libxkbcommon0 libasound2t64
       shell: bash
 
+    - name: Enable cloning web app repo
+      uses: webfactory/ssh-agent@v0.5.4
+      with:
+        ssh-private-key: ${{ inputs.ankihub_ssh_key }}
+
     - name: Build
       run: |
+        # force git to use ssh
+        git config --global url."git@github.com:".insteadOf "https://github.com/"
         uv run ./scripts/build.py
       shell: bash
       env:

@@ -13,6 +13,7 @@ package-dir = { "ankihub_addon" = "ankihub" }
 dev = [
   "approvaltests>=12.2.0",
   "coverage>=6.5.0",
+  "django-stubs>=5.1.3",
   "factory-boy>=3.2.1",
   "faker>=19.12.0",
   "mypy>=1.18.2",
@@ -40,6 +41,8 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
+  "django>=4.2.27",
+  "django-cotton>=2.5.1",
 ]
 aqt = ["aqt[qt]==25.9.2"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
@@ -89,6 +92,7 @@ module = [
   'urllib3.*',
   'tenacity.*',
   'peewee.*',
+  'django_cotton.*',
 ]
 ignore_errors = true
 ignore_missing_imports = true

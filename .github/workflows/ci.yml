@@ -48,6 +48,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          ankihub_ssh_key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
           install_qt: true
           aqt_dependency_group: ${{ matrix.aqt_dependency_group }}
           qt_package: ${{ matrix.qt_package }}
@@ -92,6 +93,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          ankihub_ssh_key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
           install_qt: true
           aqt_dependency_group: aqt
           qt_package: pyqt6
@@ -159,6 +161,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          ankihub_ssh_key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
           install_qt: false
 
       - name: Download all artifacts
