@@ -32,6 +32,7 @@ from .errors import upload_logs_and_data_in_background, upload_logs_in_backgroun
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.deck_creation import create_collaborative_deck
+from .tutorial import OnboardingTutorial
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -229,7 +230,7 @@ class AnkiHubLogin(QWidget):
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
-    q_action = QAction("🛠️ Create AnkiHub Deck", parent=parent)
+    q_action = QAction("🛠️ Create AnkiHub deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck)
     parent.addAction(q_action)
 
@@ -313,7 +314,7 @@ def _ankihub_login_setup(parent: QMenu) -> None:
 
 
 def _subscribed_decks_setup(parent: QMenu):
-    q_action = QAction("📚 Deck Management", aqt.mw)
+    q_action = QAction("📚 Deck management", aqt.mw)
     qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
@@ -447,6 +448,14 @@ def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
+    if config.get_feature_flags().get("addon_tours", False):
+        q_onboarding_action = QAction("Start onboarding tour", help_menu)
+        qconnect(
+            q_onboarding_action.triggered,
+            lambda: OnboardingTutorial().start(),
+        )
+        help_menu.addAction(q_onboarding_action)
+
     # && is an escaped & in qt
     q_notion_action = QAction("Documentation", help_menu)
     qconnect(
@@ -455,7 +464,7 @@ def _ankihub_help_setup(parent: QMenu):
     )
     help_menu.addAction(q_notion_action)
 
-    q_get_help_action = QAction("Get Help", help_menu)
+    q_get_help_action = QAction("Get help", help_menu)
     qconnect(
         q_get_help_action.triggered,
         lambda: openLink("https://community.ankihub.net/c/support"),

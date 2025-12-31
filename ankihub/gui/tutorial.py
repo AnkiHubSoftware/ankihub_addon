@@ -354,3 +354,10 @@ class Tutorial:
         self.current_step += 1
 
         self.show_current()
+
+
+class OnboardingTutorial(Tutorial):
+    "A placeholder for onboarding tutorial."
+
+    def start(self) -> None:
+        print("Onboarding tour started")
