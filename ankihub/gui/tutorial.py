@@ -18,12 +18,74 @@ from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
 from aqt.webview import AnkiWebView
 
+from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
+from ..settings import config
 
-PRIMARY_BUTTON_CLICKED_PYCMD = "ankihub_tutorial_primary_button_clicked"
+NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
+PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
-MODAL_CLOSED_PYCMD = "ankihub_modal_closed"
+TUTORIAL_CLOSED_PYCMD = "ankihub_tutorial_closed"
 JS_LOADED_PYCMD = "ankihub_tutorial_js_loaded"
+
+
+def render_dialog(
+    title: str,
+    body: str,
+    text_button_label: Optional[str] = None,
+    secondary_button_label: Optional[str] = None,
+    main_button_label: Optional[str] = None,
+    on_text_button_click: Optional[str] = None,
+    on_secondary_button_click: Optional[str] = None,
+    on_main_button_click: Optional[str] = None,
+    on_close: Optional[str] = None,
+) -> str:
+    return render_template(
+        "dialog.html",
+        {
+            "title": title,
+            "body": body,
+            "text_button_label": text_button_label,
+            "secondary_button_label": secondary_button_label,
+            "main_button_label": main_button_label,
+            "on_text_button_click": on_text_button_click,
+            "on_secondary_button_click": on_secondary_button_click,
+            "on_main_button_click": on_main_button_click,
+            "on_close": on_close,
+        },
+    )
+
+
+def render_tour_step(
+    body: str,
+    current_step: int,
+    total_steps: int,
+    on_back: Optional[str] = None,
+    on_next: Optional[str] = None,
+    on_close: Optional[str] = None,
+    show_backdrop: bool = True,
+) -> str:
+    return render_template(
+        "tour_step.html",
+        {
+            "body": body,
+            "current_step": current_step,
+            "total_steps": total_steps,
+            "on_back": on_back,
+            "on_next": on_next,
+            "on_close": on_close,
+            "show_backdrop": show_backdrop,
+            "class": "ah-tour-step",
+        },
+    )
+
+
+def render_arrow() -> str:
+    return render_template("arrow.html")
+
+
+def render_backdrop() -> str:
+    return render_template_from_string("<c-v1.backdrop :open=True />")
 
 
 class TutorialOverlayDialog(OverlayDialog):
@@ -155,9 +217,8 @@ class TutorialStep:
     qt_target: Optional[QWidget] = None
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
-    show_primary_button: bool = True
-    primary_button_label: str = "Next"
-    button_callback: Optional[Callable[[], None]] = None
+    next_callback: Optional[Callable[[], None]] = None
+    back_callback: Optional[Callable[[], None]] = None
     block_target_click: bool = False
 
     def __post_init__(self):
@@ -190,20 +251,24 @@ class Tutorial:
         if step.shown_callback:
             step.shown_callback()
         tooltip_web = webview_for_context(step.tooltip_context)
+        modal = render_tour_step(
+            body=step.body,
+            current_step=self.current_step,
+            total_steps=len(self.steps),
+            on_back=f"pycmd('{PREV_STEP_PYCMD}')",
+            on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
+            show_backdrop=self.apply_backdrop,
+        )
+        arrow = render_arrow()
         tooltip_options = {
-            "body": step.body,
-            "currentStep": self.current_step,
-            "stepCount": len(self.steps),
+            "modal": modal,
+            "arrow": arrow,
             "blockTargetClick": step.block_target_click,
-            "primaryButton": {
-                "show": step.show_primary_button,
-                "label": step.primary_button_label,
-            },
-            "backdrop": self.apply_backdrop,
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
-        js = self._render_js_function_with_options("showTutorialModal", tooltip_options)
+        js = self._render_js_function_with_options("showTutorialStep", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)
         return js
@@ -219,14 +284,12 @@ class Tutorial:
                     "target": step.target,
                     "currentStep": self.current_step,
                     "blockTargetClick": step.block_target_click,
+                    "backdrop": render_backdrop(),
                 },
             )
             if eval_js:
                 target_web.eval(js)
         return js
-
-    def _backdrop_js(self) -> str:
-        return "AnkiHub.addTutorialBackdrop()"
 
     def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -235,7 +298,7 @@ class Tutorial:
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                web.eval(self._backdrop_js())
+                web.eval(f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())})")
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -293,10 +356,19 @@ class Tutorial:
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
     ) -> tuple[bool, Any]:
-        if message == PRIMARY_BUTTON_CLICKED_PYCMD:
+        if message == PREV_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
-            if step.button_callback:
-                step.button_callback()
+            if step.back_callback:
+                step.back_callback()
+            else:
+                self.back()
+
+            return True, None
+
+        if message == NEXT_STEP_PYCMD:
+            step = self.steps[self.current_step - 1]
+            if step.next_callback:
+                step.next_callback()
             else:
                 self.next()
             return True, None
@@ -332,12 +404,12 @@ class Tutorial:
                 js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, width: {width}, height: {height}}});"
                 tooltip_web.eval(js)
             return True, None
-        elif message == MODAL_CLOSED_PYCMD:
+        elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
             return True, None
         return handled
 
-    def next(self) -> None:
+    def _cleanup_step(self) -> None:
         step = self.steps[self.current_step - 1]
         for web in (
             webview_for_context(step.tooltip_context),
@@ -348,6 +420,17 @@ class Tutorial:
 
         if step.hidden_callback:
             step.hidden_callback()
+
+    def back(self) -> None:
+        self._cleanup_step()
+        if self.current_step == 1:
+            self.end()
+            return
+        self.current_step -= 1
+        self.show_current()
+
+    def next(self) -> None:
+        self._cleanup_step()
         if self.current_step >= len(self.steps):
             self.end()
             return
@@ -356,8 +439,27 @@ class Tutorial:
         self.show_current()
 
 
-class OnboardingTutorial(Tutorial):
-    "A placeholder for onboarding tutorial."
+def prompt_for_onboarding_tutorial() -> None:
+    if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
+        return
 
+    def on_loaded() -> None:
+        from .js_message_handling import START_ONBOARDING_PYCMD
+
+        body = render_dialog(
+            title="📚 First time with Anki?",
+            body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+            "You can revisit it anytime in AnkiHub's Help menu.",
+            secondary_button_label="Maybe later",
+            main_button_label="Take tour",
+            on_secondary_button_click="AnkiHub.destroyActiveTutorialModal()",
+            on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+        )
+        aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+
+    inject_tutorial_assets(aqt.mw, on_loaded)
+
+
+class OnboardingTutorial(Tutorial):
     def start(self) -> None:
         print("Onboarding tour started")
