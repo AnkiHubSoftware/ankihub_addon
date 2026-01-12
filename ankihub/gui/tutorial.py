@@ -220,6 +220,7 @@ class TutorialStep:
     next_callback: Optional[Callable[[], None]] = None
     back_callback: Optional[Callable[[], None]] = None
     block_target_click: bool = False
+    auto_advance: bool = True
 
     def __post_init__(self):
         if not self.target_context:
@@ -357,6 +358,8 @@ class Tutorial:
             if step.back_callback:
                 self._cleanup_step()
                 step.back_callback()
+                if step.auto_advance:
+                    aqt.mw.progress.single_shot(100, self.back)
             else:
                 self.back()
             return True, None
@@ -366,6 +369,8 @@ class Tutorial:
             if step.next_callback:
                 self._cleanup_step()
                 step.next_callback()
+                if step.auto_advance:
+                    aqt.mw.progress.single_shot(100, self.next)
             else:
                 self.next()
             return True, None
