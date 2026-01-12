@@ -1,5 +1,7 @@
 import json
+from asyncio.futures import Future
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Callable, Optional, Union
 
 import aqt
@@ -486,5 +488,96 @@ def prompt_for_onboarding_tutorial() -> None:
 
 
 class OnboardingTutorial(Tutorial):
-    def start(self) -> None:
-        print("Onboarding tour started")
+    def _move_to_intro_deck_overview(self) -> None:
+        did = config.deck_config(config.intro_deck_id).anki_id
+        aqt.mw.col.decks.set_current(did)
+        aqt.mw.moveToState("overview")
+
+    @cached_property
+    def steps(self) -> list[TutorialStep]:
+        steps = [
+            TutorialStep(
+                body="<b>Decks</b> is where you will find your subscribed decks.",
+                target="#decks",
+                tooltip_context=aqt.mw.deckBrowser,
+                target_context=aqt.mw.toolbar,
+                block_target_click=True,
+            )
+        ]
+
+        intro_deck_config = config.deck_config(config.intro_deck_id)
+        if intro_deck_config:
+            steps.append(
+                TutorialStep(
+                    body="We've already subscribed you to this deck.<br><br>Click on it to open.",
+                    target=f"[id='{intro_deck_config.anki_id}']",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=self._move_to_intro_deck_overview,
+                )
+            )
+        else:
+
+            def on_sync_with_ankihub_done(future: Future) -> None:
+                future.result()
+                aqt.mw.progress.single_shot(100, self.next)
+
+            def on_sync_with_ankihub_button_clicked() -> None:
+                from ..gui.operations.ankihub_sync import sync_with_ankihub
+
+                sync_with_ankihub(on_sync_with_ankihub_done)
+
+            steps.append(
+                TutorialStep(
+                    body="There is no deck here, but we've already subscribed you to "
+                    "the <b>Getting Started with Anki</b> deck.<br><br>"
+                    "To make a deck you are subscribed to appear here, "
+                    "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
+                    "Right now you can just <b>click on the button bellow</b>.",
+                    target=".deck",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=on_sync_with_ankihub_button_clicked,
+                    auto_advance=False,
+                )
+            )
+
+            steps.append(
+                TutorialStep(
+                    body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
+                    target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=self._move_to_intro_deck_overview,
+                )
+            )
+
+        steps.append(
+            TutorialStep(
+                body="This deck will help you understand the basics of card reviewing.",
+                target="",
+                tooltip_context=aqt.mw.overview,
+                back_callback=lambda: aqt.mw.moveToState("deckBrowser"),
+            )
+        )
+        steps.append(
+            TutorialStep(
+                "These daily stats show you:<br><ul>"
+                "<li><b>New</b>: new cards to study</li>"
+                "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
+                "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
+                target="td",
+                tooltip_context=aqt.mw.overview,
+            )
+        )
+
+        steps.append(
+            TutorialStep(
+                "Click this button and start practicing card reviewing now!",
+                target="#study",
+                tooltip_context=aqt.mw.overview,
+                next_callback=lambda: aqt.mw.moveToState("review"),
+            )
+        )
+        return steps
+
+    @property
+    def extra_backdrop_contexts(self) -> tuple[Any, ...]:
+        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
