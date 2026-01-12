@@ -88,6 +88,7 @@ export class TutorialEffect {
             if (this.options.modal) {
                 this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
             }
+            this.targetElement.addEventListener("click", this.targetClickHandler);
         }
 
         const css = tailwindCss.replaceAll(":root", ":host");
@@ -95,6 +96,10 @@ export class TutorialEffect {
         style.textContent = css;
         this.shadowRoot.append(style);
         Alpine.initTree(this.modalElement);
+    }
+
+    targetClickHandler() {
+        bridgeCommand("ankihub_tutorial_target_click");
     }
 
     show() {
@@ -107,6 +112,7 @@ export class TutorialEffect {
 
     destroy() {
         this.cleanUpdateHandler?.();
+        this.targetElement?.removeEventListener("click", this.targetClickHandler);
         this.removeSpotlight();
         setTimeout(() => {
             if (this.hostElement.parentNode) {

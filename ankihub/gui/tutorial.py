@@ -29,6 +29,7 @@ PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
 TUTORIAL_CLOSED_PYCMD = "ankihub_tutorial_closed"
 JS_LOADED_PYCMD = "ankihub_tutorial_js_loaded"
+TARGET_CLICK_PYCMD = "ankihub_tutorial_target_click"
 
 
 def render_dialog(
@@ -422,6 +423,10 @@ class Tutorial:
         elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
             return True, None
+        elif message == TARGET_CLICK_PYCMD:
+            if self.current_step == len(self.steps):
+                self.end()
+            return True, None
         return handled
 
     def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
@@ -442,7 +447,6 @@ class Tutorial:
         webviews = set()
         for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
             webviews.add(webview_for_context(context))
-
         for web in webviews:
             web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
