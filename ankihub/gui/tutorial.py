@@ -16,7 +16,7 @@ from aqt.qt import (
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
-from aqt.webview import AnkiWebView
+from aqt.webview import AnkiWebView, WebContent
 
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
@@ -160,22 +160,13 @@ def webview_for_context(context: Any) -> AnkiWebView:
         assert False, f"Webview context of type {type(context)} is not handled"
 
 
-def inject_tutorial_assets(context: Any, on_loaded: Callable[[], None]) -> None:
-    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if message == JS_LOADED_PYCMD:
-            # Some delay is required here before the global AnkiHub object is available for some reason
-            aqt.mw.progress.single_shot(100, on_loaded)
-            gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
-            return True, None
-        return handled
-
-    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
-
-    web = webview_for_context(context)
+def tutorial_assets_js(on_loaded: str) -> str:
     web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
-    web.eval(
-        """
+    js = """
 (() => {
+    const onLoaded = () => {
+         %(on_loaded)s
+    };
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
         const css = document.createElement("link");
@@ -190,21 +181,35 @@ def inject_tutorial_assets(context: Any, on_loaded: Callable[[], None]) -> None:
     if(!document.getElementById(jsId)) {
         const js = document.createElement("script");
         js.id = jsId;
-        js.addEventListener("load", () => pycmd(%(loaded_cmd)s));
+        js.addEventListener("load", onLoaded);
         document.body.appendChild(js);
         js.src = %(js_path)s;
     }
     else {
-        pycmd(%(loaded_cmd)s);
+        onLoaded();
     }
 })();
-"""
-        % dict(
-            css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
-            js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
-            loaded_cmd=json.dumps(JS_LOADED_PYCMD),
-        )
+""" % dict(
+        css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
+        js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
+        on_loaded=on_loaded,
     )
+    return js
+
+
+def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]) -> None:
+    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
+        if message == JS_LOADED_PYCMD:
+            # Some delay is required here before the global AnkiHub object is available for some reason
+            aqt.mw.progress.single_shot(100, on_loaded)
+            gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
+            return True, None
+        return handled
+
+    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
+    js = tutorial_assets_js(f"pycmd('{JS_LOADED_PYCMD}');")
+    web = webview_for_context(context)
+    web.eval(js)
 
 
 @dataclass
@@ -292,14 +297,18 @@ class Tutorial:
                 target_web.eval(js)
         return js
 
-    def _render_backdrop(self) -> None:
+    def _render_backdrop(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
+        js = ""
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                web.eval(f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())})")
+                js += f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
+                if eval_js:
+                    web.eval(js)
+        return js
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -339,10 +348,12 @@ class Tutorial:
         global active_tutorial
         active_tutorial = self
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
 
     def _finalize_tutorial(self) -> None:
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
         global active_tutorial
         active_tutorial = None
 
@@ -410,6 +421,19 @@ class Tutorial:
             self.end()
             return True, None
         return handled
+
+    def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
+        step = self.steps[self.current_step - 1]
+        js = ""
+        if context == step.tooltip_context:
+            js = self._render_tooltip(eval_js=False)
+        elif context == step.target_context:
+            js = self._render_highlight(eval_js=False)
+        elif context in self.extra_backdrop_contexts:
+            js = self._render_backdrop(eval_js=False)
+        if js:
+            js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
+            web_content.body += f"<script>{js}</script>"
 
     def _cleanup_step(self) -> None:
         step = self.steps[self.current_step - 1]
