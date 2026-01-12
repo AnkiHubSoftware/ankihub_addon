@@ -411,11 +411,11 @@ class Tutorial:
 
     def _cleanup_step(self) -> None:
         step = self.steps[self.current_step - 1]
-        for web in (
-            webview_for_context(step.tooltip_context),
-            webview_for_context(step.target_context),
-            *[webview_for_context(context) for context in self.extra_backdrop_contexts],
-        ):
+        webviews = set()
+        for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
+            webviews.add(webview_for_context(context))
+
+        for web in webviews:
             web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
 
         if step.hidden_callback:
