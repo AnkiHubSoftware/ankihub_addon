@@ -308,10 +308,13 @@ class Tutorial:
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
         backdrop_js = self._backdrop_js()
+        webviews = set()
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                web.eval(backdrop_js)
+                webviews.add(web)
+        for web in webviews:
+            web.eval(backdrop_js)
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -584,4 +587,4 @@ class OnboardingTutorial(Tutorial):
 
     @property
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
-        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
+        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
