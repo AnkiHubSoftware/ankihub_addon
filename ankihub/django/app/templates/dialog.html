@@ -1,0 +1,30 @@
+<div x-data="{open: true}" x-effect="if(!open) { {{ on_close }} }">
+    <c-v1.dialog
+        open_var="open"
+    >
+        <c-v1.dialog.body>{{ body|safe }}</c-v1.dialog.body>
+
+        <c-v1.divider />
+
+        <c-v1.dialog.action_area>
+            <c-slot name="right_side">
+                {% if text_button_label %}
+                    <c-v1.button kind="text" @click="{{ on_text_button_click }}">
+                        {{ text_button_label }}
+                    </c-v1.button>
+                {% endif %}
+                {% if secondary_button_label %}
+                    <c-v1.button kind="secondary" @click="{{ on_secondary_button_click }}">
+                        {{ secondary_button_label }}
+                    </c-v1.button>
+                {% endif %}
+                {% if main_button_label %}
+                    <c-v1.button kind="main" @click="{{ on_main_button_click }}">
+                        {{ main_button_label }}
+                    </c-v1.button>
+                {% endif %}
+            </c-slot>
+        </c-v1.dialog.action_area>
+        <c-v1.dialog.header open_var="open" title="{{ title }}" />
+    </c-v1.dialog>
+</div>
