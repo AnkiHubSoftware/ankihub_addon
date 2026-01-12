@@ -300,18 +300,18 @@ class Tutorial:
                 target_web.eval(js)
         return js
 
-    def _render_backdrop(self, eval_js: bool = True) -> str:
+    def _backdrop_js(self) -> str:
+        return f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
+
+    def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
-        js = ""
+        backdrop_js = self._backdrop_js()
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                js += f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
-                if eval_js:
-                    web.eval(js)
-        return js
+                web.eval(backdrop_js)
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -437,7 +437,7 @@ class Tutorial:
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
         elif context in self.extra_backdrop_contexts:
-            js = self._render_backdrop(eval_js=False)
+            js = self._backdrop_js()
         if js:
             js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
             web_content.body += f"<script>{js}</script>"
