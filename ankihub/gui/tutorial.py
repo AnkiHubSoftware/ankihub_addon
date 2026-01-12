@@ -444,7 +444,7 @@ class Tutorial:
             webviews.add(webview_for_context(context))
 
         for web in webviews:
-            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
+            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
         if step.hidden_callback:
             step.hidden_callback()
@@ -479,7 +479,7 @@ def prompt_for_onboarding_tutorial() -> None:
             "You can revisit it anytime in AnkiHub's Help menu.",
             secondary_button_label="Maybe later",
             main_button_label="Take tour",
-            on_secondary_button_click="AnkiHub.destroyActiveTutorialModal()",
+            on_secondary_button_click="AnkiHub.destroyActiveTutorialEffect()",
             on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
         )
         aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")

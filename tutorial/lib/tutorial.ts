@@ -229,7 +229,7 @@ export class TutorialEffect {
 let activeEffect: TutorialEffect | null = null;
 let targetResizeHandler: (() => void) | null = null;
 
-export function destroyActiveTutorialModal() {
+export function destroyActiveTutorialEffect() {
     if (activeEffect) {
         activeEffect.destroy();
         activeEffect = null;
@@ -237,7 +237,7 @@ export function destroyActiveTutorialModal() {
 }
 
 function createAndShowEffect(options: Partial<TutorialEffectOptions>): TutorialEffect {
-    destroyActiveTutorialModal();
+    destroyActiveTutorialEffect();
     const effect = new TutorialEffect(options);
     effect.show();
     activeEffect = effect;
