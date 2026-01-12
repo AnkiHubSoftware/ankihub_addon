@@ -340,18 +340,14 @@ class Tutorial:
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         self.show_current()
 
-    def end(self) -> None:
+    def _finalize_tutorial(self) -> None:
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
-        last_step = self.steps[self.current_step - 1]
-        for context in (
-            last_step.target_context,
-            *self.extra_backdrop_contexts,
-        ):
-            webview_for_context(context).eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
-        if last_step.hidden_callback:
-            last_step.hidden_callback()
         global active_tutorial
         active_tutorial = None
+
+    def end(self) -> None:
+        self._cleanup_step()
+        self._finalize_tutorial()
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
@@ -359,15 +355,16 @@ class Tutorial:
         if message == PREV_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
             if step.back_callback:
+                self._cleanup_step()
                 step.back_callback()
             else:
                 self.back()
-
             return True, None
 
         if message == NEXT_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
             if step.next_callback:
+                self._cleanup_step()
                 step.next_callback()
             else:
                 self.next()
@@ -424,7 +421,7 @@ class Tutorial:
     def back(self) -> None:
         self._cleanup_step()
         if self.current_step == 1:
-            self.end()
+            self._finalize_tutorial()
             return
         self.current_step -= 1
         self.show_current()
@@ -432,10 +429,9 @@ class Tutorial:
     def next(self) -> None:
         self._cleanup_step()
         if self.current_step >= len(self.steps):
-            self.end()
+            self._finalize_tutorial()
             return
         self.current_step += 1
-
         self.show_current()
 
 
