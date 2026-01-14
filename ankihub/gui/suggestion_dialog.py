@@ -384,7 +384,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
 
     msg_about_created_suggestions = (
         f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n"
     )
 
     notes_without_changes = [

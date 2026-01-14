@@ -1149,7 +1149,6 @@ class TestOnSuggestNotesInBulkDone:
                 Submitted 10 change note suggestion(s).
                 Submitted 20 new note suggestion(s).
 
-
                 Failed to submit suggestions for 4 note(s).
                 All notes with failed suggestions:
                 1, 2, 3, 4
@@ -1194,7 +1193,6 @@ class TestOnSuggestNotesInBulkDone:
                 """
                 Submitted 5 change note suggestion(s).
                 Submitted 3 new note suggestion(s).
-
 
                 Failed to submit suggestions for 1 note(s).
                 All notes with failed suggestions:

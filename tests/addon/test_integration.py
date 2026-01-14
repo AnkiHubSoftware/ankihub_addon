@@ -1607,7 +1607,7 @@ class TestSuggestNotesInBulk:
 
             # Set the first field to empty
             note.fields[0] = ""
-            note.flush()
+            aqt.mw.col.update_note(note)
 
             result = suggest_notes_in_bulk(
                 ankihub_did=ah_did,
