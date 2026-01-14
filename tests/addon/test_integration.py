@@ -195,6 +195,7 @@ from ankihub.main.note_type_management import add_note_type, add_note_type_field
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ankihub.main.suggestions import (
+    ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
@@ -1577,6 +1578,52 @@ class TestSuggestNotesInBulk:
                     assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(result.errors_by_nid[changed_note.id])
                 else:
                     assert ANKIHUB_NO_CHANGE_ERROR in str(result.errors_by_nid[changed_note.id])
+
+    @pytest.mark.parametrize(
+        "is_new_note",
+        [True, False],
+    )
+    def test_note_with_empty_first_field_is_excluded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        is_new_note: bool,
+    ):
+        """Test that notes with empty first field are excluded from bulk suggestions."""
+        bulk_suggestions_method_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk")
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            if is_new_note:
+                note_type = import_ah_note_type(ah_did=ah_did)
+                note = add_anki_note(note_type=note_type)
+            else:
+                ah_note = import_ah_note(ah_did=ah_did)
+                note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            # Set the first field to empty
+            note.fields[0] = ""
+            note.flush()
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            # The note should not be sent to the API
+            assert bulk_suggestions_method_mock.call_count == 0
+            assert result.change_note_suggestions_count == 0
+            assert result.new_note_suggestions_count == 0
+            assert len(result.errors_by_nid) == 1
+            assert ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(result.errors_by_nid[note.id])
 
     def test_suggestion_for_multiple_notes(
         self,
