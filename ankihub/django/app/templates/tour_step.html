@@ -1,0 +1,3 @@
+<div x-data="{ open: true, currentStep: {{ current_step }} }" x-effect="if(!open) { {{ on_close }} }">
+    <c-v1.tour_step open_var="open" total_steps="{{ total_steps }}" current_step_var="currentStep" :show_backdrop="{{ show_backdrop }}" body="{{ body|safe }}" on_back="{{ on_back }}" on_next="{{ on_next }}" class="{{ class }}" />
+</div>

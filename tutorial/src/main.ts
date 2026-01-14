@@ -1,10 +1,2 @@
-import { showTutorialModal } from "../lib/main";
+import "../lib/vendor/tailwind.css";
 import './style.css';
-
-
-showTutorialModal({
-  body: "Click here!",
-  target: "#target",
-  currentStep: 1,
-  stepCount: 1,
-});

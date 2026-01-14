@@ -67,7 +67,11 @@ shutil.copytree(WEB_COMPONENTS_SRC, WEB_COMPONENTS_TARGET)
 WEB_CSS_TARGET.parent.mkdir(exist_ok=True)
 web_css = WEB_CSS_SRC.read_text(encoding="utf-8")
 # Point Tailwind to the templates for class generation
-web_css = re.sub("@source .*", '@source "../../../ankihub/django/app/templates/**/*.html";', web_css)
+tailwind_sources = """@source "../**/*.{ts,js,html}";
+@source "../../../ankihub/django/app/templates/";
+@source "../../../ankihub/django/app/templates/cotton/v1";
+@source "../../../ankihub/django/app/templates/cotton/v1/**";"""
+web_css = re.sub("@source .*", tailwind_sources, web_css)
 WEB_CSS_TARGET.write_text(web_css, encoding="utf-8")
 subprocess.run([shutil.which("npm"), "install"], cwd=PROJECT_ROOT / "tutorial", check=True)
 subprocess.run([shutil.which("npm"), "run", "build"], cwd=PROJECT_ROOT / "tutorial", check=True)

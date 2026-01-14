@@ -1,101 +1,298 @@
+import { arrow, autoPlacement, autoUpdate, computePosition, offset, type ReferenceElement } from '@floating-ui/dom';
+import Alpine from 'alpinejs';
 import { bridgeCommand } from "./bridgecommand";
-import { Modal } from "./modal";
+import tailwindCss from './vendor/tailwind.css?inline';
 
-let activeModal: Modal | null = null;
-let targetResizeHandler: (() => void) | null = null;
 
-export function destroyActiveTutorialModal() {
-    if (activeModal) {
-        activeModal.destroy();
-        activeModal = null;
+function getTargetElement(target: string | HTMLElement): HTMLElement | null {
+    return typeof target === "string"
+        ? document.querySelector(target)
+        : target
+}
+
+export function elementFromHtml(html: string): HTMLElement {
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    return template.content.firstElementChild as HTMLElement;
+}
+
+type TutorialEffectOptions = {
+    modal?: string | HTMLElement,
+    arrow?: string | HTMLElement,
+    backdrop?: string | HTMLElement,
+    target?: string | HTMLElement,
+    blockTargetClick: boolean,
+};
+
+export class TutorialEffect {
+
+    options: TutorialEffectOptions;
+    targetElement?: HTMLElement;
+    modalElement!: HTMLElement;
+    arrowElement?: HTMLElement;
+    shadowRoot!: ShadowRoot;
+    hostElement!: HTMLDivElement;
+    cleanUpdateHandler?: () => void;
+    resizeTimeout: number | null = null;
+
+    constructor(options: Partial<TutorialEffectOptions> = {}) {
+        this.options = {
+            modal: "",
+            blockTargetClick: false,
+            ...options,
+        };
+        this.create();
+    }
+
+    create() {
+        this.hostElement = document.createElement("div");
+        this.hostElement.style.position = "fixed";
+        this.hostElement.style.top = "0";
+        this.hostElement.style.left = "0";
+        this.hostElement.style.width = "100%";
+        this.hostElement.style.height = "100%";
+        this.hostElement.style.zIndex = "10000";
+        this.shadowRoot = this.hostElement.attachShadow({ mode: "open" });
+        let modalElement: HTMLElement | null = null;
+        if (this.options.modal instanceof HTMLElement) {
+            modalElement = this.options.modal;
+        } else if (this.options.modal) {
+            modalElement = elementFromHtml(this.options.modal);
+        } else {
+            modalElement = document.createElement("div");
+        }
+        this.modalElement = modalElement;
+        let arrowElement: HTMLElement | null = null;
+        if (this.options.arrow instanceof HTMLElement) {
+            arrowElement = this.options.arrow;
+        } else if (this.options.arrow) {
+            arrowElement = elementFromHtml(this.options.arrow);
+        }
+        if (arrowElement) {
+            this.arrowElement = arrowElement;
+            this.getStepElement().appendChild(this.arrowElement);
+        }
+        let backdropElement: HTMLElement | null = null;
+        if (this.options.backdrop instanceof HTMLElement) {
+            backdropElement = this.options.backdrop;
+        } else if (this.options.backdrop) {
+            backdropElement = elementFromHtml(this.options.backdrop);
+        }
+        if (backdropElement) {
+            this.modalElement.appendChild(backdropElement);
+        }
+
+        this.shadowRoot.appendChild(this.modalElement);
+        if (this.options.target) {
+            this.targetElement = getTargetElement(this.options.target)!;
+            if (this.options.modal) {
+                this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
+            }
+            this.targetElement.addEventListener("click", this.targetClickHandler);
+        }
+
+        const css = tailwindCss.replaceAll(":root", ":host");
+        const style = document.createElement("style");
+        style.textContent = css;
+        this.shadowRoot.append(style);
+        Alpine.initTree(this.modalElement);
+    }
+
+    targetClickHandler() {
+        bridgeCommand("ankihub_tutorial_target_click");
+    }
+
+    show() {
+        document.body.appendChild(this.hostElement);
+        if (this.targetElement) {
+            this.applySpotlight();
+            this.positionModal(this.targetElement);
+        }
+    }
+
+    destroy() {
+        this.cleanUpdateHandler?.();
+        this.targetElement?.removeEventListener("click", this.targetClickHandler);
+        this.removeSpotlight();
+        setTimeout(() => {
+            if (this.hostElement.parentNode) {
+                this.hostElement.parentNode.removeChild(this.hostElement);
+            }
+        }, 200);
+        if (this.resizeTimeout) {
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = null;
+        }
+    }
+
+    spotlightClasses() {
+        let classes = ["ah-spotlight-active"];
+        if (this.options.backdrop || this.options.modal) {
+            classes.push("ah-with-backdrop");
+        }
+        return classes;
+    }
+
+    applySpotlight() {
+        if (!this.targetElement) return;
+
+        this.targetElement.classList.add(...this.spotlightClasses());
+        if (this.options.blockTargetClick) {
+            const originalPointerEvents =
+                this.targetElement.style.pointerEvents;
+            this.targetElement.style.pointerEvents = "none";
+            this.targetElement.setAttribute(
+                "data-original-pointer-events",
+                originalPointerEvents
+            );
+        }
+        // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
+        if (this.targetElement.parentElement) {
+            this.targetElement.parentElement.style.backdropFilter = "none";
+        }
+    }
+
+    removeSpotlight() {
+        if (!this.targetElement) return;
+        this.targetElement.classList.remove(...this.spotlightClasses());
+        const originalPointerEvents = this.targetElement.getAttribute(
+            "data-original-pointer-events"
+        );
+        if (originalPointerEvents) {
+            this.targetElement.style.pointerEvents = originalPointerEvents;
+            this.targetElement.removeAttribute("data-original-pointer-events");
+        } else {
+            this.targetElement.style.pointerEvents = "";
+        }
+    }
+
+    getStepElement(): HTMLElement {
+        return this.modalElement.getElementsByClassName("ah-tour-step")[0] as HTMLElement;
+    }
+
+    _positionModal(y: number, x: number) {
+        const stepElement = this.getStepElement();
+        stepElement.style.top = `${y}px`;
+        stepElement.style.left = `${x}px`;
+    }
+
+    async positionModal(target: ReferenceElement) {
+        if (!this.options.modal) {
+            return;
+        }
+        const arrowLength = this.arrowElement?.offsetWidth ?? 0;
+        const floatingOffset = Math.sqrt(2 * arrowLength ** 2) / 2;
+
+        let middleware = [autoPlacement()];
+        if (this.arrowElement) {
+            middleware.push(offset(floatingOffset));
+            middleware.push(arrow({ element: this.arrowElement }));
+        }
+        const { x, y, middlewareData, placement } = await computePosition(target, this.getStepElement(), {
+            middleware
+        });
+        this._positionModal(y, x);
+        const side = placement.split("-")[0];
+        const staticSide = {
+            top: "bottom",
+            right: "left",
+            bottom: "top",
+            left: "right",
+        }[side]!;
+
+        if (middlewareData.arrow) {
+            const { x, y } = middlewareData.arrow;
+            Object.assign(this.arrowElement!.style, {
+                left: x != null ? `${x}px` : "",
+                top: y != null ? `${y}px` : "",
+                right: "",
+                bottom: "",
+                [staticSide]: `${-arrowLength / 2}px`,
+                transform: "rotate(45deg)",
+            });
+        }
+    }
+
+    setModalPosition(top: number, left: number, width: number, height: number) {
+        let virtualElement = {
+            getBoundingClientRect() {
+                return {
+                    x: 0,
+                    y: 0,
+                    top,
+                    left,
+                    bottom: height,
+                    right: width,
+                    width,
+                    height,
+                };
+            }
+        };
+        this.positionModal(virtualElement);
     }
 }
 
-export function promptForOnboardingTour() {
-    destroyActiveTutorialModal();
-    const body = `<h2>📚 First time with Anki?</h2><p>Find your way in the app with this onboarding tour.</p>`;
-    const footer = [];
-    const secondaryButton = document.createElement("button");
-    secondaryButton.textContent = "Close";
-    secondaryButton.classList.add("ah-button", "ah-secondary-button");
-    secondaryButton.addEventListener("click", destroyActiveTutorialModal);
-    footer.push(secondaryButton);
-    const primaryButton = document.createElement("button");
-    primaryButton.textContent = "Take tour";
-    primaryButton.classList.add("ah-button", "ah-secondary-button");
-    primaryButton.addEventListener("click", () => bridgeCommand("ankihub_start_onboarding"));
-    footer.push(primaryButton);
+let activeEffect: TutorialEffect | null = null;
+let targetResizeHandler: (() => void) | null = null;
 
-    const modal = new Modal({
-        body,
-        footer,
-    });
-    modal.show();
-    activeModal = modal;
+export function destroyActiveTutorialEffect() {
+    if (activeEffect) {
+        activeEffect.destroy();
+        activeEffect = null;
+    }
+}
+
+function createAndShowEffect(options: Partial<TutorialEffectOptions>): TutorialEffect {
+    destroyActiveTutorialEffect();
+    const effect = new TutorialEffect(options);
+    effect.show();
+    activeEffect = effect;
+    return effect;
+}
+
+export function showModal(modal: string) {
+    createAndShowEffect({ modal });
 }
 
 type ShowModalArgs = {
-    body: string,
-    currentStep: number,
-    stepCount: number,
+    modal: string,
+    arrow: string,
     target: string,
-    primaryButton?: { show: boolean, label: string },
     blockTargetClick?: boolean,
-    backdrop?: boolean,
 };
 
-export function showTutorialModal({
-    body,
-    currentStep,
-    stepCount,
+export function showTutorialStep({
+    modal,
+    arrow,
     target,
-    primaryButton = { show: true, label: "Next" },
     blockTargetClick = false,
-    backdrop = true,
 }: ShowModalArgs) {
-    destroyActiveTutorialModal();
-    const footer = [];
-    const stepSpan = document.createElement("span");
-    stepSpan.textContent = `${currentStep} of ${stepCount}`;
-    footer.push(stepSpan);
-    if (primaryButton.show) {
-        const button = document.createElement("button");
-        button.textContent = primaryButton.label;
-        button.classList.add("ah-button", "ah-primary-button");
-        button.addEventListener("click", () => bridgeCommand("ankihub_tutorial_primary_button_clicked"));
-        footer.push(button);
-    }
-    const modal = new Modal({
-        body,
-        footer,
+    createAndShowEffect({
+        modal,
+        arrow,
         target,
         blockTargetClick,
-        backdrop,
     });
-    modal.show();
-    activeModal = modal;
 }
 
 type HighlightTargetArgs = {
     target: string | HTMLElement,
     currentStep: number,
     blockTargetClick?: boolean,
+    backdrop?: string,
 };
 
 export function highlightTutorialTarget({
     target,
     currentStep,
     blockTargetClick = false,
+    backdrop,
 }: HighlightTargetArgs) {
-    destroyActiveTutorialModal();
-    const modal = new Modal({
-        body: "",
-        footer: "",
+    const effect = createAndShowEffect({
         target,
         blockTargetClick,
+        backdrop,
     });
-    modal.show();
-    activeModal = modal;
     if (targetResizeHandler) {
         window.removeEventListener(
             "resize",
@@ -104,9 +301,9 @@ export function highlightTutorialTarget({
         targetResizeHandler = null;
     }
     targetResizeHandler = () => {
-        if (!modal.targetElement) return;
+        if (!effect.targetElement) return;
         const { top, left, width, height } =
-            modal.targetElement!.getBoundingClientRect();
+            effect.targetElement!.getBoundingClientRect();
         bridgeCommand(
             `ankihub_tutorial_target_resize:${currentStep}:${top}:${left}:${width}:${height}`
         );
@@ -126,15 +323,12 @@ type PositionTargetArgs = {
 };
 
 export function positionTutorialTarget({ top, left, width, height }: PositionTargetArgs) {
-    if (activeModal) {
-        activeModal.setModalPosition(top, left, width, height);
+    if (activeEffect) {
+        activeEffect.setModalPosition(top, left, width, height);
     }
 }
 
-export function addTutorialBackdrop() {
-    destroyActiveTutorialModal();
-    const modal = new Modal({ body: "", footer: "" });
-    modal.show();
-    activeModal = modal;
+export function addTutorialBackdrop(backdrop: string) {
+    createAndShowEffect({ backdrop });
 }
 

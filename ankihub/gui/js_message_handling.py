@@ -157,6 +157,13 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
 
+    elif message == START_ONBOARDING_PYCMD:
+        from .tutorial import OnboardingTutorial
+
+        OnboardingTutorial().start()
+
+        return (True, None)
+
     return handled
 
 

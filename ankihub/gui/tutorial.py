@@ -1,5 +1,7 @@
 import json
+from asyncio.futures import Future
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Callable, Optional, Union
 
 import aqt
@@ -16,14 +18,77 @@ from aqt.qt import (
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
-from aqt.webview import AnkiWebView
+from aqt.webview import AnkiWebView, WebContent
 
+from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
+from ..settings import config
 
-PRIMARY_BUTTON_CLICKED_PYCMD = "ankihub_tutorial_primary_button_clicked"
+NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
+PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
-MODAL_CLOSED_PYCMD = "ankihub_modal_closed"
+TUTORIAL_CLOSED_PYCMD = "ankihub_tutorial_closed"
 JS_LOADED_PYCMD = "ankihub_tutorial_js_loaded"
+TARGET_CLICK_PYCMD = "ankihub_tutorial_target_click"
+
+
+def render_dialog(
+    title: str,
+    body: str,
+    text_button_label: Optional[str] = None,
+    secondary_button_label: Optional[str] = None,
+    main_button_label: Optional[str] = None,
+    on_text_button_click: Optional[str] = None,
+    on_secondary_button_click: Optional[str] = None,
+    on_main_button_click: Optional[str] = None,
+    on_close: Optional[str] = None,
+) -> str:
+    return render_template(
+        "dialog.html",
+        {
+            "title": title,
+            "body": body,
+            "text_button_label": text_button_label,
+            "secondary_button_label": secondary_button_label,
+            "main_button_label": main_button_label,
+            "on_text_button_click": on_text_button_click,
+            "on_secondary_button_click": on_secondary_button_click,
+            "on_main_button_click": on_main_button_click,
+            "on_close": on_close,
+        },
+    )
+
+
+def render_tour_step(
+    body: str,
+    current_step: int,
+    total_steps: int,
+    on_back: Optional[str] = None,
+    on_next: Optional[str] = None,
+    on_close: Optional[str] = None,
+    show_backdrop: bool = True,
+) -> str:
+    return render_template(
+        "tour_step.html",
+        {
+            "body": body,
+            "current_step": current_step,
+            "total_steps": total_steps,
+            "on_back": on_back,
+            "on_next": on_next,
+            "on_close": on_close,
+            "show_backdrop": show_backdrop,
+            "class": "ah-tour-step",
+        },
+    )
+
+
+def render_arrow() -> str:
+    return render_template("arrow.html")
+
+
+def render_backdrop() -> str:
+    return render_template_from_string("<c-v1.backdrop :open=True />")
 
 
 class TutorialOverlayDialog(OverlayDialog):
@@ -98,22 +163,13 @@ def webview_for_context(context: Any) -> AnkiWebView:
         assert False, f"Webview context of type {type(context)} is not handled"
 
 
-def inject_tutorial_assets(context: Any, on_loaded: Callable[[], None]) -> None:
-    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if message == JS_LOADED_PYCMD:
-            # Some delay is required here before the global AnkiHub object is available for some reason
-            aqt.mw.progress.single_shot(100, on_loaded)
-            gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
-            return True, None
-        return handled
-
-    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
-
-    web = webview_for_context(context)
+def tutorial_assets_js(on_loaded: str) -> str:
     web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
-    web.eval(
-        """
+    js = """
 (() => {
+    const onLoaded = () => {
+         %(on_loaded)s
+    };
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
         const css = document.createElement("link");
@@ -128,21 +184,35 @@ def inject_tutorial_assets(context: Any, on_loaded: Callable[[], None]) -> None:
     if(!document.getElementById(jsId)) {
         const js = document.createElement("script");
         js.id = jsId;
-        js.addEventListener("load", () => pycmd(%(loaded_cmd)s));
+        js.addEventListener("load", onLoaded);
         document.body.appendChild(js);
         js.src = %(js_path)s;
     }
     else {
-        pycmd(%(loaded_cmd)s);
+        onLoaded();
     }
 })();
-"""
-        % dict(
-            css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
-            js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
-            loaded_cmd=json.dumps(JS_LOADED_PYCMD),
-        )
+""" % dict(
+        css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
+        js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
+        on_loaded=on_loaded,
     )
+    return js
+
+
+def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]) -> None:
+    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
+        if message == JS_LOADED_PYCMD:
+            # Some delay is required here before the global AnkiHub object is available for some reason
+            aqt.mw.progress.single_shot(100, on_loaded)
+            gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
+            return True, None
+        return handled
+
+    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
+    js = tutorial_assets_js(f"pycmd('{JS_LOADED_PYCMD}');")
+    web = webview_for_context(context)
+    web.eval(js)
 
 
 @dataclass
@@ -155,10 +225,10 @@ class TutorialStep:
     qt_target: Optional[QWidget] = None
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
-    show_primary_button: bool = True
-    primary_button_label: str = "Next"
-    button_callback: Optional[Callable[[], None]] = None
+    next_callback: Optional[Callable[[], None]] = None
+    back_callback: Optional[Callable[[], None]] = None
     block_target_click: bool = False
+    auto_advance: bool = True
 
     def __post_init__(self):
         if not self.target_context:
@@ -190,20 +260,24 @@ class Tutorial:
         if step.shown_callback:
             step.shown_callback()
         tooltip_web = webview_for_context(step.tooltip_context)
+        modal = render_tour_step(
+            body=step.body,
+            current_step=self.current_step,
+            total_steps=len(self.steps),
+            on_back=f"pycmd('{PREV_STEP_PYCMD}')",
+            on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
+            show_backdrop=self.apply_backdrop,
+        )
+        arrow = render_arrow()
         tooltip_options = {
-            "body": step.body,
-            "currentStep": self.current_step,
-            "stepCount": len(self.steps),
+            "modal": modal,
+            "arrow": arrow,
             "blockTargetClick": step.block_target_click,
-            "primaryButton": {
-                "show": step.show_primary_button,
-                "label": step.primary_button_label,
-            },
-            "backdrop": self.apply_backdrop,
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
-        js = self._render_js_function_with_options("showTutorialModal", tooltip_options)
+        js = self._render_js_function_with_options("showTutorialStep", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)
         return js
@@ -219,6 +293,7 @@ class Tutorial:
                     "target": step.target,
                     "currentStep": self.current_step,
                     "blockTargetClick": step.block_target_click,
+                    "backdrop": render_backdrop(),
                 },
             )
             if eval_js:
@@ -226,16 +301,20 @@ class Tutorial:
         return js
 
     def _backdrop_js(self) -> str:
-        return "AnkiHub.addTutorialBackdrop()"
+        return f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
 
     def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
+        backdrop_js = self._backdrop_js()
+        webviews = set()
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
-                web.eval(self._backdrop_js())
+                webviews.add(web)
+        for web in webviews:
+            web.eval(backdrop_js)
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
@@ -275,28 +354,40 @@ class Tutorial:
         global active_tutorial
         active_tutorial = self
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
 
-    def end(self) -> None:
+    def _finalize_tutorial(self) -> None:
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
-        last_step = self.steps[self.current_step - 1]
-        for context in (
-            last_step.target_context,
-            *self.extra_backdrop_contexts,
-        ):
-            webview_for_context(context).eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
-        if last_step.hidden_callback:
-            last_step.hidden_callback()
+        gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
         global active_tutorial
         active_tutorial = None
+
+    def end(self) -> None:
+        self._cleanup_step()
+        self._finalize_tutorial()
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
     ) -> tuple[bool, Any]:
-        if message == PRIMARY_BUTTON_CLICKED_PYCMD:
+        if message == PREV_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
-            if step.button_callback:
-                step.button_callback()
+            if step.back_callback:
+                self._cleanup_step()
+                step.back_callback()
+                if step.auto_advance:
+                    aqt.mw.progress.single_shot(100, self.back)
+            else:
+                self.back()
+            return True, None
+
+        if message == NEXT_STEP_PYCMD:
+            step = self.steps[self.current_step - 1]
+            if step.next_callback:
+                self._cleanup_step()
+                step.next_callback()
+                if step.auto_advance:
+                    aqt.mw.progress.single_shot(100, self.next)
             else:
                 self.next()
             return True, None
@@ -332,32 +423,168 @@ class Tutorial:
                 js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, width: {width}, height: {height}}});"
                 tooltip_web.eval(js)
             return True, None
-        elif message == MODAL_CLOSED_PYCMD:
+        elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
+            return True, None
+        elif message == TARGET_CLICK_PYCMD:
+            if self.current_step == len(self.steps):
+                self.end()
             return True, None
         return handled
 
-    def next(self) -> None:
+    def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
         step = self.steps[self.current_step - 1]
-        for web in (
-            webview_for_context(step.tooltip_context),
-            webview_for_context(step.target_context),
-            *[webview_for_context(context) for context in self.extra_backdrop_contexts],
-        ):
-            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialModal()")
+        js = ""
+        if context == step.tooltip_context:
+            js = self._render_tooltip(eval_js=False)
+        elif context == step.target_context:
+            js = self._render_highlight(eval_js=False)
+        elif context in self.extra_backdrop_contexts:
+            js = self._backdrop_js()
+        if js:
+            js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
+            web_content.body += f"<script>{js}</script>"
+
+    def _cleanup_step(self) -> None:
+        step = self.steps[self.current_step - 1]
+        webviews = set()
+        for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
+            webviews.add(webview_for_context(context))
+        for web in webviews:
+            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
         if step.hidden_callback:
             step.hidden_callback()
+
+    def back(self) -> None:
+        self._cleanup_step()
+        if self.current_step == 1:
+            self._finalize_tutorial()
+            return
+        self.current_step -= 1
+        self.show_current()
+
+    def next(self) -> None:
+        self._cleanup_step()
         if self.current_step >= len(self.steps):
-            self.end()
+            self._finalize_tutorial()
             return
         self.current_step += 1
-
         self.show_current()
 
 
-class OnboardingTutorial(Tutorial):
-    "A placeholder for onboarding tutorial."
+def prompt_for_onboarding_tutorial() -> None:
+    if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
+        return
 
-    def start(self) -> None:
-        print("Onboarding tour started")
+    def on_loaded() -> None:
+        from .js_message_handling import START_ONBOARDING_PYCMD
+
+        body = render_dialog(
+            title="📚 First time with Anki?",
+            body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+            "You can revisit it anytime in AnkiHub's Help menu.",
+            secondary_button_label="Maybe later",
+            main_button_label="Take tour",
+            on_secondary_button_click="AnkiHub.destroyActiveTutorialEffect()",
+            on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+        )
+        aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+
+    inject_tutorial_assets(aqt.mw, on_loaded)
+
+
+class OnboardingTutorial(Tutorial):
+    def _move_to_intro_deck_overview(self) -> None:
+        did = config.deck_config(config.intro_deck_id).anki_id
+        aqt.mw.col.decks.set_current(did)
+        aqt.mw.moveToState("overview")
+
+    @cached_property
+    def steps(self) -> list[TutorialStep]:
+        steps = [
+            TutorialStep(
+                body="<b>Decks</b> is where you will find your subscribed decks.",
+                target="#decks",
+                tooltip_context=aqt.mw.deckBrowser,
+                target_context=aqt.mw.toolbar,
+                block_target_click=True,
+            )
+        ]
+
+        intro_deck_config = config.deck_config(config.intro_deck_id)
+        if intro_deck_config:
+            steps.append(
+                TutorialStep(
+                    body="We've already subscribed you to this deck.<br><br>Click on it to open.",
+                    target=f"[id='{intro_deck_config.anki_id}']",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=self._move_to_intro_deck_overview,
+                )
+            )
+        else:
+
+            def on_sync_with_ankihub_done(future: Future) -> None:
+                future.result()
+                aqt.mw.progress.single_shot(100, self.next)
+
+            def on_sync_with_ankihub_button_clicked() -> None:
+                from ..gui.operations.ankihub_sync import sync_with_ankihub
+
+                sync_with_ankihub(on_sync_with_ankihub_done)
+
+            steps.append(
+                TutorialStep(
+                    body="There is no deck here, but we've already subscribed you to "
+                    "the <b>Getting Started with Anki</b> deck.<br><br>"
+                    "To make a deck you are subscribed to appear here, "
+                    "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
+                    "Right now you can just <b>click on the button bellow</b>.",
+                    target=".deck",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=on_sync_with_ankihub_button_clicked,
+                    auto_advance=False,
+                )
+            )
+
+            steps.append(
+                TutorialStep(
+                    body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
+                    target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
+                    tooltip_context=aqt.mw.deckBrowser,
+                    next_callback=self._move_to_intro_deck_overview,
+                )
+            )
+
+        steps.append(
+            TutorialStep(
+                body="This deck will help you understand the basics of card reviewing.",
+                target="",
+                tooltip_context=aqt.mw.overview,
+                back_callback=lambda: aqt.mw.moveToState("deckBrowser"),
+            )
+        )
+        steps.append(
+            TutorialStep(
+                "These daily stats show you:<br><ul>"
+                "<li><b>New</b>: new cards to study</li>"
+                "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
+                "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
+                target="td",
+                tooltip_context=aqt.mw.overview,
+            )
+        )
+
+        steps.append(
+            TutorialStep(
+                "Click this button and start practicing card reviewing now!",
+                target="#study",
+                tooltip_context=aqt.mw.overview,
+                next_callback=lambda: aqt.mw.moveToState("review"),
+            )
+        )
+        return steps
+
+    @property
+    def extra_backdrop_contexts(self) -> tuple[Any, ...]:
+        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
