@@ -62,10 +62,6 @@ def _on_suggestion_button_press(editor: Editor) -> None:
         AnkiHubLogin.display_login()
         return
 
-    _on_suggestion_button_press_inner(editor)
-
-
-def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     def on_did_add_note(note: anki.notes.Note) -> None:
