@@ -19,11 +19,14 @@ from aqt.qt import (
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
+from aqt.utils import tooltip
 from aqt.webview import AnkiWebView, WebContent
 
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
 from ..settings import config
+from .operations import AddonQueryOp
 
 START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
 DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
@@ -557,12 +560,29 @@ class OnboardingTutorial(Tutorial):
 
             def on_sync_with_ankihub_done(future: Future) -> None:
                 future.result()
+                if not config.deck_config(config.intro_deck_id):
+                    self.end()
+                    tooltip("Tour canceled.")
+                    return
                 aqt.mw.progress.single_shot(100, self.next)
 
-            def on_sync_with_ankihub_button_clicked() -> None:
-                from ..gui.operations.ankihub_sync import sync_with_ankihub
+            def subscribe_to_intro_deck() -> None:
+                client = AnkiHubClient()
+                client.subscribe_to_deck(config.intro_deck_id)
 
+            def on_subscribed_to_intro_deck() -> None:
+                from ..gui.operations.ankihub_sync import sync_with_ankihub
+                from ..gui.operations.deck_installation import set_skip_summary_for_next_deck_installation
+
+                set_skip_summary_for_next_deck_installation(True)
                 sync_with_ankihub(on_sync_with_ankihub_done)
+
+            def on_sync_with_ankihub_button_clicked() -> None:
+                AddonQueryOp(
+                    parent=aqt.mw,
+                    op=lambda _: subscribe_to_intro_deck(),
+                    success=lambda _: on_subscribed_to_intro_deck(),
+                ).with_progress().run_in_background()
 
             steps.append(
                 TutorialStep(

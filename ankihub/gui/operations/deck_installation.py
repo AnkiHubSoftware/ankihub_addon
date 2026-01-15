@@ -85,6 +85,14 @@ def _on_deck_infos_fetched(
     )
 
 
+_skip_summary = False
+
+
+def set_skip_summary_for_next_deck_installation(skip: bool) -> None:
+    global _skip_summary
+    _skip_summary = skip
+
+
 @pass_exceptions_to_on_done
 def _on_install_done(future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future], None]):
     import_results: List[AnkiHubImportResult] = future.result()
@@ -104,8 +112,10 @@ def _on_install_done(future: Future[List[AnkiHubImportResult]], on_done: Callabl
         if deck_contains_subdeck_tags(ah_did):
             build_subdecks_and_move_cards_to_them_in_background(ah_did)
 
-    _show_deck_import_summary_dialog(import_results)
+    if not _skip_summary:
+        _show_deck_import_summary_dialog(import_results)
 
+    set_skip_summary_for_next_deck_installation(False)
     on_done(future_with_result(None))
 
 
