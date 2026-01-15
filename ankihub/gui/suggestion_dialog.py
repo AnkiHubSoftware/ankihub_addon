@@ -210,7 +210,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
         elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
             show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
         elif suggestion_result == ChangeSuggestionResult.EMPTY_FIRST_FIELD:
-            show_tooltip("The first field is required.", parent=parent)
+            show_tooltip("Suggestion was not created because the first field is required.", parent=parent)
         elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
             show_error_dialog(
                 "This note has been deleted from AnkiHub. No new suggestions can be made.",
