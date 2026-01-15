@@ -6,7 +6,6 @@ from typing import Any, Callable, Optional, Union
 
 import aqt
 from aqt import gui_hooks
-from aqt.deckbrowser import DeckBrowser
 from aqt.editor import Editor
 from aqt.main import AnkiQt
 from aqt.overview import Overview, OverviewBottomBar
@@ -491,6 +490,8 @@ class Tutorial:
 
 
 def prompt_for_onboarding_tutorial() -> None:
+    from aqt.deckbrowser import DeckBrowser
+
     config.set_onboarding_tutorial_pending(True)
 
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
