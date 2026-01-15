@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional, Union
 
 import aqt
 from aqt import gui_hooks
+from aqt.deckbrowser import DeckBrowser
 from aqt.editor import Editor
 from aqt.main import AnkiQt
 from aqt.overview import Overview, OverviewBottomBar
@@ -24,6 +25,9 @@ from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
 from ..settings import config
 
+START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
+DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
+SHOW_PROMPT_PYCMD = "ankihub_show_prompt"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
@@ -477,21 +481,47 @@ def prompt_for_onboarding_tutorial() -> None:
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
 
-    def on_loaded() -> None:
-        from .js_message_handling import START_ONBOARDING_PYCMD
+    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
+        if not isinstance(context, DeckBrowser):
+            return handled
+        if message == START_ONBOARDING_PYCMD:
+            remove_hooks()
+            OnboardingTutorial().start()
+            return True, None
+        if message == DISMISS_ONBOARDING_PYCMD:
+            remove_hooks()
+            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            return True, None
+        if message == SHOW_PROMPT_PYCMD:
+            body = render_dialog(
+                title="📚 First time with Anki?",
+                body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+                "You can revisit it anytime in AnkiHub's Help menu.",
+                secondary_button_label="Maybe later",
+                main_button_label="Take tour",
+                on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+                on_secondary_button_click=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+                on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+            )
+            aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+            return True, None
+        return handled
 
-        body = render_dialog(
-            title="📚 First time with Anki?",
-            body="Find your way in the app with this <b>onboarding tour</b>.<br>"
-            "You can revisit it anytime in AnkiHub's Help menu.",
-            secondary_button_label="Maybe later",
-            main_button_label="Take tour",
-            on_secondary_button_click="AnkiHub.destroyActiveTutorialEffect()",
-            on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
-        )
-        aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+    def on_webview_will_set_content(web_content: WebContent, context: Any) -> None:
+        if not isinstance(context, DeckBrowser):
+            return
+        # Rerender the prompt if the deck browser refreshes due to background operations or mw.reset()
+        js = tutorial_assets_js(f"pycmd('{SHOW_PROMPT_PYCMD}')")
+        web_content.body += f"<script>{js}</script>"
 
-    inject_tutorial_assets(aqt.mw, on_loaded)
+    def remove_hooks() -> None:
+        gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
+
+    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
+    gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
+
+    inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')"))
 
 
 class OnboardingTutorial(Tutorial):
