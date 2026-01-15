@@ -71,7 +71,9 @@ def render_tour_step(
     body: str,
     current_step: int,
     total_steps: int,
+    back_label: str = "Back",
     on_back: Optional[str] = None,
+    next_label: str = "Next",
     on_next: Optional[str] = None,
     on_close: Optional[str] = None,
     show_backdrop: bool = True,
@@ -82,7 +84,9 @@ def render_tour_step(
             "body": body,
             "current_step": current_step,
             "total_steps": total_steps,
+            "back_label": back_label,
             "on_back": on_back,
+            "next_label": next_label,
             "on_next": on_next,
             "on_close": on_close,
             "show_backdrop": show_backdrop,
@@ -234,7 +238,9 @@ class TutorialStep:
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[], None]] = None
+    next_label: str = "Next"
     back_callback: Optional[Callable[[], None]] = None
+    back_label: str = "Back"
     block_target_click: bool = False
     auto_advance: bool = True
 
@@ -272,8 +278,10 @@ class Tutorial:
             body=step.body,
             current_step=self.current_step,
             total_steps=len(self.steps),
+            back_label=step.back_label,
             on_back=f"pycmd('{PREV_STEP_PYCMD}')",
             on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=self.apply_backdrop,
         )
@@ -612,6 +620,7 @@ class OnboardingTutorial(Tutorial):
                     target=".deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
+                    next_label="Sync with AnkiHub",
                     auto_advance=False,
                 )
             )
