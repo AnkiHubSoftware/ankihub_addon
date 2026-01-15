@@ -534,7 +534,8 @@ class OnboardingTutorial(Tutorial):
     def steps(self) -> list[TutorialStep]:
         steps = [
             TutorialStep(
-                body="<b>Decks</b> is where you will find your subscribed decks.",
+                body="<b>Decks</b> is the main page, "
+                "where you will find both your local decks and the ones you subscribed to.",
                 target="#decks",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
@@ -546,7 +547,7 @@ class OnboardingTutorial(Tutorial):
         if intro_deck_config:
             steps.append(
                 TutorialStep(
-                    body="We've already subscribed you to this deck.<br><br>Click on it to open.",
+                    body="We've already subscribed you to this deck. Click on it to open.",
                     target=f"[id='{intro_deck_config.anki_id}']",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
@@ -569,7 +570,7 @@ class OnboardingTutorial(Tutorial):
                     "the <b>Getting Started with Anki</b> deck.<br><br>"
                     "To make a deck you are subscribed to appear here, "
                     "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
-                    "Right now you can just <b>click on the button bellow</b>.",
+                    "Right now you can just <b>click the sync button below</b>.",
                     target=".deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
@@ -579,7 +580,8 @@ class OnboardingTutorial(Tutorial):
 
             steps.append(
                 TutorialStep(
-                    body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
+                    body="You now have the deck <b>Getting Started with Anki</b> installed."
+                    "<br><br>Click on it to open.",
                     target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
@@ -597,9 +599,12 @@ class OnboardingTutorial(Tutorial):
         steps.append(
             TutorialStep(
                 "These daily stats show you:<br><ul>"
-                "<li><b>New</b>: new cards to study</li>"
-                "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
-                "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
+                "<li><b class='text-text-information-main'>New</b>: cards that you have downloaded or created yourself,"
+                " but have never studied before</li>"
+                "<li><b class='text-text-destructive-main'>Learning</b>: cards that were seen "
+                "for the first time recently, and are still being learned</li>"
+                "<li><b class='text-text-confirmation-main'>To Review</b>: cards that you have finished learning. "
+                "They will be shown again after their delay has elapsed</li></ul>",
                 target="td",
                 tooltip_context=aqt.mw.overview,
             )
