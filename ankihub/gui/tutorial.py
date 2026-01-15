@@ -30,6 +30,7 @@ from .operations import AddonQueryOp
 
 START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
 DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
+SHOW_LATER_PYCMD = "ankihub_show_later"
 SHOW_PROMPT_PYCMD = "ankihub_show_prompt"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
@@ -373,6 +374,7 @@ class Tutorial:
     def end(self) -> None:
         self._cleanup_step()
         self._finalize_tutorial()
+        config.set_onboarding_tutorial_pending(False)
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
@@ -464,23 +466,25 @@ class Tutorial:
             step.hidden_callback()
 
     def back(self) -> None:
-        self._cleanup_step()
         if self.current_step == 1:
-            self._finalize_tutorial()
+            self.end()
             return
+        self._cleanup_step()
         self.current_step -= 1
         self.show_current()
 
     def next(self) -> None:
-        self._cleanup_step()
         if self.current_step >= len(self.steps):
-            self._finalize_tutorial()
+            self.end()
             return
+        self._cleanup_step()
         self.current_step += 1
         self.show_current()
 
 
 def prompt_for_onboarding_tutorial() -> None:
+    config.set_onboarding_tutorial_pending(True)
+
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
 
@@ -494,6 +498,11 @@ def prompt_for_onboarding_tutorial() -> None:
         if message == DISMISS_ONBOARDING_PYCMD:
             remove_hooks()
             aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            config.set_onboarding_tutorial_pending(False)
+            return True, None
+        if message == SHOW_LATER_PYCMD:
+            remove_hooks()
+            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
             return True, None
         if message == SHOW_PROMPT_PYCMD:
             body = render_dialog(
@@ -503,7 +512,7 @@ def prompt_for_onboarding_tutorial() -> None:
                 secondary_button_label="Maybe later",
                 main_button_label="Take tour",
                 on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
-                on_secondary_button_click=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+                on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
                 on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
             )
             aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
@@ -525,6 +534,15 @@ def prompt_for_onboarding_tutorial() -> None:
     gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
 
     inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')"))
+
+
+def prompt_for_pending_onboarding_tutorial() -> None:
+    if config.onboarding_tutorial_pending():
+        prompt_for_onboarding_tutorial()
+
+
+def setup() -> None:
+    gui_hooks.main_window_did_init.append(prompt_for_pending_onboarding_tutorial)
 
 
 class OnboardingTutorial(Tutorial):
