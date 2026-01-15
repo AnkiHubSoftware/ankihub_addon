@@ -70,7 +70,9 @@ web_css = WEB_CSS_SRC.read_text(encoding="utf-8")
 tailwind_sources = """@source "../**/*.{ts,js,html}";
 @source "../../../ankihub/django/app/templates/";
 @source "../../../ankihub/django/app/templates/cotton/v1";
-@source "../../../ankihub/django/app/templates/cotton/v1/**";"""
+@source "../../../ankihub/django/app/templates/cotton/v1/**";
+@source "../../../ankihub/gui/tutorial.py";
+"""
 web_css = re.sub("@source .*", tailwind_sources, web_css)
 WEB_CSS_TARGET.write_text(web_css, encoding="utf-8")
 subprocess.run([shutil.which("npm"), "install"], cwd=PROJECT_ROOT / "tutorial", check=True)
