@@ -492,10 +492,10 @@ class Tutorial:
 def prompt_for_onboarding_tutorial() -> None:
     from aqt.deckbrowser import DeckBrowser
 
-    config.set_onboarding_tutorial_pending(True)
-
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
+
+    config.set_onboarding_tutorial_pending(True)
 
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
         if not isinstance(context, DeckBrowser):
