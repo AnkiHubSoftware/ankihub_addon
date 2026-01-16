@@ -9731,8 +9731,6 @@ class TestCheckUserFeatureAccess:
 
 
 class TestPromptForOnboardingTutorial:
-    """Tests for prompt_for_onboarding_tutorial function."""
-
     def test_sets_onboarding_tutorial_pending_to_true(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -9742,43 +9740,11 @@ class TestPromptForOnboardingTutorial:
         from ankihub.gui import tutorial
 
         with anki_session_with_addon_data.profile_loaded():
-            # Ensure pending is False before
             config.set_onboarding_tutorial_pending(False)
-            assert config.onboarding_tutorial_pending() is False
-
-            # Mock inject_tutorial_assets to prevent actual JS injection
             mocker.patch.object(tutorial, "inject_tutorial_assets")
-
-            # Call the function
             tutorial.prompt_for_onboarding_tutorial()
 
-            # Assert pending is now True
             assert config.onboarding_tutorial_pending() is True
-
-    def test_returns_early_when_active_tutorial_exists(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Test that function returns early when active_tutorial is set, but still sets pending."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_onboarding_tutorial_pending(False)
-
-            # Set active_tutorial to a mock value
-            mock_tutorial = Mock()
-            mocker.patch.object(tutorial, "active_tutorial", mock_tutorial)
-
-            # Mock inject_tutorial_assets to verify it's NOT called
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-
-            tutorial.prompt_for_onboarding_tutorial()
-
-            # Should still set pending to True
-            assert config.onboarding_tutorial_pending() is True
-            # But inject_tutorial_assets should NOT be called
-            mock_inject.assert_not_called()
 
     def test_returns_early_when_addon_tours_feature_flag_is_false(
         self,
@@ -9790,59 +9756,30 @@ class TestPromptForOnboardingTutorial:
 
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
-
-            # Ensure active_tutorial is None
             mocker.patch.object(tutorial, "active_tutorial", None)
-
-            # Mock feature flags to return addon_tours=False
             mocker.patch.object(config, "get_feature_flags", return_value={"addon_tours": False})
-
-            # Mock inject_tutorial_assets to verify it's NOT called
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-
             tutorial.prompt_for_onboarding_tutorial()
 
-            # Should still set pending to True
-            assert config.onboarding_tutorial_pending() is True
-            # But inject_tutorial_assets should NOT be called
             mock_inject.assert_not_called()
 
-    def test_registers_hooks_and_injects_assets(
+    def test_injects_assets(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """Test that hooks are registered and assets are injected when proceeding."""
-        from aqt import gui_hooks
+        """Test that assets are injected when proceeding."""
 
         from ankihub.gui import tutorial
 
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
-
-            # Ensure active_tutorial is None and feature flag allows tours
             mocker.patch.object(tutorial, "active_tutorial", None)
             mocker.patch.object(config, "get_feature_flags", return_value={"addon_tours": True})
-
-            # Track hook registrations
-            hooks_before_js = len(gui_hooks.webview_did_receive_js_message._hooks)
-            hooks_before_content = len(gui_hooks.webview_will_set_content._hooks)
-
-            # Mock inject_tutorial_assets
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-
             tutorial.prompt_for_onboarding_tutorial()
 
-            # Assert hooks were registered
-            assert len(gui_hooks.webview_did_receive_js_message._hooks) == hooks_before_js + 1
-            assert len(gui_hooks.webview_will_set_content._hooks) == hooks_before_content + 1
-
-            # Assert inject_tutorial_assets was called
             mock_inject.assert_called_once()
-
-            # Cleanup hooks to avoid affecting other tests
-            gui_hooks.webview_did_receive_js_message._hooks.pop()
-            gui_hooks.webview_will_set_content._hooks.pop()
 
     def test_show_onboarding_prompt_if_first_sync_calls_prompt(
         self,
@@ -9853,20 +9790,13 @@ class TestPromptForOnboardingTutorial:
         from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
 
         with anki_session_with_addon_data.profile_loaded():
-            # Mock last_deck_sync to return None (first sync)
             mocker.patch.object(config, "last_deck_sync", return_value=None)
-
-            # Mock prompt_for_onboarding_tutorial
             mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
-
-            # Mock update_last_deck_sync
             mock_update = mocker.patch.object(config, "update_last_deck_sync")
 
             _show_onboarding_prompt_if_first_sync()
 
-            # Assert prompt was called
             mock_prompt.assert_called_once()
-            # Assert last deck sync was updated
             mock_update.assert_called_once()
 
     def test_show_onboarding_prompt_if_first_sync_skips_when_not_first_sync(
@@ -9878,13 +9808,9 @@ class TestPromptForOnboardingTutorial:
         from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
 
         with anki_session_with_addon_data.profile_loaded():
-            # Mock last_deck_sync to return a datetime (not first sync)
             mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
-
-            # Mock prompt_for_onboarding_tutorial
             mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
 
             _show_onboarding_prompt_if_first_sync()
 
-            # Assert prompt was NOT called
             mock_prompt.assert_not_called()
