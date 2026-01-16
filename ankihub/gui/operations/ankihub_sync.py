@@ -108,7 +108,11 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
             .run_in_background()
         )
 
-    if config.last_deck_sync() is None and not config.deck_config(config.intro_deck_id):
+    if (
+        config.get_feature_flags().get("addon_tours", False)
+        and config.last_deck_sync() is None
+        and not config.deck_config(config.intro_deck_id)
+    ):
         AddonQueryOp(
             op=lambda _: subscribe_to_intro_deck(),
             success=lambda _: get_subscriptions_in_background(),
