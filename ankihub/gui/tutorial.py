@@ -599,10 +599,8 @@ class OnboardingTutorial(Tutorial):
 
             def on_subscribed_to_intro_deck() -> None:
                 from ..gui.operations.ankihub_sync import sync_with_ankihub
-                from ..gui.operations.deck_installation import set_skip_summary_for_next_deck_installation
 
-                set_skip_summary_for_next_deck_installation(True)
-                sync_with_ankihub(on_sync_with_ankihub_done)
+                sync_with_ankihub(on_sync_with_ankihub_done, skip_summary=True)
 
             def on_sync_with_ankihub_button_clicked() -> None:
                 AddonQueryOp(

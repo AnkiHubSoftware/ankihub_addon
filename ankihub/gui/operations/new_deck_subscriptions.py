@@ -17,7 +17,11 @@ from .utils import future_with_result, pass_exceptions_to_on_done
 
 
 @pass_exceptions_to_on_done
-def check_and_install_new_deck_subscriptions(subscribed_decks: List[Deck], on_done: Callable[[Future], None]) -> None:
+def check_and_install_new_deck_subscriptions(
+    subscribed_decks: List[Deck],
+    on_done: Callable[[Future], None],
+    skip_summary: bool = False,
+) -> None:
     """Check if there are any new deck subscriptions and install them if the user confirms."""
 
     LOGGER.info(
@@ -69,6 +73,7 @@ def check_and_install_new_deck_subscriptions(subscribed_decks: List[Deck], on_do
             recommended_deck_settings_cb=recommended_deck_settings_cb,
             decks=decks,
             on_done=on_done,
+            skip_summary=skip_summary,
         ),
         open_dialog=False,
     )
@@ -90,6 +95,7 @@ def _on_button_clicked(
     recommended_deck_settings_cb: QCheckBox,
     decks: List[Deck],
     on_done: Callable[[Future], None],
+    skip_summary: bool,
 ) -> None:
     is_recommended_deck_settings_checked = recommended_deck_settings_cb.isChecked()
     if button_index != 1:
@@ -110,6 +116,7 @@ def _on_button_clicked(
             ah_dids,
             on_done=on_done,
             recommended_deck_settings=is_recommended_deck_settings_checked,
+            skip_summary=skip_summary,
         )
 
     LOGGER.info(

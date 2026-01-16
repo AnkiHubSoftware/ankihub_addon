@@ -42,6 +42,7 @@ def download_and_install_decks(
     on_done: Callable[[Future], None],
     recommended_deck_settings: bool = True,
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+    skip_summary: bool = False,
 ) -> None:
     """Downloads and installs the given decks in the background."""
 
@@ -59,6 +60,7 @@ def download_and_install_decks(
             on_done=on_done,
             recommended_deck_settings=recommended_deck_settings,
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+            skip_summary=skip_summary,
         ),
         label="Getting deck information...",
     )
@@ -70,6 +72,7 @@ def _on_deck_infos_fetched(
     on_done: Callable[[Future], None],
     recommended_deck_settings: bool,
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    skip_summary: bool,
 ) -> None:
     decks = future.result()
 
@@ -80,21 +83,17 @@ def _on_deck_infos_fetched(
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
             recommended_deck_settings=recommended_deck_settings,
         ),
-        on_done=partial(_on_install_done, on_done=on_done),
+        on_done=partial(_on_install_done, on_done=on_done, skip_summary=skip_summary),
         label="Downloading decks from AnkiHub...",
     )
 
 
-_skip_summary = False
-
-
-def set_skip_summary_for_next_deck_installation(skip: bool) -> None:
-    global _skip_summary
-    _skip_summary = skip
-
-
 @pass_exceptions_to_on_done
-def _on_install_done(future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future], None]):
+def _on_install_done(
+    future: Future[List[AnkiHubImportResult]],
+    on_done: Callable[[Future], None],
+    skip_summary: bool,
+):
     import_results: List[AnkiHubImportResult] = future.result()
 
     LOGGER.info(
@@ -112,10 +111,9 @@ def _on_install_done(future: Future[List[AnkiHubImportResult]], on_done: Callabl
         if deck_contains_subdeck_tags(ah_did):
             build_subdecks_and_move_cards_to_them_in_background(ah_did)
 
-    if not _skip_summary:
+    if not skip_summary:
         _show_deck_import_summary_dialog(import_results)
 
-    set_skip_summary_for_next_deck_installation(False)
     on_done(future_with_result(None))
 
 
