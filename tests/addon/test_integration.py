@@ -9857,7 +9857,7 @@ class TestPromptForOnboardingTutorial:
             mocker.patch.object(config, "last_deck_sync", return_value=None)
 
             # Mock prompt_for_onboarding_tutorial
-            mock_prompt = mocker.patch("ankihub.gui.operations.ankihub_sync.prompt_for_onboarding_tutorial")
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
 
             # Mock update_last_deck_sync
             mock_update = mocker.patch.object(config, "update_last_deck_sync")
@@ -9882,7 +9882,7 @@ class TestPromptForOnboardingTutorial:
             mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
 
             # Mock prompt_for_onboarding_tutorial
-            mock_prompt = mocker.patch("ankihub.gui.operations.ankihub_sync.prompt_for_onboarding_tutorial")
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
 
             _show_onboarding_prompt_if_first_sync()
 
