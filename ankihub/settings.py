@@ -218,6 +218,7 @@ class PrivateConfig(DataClassJSONMixin):
     feature_flags: dict = field(default_factory=dict)
     user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
+    onboarding_tutorial_pending: bool = False
 
 
 class _Config:
@@ -342,6 +343,15 @@ class _Config:
         if not self._private_config.user_details:
             self._private_config.user_details = {}
         self._private_config.user_details["username"] = username
+        self._update_private_config()
+
+    def update_last_deck_sync(self):
+        last_deck_sync = datetime.now().isoformat()
+        self._private_config.user_details["last_deck_sync"] = last_deck_sync
+        self._update_private_config()
+
+    def set_onboarding_tutorial_pending(self, pending: bool):
+        self._private_config.onboarding_tutorial_pending = pending
         self._update_private_config()
 
     def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
@@ -488,6 +498,12 @@ class _Config:
 
     def user_id(self) -> Optional[int]:
         return self._private_config.user_details.get("id")
+
+    def last_deck_sync(self) -> Optional[str]:
+        return self._private_config.user_details.get("last_deck_sync")
+
+    def onboarding_tutorial_pending(self) -> bool:
+        return self._private_config.onboarding_tutorial_pending
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui

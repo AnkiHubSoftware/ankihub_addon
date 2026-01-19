@@ -21,6 +21,7 @@ from .gui import (
     overview,
     progress,
     reviewer,
+    tutorial,
 )
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
@@ -269,6 +270,9 @@ def _general_setup() -> None:
 
     setup_periodic_user_state_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")
+
+    tutorial.setup()
+    LOGGER.info("Set up tutorial.")
 
 
 def _copy_web_media_to_media_folder() -> None:

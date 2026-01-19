@@ -42,7 +42,7 @@ sync_state = _SyncState()
 
 
 @pass_exceptions_to_on_done
-def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
+def sync_with_ankihub(on_done: Callable[[Future], None], skip_summary: bool = False) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks.
 
@@ -55,16 +55,16 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
             LOGGER.info("Full sync required. Syncing with AnkiWeb first.")
-            sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done))
+            sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done, skip_summary=skip_summary))
         else:
             LOGGER.info("No full sync required. Syncing with AnkiHub directly.")
-            _sync_with_ankihub_inner(on_done=on_done)
+            _sync_with_ankihub_inner(on_done=on_done, skip_summary=skip_summary)
 
     get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
 
 
 @pass_exceptions_to_on_done
-def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
+def _after_ankiweb_sync(on_done: Callable[[Future], None], skip_summary: bool) -> None:
     @pass_exceptions_to_on_done
     def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
@@ -72,7 +72,7 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
             LOGGER.info("AnkiWeb full sync cancelled.")
             raise FullSyncCancelled()
 
-        _sync_with_ankihub_inner(on_done=on_done)
+        _sync_with_ankihub_inner(on_done=on_done, skip_summary=skip_summary)
 
     @pass_exceptions_to_on_done
     def after_delay(on_done: Callable[[Future], None]) -> None:
@@ -83,7 +83,7 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
 
 @pass_exceptions_to_on_done
-def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
+def _sync_with_ankihub_inner(on_done: Callable[[Future], None], skip_summary: bool) -> None:
     def get_subscriptions_and_clean_up() -> List[Deck]:
         client = AnkiHubClient()
         subscribed_decks = client.get_deck_subscriptions()
@@ -92,15 +92,40 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
 
         return subscribed_decks
 
-    AddonQueryOp(
-        op=lambda _: get_subscriptions_and_clean_up(),
-        success=partial(_on_subscriptions_fetched, on_done=on_done),
-        parent=aqt.mw,
-    ).failure(lambda e: on_done(future_with_exception(e))).with_progress().run_in_background()
+    def subscribe_to_intro_deck() -> None:
+        client = AnkiHubClient()
+        client.subscribe_to_deck(config.intro_deck_id)
+
+    def get_subscriptions_in_background() -> None:
+        return (
+            AddonQueryOp(
+                op=lambda _: get_subscriptions_and_clean_up(),
+                success=partial(_on_subscriptions_fetched, on_done=on_done, skip_summary=skip_summary),
+                parent=aqt.mw,
+            )
+            .failure(lambda e: on_done(future_with_exception(e)))
+            .with_progress()
+            .run_in_background()
+        )
+
+    if (
+        config.get_feature_flags().get("addon_tours", False)
+        and config.last_deck_sync() is None
+        and not config.deck_config(config.intro_deck_id)
+    ):
+        AddonQueryOp(
+            op=lambda _: subscribe_to_intro_deck(),
+            success=lambda _: get_subscriptions_in_background(),
+            parent=aqt.mw,
+        ).failure(lambda e: on_done(future_with_exception(e))).with_progress().run_in_background()
+    else:
+        get_subscriptions_in_background()
 
 
 @pass_exceptions_to_on_done
-def _on_subscriptions_fetched(subscribed_decks: List[Deck], on_done: Callable[[Future], None]) -> None:
+def _on_subscriptions_fetched(
+    subscribed_decks: List[Deck], on_done: Callable[[Future], None], skip_summary: bool
+) -> None:
     sync_state.schema_before_new_decks_installation = collection_schema()
 
     check_and_install_new_deck_subscriptions(
@@ -110,6 +135,7 @@ def _on_subscriptions_fetched(subscribed_decks: List[Deck], on_done: Callable[[F
             subscribed_decks=subscribed_decks,
             on_done=on_done,
         ),
+        skip_summary=skip_summary,
     )
 
 
@@ -222,6 +248,15 @@ def _schedule_post_sync_tasks() -> None:
     aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
     _maybe_send_daily_review_summaries()
     aqt.mw.taskman.run_on_main(maybe_show_subdeck_due_date_reminders)
+    aqt.mw.taskman.run_on_main(_show_onboarding_prompt_if_first_sync)
+
+
+def _show_onboarding_prompt_if_first_sync() -> None:
+    if config.last_deck_sync() is None:
+        from ..tutorial import prompt_for_onboarding_tutorial
+
+        prompt_for_onboarding_tutorial()
+        config.update_last_deck_sync()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:

@@ -604,7 +604,7 @@ class AnkiHubClient:
 
     def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
         response = self._send_request("POST", API.ANKIHUB, "/decks/subscriptions/", json={"deck": str(deck_id)})
-        if response.status_code != 201:
+        if response.status_code not in (200, 201):
             raise AnkiHubHTTPError(response)
 
     def unsubscribe_from_deck(self, deck_id: uuid.UUID) -> None:

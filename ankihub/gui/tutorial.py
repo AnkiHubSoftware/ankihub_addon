@@ -18,12 +18,19 @@ from aqt.qt import (
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
+from aqt.utils import tooltip
 from aqt.webview import AnkiWebView, WebContent
 
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog
 from ..settings import config
+from .operations import AddonQueryOp
 
+START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
+DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
+SHOW_LATER_PYCMD = "ankihub_show_later"
+SHOW_PROMPT_PYCMD = "ankihub_show_prompt"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
@@ -63,7 +70,9 @@ def render_tour_step(
     body: str,
     current_step: int,
     total_steps: int,
+    back_label: str = "Back",
     on_back: Optional[str] = None,
+    next_label: str = "Next",
     on_next: Optional[str] = None,
     on_close: Optional[str] = None,
     show_backdrop: bool = True,
@@ -74,7 +83,9 @@ def render_tour_step(
             "body": body,
             "current_step": current_step,
             "total_steps": total_steps,
+            "back_label": back_label,
             "on_back": on_back,
+            "next_label": next_label,
             "on_next": on_next,
             "on_close": on_close,
             "show_backdrop": show_backdrop,
@@ -226,7 +237,9 @@ class TutorialStep:
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[], None]] = None
+    next_label: str = "Next"
     back_callback: Optional[Callable[[], None]] = None
+    back_label: str = "Back"
     block_target_click: bool = False
     auto_advance: bool = True
 
@@ -264,8 +277,10 @@ class Tutorial:
             body=step.body,
             current_step=self.current_step,
             total_steps=len(self.steps),
+            back_label=step.back_label,
             on_back=f"pycmd('{PREV_STEP_PYCMD}')",
             on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=self.apply_backdrop,
         )
@@ -366,6 +381,7 @@ class Tutorial:
     def end(self) -> None:
         self._cleanup_step()
         self._finalize_tutorial()
+        config.set_onboarding_tutorial_pending(False)
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
@@ -457,41 +473,85 @@ class Tutorial:
             step.hidden_callback()
 
     def back(self) -> None:
-        self._cleanup_step()
         if self.current_step == 1:
-            self._finalize_tutorial()
+            self.end()
             return
+        self._cleanup_step()
         self.current_step -= 1
         self.show_current()
 
     def next(self) -> None:
-        self._cleanup_step()
         if self.current_step >= len(self.steps):
-            self._finalize_tutorial()
+            self.end()
             return
+        self._cleanup_step()
         self.current_step += 1
         self.show_current()
 
 
 def prompt_for_onboarding_tutorial() -> None:
-    if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
+    from aqt.deckbrowser import DeckBrowser
+
+    if active_tutorial or not config.get_feature_flags().get("addon_tours", False):
         return
 
-    def on_loaded() -> None:
-        from .js_message_handling import START_ONBOARDING_PYCMD
+    config.set_onboarding_tutorial_pending(True)
 
-        body = render_dialog(
-            title="📚 First time with Anki?",
-            body="Find your way in the app with this <b>onboarding tour</b>.<br>"
-            "You can revisit it anytime in AnkiHub's Help menu.",
-            secondary_button_label="Maybe later",
-            main_button_label="Take tour",
-            on_secondary_button_click="AnkiHub.destroyActiveTutorialEffect()",
-            on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
-        )
-        aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+    def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
+        if not isinstance(context, DeckBrowser):
+            return handled
+        if message == START_ONBOARDING_PYCMD:
+            remove_hooks()
+            OnboardingTutorial().start()
+            return True, None
+        if message == DISMISS_ONBOARDING_PYCMD:
+            remove_hooks()
+            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            config.set_onboarding_tutorial_pending(False)
+            return True, None
+        if message == SHOW_LATER_PYCMD:
+            remove_hooks()
+            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            return True, None
+        if message == SHOW_PROMPT_PYCMD:
+            body = render_dialog(
+                title="📚 First time with Anki?",
+                body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+                "You can revisit it anytime in AnkiHub's Help menu.",
+                secondary_button_label="Maybe later",
+                main_button_label="Take tour",
+                on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+                on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
+                on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+            )
+            aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+            return True, None
+        return handled
 
-    inject_tutorial_assets(aqt.mw, on_loaded)
+    def on_webview_will_set_content(web_content: WebContent, context: Any) -> None:
+        if not isinstance(context, DeckBrowser):
+            return
+        # Rerender the prompt if the deck browser refreshes due to background operations or mw.reset()
+        js = tutorial_assets_js(f"pycmd('{SHOW_PROMPT_PYCMD}')")
+        web_content.body += f"<script>{js}</script>"
+
+    def remove_hooks() -> None:
+        gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
+
+    gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
+    gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
+
+    inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')"))
+
+
+def prompt_for_pending_onboarding_tutorial() -> None:
+    if config.onboarding_tutorial_pending():
+        prompt_for_onboarding_tutorial()
+
+
+def setup() -> None:
+    gui_hooks.main_window_did_init.append(prompt_for_pending_onboarding_tutorial)
 
 
 class OnboardingTutorial(Tutorial):
@@ -504,7 +564,8 @@ class OnboardingTutorial(Tutorial):
     def steps(self) -> list[TutorialStep]:
         steps = [
             TutorialStep(
-                body="<b>Decks</b> is where you will find your subscribed decks.",
+                body="<b>Decks</b> is the main page, "
+                "where you will find both your local decks and the ones you subscribed to.",
                 target="#decks",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
@@ -516,7 +577,7 @@ class OnboardingTutorial(Tutorial):
         if intro_deck_config:
             steps.append(
                 TutorialStep(
-                    body="We've already subscribed you to this deck.<br><br>Click on it to open.",
+                    body="We've already subscribed you to this deck. Click on it to open.",
                     target=f"[id='{intro_deck_config.anki_id}']",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
@@ -526,12 +587,27 @@ class OnboardingTutorial(Tutorial):
 
             def on_sync_with_ankihub_done(future: Future) -> None:
                 future.result()
+                if not config.deck_config(config.intro_deck_id):
+                    self.end()
+                    tooltip("Tour canceled.")
+                    return
                 aqt.mw.progress.single_shot(100, self.next)
 
-            def on_sync_with_ankihub_button_clicked() -> None:
+            def subscribe_to_intro_deck() -> None:
+                client = AnkiHubClient()
+                client.subscribe_to_deck(config.intro_deck_id)
+
+            def on_subscribed_to_intro_deck() -> None:
                 from ..gui.operations.ankihub_sync import sync_with_ankihub
 
-                sync_with_ankihub(on_sync_with_ankihub_done)
+                sync_with_ankihub(on_sync_with_ankihub_done, skip_summary=True)
+
+            def on_sync_with_ankihub_button_clicked() -> None:
+                AddonQueryOp(
+                    parent=aqt.mw,
+                    op=lambda _: subscribe_to_intro_deck(),
+                    success=lambda _: on_subscribed_to_intro_deck(),
+                ).with_progress().run_in_background()
 
             steps.append(
                 TutorialStep(
@@ -539,17 +615,19 @@ class OnboardingTutorial(Tutorial):
                     "the <b>Getting Started with Anki</b> deck.<br><br>"
                     "To make a deck you are subscribed to appear here, "
                     "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
-                    "Right now you can just <b>click on the button bellow</b>.",
+                    "Right now you can just <b>click the sync button below</b>.",
                     target=".deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
+                    next_label="Sync with AnkiHub",
                     auto_advance=False,
                 )
             )
 
             steps.append(
                 TutorialStep(
-                    body="You now have the deck <b>Getting Started with Anki</b> installed. Click on it to open.",
+                    body="You now have the deck <b>Getting Started with Anki</b> installed."
+                    "<br><br>Click on it to open.",
                     target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
@@ -567,9 +645,12 @@ class OnboardingTutorial(Tutorial):
         steps.append(
             TutorialStep(
                 "These daily stats show you:<br><ul>"
-                "<li><b>New</b>: new cards to study</li>"
-                "<li><b>Learning</b>: reviewed cards on short delay to come back</li>"
-                "<li><b>To Review</b>: reviewed cards on long delay to come back</li></ul>",
+                "<li><b class='text-text-information-main'>New</b>: cards that you have downloaded or created yourself,"
+                " but have never studied before</li>"
+                "<li><b class='text-text-destructive-main'>Learning</b>: cards that were seen "
+                "for the first time recently, and are still being learned</li>"
+                "<li><b class='text-text-confirmation-main'>To Review</b>: cards that you have finished learning. "
+                "They will be shown again after their delay has elapsed</li></ul>",
                 target="td",
                 tooltip_context=aqt.mw.overview,
             )

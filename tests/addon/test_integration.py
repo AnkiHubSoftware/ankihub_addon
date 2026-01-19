@@ -9728,3 +9728,203 @@ class TestCheckUserFeatureAccess:
         on_access_denied.assert_called_with(cached_user_details)
         # Assert on_access_granted was not called
         on_access_granted_mock.assert_not_called()
+
+
+class TestPromptForOnboardingTutorial:
+    def test_sets_onboarding_tutorial_pending_to_true(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that prompt_for_onboarding_tutorial sets onboarding_tutorial_pending to True."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_pending(False)
+            mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_onboarding_tutorial()
+
+            assert config.onboarding_tutorial_pending() is True
+
+    def test_returns_early_when_addon_tours_feature_flag_is_false(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that function returns early when addon_tours feature flag is False."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"addon_tours": False})
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_onboarding_tutorial()
+
+            mock_inject.assert_not_called()
+
+    def test_injects_assets(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that assets are injected when proceeding."""
+
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"addon_tours": True})
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_onboarding_tutorial()
+
+            mock_inject.assert_called_once()
+
+    def test_show_onboarding_prompt_if_first_sync_calls_prompt(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that _show_onboarding_prompt_if_first_sync calls prompt when last_deck_sync is None."""
+        from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
+
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+            mock_update = mocker.patch.object(config, "update_last_deck_sync")
+
+            _show_onboarding_prompt_if_first_sync()
+
+            mock_prompt.assert_called_once()
+            mock_update.assert_called_once()
+
+    def test_show_onboarding_prompt_if_first_sync_skips_when_not_first_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that _show_onboarding_prompt_if_first_sync does NOT call prompt when last_deck_sync exists."""
+        from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
+
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+
+            _show_onboarding_prompt_if_first_sync()
+
+            mock_prompt.assert_not_called()
+
+
+class TestSubscribeToIntroDeck:
+    @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "addon_tours_enabled, is_first_sync, intro_deck_already_configured, expected_subscribe_called",
+        [
+            # All conditions met → subscribe_to_deck is called
+            (True, True, False, True),
+            # addon_tours feature flag is False → subscribe_to_deck is not called
+            (False, True, False, False),
+            # last_deck_sync is not None (not first sync) → subscribe_to_deck is not called
+            (True, False, False, False),
+            # intro deck is already configured → subscribe_to_deck is not called
+            (True, True, True, False),
+            # Multiple conditions not met
+            (False, False, False, False),
+            (False, True, True, False),
+            (True, False, True, False),
+        ],
+    )
+    def test_subscribe_to_intro_deck_conditions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+        install_ah_deck: InstallAHDeck,
+        addon_tours_enabled: bool,
+        is_first_sync: bool,
+        intro_deck_already_configured: bool,
+        expected_subscribe_called: bool,
+    ):
+        """Test that subscribe_to_intro_deck is called only when all conditions are met."""
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_token("test_token")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"addon_tours": addon_tours_enabled},
+            )
+            mocker.patch.object(
+                config,
+                "last_deck_sync",
+                return_value=None if is_first_sync else datetime.now(),
+            )
+            if intro_deck_already_configured:
+                install_ah_deck(ah_did=config.intro_deck_id)
+            subscribe_mock = mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            if expected_subscribe_called:
+                subscribe_mock.assert_called_once_with(config.intro_deck_id)
+            else:
+                subscribe_mock.assert_not_called()
+
+    @pytest.mark.qt_no_exception_capture
+    def test_subscribe_to_intro_deck_failure_is_propagated(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+    ):
+        """Test that exceptions from subscribe_to_deck are properly propagated."""
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_token("test_token")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"addon_tours": True},
+            )
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            error_message = "Test subscription error"
+            mocker.patch.object(
+                AnkiHubClient,
+                "subscribe_to_deck",
+                side_effect=Exception(error_message),
+            )
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future: Future = callback.kwargs.get("future") or callback.args[0]
+            with pytest.raises(Exception, match=error_message):
+                future.result()
+
+    @pytest.mark.qt_no_exception_capture
+    def test_subscribe_to_intro_deck_success_continues_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+    ):
+        """Test that after successful intro deck subscription, sync continues normally."""
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_token("test_token")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"addon_tours": True},
+            )
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            subscribe_mock = mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
+            get_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future: Future = callback.kwargs.get("future") or callback.args[0]
+            future.result()
+            subscribe_mock.assert_called_once_with(config.intro_deck_id)
+            get_subscriptions_mock.assert_called_once()
