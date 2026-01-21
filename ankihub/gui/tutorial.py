@@ -284,7 +284,7 @@ class Tutorial:
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=self.apply_backdrop,
         )
-        arrow = render_arrow()
+        arrow = render_arrow() if step.target else ""
         tooltip_options = {
             "modal": modal,
             "arrow": arrow,
