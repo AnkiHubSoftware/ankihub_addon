@@ -443,8 +443,7 @@ class Tutorial:
             self.end()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
-            if self.current_step == len(self.steps):
-                self.end()
+            self.next()
             return True, None
         return handled
 
@@ -621,6 +620,7 @@ class OnboardingTutorial(Tutorial):
                     next_callback=on_sync_with_ankihub_button_clicked,
                     next_label="Sync with AnkiHub",
                     auto_advance=False,
+                    block_target_click=True,
                 )
             )
 
