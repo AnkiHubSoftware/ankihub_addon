@@ -3,6 +3,28 @@ import Alpine from 'alpinejs';
 import { bridgeCommand } from "./bridgecommand";
 import tailwindCss from './vendor/tailwind.css?inline';
 
+let propertyRulesInjected = false;
+
+/**
+ * Extract @property rules from CSS and inject them into the main document.
+ * This is necessary because @property rules don't work inside shadow DOM -
+ * they must be registered at the document level.
+ */
+function injectPropertyRulesIntoDocument(css: string): void {
+    if (propertyRulesInjected) return;
+
+    const propertyRuleRegex = /@property\s+[^{]+\{[^}]*\}/g;
+    const propertyRules = css.match(propertyRuleRegex);
+
+    if (propertyRules && propertyRules.length > 0) {
+        const style = document.createElement("style");
+        style.id = "ankihub-property-rules";
+        style.textContent = propertyRules.join("\n");
+        document.head.appendChild(style);
+        propertyRulesInjected = true;
+    }
+}
+
 
 function getTargetElement(target: string | HTMLElement): HTMLElement | null {
     return typeof target === "string"
@@ -92,6 +114,7 @@ export class TutorialEffect {
         }
 
         const css = tailwindCss.replaceAll(":root", ":host");
+        injectPropertyRulesIntoDocument(css);
         const style = document.createElement("style");
         style.textContent = css;
         this.shadowRoot.append(style);
