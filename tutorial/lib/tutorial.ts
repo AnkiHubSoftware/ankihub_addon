@@ -4,6 +4,7 @@ import { bridgeCommand } from "./bridgecommand";
 import tailwindCss from './vendor/tailwind.css?inline';
 
 let propertyRulesInjected = false;
+let fontImportsInjected = false;
 
 /**
  * Extract @property rules from CSS and inject them into the main document.
@@ -22,6 +23,25 @@ function injectPropertyRulesIntoDocument(css: string): void {
         style.textContent = propertyRules.join("\n");
         document.head.appendChild(style);
         propertyRulesInjected = true;
+    }
+}
+
+/**
+ * Extract Google Font @import rules from CSS and inject them into the main document.
+ * This is necessary because @font-face rules (which the @import resolves to) don't work
+ * inside shadow DOM - fonts must be loaded at the document level.
+ */
+function injectFontImportsIntoDocument(css: string): void {
+    if (fontImportsInjected) return;
+
+    const fontImportRegex = /@import\s+.*?googleapis.*/g;
+    const fontImports = css.match(fontImportRegex);
+    if (fontImports && fontImports.length > 0) {
+        const style = document.createElement("style");
+        style.id = "ankihub-font-imports";
+        style.textContent = fontImports.join("\n");
+        document.head.appendChild(style);
+        fontImportsInjected = true;
     }
 }
 
@@ -115,6 +135,7 @@ export class TutorialEffect {
 
         const css = tailwindCss.replaceAll(":root", ":host");
         injectPropertyRulesIntoDocument(css);
+        injectFontImportsIntoDocument(css);
         const style = document.createElement("style");
         style.textContent = css;
         this.shadowRoot.append(style);
