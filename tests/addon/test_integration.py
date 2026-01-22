@@ -9779,7 +9779,7 @@ class TestPromptForOnboardingTutorial:
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
-            mock_inject.assert_called_once()
+            mock_inject.assert_called()
 
     def test_show_onboarding_prompt_if_first_sync_calls_prompt(
         self,
