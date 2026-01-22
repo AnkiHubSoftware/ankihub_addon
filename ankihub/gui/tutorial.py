@@ -102,6 +102,10 @@ def render_backdrop() -> str:
     return render_template_from_string("<c-v1.backdrop :open=True />")
 
 
+def get_backdrop_js() -> str:
+    return f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
+
+
 class TutorialOverlayDialog(OverlayDialog):
     def setup_ui(self) -> None:
         vbox = QVBoxLayout()
@@ -315,14 +319,11 @@ class Tutorial:
                 target_web.eval(js)
         return js
 
-    def _backdrop_js(self) -> str:
-        return f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
-
     def _render_backdrop(self) -> None:
         step = self.steps[self.current_step - 1]
         tooltip_web = webview_for_context(step.tooltip_context)
         target_web = webview_for_context(step.target_context)
-        backdrop_js = self._backdrop_js()
+        backdrop_js = get_backdrop_js()
         webviews = set()
         for context in self.extra_backdrop_contexts:
             web = webview_for_context(context)
@@ -455,7 +456,7 @@ class Tutorial:
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
         elif context in self.extra_backdrop_contexts:
-            js = self._backdrop_js()
+            js = get_backdrop_js()
         if js:
             js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
             web_content.body += f"<script>{js}</script>"
@@ -489,46 +490,52 @@ class Tutorial:
 
 
 def prompt_for_onboarding_tutorial() -> None:
-    from aqt.deckbrowser import DeckBrowser
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if active_tutorial or not config.get_feature_flags().get("addon_tours", False):
+    if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
 
     config.set_onboarding_tutorial_pending(True)
 
+    context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
+    contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
+
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if not isinstance(context, DeckBrowser):
+        if not isinstance(context, context_types):
             return handled
         if message == START_ONBOARDING_PYCMD:
             remove_hooks()
             OnboardingTutorial().start()
             return True, None
         if message == DISMISS_ONBOARDING_PYCMD:
-            remove_hooks()
-            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            clean_up_webviews()
             config.set_onboarding_tutorial_pending(False)
             return True, None
         if message == SHOW_LATER_PYCMD:
-            remove_hooks()
-            aqt.mw.web.eval("AnkiHub.destroyActiveTutorialEffect()")
+            clean_up_webviews()
             return True, None
         if message == SHOW_PROMPT_PYCMD:
-            body = render_dialog(
-                title="📚 First time with Anki?",
-                body="Find your way in the app with this <b>onboarding tour</b>.<br>"
-                "You can revisit it anytime in AnkiHub's Help menu.",
-                secondary_button_label="Maybe later",
-                main_button_label="Take tour",
-                on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
-                on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
-                on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
-            )
-            aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+            if isinstance(context, DeckBrowser):
+                body = render_dialog(
+                    title="📚 First time with Anki?",
+                    body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+                    "You can revisit it anytime in AnkiHub's Help menu.",
+                    secondary_button_label="Maybe later",
+                    main_button_label="Take tour",
+                    on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+                    on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
+                    on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+                )
+                aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
+            elif isinstance(context, DeckBrowserBottomBar):
+                aqt.mw.bottomWeb.eval(get_backdrop_js())
+            elif isinstance(context, TopToolbar):
+                aqt.mw.toolbar.web.eval(get_backdrop_js())
             return True, None
         return handled
 
     def on_webview_will_set_content(web_content: WebContent, context: Any) -> None:
-        if not isinstance(context, DeckBrowser):
+        if not isinstance(context, context_types):
             return
         # Rerender the prompt if the deck browser refreshes due to background operations or mw.reset()
         js = tutorial_assets_js(f"pycmd('{SHOW_PROMPT_PYCMD}')")
@@ -538,10 +545,26 @@ def prompt_for_onboarding_tutorial() -> None:
         gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(on_webview_will_set_content)
 
+    def clean_up_webviews() -> None:
+        remove_hooks()
+        for web in (aqt.mw.web, aqt.mw.bottomWeb, aqt.mw.toolbar.web):
+            web.eval("AnkiHub.destroyActiveTutorialEffect()")
+
     gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
     gui_hooks.webview_will_set_content.append(on_webview_will_set_content)
 
-    inject_tutorial_assets(aqt.mw, lambda: aqt.mw.web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')"))
+    loaded_scripts = 0
+
+    def on_script_loaded() -> None:
+        nonlocal loaded_scripts
+        loaded_scripts += 1
+        if loaded_scripts == len(contexts):
+            for context in contexts:
+                web = webview_for_context(context)
+                web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')")
+
+    for context in contexts:
+        inject_tutorial_assets(context, on_script_loaded)
 
 
 def prompt_for_pending_onboarding_tutorial() -> None:
