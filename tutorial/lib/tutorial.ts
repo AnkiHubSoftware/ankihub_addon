@@ -34,7 +34,7 @@ function injectPropertyRulesIntoDocument(css: string): void {
 function injectFontImportsIntoDocument(css: string): void {
     if (fontImportsInjected) return;
 
-    const fontImportRegex = /@import\s+.*?googleapis.*/g;
+    const fontImportRegex = /@import.*?googleapis.*?;/g;
     const fontImports = css.match(fontImportRegex);
     if (fontImports && fontImports.length > 0) {
         const style = document.createElement("style");
