@@ -158,11 +158,7 @@ export class TutorialEffect {
         this.cleanUpdateHandler?.();
         this.targetElement?.removeEventListener("click", this.targetClickHandler);
         this.removeSpotlight();
-        setTimeout(() => {
-            if (this.hostElement.parentNode) {
-                this.hostElement.parentNode.removeChild(this.hostElement);
-            }
-        }, 200);
+        this.hostElement.remove();
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = null;
