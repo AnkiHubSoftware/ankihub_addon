@@ -454,13 +454,14 @@ class Tutorial:
             js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
             web_content.body += f"<script>{js}</script>"
 
-    def _cleanup_step(self) -> None:
+    def _cleanup_step(self, destroy_effect: bool = True) -> None:
         step = self.steps[self.current_step - 1]
-        webviews = set()
-        for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
-            webviews.add(webview_for_context(context))
-        for web in webviews:
-            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
+        if destroy_effect:
+            webviews = set()
+            for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
+                webviews.add(webview_for_context(context))
+            for web in webviews:
+                web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
         if step.hidden_callback:
             step.hidden_callback()
@@ -469,7 +470,7 @@ class Tutorial:
         if self.current_step == 1:
             self.end()
             return
-        self._cleanup_step()
+        self._cleanup_step(destroy_effect=False)
         self.current_step -= 1
         self.show_current()
 
@@ -477,7 +478,7 @@ class Tutorial:
         if self.current_step >= len(self.steps):
             self.end()
             return
-        self._cleanup_step()
+        self._cleanup_step(destroy_effect=False)
         self.current_step += 1
         self.show_current()
 
