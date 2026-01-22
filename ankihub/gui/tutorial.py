@@ -1,7 +1,7 @@
 import json
 from asyncio.futures import Future
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Any, Callable, Optional, Union
 
 import aqt
@@ -218,8 +218,7 @@ def tutorial_assets_js(on_loaded: str) -> str:
 def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]) -> None:
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
         if message == JS_LOADED_PYCMD:
-            # Some delay is required here before the global AnkiHub object is available for some reason
-            aqt.mw.progress.single_shot(100, on_loaded)
+            on_loaded()
             gui_hooks.webview_did_receive_js_message.remove(on_webview_did_receive_js_message)
             return True, None
         return handled
@@ -240,7 +239,7 @@ class TutorialStep:
     qt_target: Optional[QWidget] = None
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
-    next_callback: Optional[Callable[[], None]] = None
+    next_callback: Optional[Callable[[Callable[[], None]], None]] = None
     next_label: str = "Next"
     back_callback: Optional[Callable[[], None]] = None
     back_label: str = "Back"
@@ -391,9 +390,7 @@ class Tutorial:
             step = self.steps[self.current_step - 1]
             if step.back_callback:
                 self._cleanup_step()
-                step.back_callback()
-                if step.auto_advance:
-                    aqt.mw.progress.single_shot(100, self.back)
+                step.back_callback(self.back if step.auto_advance else lambda: None)
             else:
                 self.back()
             return True, None
@@ -402,9 +399,7 @@ class Tutorial:
             step = self.steps[self.current_step - 1]
             if step.next_callback:
                 self._cleanup_step()
-                step.next_callback()
-                if step.auto_advance:
-                    aqt.mw.progress.single_shot(100, self.next)
+                step.next_callback(self.next if step.auto_advance else lambda: None)
             else:
                 self.next()
             return True, None
@@ -577,10 +572,26 @@ def setup() -> None:
 
 
 class OnboardingTutorial(Tutorial):
-    def _move_to_intro_deck_overview(self) -> None:
+    def _monitor_mw_state_change(self, on_done: Callable[[], None]) -> None:
+        def on_state_did_change(*args: Any, **kwargs: Any) -> None:
+            gui_hooks.state_did_change.remove(on_state_did_change)
+            on_done()
+
+        gui_hooks.state_did_change.append(on_state_did_change)
+
+    def _move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
         did = config.deck_config(config.intro_deck_id).anki_id
         aqt.mw.col.decks.set_current(did)
+        self._monitor_mw_state_change(on_done)
         aqt.mw.moveToState("overview")
+
+    def _move_to_review(self, on_done: Callable[[], None]) -> None:
+        self._monitor_mw_state_change(on_done)
+        aqt.mw.moveToState("review")
+
+    def _move_to_deck_browser(self, on_done: Callable[[], None]) -> None:
+        self._monitor_mw_state_change(on_done)
+        aqt.mw.moveToState("deckBrowser")
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
@@ -607,28 +618,28 @@ class OnboardingTutorial(Tutorial):
             )
         else:
 
-            def on_sync_with_ankihub_done(future: Future) -> None:
+            def on_sync_with_ankihub_done(on_done: Callable[[], None], future: Future) -> None:
                 future.result()
                 if not config.deck_config(config.intro_deck_id):
                     self.end()
                     tooltip("Tour canceled.")
                     return
-                aqt.mw.progress.single_shot(100, self.next)
+                on_done()
 
             def subscribe_to_intro_deck() -> None:
                 client = AnkiHubClient()
                 client.subscribe_to_deck(config.intro_deck_id)
 
-            def on_subscribed_to_intro_deck() -> None:
+            def on_subscribed_to_intro_deck(on_done: Callable[[], None]) -> None:
                 from ..gui.operations.ankihub_sync import sync_with_ankihub
 
-                sync_with_ankihub(on_sync_with_ankihub_done, skip_summary=True)
+                sync_with_ankihub(partial(on_sync_with_ankihub_done, on_done), skip_summary=True)
 
-            def on_sync_with_ankihub_button_clicked() -> None:
+            def on_sync_with_ankihub_button_clicked(on_done: Callable[[], None]) -> None:
                 AddonQueryOp(
                     parent=aqt.mw,
                     op=lambda _: subscribe_to_intro_deck(),
-                    success=lambda _: on_subscribed_to_intro_deck(),
+                    success=lambda _: on_subscribed_to_intro_deck(on_done),
                 ).with_progress().run_in_background()
 
             steps.append(
@@ -642,7 +653,7 @@ class OnboardingTutorial(Tutorial):
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
                     next_label="Sync with AnkiHub",
-                    auto_advance=False,
+                    # auto_advance=False,
                     block_target_click=True,
                 )
             )
@@ -662,7 +673,7 @@ class OnboardingTutorial(Tutorial):
                 body="This deck will help you understand the basics of card reviewing.",
                 target="",
                 tooltip_context=aqt.mw.overview,
-                back_callback=lambda: aqt.mw.moveToState("deckBrowser"),
+                back_callback=self._move_to_deck_browser,
             )
         )
         steps.append(
@@ -684,7 +695,7 @@ class OnboardingTutorial(Tutorial):
                 "Click this button and start practicing card reviewing now!",
                 target="#study",
                 tooltip_context=aqt.mw.overview,
-                next_callback=lambda: aqt.mw.moveToState("review"),
+                next_callback=self._move_to_review,
             )
         )
         return steps
