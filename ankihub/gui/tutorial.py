@@ -389,7 +389,6 @@ class Tutorial:
         if message == PREV_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
             if step.back_callback:
-                self._cleanup_step()
                 step.back_callback(self.back if step.auto_advance else lambda: None)
             else:
                 self.back()
@@ -398,7 +397,6 @@ class Tutorial:
         if message == NEXT_STEP_PYCMD:
             step = self.steps[self.current_step - 1]
             if step.next_callback:
-                self._cleanup_step()
                 step.next_callback(self.next if step.auto_advance else lambda: None)
             else:
                 self.next()
