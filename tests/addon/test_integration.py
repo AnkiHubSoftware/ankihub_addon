@@ -9741,6 +9741,8 @@ class TestPromptForOnboardingTutorial:
 
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"addon_tours": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
