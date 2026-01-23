@@ -41,7 +41,8 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
-  "django>=4.2.27",
+  # We cannot use more recent versions because we still need to support Python 3.9
+  "django==4.2.27",
   "django-cotton>=2.5.1",
 ]
 aqt = ["aqt[qt]==25.9.2"]

@@ -3,6 +3,48 @@ import Alpine from 'alpinejs';
 import { bridgeCommand } from "./bridgecommand";
 import tailwindCss from './vendor/tailwind.css?inline';
 
+let propertyRulesInjected = false;
+let fontImportsInjected = false;
+
+/**
+ * Extract @property rules from CSS and inject them into the main document.
+ * This is necessary because @property rules don't work inside shadow DOM -
+ * they must be registered at the document level.
+ */
+function injectPropertyRulesIntoDocument(css: string): void {
+    if (propertyRulesInjected) return;
+
+    const propertyRuleRegex = /@property\s+[^{]+\{[^}]*\}/g;
+    const propertyRules = css.match(propertyRuleRegex);
+
+    if (propertyRules && propertyRules.length > 0) {
+        const style = document.createElement("style");
+        style.id = "ankihub-property-rules";
+        style.textContent = propertyRules.join("\n");
+        document.head.appendChild(style);
+        propertyRulesInjected = true;
+    }
+}
+
+/**
+ * Extract Google Font @import rules from CSS and inject them into the main document.
+ * This is necessary because @font-face rules (which the @import resolves to) don't work
+ * inside shadow DOM - fonts must be loaded at the document level.
+ */
+function injectFontImportsIntoDocument(css: string): void {
+    if (fontImportsInjected) return;
+
+    const fontImportRegex = /@import.*?googleapis.*?;/g;
+    const fontImports = css.match(fontImportRegex);
+    if (fontImports && fontImports.length > 0) {
+        const style = document.createElement("style");
+        style.id = "ankihub-font-imports";
+        style.textContent = fontImports.join("\n");
+        document.head.appendChild(style);
+        fontImportsInjected = true;
+    }
+}
+
 
 function getTargetElement(target: string | HTMLElement): HTMLElement | null {
     return typeof target === "string"
@@ -92,6 +134,8 @@ export class TutorialEffect {
         }
 
         const css = tailwindCss.replaceAll(":root", ":host");
+        injectPropertyRulesIntoDocument(css);
+        injectFontImportsIntoDocument(css);
         const style = document.createElement("style");
         style.textContent = css;
         this.shadowRoot.append(style);
@@ -114,11 +158,7 @@ export class TutorialEffect {
         this.cleanUpdateHandler?.();
         this.targetElement?.removeEventListener("click", this.targetClickHandler);
         this.removeSpotlight();
-        setTimeout(() => {
-            if (this.hostElement.parentNode) {
-                this.hostElement.parentNode.removeChild(this.hostElement);
-            }
-        }, 200);
+        this.hostElement.remove();
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = null;

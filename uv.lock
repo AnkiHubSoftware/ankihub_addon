@@ -150,9 +150,7 @@ aqt-legacy = [
     { name = "pyqtwebengine" },
 ]
 bundle = [
-    { name = "django", version = "4.2.27", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "5.2.9", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django" },
     { name = "django-cotton" },
     { name = "mashumaro" },
     { name = "peewee" },
@@ -202,7 +200,7 @@ aqt-legacy = [
     { name = "pyqtwebengine", specifier = "==5.15.2" },
 ]
 bundle = [
-    { name = "django", specifier = ">=4.2.27" },
+    { name = "django", specifier = "==4.2.27" },
     { name = "django-cotton", specifier = ">=2.5.1" },
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
     { name = "peewee", specifier = "==3.18.2" },
@@ -702,14 +700,10 @@ wheels = [
 name = "django"
 version = "4.2.27"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
-    "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
-]
 dependencies = [
-    { name = "asgiref", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "sqlparse", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "tzdata", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "asgiref" },
+    { name = "sqlparse" },
+    { name = "tzdata", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ce/ff/6aa5a94b85837af893ca82227301ac6ddf4798afda86151fb2066d26ca0a/django-4.2.27.tar.gz", hash = "sha256:b865fbe0f4a3d1ee36594c5efa42b20db3c8bbb10dff0736face1c6e4bda5b92", size = 10432781, upload-time = "2025-12-02T14:01:49.006Z" }
 wheels = [
@@ -717,51 +711,11 @@ wheels = [
 ]
 
 [[package]]
-name = "django"
-version = "5.2.9"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
-]
-dependencies = [
-    { name = "asgiref", marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "sqlparse", marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "tzdata", marker = "(python_full_version >= '3.10' and python_full_version < '3.12' and sys_platform == 'win32') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/1c/188ce85ee380f714b704283013434976df8d3a2df8e735221a02605b6794/django-5.2.9.tar.gz", hash = "sha256:16b5ccfc5e8c27e6c0561af551d2ea32852d7352c67d452ae3e76b4f6b2ca495", size = 10848762, upload-time = "2025-12-02T14:01:08.418Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/b0/7f42bfc38b8f19b78546d47147e083ed06e12fc29c42da95655e0962c6c2/django-5.2.9-py3-none-any.whl", hash = "sha256:3a4ea88a70370557ab1930b332fd2887a9f48654261cdffda663fef5976bb00a", size = 8290652, upload-time = "2025-12-02T14:01:03.485Z" },
-]
-
-[[package]]
-name = "django"
-version = "6.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-]
-dependencies = [
-    { name = "asgiref", marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "sqlparse", marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "tzdata", marker = "(python_full_version >= '3.12' and sys_platform == 'win32') or (python_full_version < '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/15/75/19762bfc4ea556c303d9af8e36f0cd910ab17dff6c8774644314427a2120/django-6.0.tar.gz", hash = "sha256:7b0c1f50c0759bbe6331c6a39c89ae022a84672674aeda908784617ef47d8e26", size = 10932418, upload-time = "2025-12-03T16:26:21.878Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/ae/f19e24789a5ad852670d6885f5480f5e5895576945fcc01817dfd9bc002a/django-6.0-py3-none-any.whl", hash = "sha256:1cc2c7344303bbfb7ba5070487c17f7fc0b7174bbb0a38cebf03c675f5f19b6d", size = 8339181, upload-time = "2025-12-03T16:26:16.231Z" },
-]
-
-[[package]]
 name = "django-cotton"
 version = "2.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", version = "4.2.27", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "5.2.9", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a8/a9/ec7c6172beb4adb67278df3b58ea4e9e3b21a1987b3a5b972d53dd7d3837/django_cotton-2.5.1.tar.gz", hash = "sha256:b2dbd346d0aced774de0c212d2f6c4e5f30cb8e14521379e60e16b448934af0e", size = 30284, upload-time = "2025-12-08T07:55:53.727Z" }
 wheels = [
@@ -778,7 +732,7 @@ resolution-markers = [
 ]
 dependencies = [
     { name = "asgiref", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "4.2.27", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "django-stubs-ext", version = "5.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "tomli", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "types-pyyaml", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
@@ -802,8 +756,7 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", version = "5.2.9", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "django-stubs-ext", version = "5.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "tomli", marker = "python_full_version == '3.10.*' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "types-pyyaml", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
@@ -823,7 +776,7 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", version = "4.2.27", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "typing-extensions", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9f/06/7b210e0073c6cb8824bde82afc25f268e8c410a99d3621297f44fa3f6a6c/django_stubs_ext-5.1.3.tar.gz", hash = "sha256:3e60f82337f0d40a362f349bf15539144b96e4ceb4dbd0239be1cd71f6a74ad0", size = 9613, upload-time = "2025-02-07T09:56:22.543Z" }
@@ -844,8 +797,7 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", version = "5.2.9", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.12' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", version = "6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "typing-extensions", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/14/a2/d67f4a5200ff7626b104eddceaf529761cba4ed318a73ffdb0677551be73/django_stubs_ext-5.2.8.tar.gz", hash = "sha256:b39938c46d7a547cd84e4a6378dbe51a3dd64d70300459087229e5fee27e5c6b", size = 6487, upload-time = "2025-12-01T08:12:37.486Z" }
