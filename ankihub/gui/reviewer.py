@@ -474,9 +474,6 @@ def _show_chatbot_for_current_card(card: Card) -> None:
 def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
-    feature_flags = config.get_feature_flags()
-    if not (feature_flags.get("mh_integration") or feature_flags.get("chatbot")):
-        return
 
     js = get_remove_anking_button_js()
     aqt.mw.reviewer.web.eval(js)
@@ -537,11 +534,10 @@ def _get_enabled_buttons() -> Set[str]:
     if feature_flags.get("chatbot") and config.public_config.get("ankihub_ai_chatbot"):
         result.add(SidebarPageType.CHATBOT.value)
 
-    if feature_flags.get("mh_integration"):
-        if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
-            result.add(SidebarPageType.BOARDS_AND_BEYOND.value)
-        if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
-            result.add(SidebarPageType.FIRST_AID.value)
+    if _get_enabled_steps_for_resource_type(ResourceType.BOARDS_AND_BEYOND):
+        result.add(SidebarPageType.BOARDS_AND_BEYOND.value)
+    if _get_enabled_steps_for_resource_type(ResourceType.FIRST_AID):
+        result.add(SidebarPageType.FIRST_AID.value)
 
     return result
 

@@ -66,9 +66,8 @@ def _general_tab(conf_window) -> None:
     if feature_flags.get("chatbot"):
         tab.checkbox("ankihub_ai_chatbot", "AnkiHub AI Chatbot")
 
-    if feature_flags.get("mh_integration"):
-        add_nested_checkboxes(tab, key_prefix="boards_and_beyond", description="Boards and Beyond")
-        add_nested_checkboxes(tab, key_prefix="first_aid_forward", description="First Aid Forward")
+    add_nested_checkboxes(tab, key_prefix="boards_and_beyond", description="Boards and Beyond")
+    add_nested_checkboxes(tab, key_prefix="first_aid_forward", description="First Aid Forward")
 
     if feature_flags.get("fsrs_reminder") and get_deck_for_ah_did(config.anking_deck_id):
         tab.checkbox(
