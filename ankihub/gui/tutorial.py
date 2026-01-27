@@ -458,7 +458,13 @@ class Tutorial:
             js = self._render_tooltip(eval_js=False)
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
-        elif context in self.extra_backdrop_contexts:
+        elif (
+            context in self.extra_backdrop_contexts
+            # This is a workaround to ensure the backdrop is applied to the overview bottom bar
+            # We cannot add it to the extra_backdrop_contexts because Anki doesn't keep a reference to the instance
+            or aqt.mw.overview.bottom in self.extra_backdrop_contexts
+            and isinstance(context, OverviewBottomBar)
+        ):
             js = get_backdrop_js()
         if js:
             js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
