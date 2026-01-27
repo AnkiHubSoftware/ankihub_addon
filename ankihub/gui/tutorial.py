@@ -233,6 +233,7 @@ def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]
 class TutorialStep:
     body: str
     target: Optional[Union[str, Callable[[], str]]] = ""
+    click_target: Optional[Union[str, Callable[[], str]]] = ""
     tooltip_context: Optional[Any] = None
     target_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
@@ -295,6 +296,10 @@ class Tutorial:
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
+        if step.click_target:
+            tooltip_options["clickTarget"] = (
+                step.click_target if isinstance(step.click_target, str) else step.click_target()
+            )
         js = self._render_js_function_with_options("showTutorialStep", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)
@@ -616,6 +621,7 @@ class OnboardingTutorial(Tutorial):
                 TutorialStep(
                     body="We've already subscribed you to this deck. Click on it to open.",
                     target=f"[id='{intro_deck_config.anki_id}']",
+                    click_target=lambda: f"[id='{intro_deck_config.anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
                 )
@@ -667,6 +673,7 @@ class OnboardingTutorial(Tutorial):
                     body="You now have the deck <b>Getting Started with Anki</b> installed."
                     "<br><br>Click on it to open.",
                     target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
+                    click_target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
                 )
@@ -698,6 +705,7 @@ class OnboardingTutorial(Tutorial):
             TutorialStep(
                 "Click this button and start practicing card reviewing now!",
                 target="#study",
+                click_target="#study",
                 tooltip_context=aqt.mw.overview,
                 next_callback=self._move_to_review,
             )
