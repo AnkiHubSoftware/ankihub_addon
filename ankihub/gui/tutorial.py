@@ -183,7 +183,12 @@ def tutorial_assets_js(on_loaded: str) -> str:
     js = """
 (() => {
     const onLoaded = () => {
-         %(on_loaded)s
+        const intervalId = setInterval(() => {
+            if (typeof AnkiHub !== 'undefined') {
+              clearInterval(intervalId);
+              {%(on_loaded)s}
+            }
+        }, 10);
     };
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
@@ -469,10 +474,7 @@ class Tutorial:
         elif context in self.extra_backdrop_contexts or isinstance(context, self.extra_backdrop_context_types()):
             js = get_backdrop_js()
         if js:
-            js = tutorial_assets_js(
-                "(() => { const intervalId = setInterval(() => { if (typeof AnkiHub !== 'undefined')"
-                " { clearInterval(intervalId); {%s} } }, 10) })()" % js
-            )
+            js = tutorial_assets_js(js)
             web_content.body += f"<script>{js}</script>"
 
     def _cleanup_step(self, destroy_effect: bool = True) -> None:
