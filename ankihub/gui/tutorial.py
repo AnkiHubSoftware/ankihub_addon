@@ -437,7 +437,12 @@ class Tutorial:
             self.end()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
-            self.next()
+            step = self.steps[self.current_step - 1]
+            if step.next_callback:
+                step.next_callback(self.next)
+            else:
+                self.next()
+
             return True, None
         return handled
 
