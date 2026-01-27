@@ -467,7 +467,10 @@ class Tutorial:
         ):
             js = get_backdrop_js()
         if js:
-            js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
+            js = tutorial_assets_js(
+                "(() => { const intervalId = setInterval(() => { if (typeof AnkiHub !== 'undefined')"
+                " { clearInterval(intervalId); {%s} } }, 10) })()" % js
+            )
             web_content.body += f"<script>{js}</script>"
 
     def _cleanup_step(self, destroy_effect: bool = True) -> None:
