@@ -269,6 +269,14 @@ class Tutorial:
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
         return tuple()
 
+    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
+        """Similar to `extra_backdrop_contexts`,
+        but returns the types of the contexts instead of the contexts themselves.
+        Required to handle DeckBrowserBottomBar and OverviewBottomBar,
+        which Anki doesn't keep a reference to their instances.
+        """
+        return tuple(type(context) for context in self.extra_backdrop_contexts)
+
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
         return f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
 
@@ -458,13 +466,7 @@ class Tutorial:
             js = self._render_tooltip(eval_js=False)
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
-        elif (
-            context in self.extra_backdrop_contexts
-            # This is a workaround to ensure the backdrop is applied to the overview bottom bar
-            # We cannot add it to the extra_backdrop_contexts because Anki doesn't keep a reference to the instance
-            or aqt.mw.overview.bottom in self.extra_backdrop_contexts
-            and isinstance(context, OverviewBottomBar)
-        ):
+        elif context in self.extra_backdrop_contexts or isinstance(context, self.extra_backdrop_context_types()):
             js = get_backdrop_js()
         if js:
             js = tutorial_assets_js(
@@ -724,3 +726,8 @@ class OnboardingTutorial(Tutorial):
     @property
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
         return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
+
+    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
+        from aqt.deckbrowser import DeckBrowserBottomBar
+
+        return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)
