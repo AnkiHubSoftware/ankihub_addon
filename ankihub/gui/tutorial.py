@@ -667,16 +667,15 @@ class OnboardingTutorial(Tutorial):
 
             steps.append(
                 TutorialStep(
-                    body="There is no deck here, but we've already subscribed you to "
-                    "the <b>Getting Started with Anki</b> deck.<br><br>"
+                    body="The <b>Getting Started with Anki</b> deck is not installed, "
+                    "but we’ve already subscribed you to it.<br><br>"
                     "To make a deck you are subscribed to appear here, "
                     "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
                     "Right now you can just <b>click the sync button below</b>.",
-                    target=".deck",
+                    target="center table",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
                     next_label="Sync with AnkiHub",
-                    # auto_advance=False,
                     block_target_click=True,
                 )
             )
