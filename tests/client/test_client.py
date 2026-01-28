@@ -128,6 +128,7 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 f"--username={DB_USERNAME}",
                 "--format=custom",
                 "--clean",
+                "--if-exists",
                 "--jobs=4",
                 DB_DUMP_FILE_NAME,
             ],
@@ -233,7 +234,7 @@ def create_db_dump_if_not_exists() -> None:
             "-c",
             (
                 f"pg_dump --dbname={DB_NAME} --username={DB_USERNAME} "
-                "--format=custom --schema=public "
+                "--format=custom -t 'public.*' "
                 f"> {DB_DUMP_FILE_NAME}"
             ),
         ],
