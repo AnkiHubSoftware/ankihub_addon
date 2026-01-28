@@ -64,12 +64,14 @@ type TutorialEffectOptions = {
     backdrop?: string | HTMLElement,
     target?: string | HTMLElement,
     blockTargetClick: boolean,
+    clickTarget?: string,
 };
 
 export class TutorialEffect {
 
     options: TutorialEffectOptions;
     targetElement?: HTMLElement;
+    clickTargetElement?: HTMLElement;
     modalElement!: HTMLElement;
     arrowElement?: HTMLElement;
     shadowRoot!: ShadowRoot;
@@ -81,6 +83,7 @@ export class TutorialEffect {
         this.options = {
             modal: "",
             blockTargetClick: false,
+            clickTarget: "",
             ...options,
         };
         this.create();
@@ -130,7 +133,15 @@ export class TutorialEffect {
             if (this.options.modal) {
                 this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
             }
-            this.targetElement.addEventListener("click", this.targetClickHandler);
+            if (this.options.clickTarget) {
+                this.clickTargetElement = document.querySelector(this.options.clickTarget) ?? undefined;
+                if (this.clickTargetElement) {
+                    this.clickTargetElement.addEventListener("click", this.targetClickHandler);
+                    this.clickTargetElement.setAttribute("data-ah-original-onclick", this.clickTargetElement.getAttribute("onclick") ?? "");
+                    this.clickTargetElement.removeAttribute("onclick");
+                }
+            }
+
         }
 
         const css = tailwindCss.replaceAll(":root", ":host");
@@ -142,7 +153,9 @@ export class TutorialEffect {
         Alpine.initTree(this.modalElement);
     }
 
-    targetClickHandler() {
+    targetClickHandler(event: MouseEvent) {
+        event.preventDefault();
+        event.stopPropagation();
         bridgeCommand("ankihub_tutorial_target_click");
     }
 
@@ -156,7 +169,9 @@ export class TutorialEffect {
 
     destroy() {
         this.cleanUpdateHandler?.();
-        this.targetElement?.removeEventListener("click", this.targetClickHandler);
+        this.clickTargetElement?.removeEventListener("click", this.targetClickHandler);
+        this.clickTargetElement?.setAttribute("onclick", this.clickTargetElement.getAttribute("data-ah-original-onclick") ?? "");
+        this.clickTargetElement?.removeAttribute("data-ah-original-onclick");
         this.removeSpotlight();
         this.hostElement.remove();
         if (this.resizeTimeout) {
@@ -294,11 +309,12 @@ export function showModal(modal: string) {
     createAndShowEffect({ modal });
 }
 
-type ShowModalArgs = {
+type ShowStepArgs = {
     modal: string,
     arrow: string,
     target: string,
     blockTargetClick?: boolean,
+    clickTarget?: string,
 };
 
 export function showTutorialStep({
@@ -306,12 +322,14 @@ export function showTutorialStep({
     arrow,
     target,
     blockTargetClick = false,
-}: ShowModalArgs) {
+    clickTarget = "",
+}: ShowStepArgs) {
     createAndShowEffect({
         modal,
         arrow,
         target,
         blockTargetClick,
+        clickTarget,
     });
 }
 
