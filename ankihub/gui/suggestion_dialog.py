@@ -39,7 +39,9 @@ from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.exporting import to_note_data
 from ..main.suggestions import (
+    ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
+    ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
     ChangeSuggestionResult,
     get_anki_nid_to_ah_dids_dict,
@@ -207,6 +209,8 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
         elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
             show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+        elif suggestion_result == ChangeSuggestionResult.EMPTY_FIRST_FIELD:
+            show_tooltip("Suggestion was not created because the first field is required.", parent=parent)
         elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
             show_error_dialog(
                 "This note has been deleted from AnkiHub. No new suggestions can be made.",
@@ -218,6 +222,11 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 f"Unknown suggestion result: {suggestion_result}"
             )
     else:
+        # Check for empty first field before submitting new note suggestion
+        if not note.fields or not note.fields[0].strip():
+            show_tooltip("The first field is required.", parent=parent)
+            return
+
         try:
             suggest_new_note(
                 note=note,
@@ -375,28 +384,49 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
 
     msg_about_created_suggestions = (
         f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n"
     )
 
     notes_without_changes = [
         note for note, errors in suggestions_result.errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
     notes_that_dont_exist_on_ankihub = [
-        note for note, errors in suggestions_result.errors_by_nid.items() if "Note object does not exist" in str(errors)
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(errors)
     ]
-    msg_about_failed_suggestions = (
-        (
+    notes_with_empty_first_field = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(errors)
+    ]
+
+    if suggestions_result.errors_by_nid:
+        category_messages = []
+        if notes_without_changes:
+            category_messages.append(
+                f"Notes without changes ({len(notes_without_changes)}):\n"
+                f"{', '.join(str(nid) for nid in notes_without_changes)}"
+            )
+        if notes_that_dont_exist_on_ankihub:
+            category_messages.append(
+                f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
+                f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
+            )
+        if notes_with_empty_first_field:
+            category_messages.append(
+                f"Notes with the first field empty ({len(notes_with_empty_first_field)}):\n"
+                f"{', '.join(str(nid) for nid in notes_with_empty_first_field)}"
+            )
+
+        msg_about_failed_suggestions = (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f"{', '.join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n"
-            f"Notes without changes ({len(notes_without_changes)}):\n"
-            f"{', '.join(str(nid) for nid in notes_without_changes)}\n\n"
-            f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
-            f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
+            + "\n\n".join(category_messages)
         )
-        if suggestions_result.errors_by_nid
-        else ""
-    )
+    else:
+        msg_about_failed_suggestions = ""
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
     showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")

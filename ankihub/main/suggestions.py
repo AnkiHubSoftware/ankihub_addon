@@ -52,15 +52,26 @@ ANKIHUB_NO_CHANGE_ERROR = "Suggestion fields and tags don't have any changes to 
 # the note does not exist on AnkiHub
 ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR = "Note object does not exist"
 
+# string for errors when the first field of a note is empty
+ANKIHUB_EMPTY_FIRST_FIELD_ERROR = "The first field is required and cannot be empty"
+
 
 class ChangeSuggestionResult(Enum):
     SUCCESS = "success"
     NO_CHANGES = "no changes"
     ANKIHUB_NOT_FOUND = "not found"
+    EMPTY_FIRST_FIELD = "empty first field"
 
 
 class MediaUploadCallback(Protocol):
     def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None: ...
+
+
+def _has_empty_first_field(note: Note) -> bool:
+    """Returns True if the first field of the note is empty or whitespace-only."""
+    if not note.fields:
+        return True
+    return not note.fields[0].strip()
 
 
 def suggest_note_update(
@@ -74,6 +85,9 @@ def suggest_note_update(
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a ChangeSuggestionResult enum value.
     """
+
+    if _has_empty_first_field(note):
+        return ChangeSuggestionResult.EMPTY_FIRST_FIELD
 
     suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
@@ -154,6 +168,7 @@ def suggest_notes_in_bulk(
         change_note_suggestions,
         nids_without_changes,
         nids_deleted_on_remote,
+        nids_with_empty_first_field,
     ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
     new_note_suggestions = cast(
@@ -187,6 +202,7 @@ def suggest_notes_in_bulk(
     errors_by_nid_from_local = {
         **{nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes},
         **{nid: ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR for nid in nids_deleted_on_remote},
+        **{nid: ANKIHUB_EMPTY_FIRST_FIELD_ERROR for nid in nids_with_empty_first_field},
     }
     errors_by_nid: Dict[NoteId, Any] = {
         **errors_by_nid_from_remote,
@@ -231,19 +247,22 @@ def _suggestions_for_notes(
     Sequence[ChangeNoteSuggestion],
     Sequence[NoteId],
     Sequence[NoteId],
+    Sequence[NoteId],
 ]:
     """
-    Splits the list of notes into four categories:
+    Splits the list of notes into five categories:
     - notes that should be sent as NewNoteSuggestions
     - notes that should be sent as ChangeNoteSuggestions
     - notes that should not be sent because they don't have any changes
     - notes that should not be sent because they were deleted on AnkiHub
+    - notes that should not be sent because they have an empty first field
 
-    Returns a tuple of four sequences:
+    Returns a tuple of five sequences:
     - new_note_suggestions
     - change_note_suggestions
     - nids_without_changes
     - nids_deleted_on_remote
+    - nids_with_empty_first_field
     """
     anki_nids = [note.id for note in notes]
 
@@ -256,7 +275,12 @@ def _suggestions_for_notes(
     notes_for_new_note_suggestions = []
     notes_for_change_note_suggestions = []
     nids_deleted_on_remote = []
+    nids_with_empty_first_field: List[NoteId] = []
     for note in notes:
+        if _has_empty_first_field(note):
+            nids_with_empty_first_field.append(note.id)
+            continue
+
         if ah_db_note := ah_db_note_by_anki_nid.get(note.id):
             ah_db_note = cast(AnkiHubNote, ah_db_note)
             if ah_db_note.was_deleted():
@@ -296,6 +320,7 @@ def _suggestions_for_notes(
         change_note_suggestions,
         nids_without_changes,
         nids_deleted_on_remote,
+        nids_with_empty_first_field,
     )
 
 
