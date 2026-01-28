@@ -234,7 +234,7 @@ def create_db_dump_if_not_exists() -> None:
             "-c",
             (
                 f"pg_dump --dbname={DB_NAME} --username={DB_USERNAME} "
-                "--format=custom -t 'public.*' "
+                "--format=custom -t 'public.%' "
                 f"> {DB_DUMP_FILE_NAME}"
             ),
         ],
