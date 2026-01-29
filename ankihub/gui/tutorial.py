@@ -241,7 +241,7 @@ class TutorialStep:
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[Callable[[], None]], None]] = None
     next_label: str = "Next"
-    back_callback: Optional[Callable[[], None]] = None
+    back_callback: Optional[Callable[[Callable[[], None]], None]] = None
     back_label: str = "Back"
     block_target_click: bool = False
     auto_advance: bool = True
