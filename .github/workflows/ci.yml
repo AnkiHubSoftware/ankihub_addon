@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: AnkiHubSoftware/ankihub
-          ref: INTP-368
+          ref: dev
           path: ankihub_web
 
       - name: Set up AnkiHub env
