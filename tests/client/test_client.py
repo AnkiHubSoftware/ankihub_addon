@@ -204,7 +204,6 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 (
                     "SELECT 'users_user' AS tbl, COUNT(*) FROM users_user "
                     "UNION ALL SELECT 'decks_deck', COUNT(*) FROM decks_deck "
-                    "UNION ALL SELECT 'decks_userdeckrelation', COUNT(*) FROM decks_userdeckrelation "
                     "UNION ALL SELECT 'knox_authtoken', COUNT(*) FROM knox_authtoken "
                     "UNION ALL SELECT 'decks_deckmedia', COUNT(*) FROM decks_deckmedia;"
                 ),
