@@ -227,18 +227,13 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 f"--dbname={DB_NAME}",
                 f"--username={DB_USERNAME}",
                 "-c",
-                (
-                    "SELECT id, username, email, is_active, is_staff, is_superuser, "
-                    "customer_id, trial_started_at, agreed_to_terms, "
-                    "external_course_access_status "
-                    "FROM users_user;"
-                ),
+                "SELECT * FROM users_user;",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        print(f"User data for test1/test2 after restore:\n{result.stdout}")
+        print(f"User data after restore:\n{result.stdout}")
         if result.stderr:
             print(f"User data stderr: {result.stderr}")
 
