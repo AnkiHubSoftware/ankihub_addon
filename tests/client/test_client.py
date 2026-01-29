@@ -145,6 +145,23 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             raise_on_error=True,
         )
 
+        # Debug: print the filtered TOC list to verify what will be restored
+        toc_result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "bash",
+                "-c",
+                f"wc -l < {toc_list_path} && grep 'TABLE DATA' {toc_list_path}",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        print(f"Filtered TOC list (TABLE DATA entries):\n{toc_result.stdout}")
+
         result = subprocess.run(
             [
                 "docker",
@@ -172,6 +189,33 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             result=result,
             raise_on_error=False,
         )
+
+        # Debug: check row counts in key tables after restore
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "psql",
+                f"--dbname={DB_NAME}",
+                f"--username={DB_USERNAME}",
+                "-c",
+                (
+                    "SELECT 'users_user' AS tbl, COUNT(*) FROM users_user "
+                    "UNION ALL SELECT 'decks_deck', COUNT(*) FROM decks_deck "
+                    "UNION ALL SELECT 'decks_userdeckrelation', COUNT(*) FROM decks_userdeckrelation "
+                    "UNION ALL SELECT 'knox_authtoken', COUNT(*) FROM knox_authtoken "
+                    "UNION ALL SELECT 'decks_deckmedia', COUNT(*) FROM decks_deckmedia;"
+                ),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        print(f"DB row counts after restore:\n{result.stdout}")
+        if result.stderr:
+            print(f"DB row counts stderr: {result.stderr}")
 
         _wait_for_server(
             api_url=LOCAL_API_URL,
@@ -252,6 +296,32 @@ def create_db_dump_if_not_exists() -> None:
         text=True,
     )
     report_command_result(command_name="db setup", result=result, raise_on_error=True)
+
+    # Debug: check row counts after fixture creation (before dump)
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            "-i",
+            DB_CONTAINER_NAME,
+            "psql",
+            f"--dbname={DB_NAME}",
+            f"--username={DB_USERNAME}",
+            "-c",
+            (
+                "SELECT 'users_user' AS tbl, COUNT(*) FROM users_user "
+                "UNION ALL SELECT 'decks_deck', COUNT(*) FROM decks_deck "
+                "UNION ALL SELECT 'knox_authtoken', COUNT(*) FROM knox_authtoken "
+                "UNION ALL SELECT 'decks_deckmedia', COUNT(*) FROM decks_deckmedia;"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    print(f"DB row counts after fixture creation (before dump):\n{result.stdout}")
+    if result.stderr:
+        print(f"DB row counts stderr: {result.stderr}")
 
     # Dump the DB to a file to be able to restore it before each test
     result = subprocess.run(
