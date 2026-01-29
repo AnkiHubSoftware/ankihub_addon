@@ -183,7 +183,12 @@ def tutorial_assets_js(on_loaded: str) -> str:
     js = """
 (() => {
     const onLoaded = () => {
-         %(on_loaded)s
+        const intervalId = setInterval(() => {
+            if (typeof AnkiHub !== 'undefined') {
+              clearInterval(intervalId);
+              {%(on_loaded)s}
+            }
+        }, 10);
     };
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
@@ -233,6 +238,7 @@ def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]
 class TutorialStep:
     body: str
     target: Optional[Union[str, Callable[[], str]]] = ""
+    click_target: Optional[Union[str, Callable[[], str]]] = ""
     tooltip_context: Optional[Any] = None
     target_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
@@ -268,6 +274,14 @@ class Tutorial:
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
         return tuple()
 
+    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
+        """Similar to `extra_backdrop_contexts`,
+        but returns the types of the contexts instead of the contexts themselves.
+        Required to handle DeckBrowserBottomBar and OverviewBottomBar,
+        which Anki doesn't keep a reference to their instances.
+        """
+        return tuple(type(context) for context in self.extra_backdrop_contexts)
+
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
         return f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
 
@@ -295,6 +309,10 @@ class Tutorial:
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
+        if step.click_target:
+            tooltip_options["clickTarget"] = (
+                step.click_target if isinstance(step.click_target, str) else step.click_target()
+            )
         js = self._render_js_function_with_options("showTutorialStep", tooltip_options)
         if eval_js:
             tooltip_web.eval(js)
@@ -437,7 +455,12 @@ class Tutorial:
             self.end()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
-            self.next()
+            step = self.steps[self.current_step - 1]
+            if step.next_callback:
+                step.next_callback(self.next)
+            else:
+                self.next()
+
             return True, None
         return handled
 
@@ -448,10 +471,10 @@ class Tutorial:
             js = self._render_tooltip(eval_js=False)
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
-        elif context in self.extra_backdrop_contexts:
+        elif context in self.extra_backdrop_contexts or isinstance(context, self.extra_backdrop_context_types()):
             js = get_backdrop_js()
         if js:
-            js = tutorial_assets_js(f"setTimeout(() => {{ {js} }}, 100)")
+            js = tutorial_assets_js(js)
             web_content.body += f"<script>{js}</script>"
 
     def _cleanup_step(self, destroy_effect: bool = True) -> None:
@@ -611,6 +634,7 @@ class OnboardingTutorial(Tutorial):
                 TutorialStep(
                     body="We've already subscribed you to this deck. Click on it to open.",
                     target=f"[id='{intro_deck_config.anki_id}']",
+                    click_target=lambda: f"[id='{intro_deck_config.anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
                 )
@@ -643,16 +667,15 @@ class OnboardingTutorial(Tutorial):
 
             steps.append(
                 TutorialStep(
-                    body="There is no deck here, but we've already subscribed you to "
-                    "the <b>Getting Started with Anki</b> deck.<br><br>"
+                    body="The <b>Getting Started with Anki</b> deck is not installed, "
+                    "but we’ve already subscribed you to it.<br><br>"
                     "To make a deck you are subscribed to appear here, "
                     "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
                     "Right now you can just <b>click the sync button below</b>.",
-                    target=".deck",
+                    target="center table",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
                     next_label="Sync with AnkiHub",
-                    # auto_advance=False,
                     block_target_click=True,
                 )
             )
@@ -662,6 +685,7 @@ class OnboardingTutorial(Tutorial):
                     body="You now have the deck <b>Getting Started with Anki</b> installed."
                     "<br><br>Click on it to open.",
                     target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}']",
+                    click_target=lambda: f"[id='{config.deck_config(config.intro_deck_id).anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=self._move_to_intro_deck_overview,
                 )
@@ -693,6 +717,7 @@ class OnboardingTutorial(Tutorial):
             TutorialStep(
                 "Click this button and start practicing card reviewing now!",
                 target="#study",
+                click_target="#study",
                 tooltip_context=aqt.mw.overview,
                 next_callback=self._move_to_review,
             )
@@ -702,3 +727,8 @@ class OnboardingTutorial(Tutorial):
     @property
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
         return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
+
+    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
+        from aqt.deckbrowser import DeckBrowserBottomBar
+
+        return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)

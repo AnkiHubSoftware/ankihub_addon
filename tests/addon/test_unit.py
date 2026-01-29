@@ -1124,6 +1124,7 @@ class TestOnSuggestNotesInBulkDone:
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
         nid_3 = NoteId(3)
+        nid_4 = NoteId(4)
         _on_suggest_notes_in_bulk_done(
             future=future_with_result(
                 suggestions.BulkNoteSuggestionsResult(
@@ -1131,6 +1132,7 @@ class TestOnSuggestNotesInBulkDone:
                         nid_1: ["some error"],
                         nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
                         nid_3: ["Note object does not exist"],
+                        nid_4: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
                     },
                     change_note_suggestions_count=10,
                     new_note_suggestions_count=20,
@@ -1147,16 +1149,57 @@ class TestOnSuggestNotesInBulkDone:
                 Submitted 10 change note suggestion(s).
                 Submitted 20 new note suggestion(s).
 
-
-                Failed to submit suggestions for 3 note(s).
+                Failed to submit suggestions for 4 note(s).
                 All notes with failed suggestions:
-                1, 2, 3
+                1, 2, 3, 4
 
                 Notes without changes (1):
                 2
 
                 Notes that don't exist on AnkiHub (1):
                 3
+
+                Notes with the first field empty (1):
+                4
+                """
+            ).strip()
+        )
+
+    def test_empty_categories_are_not_shown(
+        self,
+        mocker: MockerFixture,
+    ):
+        """Test that only non-empty categories are shown in the message."""
+        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
+        nid_1 = NoteId(1)
+        _on_suggest_notes_in_bulk_done(
+            future=future_with_result(
+                suggestions.BulkNoteSuggestionsResult(
+                    errors_by_nid={
+                        nid_1: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
+                    },
+                    change_note_suggestions_count=5,
+                    new_note_suggestions_count=3,
+                )
+            ),
+            parent=aqt.mw,
+        )
+
+        _, kwargs = showText_mock.call_args
+        # Only the "empty first field" category should be shown, not the others
+        assert (
+            kwargs.get("txt")
+            == dedent(
+                """
+                Submitted 5 change note suggestion(s).
+                Submitted 3 new note suggestion(s).
+
+                Failed to submit suggestions for 1 note(s).
+                All notes with failed suggestions:
+                1
+
+                Notes with the first field empty (1):
+                1
                 """
             ).strip()
         )
