@@ -141,6 +141,11 @@ class AnkiHubHTTPError(Exception):
         self.response = response
 
     def __str__(self):
+        try:
+            response_text = self.response.text
+        except Exception:
+            response_text = "Unable to read response content"
+        print("Response text:", response_text)
         return f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
 
 
