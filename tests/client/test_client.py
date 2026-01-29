@@ -216,6 +216,32 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
         if result.stderr:
             print(f"DB row counts stderr: {result.stderr}")
 
+        # Debug: dump full user data for test users
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "psql",
+                f"--dbname={DB_NAME}",
+                f"--username={DB_USERNAME}",
+                "-c",
+                (
+                    "SELECT id, username, email, is_active, is_staff, is_superuser, "
+                    "customer_id, trial_started_at, agreed_to_terms, "
+                    "external_course_access_status "
+                    "FROM users_user;"
+                ),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        print(f"User data for test1/test2 after restore:\n{result.stdout}")
+        if result.stderr:
+            print(f"User data stderr: {result.stderr}")
+
         _wait_for_server(
             api_url=LOCAL_API_URL,
             timeout=30.0,
