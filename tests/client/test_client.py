@@ -237,6 +237,32 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
         if result.stderr:
             print(f"User data stderr: {result.stderr}")
 
+        # Debug: dump waffle switch and flag data
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "psql",
+                f"--dbname={DB_NAME}",
+                f"--username={DB_USERNAME}",
+                "-c",
+                (
+                    "SELECT * FROM waffle_switch;"
+                    "SELECT * FROM waffle_flag;"
+                    "SELECT * FROM waffle_flag_users;"
+                    "SELECT * FROM waffle_flag_groups;"
+                ),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        print(f"Waffle data after restore:\n{result.stdout}")
+        if result.stderr:
+            print(f"Waffle data stderr: {result.stderr}")
+
         _wait_for_server(
             api_url=LOCAL_API_URL,
             timeout=30.0,
