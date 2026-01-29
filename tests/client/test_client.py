@@ -130,10 +130,7 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 DB_CONTAINER_NAME,
                 "bash",
                 "-c",
-                (
-                    f"pg_restore -l {DB_DUMP_FILE_NAME}"
-                    f" | grep -v ' SCHEMA ' > {toc_list_path}"
-                ),
+                (f"pg_restore -l {DB_DUMP_FILE_NAME} | grep -v ' SCHEMA ' > {toc_list_path}"),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -157,7 +154,8 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 "--format=custom",
                 "--clean",
                 "--if-exists",
-                "-L", toc_list_path,
+                "-L",
+                toc_list_path,
                 "--jobs=4",
                 DB_DUMP_FILE_NAME,
             ],
