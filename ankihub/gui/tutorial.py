@@ -448,7 +448,7 @@ class Tutorial:
                     left = 0
                     width = 0
 
-                js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, width: {width}, height: {height}}});"
+                js = f"AnkiHub.positionTutorialModal({{top: {top}, left: {left}, width: {width}, height: {height}}});"
                 tooltip_web.eval(js)
             return True, None
         elif message == TUTORIAL_CLOSED_PYCMD:

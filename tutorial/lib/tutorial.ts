@@ -380,7 +380,7 @@ type PositionTargetArgs = {
     height: number,
 };
 
-export function positionTutorialTarget({ top, left, width, height }: PositionTargetArgs) {
+export function positionTutorialModal({ top, left, width, height }: PositionTargetArgs) {
     if (activeEffect) {
         activeEffect.setModalPosition(top, left, width, height);
     }
