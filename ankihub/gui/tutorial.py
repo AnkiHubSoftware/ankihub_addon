@@ -507,12 +507,24 @@ class Tutorial:
 
 
 def prompt_for_onboarding_tutorial() -> None:
-    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
-
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
 
     config.set_onboarding_tutorial_pending(True)
+
+    def on_state_did_change(*args: Any, **kwargs: Any) -> None:
+        gui_hooks.state_did_change.remove(on_state_did_change)
+        _prompt_for_onboarding_tutorial()
+
+    if aqt.mw.state != "deckBrowser":
+        gui_hooks.state_did_change.append(on_state_did_change)
+        aqt.mw.moveToState("deckBrowser")
+    else:
+        _prompt_for_onboarding_tutorial()
+
+
+def _prompt_for_onboarding_tutorial() -> None:
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
     context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
     contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
