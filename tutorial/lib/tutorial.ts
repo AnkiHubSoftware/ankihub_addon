@@ -77,7 +77,6 @@ export class TutorialEffect {
     shadowRoot!: ShadowRoot;
     hostElement!: HTMLDivElement;
     cleanUpdateHandler?: () => void;
-    resizeTimeout: number | null = null;
 
     constructor(options: Partial<TutorialEffectOptions> = {}) {
         this.options = {
@@ -174,10 +173,6 @@ export class TutorialEffect {
         this.clickTargetElement?.removeAttribute("data-ah-original-onclick");
         this.removeSpotlight();
         this.hostElement.remove();
-        if (this.resizeTimeout) {
-            clearTimeout(this.resizeTimeout);
-            this.resizeTimeout = null;
-        }
     }
 
     spotlightClasses() {
@@ -380,7 +375,7 @@ type PositionTargetArgs = {
     height: number,
 };
 
-export function positionTutorialTarget({ top, left, width, height }: PositionTargetArgs) {
+export function positionTutorialModal({ top, left, width, height }: PositionTargetArgs) {
     if (activeEffect) {
         activeEffect.setModalPosition(top, left, width, height);
     }

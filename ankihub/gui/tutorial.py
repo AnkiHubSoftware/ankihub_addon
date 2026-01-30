@@ -1,3 +1,4 @@
+import functools
 import json
 from asyncio.futures import Future
 from dataclasses import dataclass
@@ -30,7 +31,6 @@ from .operations import AddonQueryOp
 START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
 DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
 SHOW_LATER_PYCMD = "ankihub_show_later"
-SHOW_PROMPT_PYCMD = "ankihub_show_prompt"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
@@ -178,18 +178,27 @@ def webview_for_context(context: Any) -> AnkiWebView:
         assert False, f"Webview context of type {type(context)} is not handled"
 
 
+def on_ankihub_loaded_js(on_loaded: str) -> str:
+    return (
+        """
+    (() => {
+        const intervalId = setInterval(() => {
+            if (typeof AnkiHub !== 'undefined') {
+                clearInterval(intervalId);
+                {%s}
+            }
+        }, 10);
+    })();
+"""
+        % on_loaded
+    )
+
+
 def tutorial_assets_js(on_loaded: str) -> str:
     web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
     js = """
 (() => {
-    const onLoaded = () => {
-        const intervalId = setInterval(() => {
-            if (typeof AnkiHub !== 'undefined') {
-              clearInterval(intervalId);
-              {%(on_loaded)s}
-            }
-        }, 10);
-    };
+    const onLoaded = () => {%(on_loaded)s};
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
         const css = document.createElement("link");
@@ -215,7 +224,7 @@ def tutorial_assets_js(on_loaded: str) -> str:
 """ % dict(
         css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
         js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
-        on_loaded=on_loaded,
+        on_loaded=on_ankihub_loaded_js(on_loaded),
     )
     return js
 
@@ -283,7 +292,9 @@ class Tutorial:
         return tuple(type(context) for context in self.extra_backdrop_contexts)
 
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
-        return f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
+        return on_ankihub_loaded_js(
+            f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
+        )
 
     def _render_tooltip(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
@@ -448,8 +459,17 @@ class Tutorial:
                     left = 0
                     width = 0
 
-                js = f"AnkiHub.positionTutorialTarget({{top: {top}, left: {left}, width: {width}, height: {height}}});"
-                tooltip_web.eval(js)
+                tooltip_web.eval(
+                    self._render_js_function_with_options(
+                        "positionTutorialModal",
+                        {
+                            "top": top,
+                            "left": left,
+                            "width": width,
+                            "height": height,
+                        },
+                    )
+                )
             return True, None
         elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
@@ -506,6 +526,31 @@ class Tutorial:
         self.show_current()
 
 
+def ensure_mw_state(state: str) -> Callable[[...], None]:
+    def change_state_and_call_func(func: Callable[[...], None], *args: Any, **kwargs: Any) -> None:
+        from aqt.main import MainWindowState
+
+        def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
+            gui_hooks.state_did_change.remove(on_state_did_change)
+            # Some delay appears to be required for the toolbar
+            aqt.mw.progress.single_shot(100, lambda: func(*args, **kwargs))
+
+        gui_hooks.state_did_change.append(on_state_did_change)
+        aqt.mw.moveToState(state)
+
+    def decorated_func(func: Callable[[...], None]) -> Callable[[...], None]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> None:
+            if aqt.mw.state != state:
+                change_state_and_call_func(func, *args, **kwargs)
+            else:
+                func(*args, **kwargs)
+
+        return wrapper
+
+    return decorated_func
+
+
 def prompt_for_onboarding_tutorial() -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
@@ -517,9 +562,24 @@ def prompt_for_onboarding_tutorial() -> None:
     context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
     contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
 
+    def js_for_context(context: Any) -> str:
+        if isinstance(context, DeckBrowser):
+            body = render_dialog(
+                title="📚 First time with Anki?",
+                body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+                "You can revisit it anytime in AnkiHub's Help menu.",
+                secondary_button_label="Maybe later",
+                main_button_label="Take tour",
+                on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+                on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
+                on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+            )
+            js = f"AnkiHub.showModal({json.dumps(body)})"
+        else:
+            js = get_backdrop_js()
+        return on_ankihub_loaded_js(js)
+
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if not isinstance(context, context_types):
-            return handled
         if message == START_ONBOARDING_PYCMD:
             remove_hooks()
             OnboardingTutorial().start()
@@ -531,31 +591,13 @@ def prompt_for_onboarding_tutorial() -> None:
         if message == SHOW_LATER_PYCMD:
             clean_up_webviews()
             return True, None
-        if message == SHOW_PROMPT_PYCMD:
-            if isinstance(context, DeckBrowser):
-                body = render_dialog(
-                    title="📚 First time with Anki?",
-                    body="Find your way in the app with this <b>onboarding tour</b>.<br>"
-                    "You can revisit it anytime in AnkiHub's Help menu.",
-                    secondary_button_label="Maybe later",
-                    main_button_label="Take tour",
-                    on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
-                    on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
-                    on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
-                )
-                aqt.mw.web.eval(f"AnkiHub.showModal({json.dumps(body)})")
-            elif isinstance(context, DeckBrowserBottomBar):
-                aqt.mw.bottomWeb.eval(get_backdrop_js())
-            elif isinstance(context, TopToolbar):
-                aqt.mw.toolbar.web.eval(get_backdrop_js())
-            return True, None
         return handled
 
     def on_webview_will_set_content(web_content: WebContent, context: Any) -> None:
-        if not isinstance(context, context_types):
+        if context not in contexts and not isinstance(context, context_types):
             return
         # Rerender the prompt if the deck browser refreshes due to background operations or mw.reset()
-        js = tutorial_assets_js(f"pycmd('{SHOW_PROMPT_PYCMD}')")
+        js = tutorial_assets_js(js_for_context(context))
         web_content.body += f"<script>{js}</script>"
 
     def remove_hooks() -> None:
@@ -578,7 +620,7 @@ def prompt_for_onboarding_tutorial() -> None:
         if loaded_scripts == len(contexts):
             for context in contexts:
                 web = webview_for_context(context)
-                web.eval(f"pycmd('{SHOW_PROMPT_PYCMD}')")
+                web.eval(js_for_context(context))
 
     for context in contexts:
         inject_tutorial_assets(context, on_script_loaded)
@@ -594,6 +636,10 @@ def setup() -> None:
 
 
 class OnboardingTutorial(Tutorial):
+    @ensure_mw_state("deckBrowser")
+    def start(self) -> None:
+        return super().start()
+
     def _monitor_mw_state_change(self, on_done: Callable[[], None]) -> None:
         def on_state_did_change(*args: Any, **kwargs: Any) -> None:
             gui_hooks.state_did_change.remove(on_state_did_change)
