@@ -116,7 +116,32 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
     if not is_playback_mode(vcr, request):
         create_db_dump_if_not_exists()
 
-        # Restore DB from dump
+        # Restore DB from dump using a filtered TOC list that excludes the
+        # SCHEMA entry. pg_restore --clean tries to DROP SCHEMA public which
+        # fails when extensions (pg_trgm, vector) depend on it. By filtering
+        # out the SCHEMA entry we still get full --clean behavior for tables
+        # (drop + recreate) without touching the schema itself.
+        toc_list_path = "/tmp/restore_toc.list"
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "bash",
+                "-c",
+                (f"set -o pipefail; pg_restore -l {DB_DUMP_FILE_NAME} | grep -v ' SCHEMA ' > {toc_list_path}"),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        report_command_result(
+            command_name="pg_restore TOC list",
+            result=result,
+            raise_on_error=True,
+        )
+
         result = subprocess.run(
             [
                 "docker",
@@ -128,6 +153,9 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 f"--username={DB_USERNAME}",
                 "--format=custom",
                 "--clean",
+                "--if-exists",
+                "-L",
+                toc_list_path,
                 "--jobs=4",
                 DB_DUMP_FILE_NAME,
             ],

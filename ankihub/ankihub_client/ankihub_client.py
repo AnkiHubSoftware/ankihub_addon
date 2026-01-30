@@ -134,6 +134,44 @@ def _should_retry_for_response(response: Response) -> bool:
 RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_exception_type(REQUEST_RETRY_EXCEPTION_TYPES)
 
 
+def _sanitized_response_detail(response: Response) -> Optional[str]:
+    """Extract a safe, truncated detail string from an HTTP response body.
+
+    Prefers structured JSON fields ("detail", "message") when available,
+    otherwise falls back to a truncated version of the raw body text.
+    Returns None if the body cannot be read at all.
+    """
+    try:
+        content_type = (response.headers.get("Content-Type") or "").lower()
+    except Exception:
+        content_type = ""
+
+    try:
+        body_text = response.text
+    except Exception:
+        return None
+
+    if not body_text:
+        return None
+
+    # Prefer structured error information from JSON responses.
+    if "application/json" in content_type:
+        try:
+            data = response.json()
+            if isinstance(data, dict):
+                detail = data.get("detail") or data.get("message")
+                if isinstance(detail, str):
+                    return detail
+        except Exception:
+            pass
+
+    # Fall back to a truncated version of the body.
+    max_len = 500
+    if len(body_text) > max_len:
+        return body_text[:max_len] + "... [truncated]"
+    return body_text
+
+
 class AnkiHubHTTPError(Exception):
     """An unexpected HTTP code was returned in response to a request by the AnkiHub client."""
 
@@ -141,7 +179,13 @@ class AnkiHubHTTPError(Exception):
         self.response = response
 
     def __str__(self):
-        return f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
+        summary = f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
+        detail = _sanitized_response_detail(self.response)
+        if detail is None:
+            return f"{summary}\nUnable to read response content"
+        if detail:
+            return f"{summary}\n{detail}"
+        return summary
 
 
 class AnkiHubRequestException(Exception):
