@@ -574,8 +574,10 @@ def prompt_for_onboarding_tutorial() -> None:
                 on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
                 on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
             )
-            return f"AnkiHub.showModal({json.dumps(body)})"
-        return get_backdrop_js()
+            js = f"AnkiHub.showModal({json.dumps(body)})"
+        else:
+            js = get_backdrop_js()
+        return on_ankihub_loaded_js(js)
 
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
         if message == START_ONBOARDING_PYCMD:
