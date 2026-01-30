@@ -1,3 +1,4 @@
+import functools
 import json
 from asyncio.futures import Future
 from dataclasses import dataclass
@@ -505,25 +506,37 @@ class Tutorial:
         self.show_current()
 
 
+def ensure_mw_state(state: str) -> Callable[[...], None]:
+    def change_state_and_call_func(func: Callable[[...], None], *args: Any, **kwargs: Any) -> None:
+        from aqt.main import MainWindowState
+
+        def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
+            gui_hooks.state_did_change.remove(on_state_did_change)
+            func(*args, **kwargs)
+
+        gui_hooks.state_did_change.append(on_state_did_change)
+        aqt.mw.moveToState(state)
+
+    def decorated_func(func: Callable[[...], None]) -> Callable[[...], None]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> None:
+            if aqt.mw.state != state:
+                change_state_and_call_func(func, *args, **kwargs)
+            else:
+                func(*args, **kwargs)
+
+        return wrapper
+
+    return decorated_func
+
+
 def prompt_for_onboarding_tutorial() -> None:
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
     if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
         return
 
     config.set_onboarding_tutorial_pending(True)
-
-    def on_state_did_change(*args: Any, **kwargs: Any) -> None:
-        gui_hooks.state_did_change.remove(on_state_did_change)
-        _prompt_for_onboarding_tutorial()
-
-    if aqt.mw.state != "deckBrowser":
-        gui_hooks.state_did_change.append(on_state_did_change)
-        aqt.mw.moveToState("deckBrowser")
-    else:
-        _prompt_for_onboarding_tutorial()
-
-
-def _prompt_for_onboarding_tutorial() -> None:
-    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
     context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
     contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
@@ -544,8 +557,6 @@ def _prompt_for_onboarding_tutorial() -> None:
         return get_backdrop_js()
 
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if context not in contexts and not isinstance(context, context_types):
-            return handled
         if message == START_ONBOARDING_PYCMD:
             remove_hooks()
             OnboardingTutorial().start()
@@ -602,6 +613,10 @@ def setup() -> None:
 
 
 class OnboardingTutorial(Tutorial):
+    @ensure_mw_state("deckBrowser")
+    def start(self) -> None:
+        return super().start()
+
     def _monitor_mw_state_change(self, on_done: Callable[[], None]) -> None:
         def on_state_did_change(*args: Any, **kwargs: Any) -> None:
             gui_hooks.state_did_change.remove(on_state_did_change)
