@@ -178,18 +178,27 @@ def webview_for_context(context: Any) -> AnkiWebView:
         assert False, f"Webview context of type {type(context)} is not handled"
 
 
+def on_ankihub_loaded_js(on_loaded: str) -> str:
+    return (
+        """
+    (() => {
+        const intervalId = setInterval(() => {
+            if (typeof AnkiHub !== 'undefined') {
+                clearInterval(intervalId);
+                {%s}
+            }
+        }, 10);
+    })();
+"""
+        % on_loaded
+    )
+
+
 def tutorial_assets_js(on_loaded: str) -> str:
     web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
     js = """
 (() => {
-    const onLoaded = () => {
-        const intervalId = setInterval(() => {
-            if (typeof AnkiHub !== 'undefined') {
-              clearInterval(intervalId);
-              {%(on_loaded)s}
-            }
-        }, 10);
-    };
+    const onLoaded = () => {%(on_loaded)s};
     const cssId = "ankihub-tutorial-css";
     if(!document.getElementById(cssId)) {
         const css = document.createElement("link");
@@ -215,7 +224,7 @@ def tutorial_assets_js(on_loaded: str) -> str:
 """ % dict(
         css_path=json.dumps(f"{web_base}/lib/tutorial.css"),
         js_path=json.dumps(f"{web_base}/lib/tutorial.js"),
-        on_loaded=on_loaded,
+        on_loaded=on_ankihub_loaded_js(on_loaded),
     )
     return js
 
@@ -283,7 +292,9 @@ class Tutorial:
         return tuple(type(context) for context in self.extra_backdrop_contexts)
 
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
-        return f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
+        return on_ankihub_loaded_js(
+            f"AnkiHub.{function}({{" + ",".join(f"{k}: {json.dumps(v)}" for k, v in options.items()) + "})"
+        )
 
     def _render_tooltip(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
@@ -448,8 +459,17 @@ class Tutorial:
                     left = 0
                     width = 0
 
-                js = f"AnkiHub.positionTutorialModal({{top: {top}, left: {left}, width: {width}, height: {height}}});"
-                tooltip_web.eval(js)
+                tooltip_web.eval(
+                    self._render_js_function_with_options(
+                        "positionTutorialModal",
+                        {
+                            "top": top,
+                            "left": left,
+                            "width": width,
+                            "height": height,
+                        },
+                    )
+                )
             return True, None
         elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
@@ -512,7 +532,8 @@ def ensure_mw_state(state: str) -> Callable[[...], None]:
 
         def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
             gui_hooks.state_did_change.remove(on_state_did_change)
-            func(*args, **kwargs)
+            # Some delay appears to be required for the toolbar
+            aqt.mw.progress.single_shot(100, lambda: func(*args, **kwargs))
 
         gui_hooks.state_did_change.append(on_state_did_change)
         aqt.mw.moveToState(state)
