@@ -130,7 +130,7 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
                 DB_CONTAINER_NAME,
                 "bash",
                 "-c",
-                (f"pg_restore -l {DB_DUMP_FILE_NAME} | grep -v ' SCHEMA ' > {toc_list_path}"),
+                (f"set -o pipefail; pg_restore -l {DB_DUMP_FILE_NAME} | grep -v ' SCHEMA ' > {toc_list_path}"),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
