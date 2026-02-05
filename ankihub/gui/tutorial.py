@@ -3,12 +3,12 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import aqt
 from aqt import gui_hooks
 from aqt.editor import Editor
-from aqt.main import AnkiQt
+from aqt.main import AnkiQt, MainWindowState
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QPoint,
@@ -526,15 +526,10 @@ class Tutorial:
         self.show_current()
 
 
-MainWindowStateLiteral = Literal["startup", "deckBrowser", "overview", "review", "resetRequired", "profileManager"]
-
-
 def ensure_mw_state(
-    state: MainWindowStateLiteral,
+    state: MainWindowState,
 ) -> Callable[[Callable[..., None]], Callable[..., None]]:
     def change_state_and_call_func(func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
-        from aqt.main import MainWindowState
-
         def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
             gui_hooks.state_did_change.remove(on_state_did_change)
             # Some delay appears to be required for the toolbar
