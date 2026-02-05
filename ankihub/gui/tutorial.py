@@ -3,7 +3,7 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 import aqt
 from aqt import gui_hooks
@@ -526,8 +526,15 @@ class Tutorial:
         self.show_current()
 
 
-def ensure_mw_state(state: str) -> Callable[[...], None]:
-    def change_state_and_call_func(func: Callable[[...], None], *args: Any, **kwargs: Any) -> None:
+MainWindowStateLiteral = Literal[
+    "startup", "deckBrowser", "overview", "review", "resetRequired", "profileManager"
+]
+
+
+def ensure_mw_state(
+    state: MainWindowStateLiteral,
+) -> Callable[[Callable[..., None]], Callable[..., None]]:
+    def change_state_and_call_func(func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
         from aqt.main import MainWindowState
 
         def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
@@ -538,7 +545,7 @@ def ensure_mw_state(state: str) -> Callable[[...], None]:
         gui_hooks.state_did_change.append(on_state_did_change)
         aqt.mw.moveToState(state)
 
-    def decorated_func(func: Callable[[...], None]) -> Callable[[...], None]:
+    def decorated_func(func: Callable[..., None]) -> Callable[..., None]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> None:
             if aqt.mw.state != state:

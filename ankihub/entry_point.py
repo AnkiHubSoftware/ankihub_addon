@@ -252,7 +252,7 @@ def _general_setup() -> None:
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
 
-    from . import media_export  # noqa: F401
+    from . import media_export  # type: ignore[attr-defined]  # noqa: F401
 
     LOGGER.info("Loaded media_export.")
 
