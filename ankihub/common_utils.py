@@ -5,14 +5,14 @@ from typing import Set
 
 # Regex to find the name of image files inside an <img> tag in HTML
 # excluding the ones that start with http:// or https://
-IMG_NAME_IN_IMG_TAG_REGEX = re.compile(r"<img.*?src=[\"'](?!http://|https://)(.+?)[\"']")
+IMG_NAME_IN_IMG_TAG_REGEX = re.compile(r"(?i)<img.*?src=[\"'](?!http://|https://)(.+?)[\"']")
 # Regex to find the name of sound files inside a [sound] tag (specific to Anki)
 # excluding the ones that start with http:// or https://
-SOUND_NAME_IN_SOUND_TAG_REGEX = re.compile(r"\[sound:(?!http://|https://)(.+?)\]")
+SOUND_NAME_IN_SOUND_TAG_REGEX = re.compile(r"(?i)\[sound:(?!http://|https://)(.+?)\]")
 # Regex to find CSS import statements and url() references
-CSS_IMPORT_REGEX = re.compile(r"(?:@import\s+[\"'](.+?)[\"'])")
+CSS_IMPORT_REGEX = re.compile(r"(?i)(?:@import\s+[\"'](.+?)[\"'])")
 # Regex to find CSS url() references
-CSS_URL_REGEX = re.compile(r"(?:url\(\s*[\"']([^\"]+)[\"'])")
+CSS_URL_REGEX = re.compile(r"(?i)(?:url\(\s*[\"']([^\"]+)[\"'])")
 
 
 def local_media_names_from_html(html_content: str) -> Set[str]:
