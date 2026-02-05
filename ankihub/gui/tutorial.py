@@ -526,9 +526,7 @@ class Tutorial:
         self.show_current()
 
 
-MainWindowStateLiteral = Literal[
-    "startup", "deckBrowser", "overview", "review", "resetRequired", "profileManager"
-]
+MainWindowStateLiteral = Literal["startup", "deckBrowser", "overview", "review", "resetRequired", "profileManager"]
 
 
 def ensure_mw_state(
