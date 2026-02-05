@@ -2182,9 +2182,11 @@ class TestMediaNameExtraction:
             mw = anki_session_with_addon_data.mw
 
             note_type = note_type_with_field_names(["Front", "Back"])
-            # TODO: handle url()
-            # note_type["css"] = '.card { background-image: url("css_bg.png"); }'
-            note_type["css"] = ".card::before { content: \"<img src='css_image.png'>\"; }"
+            note_type["css"] = (
+                '@import "foo_import.css"; '
+                '.card { background: url("foo_double_quoted.png");'
+                " background: url('foo_single_quoted.png'); }"
+            )
             mw.col.models.add_dict(note_type)
             note_type = mw.col.models.by_name(note_type["name"])
             mid = note_type["id"]
@@ -2201,7 +2203,7 @@ class TestMediaNameExtraction:
 
             media_names = get_media_names_from_notes_data(notes_data)
 
-            assert "css_image.png" in media_names
+            assert media_names == {"foo_import.css", "foo_double_quoted.png", "foo_single_quoted.png"}
 
     def test_excludes_remote_media_urls(
         self,
