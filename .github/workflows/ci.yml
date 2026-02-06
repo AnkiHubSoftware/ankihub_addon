@@ -98,15 +98,15 @@ jobs:
           aqt_dependency_group: aqt
           qt_package: pyqt6
 
-      - name: Enable cloning web app repo
+      - name: Enable cloning webapp repo
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
 
-      - name: Checkout ankipalace/ankihub web app repo
+      - name: Checkout AnkiHubSoftware/ankihub web app repo
         uses: actions/checkout@v4
         with:
-          repository: ankipalace/ankihub
+          repository: AnkiHubSoftware/ankihub
           ref: dev
           path: ankihub_web
 

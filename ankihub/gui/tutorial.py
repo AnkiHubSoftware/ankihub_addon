@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Union
 import aqt
 from aqt import gui_hooks
 from aqt.editor import Editor
-from aqt.main import AnkiQt
+from aqt.main import AnkiQt, MainWindowState
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QPoint,
@@ -256,7 +256,7 @@ class TutorialStep:
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[Callable[[], None]], None]] = None
     next_label: str = "Next"
-    back_callback: Optional[Callable[[], None]] = None
+    back_callback: Optional[Callable[[Callable[[], None]], None]] = None
     back_label: str = "Back"
     block_target_click: bool = False
     auto_advance: bool = True
@@ -526,10 +526,10 @@ class Tutorial:
         self.show_current()
 
 
-def ensure_mw_state(state: str) -> Callable[[...], None]:
-    def change_state_and_call_func(func: Callable[[...], None], *args: Any, **kwargs: Any) -> None:
-        from aqt.main import MainWindowState
-
+def ensure_mw_state(
+    state: MainWindowState,
+) -> Callable[[Callable[..., None]], Callable[..., None]]:
+    def change_state_and_call_func(func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
         def on_state_did_change(old_state: MainWindowState, new_state: MainWindowState) -> None:
             gui_hooks.state_did_change.remove(on_state_did_change)
             # Some delay appears to be required for the toolbar
@@ -538,7 +538,7 @@ def ensure_mw_state(state: str) -> Callable[[...], None]:
         gui_hooks.state_did_change.append(on_state_did_change)
         aqt.mw.moveToState(state)
 
-    def decorated_func(func: Callable[[...], None]) -> Callable[[...], None]:
+    def decorated_func(func: Callable[..., None]) -> Callable[..., None]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> None:
             if aqt.mw.state != state:
