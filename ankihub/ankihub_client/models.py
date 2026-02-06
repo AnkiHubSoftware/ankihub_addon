@@ -9,6 +9,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Set
 
+from anki.models import NotetypeId
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -345,7 +346,7 @@ def get_media_names_from_notetype(notetype_id: int) -> Set[str]:
     import aqt
 
     refs = set()
-    note_type = aqt.mw.col.models.get(notetype_id)
+    note_type = aqt.mw.col.models.get(NotetypeId(notetype_id))
     refs.update(local_media_names_from_html(note_type["css"]))
     for tmpl in note_type["tmpls"]:
         refs.update(local_media_names_from_html(tmpl["qfmt"]))
