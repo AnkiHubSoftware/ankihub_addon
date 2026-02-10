@@ -554,7 +554,7 @@ def ensure_mw_state(
 def prompt_for_onboarding_tutorial() -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if active_tutorial or not config.get_feature_flags().get("addon_tours", True):
+    if active_tutorial or not config.get_feature_flags().get("addon_tours", False):
         return
 
     config.set_onboarding_tutorial_pending(True)
