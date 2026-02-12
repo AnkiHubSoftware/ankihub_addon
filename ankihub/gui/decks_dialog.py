@@ -29,7 +29,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import UserDeckRelation
+from ..ankihub_client.models import UserDeckRelation, get_media_names_from_notetype
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -56,6 +56,7 @@ from ..settings import (
     url_deck_base,
     url_decks,
 )
+from .media_sync import media_sync
 from .operations import AddonQueryOp
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import (
@@ -646,8 +647,13 @@ class DeckManagementDialog(QDialog):
             if not confirm:
                 return
 
+            ah_did = self._selected_ah_did()
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
-            add_note_type(self._selected_ah_did(), note_type)
+            new_note_type = add_note_type(ah_did, note_type)
+
+            media_names = get_media_names_from_notetype(new_note_type["id"])
+            if media_names:
+                media_sync.start_media_upload(media_names, ah_did)
 
             tooltip("Changes updated", parent=self)
             self._update_add_note_type_btn_state()
@@ -741,7 +747,13 @@ class DeckManagementDialog(QDialog):
             if not confirm:
                 return
 
-            update_note_type_templates_and_styles(self._selected_ah_did(), note_type)
+            ah_did = self._selected_ah_did()
+            update_note_type_templates_and_styles(ah_did, note_type)
+
+            media_names = get_media_names_from_notetype(note_type["id"])
+            if media_names:
+                media_sync.start_media_upload(media_names, ah_did)
+
             tooltip("Changes updated", parent=self)
             self._update_templates_btn_state()
 
