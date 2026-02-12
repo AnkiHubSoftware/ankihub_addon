@@ -1601,7 +1601,7 @@ class TestUploadMediaForDeck:
 
         deck_id = next_deterministic_uuid()
         remove_mock = mocker.patch("os.remove")
-        self._upload_media_for_notes_data(client, notes_data, deck_id)
+        self._upload_media_for_notes_data(mocker, client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip")
@@ -1647,7 +1647,7 @@ class TestUploadMediaForDeck:
             "_upload_file_to_s3_with_reusable_presigned_url",
         )
 
-        self._upload_media_for_notes_data(client, notes_data, deck_id)
+        self._upload_media_for_notes_data(mocker, client, notes_data, deck_id)
 
         get_presigned_url_mock.assert_called_once_with(prefix=f"deck_assets/{deck_id}")
         mocked_upload_file_to_s3.assert_called_once_with(
@@ -1667,13 +1667,16 @@ class TestUploadMediaForDeck:
         mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
-        self._upload_media_for_notes_data(client, notes_data, deck_id)
+        self._upload_media_for_notes_data(mocker, client, notes_data, deck_id)
 
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
 
         assert not path_to_created_zip_file.is_file()
 
-    def _upload_media_for_notes_data(self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID):
+    def _upload_media_for_notes_data(
+        self, mocker: MockerFixture, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
+    ):
+        mocker.patch("ankihub.ankihub_client.models.get_media_names_from_notetype", return_value=set())
         media_names = get_media_names_from_notes_data(notes_data)
         media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
         client.upload_media(media_paths, ah_did)

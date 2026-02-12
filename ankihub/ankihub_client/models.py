@@ -9,6 +9,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Set
 
+from anki.models import NotetypeId
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -317,9 +318,12 @@ class DailyCardReviewSummary(DataClassJSONMixinWithConfig):
 
 
 def get_media_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
-    """Return the names of all media files on the given notes.
+    """Return the names of all media files on the given notes and their note types.
     Only returns names of local files, not remote files."""
-    return {name for note in notes_data for name in get_media_names_from_note_info(note)}
+    note_refs = {name for note in notes_data for name in get_media_names_from_note_info(note)}
+    note_type_ids = {note.mid for note in notes_data}
+    note_type_refs = {name for note_type_id in note_type_ids for name in get_media_names_from_notetype(note_type_id)}
+    return {*note_refs, *note_type_refs}
 
 
 def get_media_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
@@ -336,6 +340,18 @@ def get_media_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
 def get_media_names_from_note_info(note_info: NoteInfo) -> Set[str]:
     result = {name for field in note_info.fields for name in _get_media_names_from_field(field)}
     return result
+
+
+def get_media_names_from_notetype(notetype_id: int) -> Set[str]:
+    import aqt
+
+    refs = set()
+    note_type = aqt.mw.col.models.get(NotetypeId(notetype_id))
+    refs.update(local_media_names_from_html(note_type["css"]))
+    for tmpl in note_type["tmpls"]:
+        refs.update(local_media_names_from_html(tmpl["qfmt"]))
+        refs.update(local_media_names_from_html(tmpl["afmt"]))
+    return refs
 
 
 def _get_media_names_from_field(field: Field) -> Set[str]:
