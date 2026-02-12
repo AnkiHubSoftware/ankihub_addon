@@ -109,7 +109,7 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None], skip_summary: bo
         )
 
     if (
-        config.get_feature_flags().get("addon_tours", False)
+        config.get_feature_flags().get("onboarding_tour", False)
         and config.last_deck_sync() is None
         and not config.deck_config(config.intro_deck_id)
     ):

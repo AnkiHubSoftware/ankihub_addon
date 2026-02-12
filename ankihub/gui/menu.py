@@ -448,7 +448,7 @@ def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
-    if config.get_feature_flags().get("addon_tours", False):
+    if config.get_feature_flags().get("onboarding_tour", False):
         q_onboarding_action = QAction("Start onboarding tour", help_menu)
         qconnect(
             q_onboarding_action.triggered,
