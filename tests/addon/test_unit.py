@@ -16,7 +16,7 @@ import aqt
 import pytest
 import requests
 from anki.decks import DeckId
-from anki.models import NotetypeDict
+from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from approvaltests.approvals import verify  # type: ignore
 from approvaltests.namer import NamerFactory  # type: ignore
@@ -2136,7 +2136,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
 
             assert media_names == {"image1.png", "audio1.mp3", "image2.jpg", "audio2.wav"}
 
@@ -2167,7 +2167,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
 
             assert "template_image.png" in media_names
             assert "template_audio.mp3" in media_names
@@ -2202,7 +2202,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
 
             assert media_names == {"foo_import.css", "foo_double_quoted.png", "foo_single_quoted.png"}
 
@@ -2228,7 +2228,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
 
             assert media_names == {"local.png", "local.mp3"}
 
