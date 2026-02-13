@@ -8,6 +8,7 @@ from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
 from anki.errors import NotFoundError
+from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt.qt import QAction
 
@@ -198,7 +199,8 @@ class _AnkiHubMediaSync:
             # Extract media references using Anki's files_in_str (handles latex)
             media_names.update(aqt.mw.col.media.files_in_str(note.mid, flds))
         for note_type_id in note_type_ids:
-            media_names.update(get_media_names_from_notetype(note_type_id))
+            note_type = aqt.mw.col.models.get(NotetypeId(note_type_id))
+            media_names.update(get_media_names_from_notetype(note_type))
         return media_names
 
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:

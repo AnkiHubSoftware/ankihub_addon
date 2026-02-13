@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import aqt
+from anki.models import NotetypeId
 from aqt import QCheckBox, QMessageBox
 from aqt.studydeck import StudyDeck
 from aqt.utils import showInfo, tooltip
@@ -116,7 +117,10 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         # Upload all existing local media for this deck
         # (media files that are referenced on Deck's notes)
         if should_upload_media:
-            media_names = get_media_names_from_notes_data(deck_creation_result.notes_data)
+            media_names = get_media_names_from_notes_data(
+                deck_creation_result.notes_data,
+                lambda mid: aqt.mw.col.models.get(NotetypeId(mid)),
+            )
             media_sync.start_media_upload(media_names, deck_creation_result.ankihub_did)
 
         # Add the deck to the list of decks the user owns
