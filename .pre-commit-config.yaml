@@ -22,3 +22,10 @@ repos:
             exclude: ^tests/
             entry: "from ankihub([.]| import )"
             language: pygrep
+
+          - id: no_anki_aqt_imports_in_client
+            name: no anki/aqt imports in ankihub_client
+            types: [python]
+            files: ^ankihub/ankihub_client/
+            entry: "^(from (anki|aqt)[ .]|import (anki|aqt))"
+            language: pygrep
