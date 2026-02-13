@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set
+
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
