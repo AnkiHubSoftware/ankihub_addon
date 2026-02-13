@@ -2065,7 +2065,8 @@ class TestCreateCollaborativeDeck:
                 # Assert that the correct functions were called.
                 create_ankihub_deck_mock.assert_called_once_with(deck_name, private=False, add_subdeck_tags=False)
 
-                get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
+                get_media_names_from_notes_data_mock.assert_called_once()
+                assert get_media_names_from_notes_data_mock.call_args[0][0] == notes_data
                 start_media_upload_mock.assert_called_once()
 
     def test_with_deck_name_existing(
@@ -2135,7 +2136,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data)
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
 
             assert media_names == {"image1.png", "audio1.mp3", "image2.jpg", "audio2.wav"}
 
@@ -2166,7 +2167,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data)
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
 
             assert "template_image.png" in media_names
             assert "template_audio.mp3" in media_names
@@ -2201,7 +2202,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data)
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
 
             assert media_names == {"foo_import.css", "foo_double_quoted.png", "foo_single_quoted.png"}
 
@@ -2227,7 +2228,7 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data)
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(mid))
 
             assert media_names == {"local.png", "local.mp3"}
 

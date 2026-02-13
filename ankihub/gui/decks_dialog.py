@@ -651,7 +651,7 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             new_note_type = add_note_type(ah_did, note_type)
 
-            media_names = get_media_names_from_notetype(new_note_type["id"])
+            media_names = get_media_names_from_notetype(new_note_type)
             if media_names:
                 media_sync.start_media_upload(media_names, ah_did)
 
@@ -750,7 +750,7 @@ class DeckManagementDialog(QDialog):
             ah_did = self._selected_ah_did()
             update_note_type_templates_and_styles(ah_did, note_type)
 
-            media_names = get_media_names_from_notetype(note_type["id"])
+            media_names = get_media_names_from_notetype(note_type)
             if media_names:
                 media_sync.start_media_upload(media_names, ah_did)
 

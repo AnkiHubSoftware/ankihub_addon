@@ -1606,7 +1606,7 @@ class TestUploadMediaForDeck:
         # We will create and check for just one chunk in this test
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip")
 
-        all_media_names_in_notes = get_media_names_from_notes_data(notes_data)
+        all_media_names_in_notes = get_media_names_from_notes_data(notes_data, lambda mid: {})
         assert path_to_created_zip_file.is_file()
         assert len(all_media_names_in_notes) == 14
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
@@ -1677,7 +1677,7 @@ class TestUploadMediaForDeck:
         self, mocker: MockerFixture, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
     ):
         mocker.patch("ankihub.ankihub_client.models.get_media_names_from_notetype", return_value=set())
-        media_names = get_media_names_from_notes_data(notes_data)
+        media_names = get_media_names_from_notes_data(notes_data, lambda mid: {})
         media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
         client.upload_media(media_paths, ah_did)
 
