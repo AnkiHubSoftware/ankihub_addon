@@ -11,7 +11,7 @@ import zipfile
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Generator, List, Optional, cast
+from typing import Any, Callable, Dict, Generator, List, Optional, cast
 from unittest.mock import Mock
 
 import pytest
@@ -1606,7 +1606,7 @@ class TestUploadMediaForDeck:
         # We will create and check for just one chunk in this test
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip")
 
-        all_media_names_in_notes = get_media_names_from_notes_data(notes_data, lambda mid: {})
+        all_media_names_in_notes = get_media_names_from_notes_data(notes_data, lambda mid: self._empty_notetype())
         assert path_to_created_zip_file.is_file()
         assert len(all_media_names_in_notes) == 14
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
@@ -1673,11 +1673,14 @@ class TestUploadMediaForDeck:
 
         assert not path_to_created_zip_file.is_file()
 
+    @staticmethod
+    def _empty_notetype() -> Dict[str, Any]:
+        return {"css": "", "tmpls": []}
+
     def _upload_media_for_notes_data(
         self, mocker: MockerFixture, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
     ):
-        mocker.patch("ankihub.ankihub_client.models.get_media_names_from_notetype", return_value=set())
-        media_names = get_media_names_from_notes_data(notes_data, lambda mid: {})
+        media_names = get_media_names_from_notes_data(notes_data, lambda mid: self._empty_notetype())
         media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
         client.upload_media(media_paths, ah_did)
 
