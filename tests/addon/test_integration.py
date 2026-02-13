@@ -4612,6 +4612,131 @@ class TestDeckManagementDialog:
 
             assert hasattr(dialog, "deck_not_installed_label")
 
+    @pytest.mark.parametrize("has_media", [True, False])
+    def test_publish_note_type_media_upload(
+        self,
+        has_media: bool,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        requests_mock: Mocker,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+    ):
+        """Test media upload when publishing a new note type."""
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            # Setup deck as owner
+            ah_did = install_ah_deck()
+            config.deck_config(ah_did).user_relation = UserDeckRelation.OWNER
+
+            # Create note type with optional media
+            note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
+            note_type["name"] = "Test Note Type"
+            note_type["id"] = 0
+            note_type["tmpls"][0]["qfmt"] = '<img src="test.jpg">{{Front}}' if has_media else "{{Front}}"
+
+            new_mid = NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
+            note_type = aqt.mw.col.models.get(new_mid)
+
+            # Setup mocks
+            anki_did = config.deck_config(ah_did).anki_id
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+            mock_study_deck_dialog_with_cb(
+                "ankihub.gui.decks_dialog.SearchableSelectionDialog",
+                deck_name=note_type["name"],
+            )
+            mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=True)
+
+            expected_data = note_type.copy()
+            expected_data["name"] = f"{note_type['name']} (Testdeck / user1)"
+            requests_mock.post(
+                f"{config.api_url}/decks/{ah_did}/create-note-type/",
+                json=_to_ankihub_note_type(expected_data),
+            )
+            mock_media_upload = mocker.patch("ankihub.gui.decks_dialog.media_sync.start_media_upload")
+
+            # Trigger publish
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+            dialog.add_note_type_btn.click()
+            qtbot.wait(200)
+
+            # Verify media upload
+            if has_media:
+                mock_media_upload.assert_called_once_with({"test.jpg"}, ah_did)
+            else:
+                mock_media_upload.assert_not_called()
+
+    @pytest.mark.parametrize("has_media", [True, False])
+    def test_update_templates_media_upload(
+        self,
+        has_media: bool,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        ankihub_basic_note_type: NotetypeDict,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        requests_mock: Mocker,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+    ):
+        """Test media upload when publishing template/style updates."""
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            # Setup deck as owner with existing note type
+            ah_did = install_ah_deck()
+            config.deck_config(ah_did).user_relation = UserDeckRelation.OWNER
+            anki_did = config.deck_config(ah_did).anki_id
+
+            # Import note type to AnkiHub DB
+            import_ah_note_type(ah_did=ah_did, note_type=ankihub_basic_note_type)
+            note_type = ankihub_basic_note_type
+
+            # Modify note type with optional media
+            note_type["tmpls"][0]["qfmt"] = '<img src="updated.jpg">{{Front}}' if has_media else "{{Front}}"
+            aqt.mw.col.models.update_dict(note_type)
+
+            # Setup mocks
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+            mock_study_deck_dialog_with_cb(
+                "ankihub.gui.decks_dialog.SearchableSelectionDialog",
+                deck_name=note_type["name"],
+            )
+            mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=True)
+
+            requests_mock.patch(
+                f"{config.api_url}/decks/{ah_did}/note-types/{note_type['id']}/",
+                json=_to_ankihub_note_type(note_type),
+            )
+            mock_media_upload = mocker.patch("ankihub.gui.decks_dialog.media_sync.start_media_upload")
+
+            # Trigger update
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+            dialog.update_templates_btn.click()
+            qtbot.wait(200)
+
+            # Verify media upload
+            if has_media:
+                mock_media_upload.assert_called_once_with({"updated.jpg"}, ah_did)
+            else:
+                mock_media_upload.assert_not_called()
+
     def _mock_dependencies(self, mocker: MockerFixture) -> None:
         # Mock the config to return that the user is logged in
         mocker.patch.object(config, "is_logged_in", return_value=True)
