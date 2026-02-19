@@ -364,7 +364,7 @@ class Tutorial:
         step = self.steps[self.current_step - 1]
         if step.qt_target:
             target = step.qt_target() if callable(step.qt_target) else step.qt_target
-            overlay = TutorialOverlayDialog(step.parent_widget, target)
+            overlay = TutorialOverlayDialog(step.parent_widget or target.window(), target)
             overlay.show()
             step.tooltip_context = overlay
             step.target_context = overlay
