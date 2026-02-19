@@ -251,7 +251,7 @@ class TutorialStep:
     tooltip_context: Optional[Any] = None
     target_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
-    qt_target: Optional[QWidget] = None
+    qt_target: Optional[Union[QWidget, Callable[[], QWidget]]] = None
     shown_callback: Optional[Callable[[], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[Callable[[], None]], None]] = None
@@ -363,7 +363,8 @@ class Tutorial:
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
         if step.qt_target:
-            overlay = TutorialOverlayDialog(step.parent_widget, step.qt_target)
+            target = step.qt_target() if callable(step.qt_target) else step.qt_target
+            overlay = TutorialOverlayDialog(step.parent_widget, target)
             overlay.show()
             step.tooltip_context = overlay
             step.target_context = overlay
