@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   workflow_call:
     secrets:
+      WORKFLOW_GIT_ACCESS_TOKEN:
+        required: true
       GOOGLE_API_KEY:
         required: true
       AWS_ACCESS_KEY_ID:
@@ -16,7 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
