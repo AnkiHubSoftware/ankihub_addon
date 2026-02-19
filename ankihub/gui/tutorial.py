@@ -255,6 +255,7 @@ class TutorialStep:
     back_label: str = "Back"
     block_target_click: bool = False
     auto_advance: bool = True
+    apply_backdrop: bool = True
 
     def __post_init__(self):
         if not self.target_context:
@@ -268,7 +269,6 @@ class Tutorial:
     def __init__(self) -> None:
         self.name = ""
         self.current_step = 1
-        self.apply_backdrop = True
 
     @property
     def steps(self) -> list[TutorialStep]:
@@ -303,7 +303,7 @@ class Tutorial:
             on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
             next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
-            show_backdrop=self.apply_backdrop,
+            show_backdrop=step.apply_backdrop,
         )
         arrow = render_arrow() if step.target else ""
         tooltip_options = {
