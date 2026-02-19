@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional, Union
 
 import aqt
 from aqt import gui_hooks
+from aqt.deckoptions import DeckOptionsDialog
 from aqt.editor import Editor
 from aqt.main import AnkiQt, MainWindowState
 from aqt.overview import Overview, OverviewBottomBar
@@ -173,6 +174,8 @@ def webview_for_context(context: Any) -> AnkiWebView:
     if isinstance(context, Editor):
         return context.web
     if isinstance(context, (TutorialOverlayDialog,)):
+        return context.web
+    if isinstance(context, DeckOptionsDialog):
         return context.web
     else:
         assert False, f"Webview context of type {type(context)} is not handled"
