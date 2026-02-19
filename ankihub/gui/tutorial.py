@@ -3,7 +3,7 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Required, TypedDict, Union
 
 import aqt
 from aqt import gui_hooks
@@ -29,8 +29,8 @@ from ..gui.overlay_dialog import OverlayDialog
 from ..settings import config
 from .operations import AddonQueryOp
 
-START_ONBOARDING_PYCMD = "ankihub_start_onboarding"
-DISMISS_ONBOARDING_PYCMD = "ankihub_dismiss_onboarding"
+START_TUTORIAL_PYCMD = "ankihub_start_tutorial"
+DISMISS_TUTORIAL_PYCMD = "ankihub_dismiss_tutorial"
 SHOW_LATER_PYCMD = "ankihub_show_later"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
@@ -40,30 +40,22 @@ JS_LOADED_PYCMD = "ankihub_tutorial_js_loaded"
 TARGET_CLICK_PYCMD = "ankihub_tutorial_target_click"
 
 
-def render_dialog(
-    title: str,
-    body: str,
-    text_button_label: Optional[str] = None,
-    secondary_button_label: Optional[str] = None,
-    main_button_label: Optional[str] = None,
-    on_text_button_click: Optional[str] = None,
-    on_secondary_button_click: Optional[str] = None,
-    on_main_button_click: Optional[str] = None,
-    on_close: Optional[str] = None,
-) -> str:
+class RenderDialogKwargs(TypedDict, total=False):
+    title: Required[str]
+    body: Required[str]
+    text_button_label: Optional[str]
+    secondary_button_label: Optional[str]
+    main_button_label: Optional[str]
+    on_text_button_click: Optional[str]
+    on_secondary_button_click: Optional[str]
+    on_main_button_click: Optional[str]
+    on_close: Optional[str]
+
+
+def render_dialog(**kwargs: RenderDialogKwargs) -> str:
     return render_template(
         "dialog.html",
-        {
-            "title": title,
-            "body": body,
-            "text_button_label": text_button_label,
-            "secondary_button_label": secondary_button_label,
-            "main_button_label": main_button_label,
-            "on_text_button_click": on_text_button_click,
-            "on_secondary_button_click": on_secondary_button_click,
-            "on_main_button_click": on_main_button_click,
-            "on_close": on_close,
-        },
+        context=kwargs,
     )
 
 
@@ -556,28 +548,24 @@ def ensure_mw_state(
     return decorated_func
 
 
-def prompt_for_onboarding_tutorial() -> None:
-    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
-
-    if active_tutorial or not config.get_feature_flags().get("onboarding_tour", False):
+def prompt_for_tutorial(
+    context_types: tuple[Any, ...],
+    contexts: tuple[Any, ...],
+    dialog_context: Any,
+    dialog_kwargs: RenderDialogKwargs,
+    on_start_tutorial: Callable[[], None],
+    on_dismiss_tutorial: Optional[Callable[[], None]] = None,
+) -> None:
+    if active_tutorial:
         return
 
-    config.set_onboarding_tutorial_pending(True)
-
-    context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
-    contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
-
     def js_for_context(context: Any) -> str:
-        if isinstance(context, DeckBrowser):
+        if isinstance(context, dialog_context):
             body = render_dialog(
-                title="📚 First time with Anki?",
-                body="Find your way in the app with this <b>onboarding tour</b>.<br>"
-                "You can revisit it anytime in AnkiHub's Help menu.",
-                secondary_button_label="Maybe later",
-                main_button_label="Take tour",
-                on_main_button_click=f"pycmd('{START_ONBOARDING_PYCMD}')",
+                on_main_button_click=f"pycmd('{START_TUTORIAL_PYCMD}')",
                 on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
-                on_close=f"pycmd('{DISMISS_ONBOARDING_PYCMD}')",
+                on_close=f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
+                **dialog_kwargs,
             )
             js = f"AnkiHub.showModal({json.dumps(body)})"
         else:
@@ -585,13 +573,13 @@ def prompt_for_onboarding_tutorial() -> None:
         return on_ankihub_loaded_js(js)
 
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
-        if message == START_ONBOARDING_PYCMD:
+        if message == START_TUTORIAL_PYCMD:
             remove_hooks()
-            OnboardingTutorial().start()
+            on_start_tutorial()
             return True, None
-        if message == DISMISS_ONBOARDING_PYCMD:
+        if message == DISMISS_TUTORIAL_PYCMD:
             clean_up_webviews()
-            config.set_onboarding_tutorial_pending(False)
+            on_dismiss_tutorial()
             return True, None
         if message == SHOW_LATER_PYCMD:
             clean_up_webviews()
@@ -611,7 +599,8 @@ def prompt_for_onboarding_tutorial() -> None:
 
     def clean_up_webviews() -> None:
         remove_hooks()
-        for web in (aqt.mw.web, aqt.mw.bottomWeb, aqt.mw.toolbar.web):
+        for context in contexts:
+            web = webview_for_context(context)
             web.eval("AnkiHub.destroyActiveTutorialEffect()")
 
     gui_hooks.webview_did_receive_js_message.append(on_webview_did_receive_js_message)
@@ -629,6 +618,58 @@ def prompt_for_onboarding_tutorial() -> None:
 
     for context in contexts:
         inject_tutorial_assets(context, on_script_loaded)
+
+
+def prompt_for_onboarding_tutorial() -> None:
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
+    if config.get_feature_flags().get("onboarding_tour", False):
+        return
+
+    config.set_onboarding_tutorial_pending(True)
+
+    context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
+    contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
+
+    prompt_for_tutorial(
+        context_types=context_types,
+        contexts=contexts,
+        dialog_context=DeckBrowser,
+        dialog_kwargs=dict(
+            title="📚 First time with Anki?",
+            body="Find your way in the app with this <b>onboarding tour</b>.<br>"
+            "You can revisit it anytime in AnkiHub's Help menu.",
+            secondary_button_label="Maybe later",
+            main_button_label="Take tour",
+        ),
+        on_start_tutorial=lambda: OnboardingTutorial().start(),
+        on_dismiss_tutorial=lambda: config.set_onboarding_tutorial_pending(False),
+    )
+
+
+def prompt_for_step_deck_tutorial() -> None:
+    from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
+
+    if config.get_feature_flags().get("step_deck_tour", False):
+        return
+
+    context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
+    contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
+
+    prompt_for_tutorial(
+        context_types=context_types,
+        contexts=contexts,
+        dialog_context=DeckBrowser,
+        dialog_kwargs=dict(
+            title="📘 Add cards to your study queue",
+            body="When installed, the AnKing Step Deck comes with all cards hidden. "
+            "Take this tour to learn how to <b>select cards to study</b> and <b>set your daily limits</b>.<br><br>"
+            "You can revisit this anytime in AnkiHub's Help menu.",
+            secondary_button_label="Skip for now",
+            main_button_label="Take tour",
+        ),
+        on_start_tutorial=lambda: StepDeckTutorial().start(),
+    )
 
 
 def prompt_for_pending_onboarding_tutorial() -> None:
@@ -783,3 +824,7 @@ class OnboardingTutorial(Tutorial):
         from aqt.deckbrowser import DeckBrowserBottomBar
 
         return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)
+
+
+class StepDeckTutorial(Tutorial):
+    pass
