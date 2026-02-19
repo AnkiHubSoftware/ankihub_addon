@@ -3,7 +3,7 @@ name = "ankihub_addon"
 description = "AnkiHub add-on for Anki"
 readme = "README.md"
 requires-python = ">=3.9"
-version = "2026.02.19.1"
+version = "2026.02.19.2"
 dependencies = []
 
 [tool.setuptools]
