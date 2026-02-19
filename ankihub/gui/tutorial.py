@@ -252,7 +252,7 @@ class TutorialStep:
     target_context: Optional[Any] = None
     parent_widget: Optional[QWidget] = None
     qt_target: Optional[Union[QWidget, Callable[[], QWidget]]] = None
-    shown_callback: Optional[Callable[[], None]] = None
+    shown_callback: Optional[Callable[["TutorialStep"], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[Callable[[], None]], None]] = None
     next_label: str = "Next"
@@ -298,8 +298,6 @@ class Tutorial:
 
     def _render_tooltip(self, eval_js: bool = True) -> str:
         step = self.steps[self.current_step - 1]
-        if step.shown_callback:
-            step.shown_callback()
         tooltip_web = webview_for_context(step.tooltip_context)
         modal = render_tour_step(
             body=step.body,
@@ -374,6 +372,9 @@ class Tutorial:
                 overlay.close()
 
             step.hidden_callback = close_overlay
+
+        if step.shown_callback:
+            step.shown_callback(step)
 
         contexts = []
         webviews = set()
