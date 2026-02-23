@@ -94,6 +94,7 @@ type TutorialEffectOptions = {
     target?: string | HTMLElement,
     blockTargetClick: boolean,
     clickTarget?: string,
+    removeParentBackdrop?: boolean,
 };
 
 export class TutorialEffect {
@@ -112,6 +113,7 @@ export class TutorialEffect {
             modal: "",
             blockTargetClick: false,
             clickTarget: "",
+            removeParentBackdrop: false,
             ...options,
         };
     }
@@ -226,7 +228,7 @@ export class TutorialEffect {
             );
         }
         // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
-        if (this.targetElement.parentElement) {
+        if (this.targetElement.parentElement && this.options.removeParentBackdrop) {
             this.targetElement.parentElement.style.backdropFilter = "none";
         }
     }
@@ -339,6 +341,7 @@ type ShowStepArgs = {
     target: string,
     blockTargetClick?: boolean,
     clickTarget?: string,
+    removeParentBackdrop?: boolean,
 };
 
 export function showTutorialStep({
@@ -347,6 +350,7 @@ export function showTutorialStep({
     target,
     blockTargetClick = false,
     clickTarget = "",
+    removeParentBackdrop = false,
 }: ShowStepArgs) {
     createAndShowEffect({
         modal,
@@ -354,6 +358,7 @@ export function showTutorialStep({
         target,
         blockTargetClick,
         clickTarget,
+        removeParentBackdrop,
     });
 }
 
@@ -362,6 +367,7 @@ type HighlightTargetArgs = {
     currentStep: number,
     blockTargetClick?: boolean,
     backdrop?: string,
+    removeParentBackdrop?: boolean,
 };
 
 export async function highlightTutorialTarget({
@@ -369,11 +375,13 @@ export async function highlightTutorialTarget({
     currentStep,
     blockTargetClick = false,
     backdrop,
+    removeParentBackdrop = false,
 }: HighlightTargetArgs) {
     const effect = await createAndShowEffect({
         target,
         blockTargetClick,
         backdrop,
+        removeParentBackdrop,
     });
     if (targetResizeHandler) {
         window.removeEventListener(

@@ -256,6 +256,7 @@ class TutorialStep:
     block_target_click: bool = False
     auto_advance: bool = True
     apply_backdrop: bool = True
+    remove_parent_backdrop: bool = False
 
     def __post_init__(self):
         if not self.target_context:
@@ -310,6 +311,7 @@ class Tutorial:
             "modal": modal,
             "arrow": arrow,
             "blockTargetClick": step.block_target_click,
+            "removeParentBackdrop": step.remove_parent_backdrop,
         }
         if step.target and step.tooltip_context == step.target_context:
             tooltip_options["target"] = step.target if isinstance(step.target, str) else step.target()
@@ -334,6 +336,7 @@ class Tutorial:
                     "currentStep": self.current_step,
                     "blockTargetClick": step.block_target_click,
                     "backdrop": render_backdrop(),
+                    "removeParentBackdrop": step.remove_parent_backdrop,
                 },
             )
             if eval_js:
@@ -717,6 +720,7 @@ class OnboardingTutorial(Tutorial):
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
                 block_target_click=True,
+                remove_parent_backdrop=True,
             )
         ]
 
