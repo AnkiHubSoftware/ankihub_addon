@@ -6,17 +6,26 @@ from functools import cached_property, partial
 from typing import Any, Callable, Optional, Required, TypedDict, Union
 
 import aqt
+from anki.hooks import wrap
 from aqt import gui_hooks
+from aqt.browser import Browser
+from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
+from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.deckoptions import DeckOptionsDialog
 from aqt.editor import Editor
 from aqt.main import AnkiQt, MainWindowState
+from aqt.operations.scheduling import unsuspend_cards
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
+    QAbstractItemView,
     QPoint,
     Qt,
+    QTimer,
+    QToolButton,
     QVBoxLayout,
     QWidget,
     qconnect,
+    sip,
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
@@ -27,7 +36,11 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
 from ..settings import config
+from .flashcard_selector_dialog import (
+    show_flashcard_selector,
+)
 from .operations import AddonQueryOp
+from .utils import extract_argument
 
 START_TUTORIAL_PYCMD = "ankihub_start_tutorial"
 DISMISS_TUTORIAL_PYCMD = "ankihub_dismiss_tutorial"
@@ -38,6 +51,7 @@ TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
 TUTORIAL_CLOSED_PYCMD = "ankihub_tutorial_closed"
 JS_LOADED_PYCMD = "ankihub_tutorial_js_loaded"
 TARGET_CLICK_PYCMD = "ankihub_tutorial_target_click"
+FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_browser_flashcard_selector_open"
 
 
 class RenderDialogKwargs(TypedDict, total=False):
@@ -99,14 +113,32 @@ def get_backdrop_js() -> str:
     return f"AnkiHub.addTutorialBackdrop({json.dumps(render_backdrop())});"
 
 
+def render_link(href: str, text: str) -> str:
+    # Copied from the Link component in the website - we can't use it directly right now
+    # because it unconditionally adds an icon that we don't need here
+    classes = (
+        "component-default inline-flex items-center rounded-md "
+        "outline-offset-0 text-text-primary-main underline decoration-1 underline-offset-4 "
+        "hover:text-text-primary-main-hover hover:decoration-link-border hover:decoration-2 "
+        "focus:outline-2 focus:outline-border-primary-focus focus-visible:outline-2 "
+        "focus-visible:outline-border-primary-focus focus:hover:outline-link-border "
+        "focus:hover:text-text-primary-hover focus:no-underline focus-visible:no-underline"
+    )
+    return f"<a class='{classes}' href='{href}'>{text}</a>"
+
+
 class TutorialOverlayDialog(OverlayDialog):
+    def __init__(self, parent: QWidget, target: Optional[OverlayDialog], target_outline: bool = True) -> None:
+        self.target_outline = target_outline
+        super().__init__(parent, target)
+
     def setup_ui(self) -> None:
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
         self.web = AnkiWebView(self)
         self.web.disable_zoom()
-        self.web.set_bridge_command(self.web.defaultOnBridgeCmd, self)
+        self.web.set_bridge_command(self.on_bridge_cmd, self)
         vbox.addWidget(self.web)
         self.refresh()
         qconnect(self.finished, lambda: self.web.cleanup())
@@ -121,6 +153,12 @@ class TutorialOverlayDialog(OverlayDialog):
             context=self,
         )
         self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
+
+    def on_bridge_cmd(self, cmd: str) -> None:
+        if cmd == FLASHCARD_SELECTOR_OPEN_PYCMD:
+            show_flashcard_selector(config.anking_deck_id, parent=self.parentWidget())
+        else:
+            print("unhandled bridge cmd:", cmd)
 
     def on_position(self) -> None:
         super().on_position()
@@ -714,7 +752,17 @@ def setup() -> None:
     gui_hooks.main_window_did_init.append(prompt_for_pending_onboarding_tutorial)
 
 
-class OnboardingTutorial(Tutorial):
+class DeckBrowserOverviewBackdropMixin:
+    def extra_backdrop_contexts(self) -> tuple[Any, ...]:
+        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
+
+    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
+        from aqt.deckbrowser import DeckBrowserBottomBar
+
+        return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)
+
+
+class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
         return super().start()
@@ -850,15 +898,254 @@ class OnboardingTutorial(Tutorial):
         )
         return steps
 
-    @property
-    def extra_backdrop_contexts(self) -> tuple[Any, ...]:
-        return (aqt.mw.deckBrowser, aqt.mw.overview, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar, aqt.mw.overview.bottom)
 
-    def extra_backdrop_context_types(self) -> tuple[Any, ...]:
-        from aqt.deckbrowser import DeckBrowserBottomBar
+class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
+    def __init__(self) -> None:
+        super().__init__()
+        self.anking_deck_config = config.deck_config(config.anking_deck_id)
+        assert self.anking_deck_config is not None
+        self.deckoptions: Optional[DeckOptionsDialog] = None
+        self.browser: Optional[Browser] = None
 
-        return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)
+    def on_deckoptions_step(self, step: TutorialStep) -> None:
+        self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
+        step.tooltip_context = self.deckoptions
+        step.target_context = self.deckoptions
 
+    def on_deckoptions_next(self, on_done: Callable[[], None]) -> None:
+        self.deckoptions.web.eval("document.querySelector('.save').click()")
+        on_done()
 
-class StepDeckTutorial(Tutorial):
-    pass
+    def is_step_sidebar_item(self, item: SidebarItem) -> bool:
+        return item.id == self.anking_deck_config.anki_id and item.item_type != SidebarItemType.DECK_CURRENT
+
+    def find_step_deck_sidebar_item(self, root: SidebarItem) -> SidebarItem:
+        for child in root.children:
+            if child.item_type == SidebarItemType.DECK_ROOT:
+                for grandchild in child.children:
+                    if self.is_step_sidebar_item(grandchild):
+                        grandchild.search(self.anking_deck_config.name)
+                        return grandchild
+
+        raise RuntimeError("Sidebar item for Step deck not found")
+
+    def get_step_deck_sidebar_item_rect(self) -> OverlayTarget:
+        sidebar = self.browser.sidebar
+        model = sidebar.model()
+        step_sidebar_item = self.find_step_deck_sidebar_item(model.root)
+        idx = model.index_for_item(step_sidebar_item)
+        rect = sidebar.visualRect(idx)
+        return OverlayTarget(sidebar, rect)
+
+    def get_tags_sidebar_item(self) -> OverlayTarget:
+        sidebar = self.browser.sidebar
+        model = sidebar.model()
+        for child in model.root.children:
+            if child.item_type == SidebarItemType.TAG_ROOT:
+                sidebar.collapseAll()
+                idx = model.index_for_item(child)
+                sidebar.expand(idx)
+                sidebar.scrollTo(idx, QAbstractItemView.ScrollHint.PositionAtCenter)
+                rect = sidebar.visualRect(idx)
+                return OverlayTarget(sidebar, rect)
+        raise RuntimeError("Sidebar item for Tags not found")
+
+    def open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+        timer: Optional[QTimer] = None
+
+        def clear_sidebar_highlight(root: SidebarItem) -> None:
+            for child in root.children:
+                if child._search_matches_self and not self.is_step_sidebar_item(child):
+                    child._search_matches_self = False
+                if child._search_matches_child:
+                    clear_sidebar_highlight(child)
+
+        def wrapped_on_done(root: SidebarItem) -> None:
+            self.browser.sidebar.search_for(self.anking_deck_config.name)
+            clear_sidebar_highlight(self.browser.sidebar.model().root)
+            step_sidebar_item = self.find_step_deck_sidebar_item(root)
+            search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
+            self.browser.search_for(search)
+            on_done()
+
+        def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
+            _old: Callable[[SidebarItem], None] = kwargs.pop("_old")
+            args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
+            _old(*args, **kwargs, root=root)
+
+            def on_main() -> None:
+                # There can be multiple sidebar refresh events at browser startup,
+                # so we need to ensure we only call .next() once
+                nonlocal timer
+                if timer and not sip.isdeleted(timer):
+                    timer.deleteLater()
+                    timer = None
+                timer = aqt.mw.progress.timer(
+                    1000, functools.partial(wrapped_on_done, root=root), repeat=False, parent=self.browser
+                )
+                SidebarTreeView._deck_tree = original_deck_tree
+
+            aqt.mw.taskman.run_on_main(on_main)
+
+        original_deck_tree = SidebarTreeView._deck_tree
+        SidebarTreeView._deck_tree = wrap(SidebarTreeView._deck_tree, _build_deck_tree, "around")
+        self.browser = aqt.dialogs.open("Browser", aqt.mw)
+
+    def unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+        nids = [
+            1500401546879,
+            1500401591194,
+            1470839334989,
+            1470839322331,
+            1470839316273,
+            1470839294833,
+            1470839280347,
+            1550661266842,
+            1472161006747,
+            1478831098355,
+            1474154340790,
+            1472426521266,
+            1472426529103,
+            1474224658849,
+            1482115345843,
+            1482021715220,
+            1484686747922,
+            1462992514871,
+            1485913667420,
+            1485913618153,
+            1462326105448,
+            1462326951145,
+            1608908268526,
+            1518568098631,
+            1482361493392,
+            1474509558350,
+            1502065388242,
+            1488680344608,
+            1483930816351,
+            1476583175080,
+            1478834028289,
+            1540336057514,
+            1480908234945,
+            1478833957640,
+        ]
+        cids = set()
+        for nid in nids:
+            cids.update(aqt.mw.col.card_ids_of_note(nid))
+
+        def success(_):
+            self.browser.close()
+            on_done()
+
+        unsuspend_cards(parent=self.browser, card_ids=cids).success(success).run_in_background()
+
+    @ensure_mw_state("deckBrowser")
+    def start(self) -> None:
+        return super().start()
+
+    @cached_property
+    def steps(self) -> list[TutorialStep]:
+        steps = []
+        steps.append(
+            TutorialStep(
+                body="Click on the deck’s gear icon and select <b>Options</b>.",
+                target=f"[id='{self.anking_deck_config.anki_id}'] .opts",
+                tooltip_context=aqt.mw.deckBrowser,
+            )
+        )
+
+        steps.append(
+            TutorialStep(
+                body="Here, you can set your daily limits.<br><br>"
+                "<b>Recommended:</b><br>"
+                "maximum reviews = 10x new cards.<br><br>"
+                "Ex. If you plan to study 10 new cards daily, set your maximum reviews to 100 per day.",
+                # NOTE: This assumes Daily Limits is the first section.
+                # We should add section IDs to Anki
+                target=".row",
+                shown_callback=self.on_deckoptions_step,
+                next_callback=self.on_deckoptions_next,
+            )
+        )
+
+        steps.append(
+            TutorialStep(
+                body="Now click on <b>Browse</b>.",
+                target="#browse",
+                tooltip_context=aqt.mw.deckBrowser,
+                target_context=aqt.mw.toolbar,
+                next_callback=self.open_browser_and_move_to_next_step,
+                remove_parent_backdrop=True,
+            )
+        )
+
+        steps.append(
+            QtTutorialStep(
+                body="On <b>Browse</b>, you’ll find all cards from your decks.<br><br>"
+                "When the <b>AnKing Step Deck</b> is selected, only its cards are shown.",
+                qt_target=self.get_step_deck_sidebar_item_rect,
+                parent_widget=lambda: self.browser,
+            )
+        )
+
+        steps.append(
+            QtTutorialStep(
+                body="You can find specific cards to study using a few methods.<br><br>"
+                "One of them is typing terms on the <b>search bar</b>.",
+                qt_target=lambda: OverlayTarget(self.browser, self.browser.form.searchEdit),
+                parent_widget=lambda: self.browser,
+            )
+        )
+
+        steps.append(
+            QtTutorialStep(
+                body="You can also use <b>tags</b> to find specific sets of cards.",
+                qt_target=self.get_tags_sidebar_item,
+                parent_widget=lambda: self.browser,
+            )
+        )
+
+        smart_search_link = render_link(f'javascript:pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}")', "Smart Search")
+        body = (
+            f"Or use our AI {smart_search_link}, "
+            "a Premium feature that helps you search decks for cards"
+            " that match your study materials (lecture notes, PDFs, study aids, and more)."
+        )
+        steps.append(
+            QtTutorialStep(
+                body=body,
+                qt_target=lambda: OverlayTarget(
+                    self.browser.sidebar, self.browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
+                ),
+                parent_widget=lambda: self.browser,
+            )
+        )
+
+        media_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web/media"
+        steps.append(
+            QtTutorialStep(
+                body="Suspended cards won't appear in study sessions. In the Browser, "
+                "they're shown with a <span style='background-color: #FFE77E'>yellow background</span>.<br><br>"
+                "During the tour, you can’t perform actions. Normally, to unsuspend a card, "
+                "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
+                "Click Next and we'll unsuspend a card for you as an example.<br><br>"
+                f"<img src='{media_base}/toggle_suspend.png'>",
+                qt_target=lambda: self.browser.form.tableView,
+                parent_widget=lambda: self.browser,
+                target_outline=False,
+                next_callback=self.unsuspend_cards_and_move_to_next_step,
+            )
+        )
+
+        forum_link = render_link("https://community.ankihub.net/c/support/5", "forum")
+        steps.append(
+            TutorialStep(
+                body="We've unsuspended some cards for you and they are ready for study. Check them out, "
+                "then try selecting cards on your own!<br><br>"
+                f"<b>Need help?</b> Post in the {forum_link} and our support team will be happy to assist.",
+                target=f"[id='{self.anking_deck_config.anki_id}']",
+                click_target=f"[id='{self.anking_deck_config.anki_id}'] a.deck",
+                tooltip_context=aqt.mw.deckBrowser,
+            )
+        )
+
+        return steps
