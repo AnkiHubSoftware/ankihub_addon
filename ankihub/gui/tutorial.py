@@ -25,7 +25,7 @@ from aqt.webview import AnkiWebView, WebContent
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
-from ..gui.overlay_dialog import OverlayDialog
+from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
 from ..settings import config
 from .operations import AddonQueryOp
 
@@ -124,12 +124,12 @@ class TutorialOverlayDialog(OverlayDialog):
 
     def on_position(self) -> None:
         super().on_position()
-        target = self.target
-        geom = target.contentsRect()
-        target_global_top_left = target.mapToGlobal(geom.topLeft())
-        target_global_bottom_right = target.mapToGlobal(geom.bottomRight())
-        webview_top_left = self.web.mapFromGlobal(target_global_top_left)
-        webview_bottom_right = self.web.mapFromGlobal(target_global_bottom_right)
+        if not self.target:
+            return
+
+        rect = self.target.rect()
+        webview_top_left = self.web.mapFromGlobal(rect.topLeft())
+        webview_bottom_right = self.web.mapFromGlobal(rect.bottomRight())
         top = webview_top_left.y()
         left = webview_top_left.x()
         width = webview_bottom_right.x() - left
@@ -142,13 +142,17 @@ class TutorialOverlayDialog(OverlayDialog):
             """
 (() => {
     const target = document.getElementById('target');
+    const targetClass = '%(target_class)s';
+    if(targetClass) target.classList.add(targetClass);
     target.style.top = '%(top)dpx';
     target.style.left = '%(left)dpx';
     target.style.width = '%(width)dpx';
     target.style.height = '%(height)dpx';
 })();
         """
-            % dict(top=top, left=left, width=width, height=height)
+            % dict(
+                target_class="ah-outline" if self.target_outline else "", top=top, left=left, width=width, height=height
+            )
         )
 
 
@@ -245,8 +249,6 @@ class TutorialStep:
     click_target: Optional[Union[str, Callable[[], str]]] = ""
     tooltip_context: Optional[Any] = None
     target_context: Optional[Any] = None
-    parent_widget: Optional[QWidget] = None
-    qt_target: Optional[Union[QWidget, Callable[[], QWidget]]] = None
     shown_callback: Optional[Callable[["TutorialStep"], None]] = None
     hidden_callback: Optional[Callable[[], None]] = None
     next_callback: Optional[Callable[[Callable[[], None]], None]] = None
@@ -261,6 +263,14 @@ class TutorialStep:
     def __post_init__(self):
         if not self.target_context:
             self.target_context = self.tooltip_context
+
+
+@dataclass
+class QtTutorialStep(TutorialStep):
+    parent_widget: Optional[Union[QWidget, Callable[[], QWidget]]] = None
+    qt_target: Optional[Union[OverlayTarget, Callable[[], OverlayTarget]]] = None
+    target_outline: bool = True
+    apply_backdrop: bool = False
 
 
 active_tutorial: Optional["Tutorial"] = None
@@ -358,14 +368,17 @@ class Tutorial:
 
     def contexts_for_step(self, step: TutorialStep) -> tuple[Any]:
         backdrop_contexts = []
-        backdrop_contexts.extend(self.extra_backdrop_contexts)
+        backdrop_contexts.extend(self.extra_backdrop_contexts())
         return (step.tooltip_context, step.target_context, *backdrop_contexts)
 
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
-        if step.qt_target:
+        if isinstance(step, QtTutorialStep):
             target = step.qt_target() if callable(step.qt_target) else step.qt_target
-            overlay = TutorialOverlayDialog(step.parent_widget or target.window(), target)
+            parent_widget = step.parent_widget() if callable(step.parent_widget) else step.parent_widget
+            overlay = TutorialOverlayDialog(
+                parent_widget or (target and target.window()) or aqt.mw, target, step.target_outline
+            )
             overlay.show()
             step.tooltip_context = overlay
             step.target_context = overlay

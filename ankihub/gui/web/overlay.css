@@ -11,6 +11,6 @@ html, body {
     position: absolute;
 }
 
-#target {
+#target.ah-outline {
     outline: 4px solid #4F39F6;
 }
