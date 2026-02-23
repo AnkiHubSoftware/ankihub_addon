@@ -55,7 +55,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         return url_flashcard_selector(self.ah_did)
 
 
-def _show_upsell(user_details: dict) -> None:
+def _show_upsell(user_details: dict, parent=aqt.mw) -> None:
     show_trial_ended_message = user_details.get("show_trial_ended_message", False)
     text = "Let AI do the heavy lifting! Find flashcards perfectly matched to your study materials and elevate your \
 learning experience with Premium. 🌟"
@@ -71,7 +71,7 @@ learning experience with Premium. 🌟"
     show_dialog(
         text,
         title,
-        parent=aqt.mw,
+        parent=parent,
         buttons=[
             ("Not Now", QDialogButtonBox.ButtonRole.RejectRole),
             ("Learn More", QDialogButtonBox.ButtonRole.HelpRole),
@@ -89,5 +89,5 @@ def show_flashcard_selector(ah_did: UUID, parent=aqt.mw) -> None:
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
         on_access_granted=on_access_granted,
-        on_access_denied=_show_upsell,
+        on_access_denied=lambda user_details: _show_upsell(user_details, parent),
     )
