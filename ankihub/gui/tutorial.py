@@ -281,6 +281,10 @@ class Tutorial:
         self.name = ""
         self.current_step = 1
 
+    @classmethod
+    def is_active(cls) -> bool:
+        return isinstance(active_tutorial, cls)
+
     @property
     def steps(self) -> list[TutorialStep]:
         return []
