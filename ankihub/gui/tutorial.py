@@ -44,7 +44,7 @@ from .utils import extract_argument
 
 START_TUTORIAL_PYCMD = "ankihub_start_tutorial"
 DISMISS_TUTORIAL_PYCMD = "ankihub_dismiss_tutorial"
-SHOW_LATER_PYCMD = "ankihub_show_later"
+SKIP_TUTORIAL_PYCMD = "ankihub_skip_tutorial"
 NEXT_STEP_PYCMD = "ankihub_tutorial_next_step"
 PREV_STEP_PYCMD = "ankihub_tutorial_prev_step"
 TARGET_RESIZE_PYCMD = "ankihub_tutorial_target_resize"
@@ -469,7 +469,6 @@ class Tutorial:
     def end(self) -> None:
         self._cleanup_step()
         self._finalize_tutorial()
-        config.set_onboarding_tutorial_pending(False)
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
@@ -624,8 +623,9 @@ def prompt_for_tutorial(
     contexts: tuple[Any, ...],
     dialog_context: Any,
     dialog_kwargs: RenderDialogKwargs,
-    on_start_tutorial: Callable[[], None],
-    on_dismiss_tutorial: Optional[Callable[[], None]] = None,
+    on_start: Callable[[], None],
+    on_dismiss: Callable[[], None],
+    on_skip: Optional[Callable[[], None]] = None,
 ) -> None:
     if active_tutorial:
         return
@@ -634,7 +634,7 @@ def prompt_for_tutorial(
         if isinstance(context, dialog_context):
             body = render_dialog(
                 on_main_button_click=f"pycmd('{START_TUTORIAL_PYCMD}')",
-                on_secondary_button_click=f"pycmd('{SHOW_LATER_PYCMD}')",
+                on_secondary_button_click=f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
                 on_close=f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
                 **dialog_kwargs,
             )
@@ -646,14 +646,16 @@ def prompt_for_tutorial(
     def on_webview_did_receive_js_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
         if message == START_TUTORIAL_PYCMD:
             remove_hooks()
-            on_start_tutorial()
+            on_start()
             return True, None
         if message == DISMISS_TUTORIAL_PYCMD:
             clean_up_webviews()
-            on_dismiss_tutorial()
+            on_dismiss()
             return True, None
-        if message == SHOW_LATER_PYCMD:
+        if message == SKIP_TUTORIAL_PYCMD:
             clean_up_webviews()
+            if on_skip:
+                on_skip()
             return True, None
         return handled
 
@@ -713,16 +715,19 @@ def prompt_for_onboarding_tutorial() -> None:
             secondary_button_label="Maybe later",
             main_button_label="Take tour",
         ),
-        on_start_tutorial=lambda: OnboardingTutorial().start(),
-        on_dismiss_tutorial=lambda: config.set_onboarding_tutorial_pending(False),
+        on_start=lambda: OnboardingTutorial().start(),
+        on_dismiss=lambda: config.set_onboarding_tutorial_pending(False),
     )
 
 
-def prompt_for_step_deck_tutorial() -> None:
+def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
     if config.get_feature_flags().get("step_deck_tour", False):
         return
+
+    config.set_step_deck_tutorial_pending(True)
+    config.set_show_step_deck_tutorial(False)
 
     context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
     contexts = (aqt.mw.deckBrowser, aqt.mw.deckBrowser.bottom, aqt.mw.toolbar)
@@ -739,17 +744,21 @@ def prompt_for_step_deck_tutorial() -> None:
             secondary_button_label="Skip for now",
             main_button_label="Take tour",
         ),
-        on_start_tutorial=lambda: StepDeckTutorial().start(),
+        on_start=lambda: StepDeckTutorial().start(),
+        on_dismiss=lambda: config.set_step_deck_tutorial_pending(False),
+        on_skip=on_skip,
     )
 
 
-def prompt_for_pending_onboarding_tutorial() -> None:
+def prompt_for_pending_tutorial() -> None:
     if config.onboarding_tutorial_pending():
         prompt_for_onboarding_tutorial()
+    elif config.step_deck_tutorial_pending():
+        prompt_for_step_deck_tutorial()
 
 
 def setup() -> None:
-    gui_hooks.main_window_did_init.append(prompt_for_pending_onboarding_tutorial)
+    gui_hooks.main_window_did_init.append(prompt_for_pending_tutorial)
 
 
 class DeckBrowserOverviewBackdropMixin:
@@ -766,6 +775,10 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
         return super().start()
+
+    def end(self) -> None:
+        config.set_onboarding_tutorial_pending(False)
+        return super().end()
 
     def _monitor_mw_state_change(self, on_done: Callable[[], None]) -> None:
         def on_state_did_change(*args: Any, **kwargs: Any) -> None:
@@ -907,6 +920,14 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self.deckoptions: Optional[DeckOptionsDialog] = None
         self.browser: Optional[Browser] = None
 
+    @ensure_mw_state("deckBrowser")
+    def start(self) -> None:
+        return super().start()
+
+    def end(self) -> None:
+        config.set_step_deck_tutorial_pending(False)
+        return super().end()
+
     def on_deckoptions_step(self, step: TutorialStep) -> None:
         self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
         step.tooltip_context = self.deckoptions
@@ -1037,10 +1058,6 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             on_done()
 
         unsuspend_cards(parent=self.browser, card_ids=cids).success(success).run_in_background()
-
-    @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
-        return super().start()
 
     @cached_property
     def steps(self) -> list[TutorialStep]:

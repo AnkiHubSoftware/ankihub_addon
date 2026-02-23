@@ -219,6 +219,9 @@ class PrivateConfig(DataClassJSONMixin):
     user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
     onboarding_tutorial_pending: bool = False
+    step_deck_tutorial_pending: bool = False
+    # Show Step Deck tutorial next time the user opens the deck
+    show_step_deck_tutorial: bool = False
 
 
 class _Config:
@@ -352,6 +355,14 @@ class _Config:
 
     def set_onboarding_tutorial_pending(self, pending: bool):
         self._private_config.onboarding_tutorial_pending = pending
+        self._update_private_config()
+
+    def set_show_step_deck_tutorial(self, show: bool):
+        self._private_config.show_step_deck_tutorial = show
+        self._update_private_config()
+
+    def set_step_deck_tutorial_pending(self, pending: bool):
+        self._private_config.step_deck_tutorial_pending = pending
         self._update_private_config()
 
     def save_latest_deck_update(self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]):
@@ -504,6 +515,12 @@ class _Config:
 
     def onboarding_tutorial_pending(self) -> bool:
         return self._private_config.onboarding_tutorial_pending
+
+    def show_step_deck_tutorial(self) -> bool:
+        return self._private_config.show_step_deck_tutorial
+
+    def step_deck_tutorial_pending(self) -> bool:
+        return self._private_config.step_deck_tutorial_pending
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui
