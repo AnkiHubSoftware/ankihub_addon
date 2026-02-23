@@ -285,7 +285,6 @@ class Tutorial:
     def steps(self) -> list[TutorialStep]:
         return []
 
-    @property
     def extra_backdrop_contexts(self) -> tuple[Any, ...]:
         return tuple()
 
@@ -295,7 +294,7 @@ class Tutorial:
         Required to handle DeckBrowserBottomBar and OverviewBottomBar,
         which Anki doesn't keep a reference to their instances.
         """
-        return tuple(type(context) for context in self.extra_backdrop_contexts)
+        return tuple(type(context) for context in self.extra_backdrop_contexts())
 
     def _render_js_function_with_options(self, function: str, options: dict[str, Any]) -> str:
         return on_ankihub_loaded_js(
@@ -359,7 +358,7 @@ class Tutorial:
         target_web = webview_for_context(step.target_context)
         backdrop_js = get_backdrop_js()
         webviews = set()
-        for context in self.extra_backdrop_contexts:
+        for context in self.extra_backdrop_contexts():
             web = webview_for_context(context)
             if web not in (tooltip_web, target_web):
                 webviews.add(web)
@@ -509,7 +508,7 @@ class Tutorial:
             js = self._render_tooltip(eval_js=False)
         elif context == step.target_context:
             js = self._render_highlight(eval_js=False)
-        elif context in self.extra_backdrop_contexts or isinstance(context, self.extra_backdrop_context_types()):
+        elif context in self.extra_backdrop_contexts() or isinstance(context, self.extra_backdrop_context_types()):
             js = get_backdrop_js()
         if js:
             js = tutorial_assets_js(js)
