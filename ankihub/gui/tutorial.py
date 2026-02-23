@@ -356,6 +356,11 @@ class Tutorial:
         for web in webviews:
             web.eval(backdrop_js)
 
+    def contexts_for_step(self, step: TutorialStep) -> tuple[Any]:
+        backdrop_contexts = []
+        backdrop_contexts.extend(self.extra_backdrop_contexts)
+        return (step.tooltip_context, step.target_context, *backdrop_contexts)
+
     def show_current(self) -> None:
         step = self.steps[self.current_step - 1]
         if step.qt_target:
@@ -376,7 +381,7 @@ class Tutorial:
 
         contexts = []
         webviews = set()
-        for context in [step.tooltip_context, step.target_context, *self.extra_backdrop_contexts]:
+        for context in self.contexts_for_step(step):
             web = webview_for_context(context)
             if web not in webviews:
                 contexts.append(context)
@@ -497,14 +502,23 @@ class Tutorial:
             js = tutorial_assets_js(js)
             web_content.body += f"<script>{js}</script>"
 
-    def _cleanup_step(self, destroy_effect: bool = True) -> None:
+    def _cleanup_step(self) -> None:
         step = self.steps[self.current_step - 1]
-        if destroy_effect:
-            webviews = set()
-            for context in (step.tooltip_context, step.target_context, *self.extra_backdrop_contexts):
-                webviews.add(webview_for_context(context))
-            for web in webviews:
-                web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
+        webviews = set()
+        for context in self.contexts_for_step(step):
+            webviews.add(webview_for_context(context))
+        if self.current_step < len(self.steps):
+            next_step = self.steps[self.current_step]
+            for context in self.contexts_for_step(next_step):
+                # Skip if no context set yet (in Qt screens)
+                if not context:
+                    continue
+                web = webview_for_context(context)
+                if web in webviews:
+                    webviews.remove(web)
+
+        for web in webviews:
+            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
         if step.hidden_callback:
             step.hidden_callback()
@@ -513,7 +527,7 @@ class Tutorial:
         if self.current_step == 1:
             self.end()
             return
-        self._cleanup_step(destroy_effect=False)
+        self._cleanup_step()
         self.current_step -= 1
         self.show_current()
 
@@ -521,7 +535,7 @@ class Tutorial:
         if self.current_step >= len(self.steps):
             self.end()
             return
-        self._cleanup_step(destroy_effect=False)
+        self._cleanup_step()
         self.current_step += 1
         self.show_current()
 
