@@ -935,8 +935,19 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         config.set_step_deck_tutorial_pending(False)
         return super().end()
 
+    def on_deck_options_did_load(self, deckoptions: DeckOptionsDialog) -> None:
+        self.deckoptions = deckoptions
+        self.next()
+
+    def on_gears_icon_step(self, step: TutorialStep) -> None:
+        gui_hooks.deck_options_did_load.append(self.on_deck_options_did_load)
+
+    def on_gears_icon_step_hidden(self) -> None:
+        gui_hooks.deck_options_did_load.remove(self.on_deck_options_did_load)
+
     def on_deckoptions_step(self, step: TutorialStep) -> None:
-        self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
+        if not self.deckoptions:
+            self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
         step.tooltip_context = self.deckoptions
         step.target_context = self.deckoptions
 
@@ -1073,6 +1084,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 body="Click on the deck’s gear icon and select <b>Options</b>.",
                 target=f"[id='{self.anking_deck_config.anki_id}'] .opts",
                 tooltip_context=aqt.mw.deckBrowser,
+                shown_callback=self.on_gears_icon_step,
+                hidden_callback=self.on_gears_icon_step_hidden,
             )
         )
 
