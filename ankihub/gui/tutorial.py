@@ -459,6 +459,10 @@ class Tutorial:
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
 
+    def restart(self) -> None:
+        self.current_step = 1
+        self.show_current()
+
     def _finalize_tutorial(self) -> None:
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
@@ -1161,6 +1165,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 target=f"[id='{self.anking_deck_config.anki_id}']",
                 click_target=f"[id='{self.anking_deck_config.anki_id}'] a.deck",
                 tooltip_context=aqt.mw.deckBrowser,
+                next_label="End tour",
+                back_label="Restart tour",
+                back_callback=lambda _: self.restart(),
             )
         )
 
