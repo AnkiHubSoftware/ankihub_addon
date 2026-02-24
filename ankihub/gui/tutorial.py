@@ -3,7 +3,7 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Optional, Required, TypedDict, Union
+from typing import Any, Callable, Optional, Required, TypedDict, Union, cast
 
 import aqt
 from anki.config import Config
@@ -962,6 +962,17 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self.next()
 
     def on_gears_icon_step(self, step: TutorialStep) -> None:
+        def after_init(*args: Any, **kwargs: Any) -> None:
+            _old: Callable = kwargs.pop("_old")
+            args, kwargs, deckoptions = extract_argument(_old, args, kwargs, "self")
+            _old(deckoptions, *args, **kwargs)
+            deckoptions = cast(DeckOptionsDialog, deckoptions)
+            deckoptions.setWindowState(deckoptions.windowState() | Qt.WindowState.WindowMaximized)
+            DeckOptionsDialog.__init__ = original_init
+
+        original_init = DeckOptionsDialog.__init__
+        DeckOptionsDialog.__init__ = wrap(DeckOptionsDialog.__init__, after_init, "around")
+
         gui_hooks.deck_options_did_load.append(self.on_deck_options_did_load)
 
     def on_gears_icon_step_hidden(self) -> None:
@@ -1069,6 +1080,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             args, kwargs, browser = extract_argument(_old, args, kwargs, "self")
             self.browser = browser
             _old(browser, *args, **kwargs)
+            browser.setWindowState(self.browser.windowState() | Qt.WindowState.WindowMaximized)
             Browser.__init__ = original_init
 
         original_init = Browser.__init__
