@@ -475,7 +475,7 @@ class Tutorial:
         active_tutorial = None
 
     def end(self) -> None:
-        self._cleanup_step()
+        self._cleanup_step(all_webviews=True)
         self._finalize_tutorial()
 
     def _on_webview_did_receive_js_message(
@@ -563,12 +563,12 @@ class Tutorial:
             js = tutorial_assets_js(js)
             web_content.body += f"<script>{js}</script>"
 
-    def _cleanup_step(self) -> None:
+    def _cleanup_step(self, all_webviews: bool = False) -> None:
         step = self.steps[self.current_step - 1]
         webviews = set()
         for context in self.contexts_for_step(step):
             webviews.add(webview_for_context(context))
-        if self.current_step < len(self.steps):
+        if self.current_step < len(self.steps) and not all_webviews:
             next_step = self.steps[self.current_step]
             for context in self.contexts_for_step(next_step):
                 # Skip if no context set yet (in Qt screens)
