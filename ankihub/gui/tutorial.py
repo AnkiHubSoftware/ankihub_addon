@@ -1003,7 +1003,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 return OverlayTarget(sidebar, rect)
         raise RuntimeError("Sidebar item for Tags not found")
 
-    def open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+    def hook_browser_startup(self, on_done: Callable[[Browser], None]) -> None:
         timer: Optional[QTimer] = None
 
         def clear_sidebar_highlight(root: SidebarItem) -> None:
@@ -1019,7 +1019,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             step_sidebar_item = self.find_step_deck_sidebar_item(root)
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
             self.browser.search_for(search)
-            on_done()
+            on_done(self.browser)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[[SidebarItem], None] = kwargs.pop("_old")
@@ -1040,10 +1040,35 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
             aqt.mw.taskman.run_on_main(on_main)
 
+        def before_setup_table(browser: Browser) -> None:
+            aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
+            Browser.setup_table = original_setup_table
+
+        def before_init(*args, **kwargs) -> None:
+            _old: Callable = kwargs.pop("_old")
+            args, kwargs, browser = extract_argument(_old, args, kwargs, "self")
+            self.browser = browser
+            _old(browser, *args, **kwargs)
+            Browser.__init__ = original_init
+
+        original_init = Browser.__init__
+        Browser.__init__ = wrap(Browser.__init__, before_init, "around")
+
+        original_setup_table = Browser.setup_table
+        Browser.setup_table = wrap(Browser.setup_table, before_setup_table, "before")
+
         original_deck_tree = SidebarTreeView._deck_tree
         SidebarTreeView._deck_tree = wrap(SidebarTreeView._deck_tree, _build_deck_tree, "around")
-        aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
-        self.browser = aqt.dialogs.open("Browser", aqt.mw)
+
+    def on_browser_startup(self, browser: Browser) -> None:
+        self.next()
+
+    def on_browse_button_step(self, step: TutorialStep) -> None:
+        self.hook_browser_startup(self.on_browser_startup)
+
+    def open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+        aqt.dialogs.open("Browser", aqt.mw)
+        # on_browser_startup() takes care of calling .next() directly after the browser is properly set up
 
     def unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         nids = [
@@ -1125,6 +1150,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
+                shown_callback=self.on_browse_button_step,
                 next_callback=self.open_browser_and_move_to_next_step,
                 remove_parent_backdrop=True,
             )
