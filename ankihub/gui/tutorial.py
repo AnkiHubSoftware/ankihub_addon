@@ -6,6 +6,7 @@ from functools import cached_property, partial
 from typing import Any, Callable, Optional, Required, TypedDict, Union
 
 import aqt
+from anki.config import Config
 from anki.hooks import wrap
 from aqt import gui_hooks
 from aqt.browser import Browser
@@ -1041,6 +1042,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         original_deck_tree = SidebarTreeView._deck_tree
         SidebarTreeView._deck_tree = wrap(SidebarTreeView._deck_tree, _build_deck_tree, "around")
+        aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
         self.browser = aqt.dialogs.open("Browser", aqt.mw)
 
     def unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
