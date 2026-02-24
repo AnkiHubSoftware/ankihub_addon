@@ -1014,7 +1014,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         step_sidebar_item = self.find_step_deck_sidebar_item(model.root)
         idx = model.index_for_item(step_sidebar_item)
         rect = sidebar.visualRect(idx)
-        return OverlayTarget(sidebar, rect)
+        return OverlayTarget(sidebar.viewport(), rect)
 
     def get_tags_sidebar_item(self) -> OverlayTarget:
         sidebar = self.browser.sidebar
@@ -1026,7 +1026,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 sidebar.expand(idx)
                 sidebar.scrollTo(idx, QAbstractItemView.ScrollHint.PositionAtCenter)
                 rect = sidebar.visualRect(idx)
-                return OverlayTarget(sidebar, rect)
+                return OverlayTarget(sidebar.viewport(), rect)
         raise RuntimeError("Sidebar item for Tags not found")
 
     def hook_browser_startup(self, on_done: Callable[[Browser], None]) -> None:

@@ -34,9 +34,9 @@ class OverlayTarget:
 
     def rect(self) -> QRect:
         if isinstance(self.element, QWidget):
-            geom = self.element.contentsRect()
-            top_left = self.element.parentWidget().mapToGlobal(geom.topLeft())
-            bottom_right = self.element.parentWidget().mapToGlobal(geom.bottomRight())
+            geom = self.element.rect()
+            top_left = self.element.mapToGlobal(geom.topLeft())
+            bottom_right = self.element.mapToGlobal(geom.bottomRight())
             return QRect(top_left, bottom_right)
         else:
             top_left = self.parent.mapToGlobal(self.element.topLeft())
