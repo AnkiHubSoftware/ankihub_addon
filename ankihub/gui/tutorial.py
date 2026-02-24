@@ -14,6 +14,7 @@ from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.deckoptions import DeckOptionsDialog
 from aqt.editor import Editor
 from aqt.main import AnkiQt, MainWindowState
+from aqt.operations.deck import set_current_deck
 from aqt.operations.scheduling import unsuspend_cards
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
@@ -929,7 +930,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
-        return super().start()
+        base_start = super().start
+        set_current_deck(parent=aqt.mw, deck_id=self.anking_deck_config.anki_id).success(
+            lambda _: base_start()
+        ).run_in_background()
 
     def end(self) -> None:
         config.set_step_deck_tutorial_pending(False)
