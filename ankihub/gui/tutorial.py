@@ -321,6 +321,18 @@ class QtTutorialStep(TutorialStep):
 active_tutorial: Optional["Tutorial"] = None
 
 
+def ensure_tutorial_active(func: Callable[..., None]) -> Callable[..., None]:
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> None:
+        args, kwargs, tutorial = extract_argument(func, args, kwargs, "self")
+        if active_tutorial is not tutorial:
+            print(f"Ignored {func.__name__} call as tutorial is not active")
+        else:
+            func(tutorial, *args, **kwargs)
+
+    return wrapper
+
+
 class Tutorial:
     def __init__(self) -> None:
         self.current_step = 1
@@ -471,15 +483,12 @@ class Tutorial:
         self.current_step = 1
         self.show_current()
 
-    def _finalize_tutorial(self) -> None:
+    def end(self) -> None:
+        self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
         global active_tutorial
         active_tutorial = None
-
-    def end(self) -> None:
-        self._cleanup_step(all_webviews=True)
-        self._finalize_tutorial()
 
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
@@ -588,6 +597,7 @@ class Tutorial:
         if step.hidden_callback:
             step.hidden_callback()
 
+    @ensure_tutorial_active
     def back(self) -> None:
         if self.current_step == 1:
             self.end()
@@ -596,6 +606,7 @@ class Tutorial:
         self.current_step -= 1
         self.show_current()
 
+    @ensure_tutorial_active
     def next(self) -> None:
         if self.current_step >= len(self.steps):
             self.end()
@@ -604,6 +615,7 @@ class Tutorial:
         self.current_step += 1
         self.show_current()
 
+    @ensure_tutorial_active
     def go_to_step(self, id_or_ordinal: Union[str, int]) -> None:
         new_step: Optional[int] = None
         if isinstance(id_or_ordinal, int):
