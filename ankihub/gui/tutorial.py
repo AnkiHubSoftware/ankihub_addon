@@ -1066,8 +1066,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         unsuspend_cards(parent=self.browser, card_ids=cids).success(success).run_in_background()
 
-    @cached_property
-    def steps(self) -> list[TutorialStep]:
+    def _steps(self) -> list[TutorialStep]:
         steps = []
         steps.append(
             TutorialStep(
@@ -1176,4 +1175,12 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             )
         )
 
+        return steps
+
+    @cached_property
+    def steps(self) -> list[TutorialStep]:
+        steps = self._steps()
+        # Hide back button for all but the last step
+        for step in steps[:-1]:
+            step.back_label = ""
         return steps
