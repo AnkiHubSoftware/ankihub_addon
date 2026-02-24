@@ -20,6 +20,7 @@ from aqt.operations.scheduling import unsuspend_cards
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QAbstractItemView,
+    QCloseEvent,
     QPoint,
     Qt,
     QTimer,
@@ -287,6 +288,7 @@ def inject_tutorial_assets(context: Any, on_loaded: Optional[Callable[[], None]]
 @dataclass
 class TutorialStep:
     body: str
+    id: Optional[str] = None
     target: Optional[Union[str, Callable[[], str]]] = ""
     click_target: Optional[Union[str, Callable[[], str]]] = ""
     tooltip_context: Optional[Any] = None
@@ -601,6 +603,18 @@ class Tutorial:
         self._cleanup_step()
         self.current_step += 1
         self.show_current()
+
+    def go_to_step(self, id_or_ordinal: Union[str, int]) -> None:
+        new_step: Optional[int] = None
+        if isinstance(id_or_ordinal, int):
+            new_step = id_or_ordinal
+        else:
+            idx = next((idx + 1 for idx, step in enumerate(self.steps) if step.id == id_or_ordinal), None)
+            new_step = idx
+        if new_step is not None:
+            self._cleanup_step()
+            self.current_step = new_step
+            self.show_current()
 
 
 def ensure_mw_state(
@@ -930,6 +944,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self.deckoptions: Optional[DeckOptionsDialog] = None
         self.deckoptions_saved = False
         self.browser: Optional[Browser] = None
+        self.browser_closed_by_us = False
 
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
@@ -1044,7 +1059,12 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
             Browser.setup_table = original_setup_table
 
-        def before_init(*args, **kwargs) -> None:
+        def before_close(browser: Browser, evt: Optional[QCloseEvent]) -> None:
+            Browser.closeEvent = original_close_event
+            if not self.browser_closed_by_us:
+                self.go_to_step("browse_button")
+
+        def wrapped_init(*args, **kwargs) -> None:
             _old: Callable = kwargs.pop("_old")
             args, kwargs, browser = extract_argument(_old, args, kwargs, "self")
             self.browser = browser
@@ -1052,7 +1072,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             Browser.__init__ = original_init
 
         original_init = Browser.__init__
-        Browser.__init__ = wrap(Browser.__init__, before_init, "around")
+        Browser.__init__ = wrap(Browser.__init__, wrapped_init, "around")
+
+        original_close_event = Browser.closeEvent
+        Browser.closeEvent = wrap(Browser.closeEvent, before_close, "before")
 
         original_setup_table = Browser.setup_table
         Browser.setup_table = wrap(Browser.setup_table, before_setup_table, "before")
@@ -1112,6 +1135,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             cids.update(aqt.mw.col.card_ids_of_note(nid))
 
         def success(_):
+            self.browser_closed_by_us = True
             self.browser.close()
             on_done()
 
@@ -1146,6 +1170,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         steps.append(
             TutorialStep(
+                id="browse_button",
                 body="Now click on <b>Browse</b>.",
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
