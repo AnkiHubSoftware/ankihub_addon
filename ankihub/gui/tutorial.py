@@ -316,7 +316,6 @@ active_tutorial: Optional["Tutorial"] = None
 
 class Tutorial:
     def __init__(self) -> None:
-        self.name = ""
         self.current_step = 1
 
     @classmethod
