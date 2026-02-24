@@ -83,6 +83,7 @@ def render_tour_step(
     on_next: Optional[str] = None,
     on_close: Optional[str] = None,
     show_backdrop: bool = True,
+    close_button: bool = True,
 ) -> str:
     return render_template(
         "tour_step.html",
@@ -96,6 +97,7 @@ def render_tour_step(
             "on_next": on_next,
             "on_close": on_close,
             "show_backdrop": show_backdrop,
+            "close_button": close_button,
             "class": "ah-tour-step",
         },
     )
@@ -297,6 +299,7 @@ class TutorialStep:
     auto_advance: bool = True
     apply_backdrop: bool = True
     remove_parent_backdrop: bool = False
+    close_button: bool = True
 
     def __post_init__(self):
         if not self.target_context:
@@ -355,6 +358,7 @@ class Tutorial:
             next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=step.apply_backdrop,
+            close_button=step.close_button,
         )
         arrow = render_arrow() if step.target else ""
         tooltip_options = {
@@ -1168,6 +1172,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 next_label="End tour",
                 back_label="Restart tour",
                 back_callback=lambda _: self.restart(),
+                close_button=False,
             )
         )
 
