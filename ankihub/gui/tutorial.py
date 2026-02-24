@@ -1098,7 +1098,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 body="Here, you can set your daily limits.<br><br>"
                 "<b>Recommended:</b><br>"
                 "maximum reviews = 10x new cards.<br><br>"
-                "Ex. If you plan to study 10 new cards daily, set your maximum reviews to 100 per day.",
+                "Ex. If you plan to study 10 new cards daily, set your maximum reviews to 100 per day.<br><br>"
+                "Click <b>Next</b> when you're done.",
                 # NOTE: This assumes Daily Limits is the first section.
                 # We should add section IDs to Anki
                 target=".row",
