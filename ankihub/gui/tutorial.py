@@ -579,7 +579,8 @@ class Tutorial:
                     webviews.remove(web)
 
         for web in webviews:
-            web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
+            if web and not sip.isdeleted(web):
+                web.eval("if(typeof AnkiHub !== 'undefined') AnkiHub.destroyActiveTutorialEffect()")
 
         if step.hidden_callback:
             step.hidden_callback()
@@ -926,6 +927,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self.anking_deck_config = config.deck_config(config.anking_deck_id)
         assert self.anking_deck_config is not None
         self.deckoptions: Optional[DeckOptionsDialog] = None
+        self.deckoptions_saved = False
         self.browser: Optional[Browser] = None
 
     @ensure_mw_state("deckBrowser")
@@ -949,13 +951,20 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     def on_gears_icon_step_hidden(self) -> None:
         gui_hooks.deck_options_did_load.remove(self.on_deck_options_did_load)
 
+    def on_deckoptions_finished(self) -> None:
+        # If closed without saving, go back to previous step in the main window
+        if not self.deckoptions_saved:
+            self.back()
+
     def on_deckoptions_step(self, step: TutorialStep) -> None:
-        if not self.deckoptions:
+        if not self.deckoptions or sip.isdeleted(self.deckoptions):
             self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
         step.tooltip_context = self.deckoptions
         step.target_context = self.deckoptions
+        qconnect(self.deckoptions.finished, self.on_deckoptions_finished)
 
     def on_deckoptions_next(self, on_done: Callable[[], None]) -> None:
+        self.deckoptions_saved = True
         self.deckoptions.web.eval("document.querySelector('.save').click()")
         on_done()
 
