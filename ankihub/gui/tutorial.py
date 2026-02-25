@@ -3,7 +3,7 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Optional, Required, TypedDict, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Required, Tuple, TypedDict, Union, cast
 
 import aqt
 from anki.config import Config
@@ -21,9 +21,9 @@ from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QAbstractItemView,
     QCloseEvent,
+    QObject,
     QPoint,
     Qt,
-    QTimer,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -130,6 +130,46 @@ def render_link(href: str, text: str) -> str:
         "focus:hover:text-text-primary-hover focus:no-underline focus-visible:no-underline"
     )
     return f"<a class='{classes}' href='{href}'>{text}</a>"
+
+
+def wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable:
+    "Wrap a class method using anki.hooks.wrap() and return a function that reverts the wrapping when called."
+
+    original_method = getattr(klass, method_name)
+    setattr(klass, method_name, wrap(original_method, new, pos))
+
+    def revert_wrapping() -> None:
+        setattr(klass, method_name, original_method)
+
+    return revert_wrapping
+
+
+class DebouncedDelayedCall:
+    """Queues delayed callbacks. Only the most recent one runs; earlier ones exit when superseded."""
+
+    def __init__(
+        self,
+        callback: Callable[..., None],
+        delay_ms: int,
+    ) -> None:
+        self._callback = callback
+        self._delay_ms = delay_ms
+        self._pending_calls: List[Tuple[int, Tuple[Any], Dict[str, Any]]] = []
+        self._next_sequence = 0
+
+    def schedule(self, parent: QObject, *args: Any, **kwargs: Any) -> None:
+        self._next_sequence += 1
+        my_seq = self._next_sequence
+        self._pending_calls.append((my_seq, args, kwargs))
+
+        def run() -> None:
+            if any(seq > my_seq for seq, _, _ in self._pending_calls):
+                self._pending_calls.remove((my_seq, args, kwargs))
+                return
+            self._pending_calls.remove((my_seq, args, kwargs))
+            self._callback(*args, **kwargs)
+
+        aqt.mw.progress.timer(self._delay_ms, run, repeat=False, parent=parent)
 
 
 class TutorialOverlayDialog(OverlayDialog):
@@ -957,15 +997,18 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self.deckoptions_saved = False
         self.browser: Optional[Browser] = None
         self.browser_closed_by_us = False
+        self.unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
+        self.unhook_browser = self.hook_browser_startup(self.on_browser_startup)
         base_start = super().start
         set_current_deck(parent=aqt.mw, deck_id=self.anking_deck_config.anki_id).success(
             lambda _: base_start()
         ).run_in_background()
 
     def end(self) -> None:
+        self.unhook_browser()
         config.set_step_deck_tutorial_pending(False)
         return super().end()
 
@@ -1041,49 +1084,42 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 return OverlayTarget(sidebar.viewport(), rect)
         raise RuntimeError("Sidebar item for Tags not found")
 
-    def hook_browser_startup(self, on_done: Callable[[Browser], None]) -> None:
-        timer: Optional[QTimer] = None
+    def clear_sidebar_highlight(self, root: SidebarItem) -> None:
+        for child in root.children:
+            if child._search_matches_self and not self.is_step_sidebar_item(child):
+                child._search_matches_self = False
+            if child._search_matches_child:
+                self.clear_sidebar_highlight(child)
 
-        def clear_sidebar_highlight(root: SidebarItem) -> None:
-            for child in root.children:
-                if child._search_matches_self and not self.is_step_sidebar_item(child):
-                    child._search_matches_self = False
-                if child._search_matches_child:
-                    clear_sidebar_highlight(child)
+    def hook_browser_startup(self, on_done: Callable[[], None]) -> Callable[[], None]:
+        # Track if wrapped_on_done() is called after browser startup rather than a normal sidebar refresh
+        is_startup = False
 
         def wrapped_on_done(root: SidebarItem) -> None:
             self.browser.sidebar.search_for(self.anking_deck_config.name)
-            clear_sidebar_highlight(self.browser.sidebar.model().root)
+            self.clear_sidebar_highlight(self.browser.sidebar.model().root)
             step_sidebar_item = self.find_step_deck_sidebar_item(root)
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
             self.browser.search_for(search)
-            on_done(self.browser)
+            nonlocal is_startup
+            if is_startup:
+                on_done()
+            is_startup = False
+
+        # There can be multiple sidebar refresh events at browser startup,
+        # so we need to ensure we only call .next() once
+        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=1000)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[[SidebarItem], None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
             _old(*args, **kwargs, root=root)
-
-            def on_main() -> None:
-                # There can be multiple sidebar refresh events at browser startup,
-                # so we need to ensure we only call .next() once
-                nonlocal timer
-                if timer and not sip.isdeleted(timer):
-                    timer.deleteLater()
-                    timer = None
-                timer = aqt.mw.progress.timer(
-                    1000, functools.partial(wrapped_on_done, root=root), repeat=False, parent=self.browser
-                )
-                SidebarTreeView._deck_tree = original_deck_tree
-
-            aqt.mw.taskman.run_on_main(on_main)
+            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self.browser, root))
 
         def before_setup_table(browser: Browser) -> None:
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
-            Browser.setup_table = original_setup_table
 
         def before_close(browser: Browser, evt: Optional[QCloseEvent]) -> None:
-            Browser.closeEvent = original_close_event
             if not self.browser_closed_by_us:
                 self.go_to_step("browse_button")
 
@@ -1093,29 +1129,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             self.browser = browser
             _old(browser, *args, **kwargs)
             browser.setWindowState(self.browser.windowState() | Qt.WindowState.WindowMaximized)
-            Browser.__init__ = original_init
+            nonlocal is_startup
+            is_startup = True
 
-        original_init = Browser.__init__
-        Browser.__init__ = wrap(Browser.__init__, wrapped_init, "around")
+        unwrap_init = wrap_method(Browser, "__init__", wrapped_init, "around")
+        unwrap_close = wrap_method(Browser, "closeEvent", before_close, "before")
+        unwrap_setup = wrap_method(Browser, "setup_table", before_setup_table, "before")
+        unwrap_build = wrap_method(SidebarTreeView, "_deck_tree", _build_deck_tree, "around")
 
-        original_close_event = Browser.closeEvent
-        Browser.closeEvent = wrap(Browser.closeEvent, before_close, "before")
+        def revert_hooks() -> None:
+            unwrap_init()
+            unwrap_close()
+            unwrap_setup()
+            unwrap_build()
 
-        original_setup_table = Browser.setup_table
-        Browser.setup_table = wrap(Browser.setup_table, before_setup_table, "before")
+        return revert_hooks
 
-        original_deck_tree = SidebarTreeView._deck_tree
-        SidebarTreeView._deck_tree = wrap(SidebarTreeView._deck_tree, _build_deck_tree, "around")
-
-    def on_browser_startup(self, browser: Browser) -> None:
-        self.next()
-
-    def on_browse_button_step(self, step: TutorialStep) -> None:
-        self.hook_browser_startup(self.on_browser_startup)
+    def on_browser_startup(self) -> None:
+        self.go_to_step("browser_step_deck")
 
     def open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         aqt.dialogs.open("Browser", aqt.mw)
-        # on_browser_startup() takes care of calling .next() directly after the browser is properly set up
+        # on_browser_startup() takes care of moving to the next step after the browser is properly set up
 
     def unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         nids = [
@@ -1199,7 +1234,6 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
-                shown_callback=self.on_browse_button_step,
                 next_callback=self.open_browser_and_move_to_next_step,
                 remove_parent_backdrop=True,
             )
@@ -1207,6 +1241,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         steps.append(
             QtTutorialStep(
+                id="browser_step_deck",
                 body="On <b>Browse</b>, you’ll find all cards from your decks.<br><br>"
                 "When the <b>AnKing Step Deck</b> is selected, only its cards are shown.",
                 qt_target=self.get_step_deck_sidebar_item_rect,
