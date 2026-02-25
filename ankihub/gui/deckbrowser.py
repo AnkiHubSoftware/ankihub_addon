@@ -96,7 +96,7 @@ def setup() -> None:
         new=_after_anki_deck_deleted,
         pos="after",
     )
-    AnkiQt.onOverview = wrap(old=AnkiQt.onOverview, new=_on_overview, pos="around")
+    AnkiQt.onOverview = wrap(old=AnkiQt.onOverview, new=_on_overview, pos="around")  # type: ignore
     setup_subdeck_ankihub_options()
 
 

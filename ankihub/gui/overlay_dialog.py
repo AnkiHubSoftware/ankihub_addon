@@ -46,7 +46,7 @@ class OverlayTarget:
 
 class OverlayDialog(QDialog):
     def __init__(self, parent: QWidget, target: Optional[OverlayTarget]) -> None:
-        self._tracked_widgets: Set[QWidget] = set()
+        self._tracked_widgets: Set[Union[QWidget, OverlayTarget]] = set()
         super().__init__(parent, Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.target = target

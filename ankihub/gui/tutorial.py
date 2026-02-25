@@ -3,11 +3,13 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Dict, List, Optional, Required, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, Union, cast
 
 import aqt
+from anki.cards import CardId
 from anki.config import Config
 from anki.hooks import wrap
+from anki.notes import NoteId
 from aqt import gui_hooks
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
@@ -34,6 +36,7 @@ from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.toolbar import BottomBar, Toolbar, TopToolbar
 from aqt.utils import tooltip
 from aqt.webview import AnkiWebView, WebContent
+from typing_extensions import Required, Unpack
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
@@ -69,10 +72,10 @@ class RenderDialogKwargs(TypedDict, total=False):
     on_close: Optional[str]
 
 
-def render_dialog(**kwargs: RenderDialogKwargs) -> str:
+def render_dialog(**kwargs: Unpack[RenderDialogKwargs]) -> str:
     return render_template(
         "dialog.html",
-        context=kwargs,
+        context=dict(kwargs),
     )
 
 
@@ -173,7 +176,7 @@ class DebouncedDelayedCall:
 
 
 class TutorialOverlayDialog(OverlayDialog):
-    def __init__(self, parent: QWidget, target: Optional[OverlayDialog], target_outline: bool = True) -> None:
+    def __init__(self, parent: QWidget, target: Optional[OverlayTarget], target_outline: bool = True) -> None:
         self.target_outline = target_outline
         super().__init__(parent, target)
 
@@ -467,7 +470,7 @@ class Tutorial:
             web.eval(backdrop_js)
 
     def contexts_for_step(self, step: TutorialStep) -> tuple[Any]:
-        backdrop_contexts = []
+        backdrop_contexts: List[Any] = []
         backdrop_contexts.extend(self.extra_backdrop_contexts())
         return (step.tooltip_context, step.target_context, *backdrop_contexts)
 
@@ -708,12 +711,13 @@ def prompt_for_tutorial(
 
     def js_for_context(context: Any) -> str:
         if isinstance(context, dialog_context):
-            body = render_dialog(
-                on_main_button_click=f"pycmd('{START_TUTORIAL_PYCMD}')",
-                on_secondary_button_click=f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
-                on_close=f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
+            kwargs: RenderDialogKwargs = {
                 **dialog_kwargs,
-            )
+                "on_main_button_click": f"pycmd('{START_TUTORIAL_PYCMD}')",
+                "on_secondary_button_click": f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
+                "on_close": f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
+            }
+            body = render_dialog(**kwargs)
             js = f"AnkiHub.showModal({json.dumps(body)})"
         else:
             js = get_backdrop_js()
@@ -844,7 +848,7 @@ class DeckBrowserOverviewBackdropMixin:
     def extra_backdrop_context_types(self) -> tuple[Any, ...]:
         from aqt.deckbrowser import DeckBrowserBottomBar
 
-        return (*super().extra_backdrop_context_types(), DeckBrowserBottomBar, OverviewBottomBar)
+        return (DeckBrowserBottomBar, OverviewBottomBar)
 
 
 class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
@@ -1023,10 +1027,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             _old(deckoptions, *args, **kwargs)
             deckoptions = cast(DeckOptionsDialog, deckoptions)
             deckoptions.setWindowState(deckoptions.windowState() | Qt.WindowState.WindowMaximized)
-            DeckOptionsDialog.__init__ = original_init
+            DeckOptionsDialog.__init__ = original_init  # type: ignore
 
         original_init = DeckOptionsDialog.__init__
-        DeckOptionsDialog.__init__ = wrap(DeckOptionsDialog.__init__, after_init, "around")
+        DeckOptionsDialog.__init__ = wrap(DeckOptionsDialog.__init__, after_init, "around")  # type: ignore
 
         gui_hooks.deck_options_did_load.append(self._on_deck_options_did_load)
 
@@ -1111,9 +1115,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=1000)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
-            _old: Callable[[SidebarItem], None] = kwargs.pop("_old")
+            _old: Callable[..., None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
-            _old(*args, **kwargs, root=root)
+            _old(*args, root, **kwargs)
             aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._browser, root))
 
         def before_setup_table(browser: Browser) -> None:
@@ -1189,16 +1193,16 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             1480908234945,
             1478833957640,
         ]
-        cids = set()
+        cids: Set[CardId] = set()
         for nid in nids:
-            cids.update(aqt.mw.col.card_ids_of_note(nid))
+            cids.update(aqt.mw.col.card_ids_of_note(NoteId(nid)))
 
         def success(_):
             self._browser_closed_by_us = True
             self._browser.close()
             on_done()
 
-        unsuspend_cards(parent=self._browser, card_ids=cids).success(success).run_in_background()
+        unsuspend_cards(parent=self._browser, card_ids=list(cids)).success(success).run_in_background()
 
     def _steps(self) -> list[TutorialStep]:
         steps = []
