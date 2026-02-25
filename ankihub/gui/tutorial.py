@@ -38,6 +38,7 @@ from aqt.utils import tooltip
 from aqt.webview import AnkiWebView, WebContent
 from typing_extensions import Required, Unpack
 
+from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
@@ -205,8 +206,6 @@ class TutorialOverlayDialog(OverlayDialog):
     def on_bridge_cmd(self, cmd: str) -> None:
         if cmd == FLASHCARD_SELECTOR_OPEN_PYCMD:
             show_flashcard_selector(config.anking_deck_id, parent=self.parentWidget())
-        else:
-            print("unhandled bridge cmd:", cmd)
 
     def on_position(self) -> None:
         super().on_position()
@@ -369,7 +368,7 @@ def ensure_tutorial_active(func: Callable[..., None]) -> Callable[..., None]:
     def wrapper(*args: Any, **kwargs: Any) -> None:
         args, kwargs, tutorial = extract_argument(func, args, kwargs, "self")
         if active_tutorial is not tutorial:
-            print(f"Ignored {func.__name__} call as tutorial is not active")
+            LOGGER.debug("Ignored tutorial call as tutorial is not active", name=func.__name__)
         else:
             func(tutorial, *args, **kwargs)
 
