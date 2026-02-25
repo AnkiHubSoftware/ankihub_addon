@@ -10,4 +10,4 @@
 [submodule "ankihub_web"]
 	path = ankihub_web
 	url = https://github.com/AnkiHubSoftware/ankihub
-	branch = dev
+	branch = main
