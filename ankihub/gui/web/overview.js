@@ -181,8 +181,14 @@ function renderFlashCardSelectorButtonOnDecks() {
     }
 }
 
-
-
+function renderTourPrompt() {
+    if (!document.getElementById("{{ TOUR_PROMPT_TEXT_ID }}")) {
+        const p = document.createElement("p");
+        p.id = "{{ TOUR_PROMPT_TEXT_ID }}";
+        p.innerHTML = `If you have doubts on how to get more cards to study, take our <a href="javascript:pycmd('{{ TOUR_OPEN_PYCMD }}')">tour on how to unsuspend cards</a>.`;
+        document.querySelector(".congrats").appendChild(p);
+    }
+}
 
 function waitForElm(selector) {
     return new Promise(resolve => {
@@ -205,12 +211,19 @@ function waitForElm(selector) {
     });
 }
 
+var flashcardSelectorEnabled = "{{ FLASHCARD_SELECTOR_ENABLED }}" === "True";
+var tourEnabled = "{{ TOUR_ENABLED }}" === "True";
 
 if (window.location.href.includes("congrats")) {
     waitForElm(".congrats").then(() => {
-        renderFlashCardSelectorButtonOnCongrats();
-        document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}").style.display = "flex";
+        if (flashcardSelectorEnabled) {
+            renderFlashCardSelectorButtonOnCongrats();
+            document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}").style.display = "flex";
+        }
+        if (tourEnabled) {
+            renderTourPrompt();
+        }
     })
-} else {
+} else if (flashcardSelectorEnabled) {
     renderFlashCardSelectorButtonOnDecks();
 }
