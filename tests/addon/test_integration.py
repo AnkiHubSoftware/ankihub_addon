@@ -10117,6 +10117,7 @@ class TestPromptForStepDeckTutorial:
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
             mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10139,6 +10140,24 @@ class TestPromptForStepDeckTutorial:
 
             mock_inject.assert_not_called()
 
+    def test_returns_early_when_step_deck_is_not_installed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that function returns early when the AnKing deck is not installed."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=None)
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            mock_inject.assert_not_called()
+
     def test_injects_assets(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -10151,6 +10170,7 @@ class TestPromptForStepDeckTutorial:
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
             mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10169,6 +10189,7 @@ class TestPromptForStepDeckTutorial:
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
             mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
