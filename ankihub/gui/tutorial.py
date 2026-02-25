@@ -1117,7 +1117,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[..., None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
-            _old(*args, root, **kwargs)
+            _old(*args, **kwargs, root=root)
             aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._browser, root))
 
         def before_setup_table(browser: Browser) -> None:
