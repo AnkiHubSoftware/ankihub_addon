@@ -776,7 +776,7 @@ def prompt_for_tutorial(
 def prompt_for_onboarding_tutorial() -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if config.get_feature_flags().get("onboarding_tour", False):
+    if not config.get_feature_flags().get("onboarding_tour", False):
         return
 
     config.set_onboarding_tutorial_pending(True)
@@ -803,7 +803,7 @@ def prompt_for_onboarding_tutorial() -> None:
 def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if config.get_feature_flags().get("step_deck_tour", False):
+    if not config.get_feature_flags().get("step_deck_tour", False):
         return
 
     config.set_step_deck_tutorial_pending(True)

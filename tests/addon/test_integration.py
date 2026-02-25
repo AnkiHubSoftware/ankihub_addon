@@ -10116,7 +10116,7 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10127,13 +10127,13 @@ class TestPromptForStepDeckTutorial:
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """Test that function returns early when step_deck_tour feature flag is True."""
+        """Test that function returns early when step_deck_tour feature flag is False."""
         from ankihub.gui import tutorial
 
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10150,7 +10150,7 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10168,7 +10168,7 @@ class TestPromptForStepDeckTutorial:
             config.set_show_step_deck_tutorial(True)
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
@@ -10185,7 +10185,7 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             mock_skip = mocker.Mock()
             tutorial.prompt_for_step_deck_tutorial(on_skip=mock_skip)  # Should not raise
@@ -10219,7 +10219,7 @@ class TestStepDeckTutorial:
 
         with anki_session_with_addon_data.profile_loaded():
             install_ah_deck(ah_did=config.anking_deck_id)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
 
             mock_inject = mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
             success_cbs = []
@@ -10259,7 +10259,7 @@ class TestStepDeckTutorial:
 
         with anki_session_with_addon_data.profile_loaded():
             install_ah_deck(ah_did=config.anking_deck_id)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
             success_cbs = []
 
