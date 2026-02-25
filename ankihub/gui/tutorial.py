@@ -991,32 +991,32 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     def __init__(self) -> None:
         super().__init__()
-        self.anking_deck_config = config.deck_config(config.anking_deck_id)
-        assert self.anking_deck_config is not None
-        self.deckoptions: Optional[DeckOptionsDialog] = None
-        self.deckoptions_saved = False
-        self.browser: Optional[Browser] = None
-        self.browser_closed_by_us = False
-        self.unhook_browser: Callable[[], None]
+        self._anking_deck_config = config.deck_config(config.anking_deck_id)
+        assert self._anking_deck_config is not None
+        self._deckoptions: Optional[DeckOptionsDialog] = None
+        self._deckoptions_saved = False
+        self._browser: Optional[Browser] = None
+        self._browser_closed_by_us = False
+        self._unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
     def start(self) -> None:
-        self.unhook_browser = self.hook_browser_startup(self.on_browser_startup)
+        self._unhook_browser = self.hook_browser_startup(self._on_browser_startup)
         base_start = super().start
-        set_current_deck(parent=aqt.mw, deck_id=self.anking_deck_config.anki_id).success(
+        set_current_deck(parent=aqt.mw, deck_id=self._anking_deck_config.anki_id).success(
             lambda _: base_start()
         ).run_in_background()
 
     def end(self) -> None:
-        self.unhook_browser()
+        self._unhook_browser()
         config.set_step_deck_tutorial_pending(False)
         return super().end()
 
-    def on_deck_options_did_load(self, deckoptions: DeckOptionsDialog) -> None:
-        self.deckoptions = deckoptions
+    def _on_deck_options_did_load(self, deckoptions: DeckOptionsDialog) -> None:
+        self._deckoptions = deckoptions
         self.next()
 
-    def on_gears_icon_step(self, step: TutorialStep) -> None:
+    def _on_gears_icon_step(self, step: TutorialStep) -> None:
         def after_init(*args: Any, **kwargs: Any) -> None:
             _old: Callable = kwargs.pop("_old")
             args, kwargs, deckoptions = extract_argument(_old, args, kwargs, "self")
@@ -1028,51 +1028,51 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         original_init = DeckOptionsDialog.__init__
         DeckOptionsDialog.__init__ = wrap(DeckOptionsDialog.__init__, after_init, "around")
 
-        gui_hooks.deck_options_did_load.append(self.on_deck_options_did_load)
+        gui_hooks.deck_options_did_load.append(self._on_deck_options_did_load)
 
-    def on_gears_icon_step_hidden(self) -> None:
-        gui_hooks.deck_options_did_load.remove(self.on_deck_options_did_load)
+    def _on_gears_icon_step_hidden(self) -> None:
+        gui_hooks.deck_options_did_load.remove(self._on_deck_options_did_load)
 
-    def on_deckoptions_finished(self) -> None:
+    def _on_deckoptions_finished(self) -> None:
         # If closed without saving, go back to previous step in the main window
-        if not self.deckoptions_saved:
+        if not self._deckoptions_saved:
             self.back()
 
-    def on_deckoptions_step(self, step: TutorialStep) -> None:
-        if not self.deckoptions or sip.isdeleted(self.deckoptions):
-            self.deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self.anking_deck_config.anki_id))
-        step.tooltip_context = self.deckoptions
-        step.target_context = self.deckoptions
-        qconnect(self.deckoptions.finished, self.on_deckoptions_finished)
+    def _on_deckoptions_step(self, step: TutorialStep) -> None:
+        if not self._deckoptions or sip.isdeleted(self._deckoptions):
+            self._deckoptions = DeckOptionsDialog(aqt.mw, aqt.mw.col.decks.get(self._anking_deck_config.anki_id))
+        step.tooltip_context = self._deckoptions
+        step.target_context = self._deckoptions
+        qconnect(self._deckoptions.finished, self._on_deckoptions_finished)
 
-    def on_deckoptions_next(self, on_done: Callable[[], None]) -> None:
-        self.deckoptions_saved = True
-        self.deckoptions.web.eval("document.querySelector('.save').click()")
+    def _on_deckoptions_next(self, on_done: Callable[[], None]) -> None:
+        self._deckoptions_saved = True
+        self._deckoptions.web.eval("document.querySelector('.save').click()")
         on_done()
 
-    def is_step_sidebar_item(self, item: SidebarItem) -> bool:
-        return item.id == self.anking_deck_config.anki_id and item.item_type != SidebarItemType.DECK_CURRENT
+    def _is_step_sidebar_item(self, item: SidebarItem) -> bool:
+        return item.id == self._anking_deck_config.anki_id and item.item_type != SidebarItemType.DECK_CURRENT
 
-    def find_step_deck_sidebar_item(self, root: SidebarItem) -> SidebarItem:
+    def _find_step_deck_sidebar_item(self, root: SidebarItem) -> SidebarItem:
         for child in root.children:
             if child.item_type == SidebarItemType.DECK_ROOT:
                 for grandchild in child.children:
-                    if self.is_step_sidebar_item(grandchild):
-                        grandchild.search(self.anking_deck_config.name)
+                    if self._is_step_sidebar_item(grandchild):
+                        grandchild.search(self._anking_deck_config.name)
                         return grandchild
 
         raise RuntimeError("Sidebar item for Step deck not found")
 
-    def get_step_deck_sidebar_item_rect(self) -> OverlayTarget:
-        sidebar = self.browser.sidebar
+    def _get_step_deck_sidebar_item_rect(self) -> OverlayTarget:
+        sidebar = self._browser.sidebar
         model = sidebar.model()
-        step_sidebar_item = self.find_step_deck_sidebar_item(model.root)
+        step_sidebar_item = self._find_step_deck_sidebar_item(model.root)
         idx = model.index_for_item(step_sidebar_item)
         rect = sidebar.visualRect(idx)
         return OverlayTarget(sidebar.viewport(), rect)
 
-    def get_tags_sidebar_item(self) -> OverlayTarget:
-        sidebar = self.browser.sidebar
+    def _get_tags_sidebar_item(self) -> OverlayTarget:
+        sidebar = self._browser.sidebar
         model = sidebar.model()
         for child in model.root.children:
             if child.item_type == SidebarItemType.TAG_ROOT:
@@ -1084,23 +1084,23 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 return OverlayTarget(sidebar.viewport(), rect)
         raise RuntimeError("Sidebar item for Tags not found")
 
-    def clear_sidebar_highlight(self, root: SidebarItem) -> None:
+    def _clear_sidebar_highlight(self, root: SidebarItem) -> None:
         for child in root.children:
-            if child._search_matches_self and not self.is_step_sidebar_item(child):
+            if child._search_matches_self and not self._is_step_sidebar_item(child):
                 child._search_matches_self = False
             if child._search_matches_child:
-                self.clear_sidebar_highlight(child)
+                self._clear_sidebar_highlight(child)
 
     def hook_browser_startup(self, on_done: Callable[[], None]) -> Callable[[], None]:
         # Track if wrapped_on_done() is called after browser startup rather than a normal sidebar refresh
         is_startup = False
 
         def wrapped_on_done(root: SidebarItem) -> None:
-            self.browser.sidebar.search_for(self.anking_deck_config.name)
-            self.clear_sidebar_highlight(self.browser.sidebar.model().root)
-            step_sidebar_item = self.find_step_deck_sidebar_item(root)
+            self._browser.sidebar.search_for(self._anking_deck_config.name)
+            self._clear_sidebar_highlight(self._browser.sidebar.model().root)
+            step_sidebar_item = self._find_step_deck_sidebar_item(root)
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
-            self.browser.search_for(search)
+            self._browser.search_for(search)
             nonlocal is_startup
             if is_startup:
                 on_done()
@@ -1114,21 +1114,21 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             _old: Callable[[SidebarItem], None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
             _old(*args, **kwargs, root=root)
-            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self.browser, root))
+            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._browser, root))
 
         def before_setup_table(browser: Browser) -> None:
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
 
         def before_close(browser: Browser, evt: Optional[QCloseEvent]) -> None:
-            if not self.browser_closed_by_us:
+            if not self._browser_closed_by_us:
                 self.go_to_step("browse_button")
 
         def wrapped_init(*args, **kwargs) -> None:
             _old: Callable = kwargs.pop("_old")
             args, kwargs, browser = extract_argument(_old, args, kwargs, "self")
-            self.browser = browser
+            self._browser = browser
             _old(browser, *args, **kwargs)
-            browser.setWindowState(self.browser.windowState() | Qt.WindowState.WindowMaximized)
+            browser.setWindowState(self._browser.windowState() | Qt.WindowState.WindowMaximized)
             nonlocal is_startup
             is_startup = True
 
@@ -1145,14 +1145,14 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         return revert_hooks
 
-    def on_browser_startup(self) -> None:
+    def _on_browser_startup(self) -> None:
         self.go_to_step("browser_step_deck")
 
-    def open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+    def _open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         aqt.dialogs.open("Browser", aqt.mw)
-        # on_browser_startup() takes care of moving to the next step after the browser is properly set up
+        # _on_browser_startup() takes care of moving to the next step after the browser is properly set up
 
-    def unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+    def _unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         nids = [
             1500401546879,
             1500401591194,
@@ -1194,21 +1194,21 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             cids.update(aqt.mw.col.card_ids_of_note(nid))
 
         def success(_):
-            self.browser_closed_by_us = True
-            self.browser.close()
+            self._browser_closed_by_us = True
+            self._browser.close()
             on_done()
 
-        unsuspend_cards(parent=self.browser, card_ids=cids).success(success).run_in_background()
+        unsuspend_cards(parent=self._browser, card_ids=cids).success(success).run_in_background()
 
     def _steps(self) -> list[TutorialStep]:
         steps = []
         steps.append(
             TutorialStep(
                 body="Click on the deck’s gear icon and select <b>Options</b>.",
-                target=f"[id='{self.anking_deck_config.anki_id}'] .opts",
+                target=f"[id='{self._anking_deck_config.anki_id}'] .opts",
                 tooltip_context=aqt.mw.deckBrowser,
-                shown_callback=self.on_gears_icon_step,
-                hidden_callback=self.on_gears_icon_step_hidden,
+                shown_callback=self._on_gears_icon_step,
+                hidden_callback=self._on_gears_icon_step_hidden,
             )
         )
 
@@ -1222,8 +1222,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 # NOTE: This assumes Daily Limits is the first section.
                 # We should add section IDs to Anki
                 target=".row",
-                shown_callback=self.on_deckoptions_step,
-                next_callback=self.on_deckoptions_next,
+                shown_callback=self._on_deckoptions_step,
+                next_callback=self._on_deckoptions_next,
             )
         )
 
@@ -1234,7 +1234,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
-                next_callback=self.open_browser_and_move_to_next_step,
+                next_callback=self._open_browser_and_move_to_next_step,
                 remove_parent_backdrop=True,
             )
         )
@@ -1244,8 +1244,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 id="browser_step_deck",
                 body="On <b>Browse</b>, you’ll find all cards from your decks.<br><br>"
                 "When the <b>AnKing Step Deck</b> is selected, only its cards are shown.",
-                qt_target=self.get_step_deck_sidebar_item_rect,
-                parent_widget=lambda: self.browser,
+                qt_target=self._get_step_deck_sidebar_item_rect,
+                parent_widget=lambda: self._browser,
             )
         )
 
@@ -1253,16 +1253,16 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             QtTutorialStep(
                 body="You can find specific cards to study using a few methods.<br><br>"
                 "One of them is typing terms on the <b>search bar</b>.",
-                qt_target=lambda: OverlayTarget(self.browser, self.browser.form.searchEdit),
-                parent_widget=lambda: self.browser,
+                qt_target=lambda: OverlayTarget(self._browser, self._browser.form.searchEdit),
+                parent_widget=lambda: self._browser,
             )
         )
 
         steps.append(
             QtTutorialStep(
                 body="You can also use <b>tags</b> to find specific sets of cards.",
-                qt_target=self.get_tags_sidebar_item,
-                parent_widget=lambda: self.browser,
+                qt_target=self._get_tags_sidebar_item,
+                parent_widget=lambda: self._browser,
             )
         )
 
@@ -1276,9 +1276,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             QtTutorialStep(
                 body=body,
                 qt_target=lambda: OverlayTarget(
-                    self.browser.sidebar, self.browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
+                    self._browser.sidebar, self._browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
                 ),
-                parent_widget=lambda: self.browser,
+                parent_widget=lambda: self._browser,
             )
         )
 
@@ -1291,10 +1291,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
                 "Click Next and we'll unsuspend a card for you as an example.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
-                qt_target=lambda: self.browser.form.tableView,
-                parent_widget=lambda: self.browser,
+                qt_target=lambda: self._browser.form.tableView,
+                parent_widget=lambda: self._browser,
                 target_outline=False,
-                next_callback=self.unsuspend_cards_and_move_to_next_step,
+                next_callback=self._unsuspend_cards_and_move_to_next_step,
             )
         )
 
@@ -1304,8 +1304,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 body="We've unsuspended some cards for you and they are ready for study. Check them out, "
                 "then try selecting cards on your own!<br><br>"
                 f"<b>Need help?</b> Post in the {forum_link} and our support team will be happy to assist.",
-                target=f"[id='{self.anking_deck_config.anki_id}']",
-                click_target=f"[id='{self.anking_deck_config.anki_id}'] a.deck",
+                target=f"[id='{self._anking_deck_config.anki_id}']",
+                click_target=f"[id='{self._anking_deck_config.anki_id}'] a.deck",
                 tooltip_context=aqt.mw.deckBrowser,
                 next_label="End tour",
                 back_label="Restart tour",
