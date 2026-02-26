@@ -10102,3 +10102,111 @@ class TestSubscribeToIntroDeck:
             future.result()
             subscribe_mock.assert_called_once_with(config.intro_deck_id)
             get_subscriptions_mock.assert_called_once()
+
+
+class TestPromptForStepDeckTutorial:
+    def test_sets_step_deck_tutorial_pending_to_true(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that prompt_for_step_deck_tutorial sets step_deck_tutorial_pending to True."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
+            mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            assert config.step_deck_tutorial_pending() is True
+
+    def test_returns_early_when_step_deck_tour_feature_flag_is_true(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that function returns early when step_deck_tour feature flag is False."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            mock_inject.assert_not_called()
+
+    def test_returns_early_when_step_deck_is_not_installed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that function returns early when the AnKing deck is not installed."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=None)
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            mock_inject.assert_not_called()
+
+    def test_injects_assets(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that assets are injected when proceeding."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            mock_inject.assert_called()
+
+    def test_sets_show_step_deck_tutorial_to_false(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that prompt_for_step_deck_tutorial sets show_step_deck_tutorial to False."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_show_step_deck_tutorial(True)
+            config.set_step_deck_tutorial_pending(False)
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
+            mocker.patch.object(config, "deck_config", return_value=Mock())
+            mocker.patch.object(tutorial, "inject_tutorial_assets")
+            tutorial.prompt_for_step_deck_tutorial()
+
+            assert config.show_step_deck_tutorial() is False
+
+
+class TestStepDeckTutorial:
+    def test_init_raises_when_anking_deck_not_installed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that StepDeckTutorial.__init__ raises when AnKing deck is not installed."""
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "deck_config", return_value=None)
+
+            with pytest.raises(AssertionError):
+                StepDeckTutorial()

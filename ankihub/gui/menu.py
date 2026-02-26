@@ -32,7 +32,7 @@ from .errors import upload_logs_and_data_in_background, upload_logs_in_backgroun
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.deck_creation import create_collaborative_deck
-from .tutorial import OnboardingTutorial
+from .tutorial import OnboardingTutorial, StepDeckTutorial
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -448,13 +448,24 @@ def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
+    tours_submenu = QMenu("Product tours", help_menu)
     if config.get_feature_flags().get("onboarding_tour", False):
-        q_onboarding_action = QAction("Start onboarding tour", help_menu)
+        q_onboarding_action = QAction("Onboarding", tours_submenu)
         qconnect(
             q_onboarding_action.triggered,
             lambda: OnboardingTutorial().start(),
         )
-        help_menu.addAction(q_onboarding_action)
+        tours_submenu.addAction(q_onboarding_action)
+
+    if config.get_feature_flags().get("step_deck_tour", False) and config.deck_config(config.anking_deck_id):
+        q_step_tour_action = QAction("AnKing Step Deck", tours_submenu)
+        qconnect(
+            q_step_tour_action.triggered,
+            lambda: StepDeckTutorial().start(),
+        )
+        tours_submenu.addAction(q_step_tour_action)
+    if tours_submenu.actions():
+        help_menu.addMenu(tours_submenu)
 
     # && is an escaped & in qt
     q_notion_action = QAction("Documentation", help_menu)

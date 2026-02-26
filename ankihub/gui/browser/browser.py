@@ -1054,6 +1054,7 @@ def add_smart_search_button_to_sidebar():
         smart_search_button_toolbar.setContentsMargins(0, 0, 8, 0)
 
     smart_search_button = QToolButton()
+    smart_search_button.setObjectName("AnkiHubSmartSearchButton")
     smart_search_button.setIcon(sparkles_icon(theme_manager.night_mode))
     smart_search_button.setIconSize(QSize(16, 16))
     smart_search_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)

@@ -45,11 +45,40 @@ function injectFontImportsIntoDocument(css: string): void {
     }
 }
 
+function setIntervalWithTimeout(callback: (timedout: boolean) => boolean, interval: number, timeout: number): number {
+    let timedout = false;
+    const intervalId = setInterval(() => {
+        if (callback(timedout)) {
+            clearInterval(intervalId);
+        }
+    }, interval);
+    setTimeout(() => {
+        clearInterval(intervalId);
+        timedout = true;
+        callback(true);
+    }, timeout);
+    return intervalId;
+}
 
-function getTargetElement(target: string | HTMLElement): HTMLElement | null {
-    return typeof target === "string"
-        ? document.querySelector(target)
-        : target
+function getTargetElement(target: string | HTMLElement): Promise<HTMLElement | null> {
+    const promise = new Promise<HTMLElement | null>((resolve, reject) => {
+        if (typeof target !== "string") {
+            return resolve(target);
+        }
+        setIntervalWithTimeout((timedout) => {
+            const element = document.querySelector(target);
+            if (element) {
+                resolve(element as HTMLElement);
+                return true;
+            }
+            if (timedout) {
+                resolve(null)
+            }
+            return false;
+        }, 10, 5000);
+    });
+    return promise;
+
 }
 
 export function elementFromHtml(html: string): HTMLElement {
@@ -65,6 +94,7 @@ type TutorialEffectOptions = {
     target?: string | HTMLElement,
     blockTargetClick: boolean,
     clickTarget?: string,
+    removeParentBackdrop?: boolean,
 };
 
 export class TutorialEffect {
@@ -83,12 +113,12 @@ export class TutorialEffect {
             modal: "",
             blockTargetClick: false,
             clickTarget: "",
+            removeParentBackdrop: false,
             ...options,
         };
-        this.create();
     }
 
-    create() {
+    async create() {
         this.hostElement = document.createElement("div");
         this.hostElement.style.position = "fixed";
         this.hostElement.style.top = "0";
@@ -128,7 +158,7 @@ export class TutorialEffect {
 
         this.shadowRoot.appendChild(this.modalElement);
         if (this.options.target) {
-            this.targetElement = getTargetElement(this.options.target)!;
+            this.targetElement = (await getTargetElement(this.options.target))!;
             if (this.options.modal) {
                 this.cleanUpdateHandler = autoUpdate(this.targetElement, this.modalElement, this.positionModal.bind(this, this.targetElement));
             }
@@ -158,7 +188,8 @@ export class TutorialEffect {
         bridgeCommand("ankihub_tutorial_target_click");
     }
 
-    show() {
+    async show() {
+        await this.create();
         document.body.appendChild(this.hostElement);
         if (this.targetElement) {
             this.applySpotlight();
@@ -197,7 +228,7 @@ export class TutorialEffect {
             );
         }
         // Work around backdrop-filter set on Anki's top bar preventing spotlight from being visible
-        if (this.targetElement.parentElement) {
+        if (this.targetElement.parentElement && this.options.removeParentBackdrop) {
             this.targetElement.parentElement.style.backdropFilter = "none";
         }
     }
@@ -292,10 +323,10 @@ export function destroyActiveTutorialEffect() {
     }
 }
 
-function createAndShowEffect(options: Partial<TutorialEffectOptions>): TutorialEffect {
+async function createAndShowEffect(options: Partial<TutorialEffectOptions>): Promise<TutorialEffect> {
     destroyActiveTutorialEffect();
     const effect = new TutorialEffect(options);
-    effect.show();
+    await effect.show();
     activeEffect = effect;
     return effect;
 }
@@ -310,6 +341,7 @@ type ShowStepArgs = {
     target: string,
     blockTargetClick?: boolean,
     clickTarget?: string,
+    removeParentBackdrop?: boolean,
 };
 
 export function showTutorialStep({
@@ -318,6 +350,7 @@ export function showTutorialStep({
     target,
     blockTargetClick = false,
     clickTarget = "",
+    removeParentBackdrop = false,
 }: ShowStepArgs) {
     createAndShowEffect({
         modal,
@@ -325,6 +358,7 @@ export function showTutorialStep({
         target,
         blockTargetClick,
         clickTarget,
+        removeParentBackdrop,
     });
 }
 
@@ -333,18 +367,21 @@ type HighlightTargetArgs = {
     currentStep: number,
     blockTargetClick?: boolean,
     backdrop?: string,
+    removeParentBackdrop?: boolean,
 };
 
-export function highlightTutorialTarget({
+export async function highlightTutorialTarget({
     target,
     currentStep,
     blockTargetClick = false,
     backdrop,
+    removeParentBackdrop = false,
 }: HighlightTargetArgs) {
-    const effect = createAndShowEffect({
+    const effect = await createAndShowEffect({
         target,
         blockTargetClick,
         backdrop,
+        removeParentBackdrop,
     });
     if (targetResizeHandler) {
         window.removeEventListener(

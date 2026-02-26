@@ -1,12 +1,13 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt import QMenu, gui_hooks, qconnect
+from aqt.main import AnkiQt
 from aqt.qt import QDialog, QDialogButtonBox, QFont
 
 from .. import LOGGER
@@ -19,6 +20,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ActionSource, BlockExamSubdeckOrigin, config
 from ..user_state import check_user_feature_access
 from .subdeck_due_date_dialog import SubdeckDueDatePickerDialog
+from .tutorial import prompt_for_step_deck_tutorial
 from .utils import ask_user, show_dialog, show_tooltip
 
 
@@ -68,6 +70,22 @@ def setup() -> None:
         ):
             unsubscribe_from_deck_and_uninstall(deck_ankihub_id)
 
+    def _on_overview(*args: Any, **kwargs: Any) -> None:
+        _old: Callable = kwargs["_old"]
+        del kwargs["_old"]
+
+        def skip() -> None:
+            _old(*args, **kwargs)
+
+        if not config.show_step_deck_tutorial():
+            return skip()
+        current_did = aqt.mw.col.decks.get_current_id()
+        anking_deck_config = config.deck_config(config.anking_deck_id)
+        if anking_deck_config and anking_deck_config.anki_id == current_did:
+            prompt_for_step_deck_tutorial(on_skip=skip)
+        else:
+            skip()
+
     DeckBrowser._delete = wrap(  # type: ignore
         old=DeckBrowser._delete,
         new=_before_anki_deck_deleted,
@@ -78,6 +96,7 @@ def setup() -> None:
         new=_after_anki_deck_deleted,
         pos="after",
     )
+    AnkiQt.onOverview = wrap(old=AnkiQt.onOverview, new=_on_overview, pos="around")  # type: ignore
     setup_subdeck_ankihub_options()
 
 

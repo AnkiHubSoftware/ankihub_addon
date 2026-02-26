@@ -109,12 +109,17 @@ def _on_button_clicked(
         on_done(future_with_result(None))
         return
 
+    def wrapped_on_done(future: Future) -> None:
+        on_done(future)
+        installed_step_deck = config.anking_deck_id in {deck.ah_did for deck in decks}
+        config.set_show_step_deck_tutorial(installed_step_deck)
+
     # Download the new decks
     def on_collection_sync_finished() -> None:
         ah_dids = [deck.ah_did for deck in decks]
         download_and_install_decks(
             ah_dids,
-            on_done=on_done,
+            on_done=wrapped_on_done,
             recommended_deck_settings=is_recommended_deck_settings_checked,
             skip_summary=skip_summary,
         )

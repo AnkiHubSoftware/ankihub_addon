@@ -8,6 +8,9 @@ html, body {
 }
 
 #target {
-    outline: 4px solid #ef4444;
     position: absolute;
+}
+
+#target.ah-outline {
+    outline: 4px solid #4F39F6;
 }
