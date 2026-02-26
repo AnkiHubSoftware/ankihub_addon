@@ -21,7 +21,7 @@ from ..gui.flashcard_selector_dialog import (
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
 from .deck_updater import ah_deck_updater
-from .js_message_handling import parse_js_message_kwargs
+from .js_message_handling import STEP_TOUR_OPEN_PYCMD, parse_js_message_kwargs
 from .utils import get_ah_did_of_deck_or_ancestor_deck, robust_filter
 
 OVERVIEW_JS_PATH = Path(__file__).parent / "web/overview.js"
@@ -29,7 +29,6 @@ FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 TOUR_PROMPT_TEXT_ID = "ankihub_tour_prompt"
-TOUR_OPEN_PYCMD = "ankihub_tour_open"
 
 # Event name dispatched when the suspension state filter should be refreshed
 REFRESH_SUSPENSION_FILTER_EVENT_NAME = "refresh-suspension-state-filter"
@@ -72,7 +71,7 @@ def _add_modifications() -> None:
             "FLASHCARD_SELECTOR_OPEN_PYCMD": f"{FLASHCARD_SELECTOR_OPEN_PYCMD} {kwargs_json}",
             "TOUR_ENABLED": tour_enabled,
             "TOUR_PROMPT_TEXT_ID": TOUR_PROMPT_TEXT_ID,
-            "TOUR_OPEN_PYCMD": TOUR_OPEN_PYCMD,
+            "STEP_TOUR_OPEN_PYCMD": STEP_TOUR_OPEN_PYCMD,
         }
     )
     aqt.mw.overview.web.eval(js)
@@ -119,12 +118,6 @@ def _handle_py_commands(handled: tuple[bool, Any], message: str, context: Any) -
             lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(deck_id),
             on_done=partial(_on_fetch_and_apply_pending_notes_actions_done, web=context.web),
         )
-        return (True, None)
-    elif message == TOUR_OPEN_PYCMD:
-        from .tutorial import prompt_for_step_deck_tutorial
-
-        prompt_for_step_deck_tutorial()
-
         return (True, None)
     else:
         return handled
