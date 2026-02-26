@@ -185,7 +185,7 @@ function renderTourPrompt() {
     if (!document.getElementById("{{ TOUR_PROMPT_TEXT_ID }}")) {
         const p = document.createElement("p");
         p.id = "{{ TOUR_PROMPT_TEXT_ID }}";
-        p.innerHTML = `If you have doubts on how to get more cards to study, take our <a href="javascript:pycmd('{{ STEP_TOUR_OPEN_PYCMD }}')">tour on how to unsuspend cards</a>.`;
+        p.innerHTML = `If you have doubts on how to get more cards to study, take our <a href="javascript:pycmd('{{ TOUR_OPEN_PYCMD }}')">tour on how to unsuspend cards</a>.`;
         document.querySelector(".congrats").appendChild(p);
     }
 }

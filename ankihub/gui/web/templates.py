@@ -28,7 +28,3 @@ def get_empty_state_html(theme: str, resource_type: str) -> str:
 
 def get_remove_anking_button_js() -> str:
     return env.get_template("remove_anking_button.js").render()
-
-
-def get_modify_anking_instructions_js(tour_pycmd: str) -> str:
-    return env.get_template("modify_anking_instructions.js").render({"STEP_TOUR_OPEN_PYCMD": tour_pycmd})

@@ -12,7 +12,6 @@ from anki.cards import Card
 from anki.notes import Note
 from aqt import QTimer, colors, qconnect
 from aqt.gui_hooks import (
-    card_will_show,
     reviewer_did_show_answer,
     reviewer_did_show_question,
     reviewer_will_end,
@@ -29,10 +28,10 @@ from ..db import ankihub_db
 from ..gui.menu import AnkiHubLogin
 from ..gui.webview import AuthenticationRequestInterceptor, CustomWebPage  # noqa: F401
 from ..main.utils import Resource, mh_tag_to_resource
-from ..settings import TAG_FOR_INSTRUCTION_NOTES, config, url_login
+from ..settings import config, url_login
 from ..user_state import check_user_feature_access
 from .config_dialog import get_config_dialog_manager
-from .js_message_handling import STEP_TOUR_OPEN_PYCMD, VIEW_NOTE_PYCMD, parse_js_message_kwargs
+from .js_message_handling import VIEW_NOTE_PYCMD, parse_js_message_kwargs
 from .utils import (
     anki_theme,
     get_ah_did_of_deck_or_ancestor_deck,
@@ -42,7 +41,6 @@ from .utils import (
 from .web.templates import (
     get_empty_state_html,
     get_header_webview_html,
-    get_modify_anking_instructions_js,
     get_remove_anking_button_js,
     get_reviewer_buttons_js,
 )
@@ -324,7 +322,6 @@ def setup():
 
     webview_did_receive_js_message.append(_on_js_message)
     reviewer_will_end.append(_close_sidebar_and_clear_states_if_exists)
-    card_will_show.append(_modify_anking_instructions_card)
 
 
 def _setup_sidebar_update_on_config_close() -> None:
@@ -655,18 +652,3 @@ def _handle_auth_failure():
     aqt.mw.reviewer.web.eval(js)
 
     AnkiHubLogin.display_login()
-
-
-def _modify_anking_instructions_card(text: str, card: Card, kind: str) -> str:
-    """Modify the instructions card in the AnKing deck to add a link to the product tour if enabled."""
-    if (
-        not kind.startswith("review")
-        or not config.get_feature_flags().get("step_deck_tour", False)
-        or not _is_anking_deck(card)
-        or TAG_FOR_INSTRUCTION_NOTES not in card.note().tags
-    ):
-        return text
-
-    js = get_modify_anking_instructions_js(STEP_TOUR_OPEN_PYCMD)
-    text += f"<script>{js}</script>"
-    return text
