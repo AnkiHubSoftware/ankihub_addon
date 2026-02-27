@@ -16,7 +16,7 @@ import aqt
 import pytest
 import requests
 from anki.decks import DeckId
-from anki.models import NotetypeDict, NotetypeId
+from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from approvaltests.approvals import verify  # type: ignore
 from approvaltests.namer import NamerFactory  # type: ignore
@@ -2136,57 +2136,26 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: note_type)
 
             assert media_names == {"image1.png", "audio1.mp3", "image2.jpg", "audio2.wav"}
 
-    def test_extracts_media_from_note_type_templates(
+    def test_extracts_underscored_images_and_scripts_from_templates(
         self,
         anki_session_with_addon_data: AnkiSession,
     ):
-        """Media references in note type templates (qfmt/afmt) are extracted."""
+        """Underscored images and scripts in note type templates are extracted."""
         from ankihub.ankihub_client.models import get_media_names_from_notes_data
 
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             note_type = note_type_with_field_names(["Front", "Back"])
-            note_type["tmpls"][0]["qfmt"] = '{{Front}}<img src="template_image.png">'
-            note_type["tmpls"][0]["afmt"] = "{{Back}}[sound:template_audio.mp3]"
-            mw.col.models.add_dict(note_type)
-            note_type = mw.col.models.by_name(note_type["name"])
-            mid = note_type["id"]
-
-            notes_data = [
-                NoteInfoFactory.create(
-                    mid=mid,
-                    fields=[
-                        Field(name="Front", value="plain text"),
-                        Field(name="Back", value="plain text"),
-                    ],
-                ),
-            ]
-
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
-
-            assert "template_image.png" in media_names
-            assert "template_audio.mp3" in media_names
-
-    def test_extracts_media_from_note_type_css(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        """Media references in note type CSS are extracted."""
-        from ankihub.ankihub_client.models import get_media_names_from_notes_data
-
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            note_type = note_type_with_field_names(["Front", "Back"])
+            note_type["tmpls"][0]["qfmt"] = '{{Front}}<img src="_image.png"><script src="_script.js"></script>'
+            note_type["tmpls"][0]["afmt"] = '{{Back}}<object data="_data.bin"></object>'
             note_type["css"] = (
-                '@import "foo_import.css"; '
-                '.card { background: url("foo_double_quoted.png");'
-                " background: url('foo_single_quoted.png'); }"
+                '@import "_style.css"; .card { background: url("_bg1.png"); background: url(\'_bg2.png\');'
+                "background: url(_bg3.png);  }"
             )
             mw.col.models.add_dict(note_type)
             note_type = mw.col.models.by_name(note_type["name"])
@@ -2196,15 +2165,23 @@ class TestMediaNameExtraction:
                 NoteInfoFactory.create(
                     mid=mid,
                     fields=[
-                        Field(name="Front", value="plain text"),
-                        Field(name="Back", value="plain text"),
+                        Field(name="Front", value="question"),
+                        Field(name="Back", value="answer"),
                     ],
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: note_type)
 
-            assert media_names == {"foo_import.css", "foo_double_quoted.png", "foo_single_quoted.png"}
+            assert media_names == {
+                "_image.png",
+                "_script.js",
+                "_data.bin",
+                "_style.css",
+                "_bg1.png",
+                "_bg2.png",
+                "_bg3.png",
+            }
 
     def test_excludes_remote_media_urls(
         self,
@@ -2228,9 +2205,37 @@ class TestMediaNameExtraction:
                 ),
             ]
 
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: mw.col.models.get(NotetypeId(mid)))
+            media_names = get_media_names_from_notes_data(notes_data, lambda mid: note_type)
 
             assert media_names == {"local.png", "local.mp3"}
+
+    def test_extracts_unquoted_attributes(self):
+        """Unquoted src/data values like src=foo.jpg are extracted from note fields."""
+        from ankihub.common_utils import gather_media_names_from_note_field
+
+        result = gather_media_names_from_note_field("<img src=unquoted.png other=attr>", Mock())
+        assert result == {"unquoted.png"}
+
+    def test_decodes_html_entities_in_filenames(self):
+        """HTML entities in filenames (e.g. &amp;) are decoded."""
+        from ankihub.common_utils import gather_media_names_from_note_field
+
+        result = gather_media_names_from_note_field('<img src="foo&amp;bar.jpg">', Mock())
+        assert result == {"foo&bar.jpg"}
+
+    def test_extracts_latex_from_note_fields(self):
+        """LaTeX in note fields generates predictable media filenames."""
+        from ankihub.common_utils import gather_media_names_from_note_field
+
+        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": False})
+        assert len(result) == 1
+        assert list(result)[0].startswith("latex-")
+        assert list(result)[0].endswith(".png")
+
+        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": True})
+        assert len(result) == 1
+        assert list(result)[0].startswith("latex-")
+        assert list(result)[0].endswith(".svg")
 
 
 class TestGetReviewCountForAHDeckSince:

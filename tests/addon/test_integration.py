@@ -130,7 +130,7 @@ from ankihub.ankihub_client.models import (
     NotesActionChoices,
     UserDeckExtensionRelation,
 )
-from ankihub.common_utils import local_media_names_from_html
+from ankihub.common_utils import gather_media_names_from_note_field
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
@@ -4635,7 +4635,7 @@ class TestDeckManagementDialog:
             note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
             note_type["name"] = "Test Note Type"
             note_type["id"] = 0
-            note_type["tmpls"][0]["qfmt"] = '<img src="test.jpg">{{Front}}' if has_media else "{{Front}}"
+            note_type["tmpls"][0]["qfmt"] = '<img src="_test.jpg">{{Front}}' if has_media else "{{Front}}"
 
             new_mid = NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
             note_type = aqt.mw.col.models.get(new_mid)
@@ -4671,7 +4671,7 @@ class TestDeckManagementDialog:
 
             # Verify media upload
             if has_media:
-                mock_media_upload.assert_called_once_with({"test.jpg"}, ah_did)
+                mock_media_upload.assert_called_once_with({"_test.jpg"}, ah_did)
             else:
                 mock_media_upload.assert_not_called()
 
@@ -4702,7 +4702,7 @@ class TestDeckManagementDialog:
             note_type = ankihub_basic_note_type
 
             # Modify note type with optional media
-            note_type["tmpls"][0]["qfmt"] = '<img src="updated.jpg">{{Front}}' if has_media else "{{Front}}"
+            note_type["tmpls"][0]["qfmt"] = '<img src="_updated.jpg">{{Front}}' if has_media else "{{Front}}"
             aqt.mw.col.models.update_dict(note_type)
 
             # Setup mocks
@@ -4733,7 +4733,7 @@ class TestDeckManagementDialog:
 
             # Verify media upload
             if has_media:
-                mock_media_upload.assert_called_once_with({"updated.jpg"}, ah_did)
+                mock_media_upload.assert_called_once_with({"_updated.jpg"}, ah_did)
             else:
                 mock_media_upload.assert_not_called()
 
@@ -6605,7 +6605,7 @@ class TestSuggestionsWithMedia:
     ):
         # Assert that the media name in the note is as expected.
         note.load()
-        media_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
+        media_name_in_note = list(gather_media_names_from_note_field(note["Front"], Mock()))[0]
         assert media_name_in_note == expected_media_name
 
         # Assert that the media name in the suggestion is as expected.
@@ -6616,7 +6616,7 @@ class TestSuggestionsWithMedia:
             suggestion = suggestion_request_mock.call_args.kwargs["new_note_suggestion"]
 
         first_field_value = suggestion.fields[0].value
-        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[0]
+        media_name_in_suggestion = list(gather_media_names_from_note_field(first_field_value, Mock()))[0]
         assert media_name_in_suggestion == expected_media_name
 
     def _assert_media_name_in_zip_as_expected(
