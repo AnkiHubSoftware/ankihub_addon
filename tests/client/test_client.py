@@ -1510,7 +1510,7 @@ class TestUploadMediaForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        original_media_names = get_media_names_from_suggestion(suggestion)
+        original_media_names = get_media_names_from_suggestion(suggestion, Mock())
         original_media_paths = [TEST_MEDIA_PATH / original_media_name for original_media_name in original_media_names]
         media_name_map = client.generate_media_files_with_hashed_names(original_media_paths)
         new_media_paths = {

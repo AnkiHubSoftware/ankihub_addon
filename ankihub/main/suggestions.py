@@ -23,7 +23,7 @@ from typing import (
 )
 
 import aqt
-from anki.models import NotetypeId
+from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -414,7 +414,12 @@ def _rename_and_upload_media_for_suggestions(
     original_media_names: Set[str] = get_media_names_from_notes_data(
         original_notes_data, lambda mid: aqt.mw.col.models.get(NotetypeId(mid))
     )
-    suggestion_media_names: Set[str] = get_media_names_from_suggestions(suggestions)
+
+    def suggestion_note_type_getter(suggestion: NoteSuggestion) -> NotetypeDict:
+        ntid = aqt.mw.col.db.scalar("select mid from notes where id = ?", suggestion.anki_nid)
+        return aqt.mw.col.models.get(NotetypeId(ntid))
+
+    suggestion_media_names: Set[str] = get_media_names_from_suggestions(suggestions, suggestion_note_type_getter)
 
     # Filter out unchanged media file names so we don't hash and upload media files that aren't part of the suggestion
     media_names_added_to_note = suggestion_media_names.difference(original_media_names)

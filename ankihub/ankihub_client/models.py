@@ -13,7 +13,7 @@ from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from ..common_utils import local_media_names_from_html
+from ..common_utils import gather_media_names_from_note_field, gather_media_names_from_note_type
 
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
 
@@ -322,42 +322,45 @@ def get_media_names_from_notes_data(
 ) -> Set[str]:
     """Return the names of all media files on the given notes and their note types.
     Only returns names of local files, not remote files."""
-    note_refs = {name for note in notes_data for name in get_media_names_from_note_info(note)}
+    note_refs = {
+        name for note in notes_data for name in get_media_names_from_note_info(note, get_notetype_by_id(note.mid))
+    }
     note_type_ids = {note.mid for note in notes_data}
     note_type_refs = {
         name
         for note_type_id in note_type_ids
-        for name in get_media_names_from_notetype(get_notetype_by_id(note_type_id))
+        for name in gather_media_names_from_note_type(get_notetype_by_id(note_type_id))
     }
     return {*note_refs, *note_type_refs}
 
 
-def get_media_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
+def get_media_names_from_suggestions(
+    suggestions: Sequence[NoteSuggestion], get_notetype_for_suggestion: Callable[[NoteSuggestion], Dict[str, Any]]
+) -> Set[str]:
     """Return the names of all media files on the given suggestions.
     Only returns names of local files, not remote files."""
-    return {name for suggestion in suggestions for name in get_media_names_from_suggestion(suggestion)}
+    return {
+        name
+        for suggestion in suggestions
+        for name in get_media_names_from_suggestion(suggestion, get_notetype_for_suggestion(suggestion))
+    }
 
 
-def get_media_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
-    result = {name for field in suggestion.fields for name in _get_media_names_from_field(field)}
+def get_media_names_from_suggestion(suggestion: NoteSuggestion, note_type: Dict[str, Any]) -> Set[str]:
+    result = {
+        name for field in suggestion.fields for name in gather_media_names_from_note_field(field.value, note_type)
+    }
     return result
 
 
-def get_media_names_from_note_info(note_info: NoteInfo) -> Set[str]:
-    result = {name for field in note_info.fields for name in _get_media_names_from_field(field)}
-    return result
+def get_media_names_from_note_type(note_type: Dict[str, Any]) -> Set[str]:
+    return gather_media_names_from_note_type(note_type)
 
 
-def get_media_names_from_notetype(note_type: Dict[str, Any]) -> Set[str]:
-    refs: Set[str] = set()
-    refs.update(local_media_names_from_html(note_type["css"]))
-    for tmpl in note_type["tmpls"]:
-        refs.update(local_media_names_from_html(tmpl["qfmt"]))
-        refs.update(local_media_names_from_html(tmpl["afmt"]))
-    return refs
+def get_media_names_from_from_field(field: str, note_type: Dict[str, Any]) -> Set[str]:
+    return gather_media_names_from_note_field(field, note_type)
 
 
-def _get_media_names_from_field(field: Field) -> Set[str]:
-    """Return the names of all media files on the given field. Only returns names of local files, not remote files."""
-    result = local_media_names_from_html(field.value)
+def get_media_names_from_note_info(note_info: NoteInfo, note_type: Dict[str, Any]) -> Set[str]:
+    result = {name for field in note_info.fields for name in gather_media_names_from_note_field(field.value, note_type)}
     return result

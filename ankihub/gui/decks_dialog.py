@@ -29,7 +29,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import UserDeckRelation, get_media_names_from_notetype
+from ..ankihub_client.models import UserDeckRelation, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -651,7 +651,7 @@ class DeckManagementDialog(QDialog):
             note_type = aqt.mw.col.models.by_name(note_type_selector.name)
             new_note_type = add_note_type(ah_did, note_type)
 
-            media_names = get_media_names_from_notetype(new_note_type)
+            media_names = get_media_names_from_note_type(new_note_type)
             if media_names:
                 media_sync.start_media_upload(media_names, ah_did)
 
@@ -750,7 +750,7 @@ class DeckManagementDialog(QDialog):
             ah_did = self._selected_ah_did()
             update_note_type_templates_and_styles(ah_did, note_type)
 
-            media_names = get_media_names_from_notetype(note_type)
+            media_names = get_media_names_from_note_type(note_type)
             if media_names:
                 media_sync.start_media_upload(media_names, ah_did)
 
