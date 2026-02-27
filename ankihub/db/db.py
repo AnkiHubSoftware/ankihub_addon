@@ -39,7 +39,7 @@ from peewee import DQ, SqliteDatabase
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
-from ..common_utils import local_media_names_from_html
+from ..common_utils import gather_media_names_from_note_field
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError, MissingValueError
 from .models import (
@@ -448,16 +448,18 @@ class _AnkiHubDB:
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
-        notes = AnkiHubNote.select(AnkiHubNote.fields).filter(
+        notes = AnkiHubNote.select(AnkiHubNote.anki_note_type_id, AnkiHubNote.fields).filter(
             NOTE_NOT_DELETED_CONDITION,
-            (AnkiHubNote.fields.cast("text").ilike("%<img%") | AnkiHubNote.fields.cast("text").ilike("%[sound:%")),
             ankihub_deck_id=ah_did,
         )
+
         return {
             media_name
             for note in notes
             for field_value in (note.fields.values() if note.fields else [])
-            for media_name in local_media_names_from_html(field_value)
+            for media_name in gather_media_names_from_note_field(
+                field_value, aqt.mw.col.models.get(note.anki_note_type_id)
+            )
         }
 
     def media_names_exist_for_ankihub_deck(self, ah_did: uuid.UUID, media_names: Set[str]) -> Dict[str, bool]:
