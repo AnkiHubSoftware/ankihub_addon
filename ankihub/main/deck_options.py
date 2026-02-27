@@ -12,6 +12,13 @@ except ImportError:
     from anki import deckconfig_pb2 as deck_config_pb2  # type: ignore
 
 ANKIHUB_PRESET_NAME = "AnkiHub"
+ANKING_PRESET_NAME = "AnKing"
+ANKING_OVERRIDES = {
+    "daily_limit": 9999,
+}
+DEFAULT_OVERRIDES = {
+    "daily_limit": [500, 50],
+}
 DECK_CONFIG: Dict[str, Any] = {
     "steps": [15, 1440],
     "fsrs_steps": [15],
@@ -69,6 +76,15 @@ def deep_set(data: Dict, path: str, value: Any) -> None:
     d[last_key] = value
 
 
+def get_effective_deck_config(preset_name: str) -> Dict[str, Any]:
+    is_anking_preset = preset_name == ANKING_PRESET_NAME
+    overrides = ANKING_OVERRIDES if is_anking_preset else DEFAULT_OVERRIDES
+    return {
+        **DECK_CONFIG,
+        **overrides,
+    }
+
+
 def create_or_reset_deck_preset(
     preset_name=ANKIHUB_PRESET_NAME,
 ) -> DeckConfigDict:
@@ -81,8 +97,9 @@ def create_or_reset_deck_preset(
     else:
         conf = aqt.mw.col.decks.add_config(preset_name)
     fsrs_enabled = aqt.mw.col.get_config("fsrs")
-    for option, value in DECK_CONFIG.items():
-        if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (not fsrs_enabled and option.startswith("fsrs_")):
+    effective_config = get_effective_deck_config(preset_name=preset_name)
+    for option, value in effective_config.items():
+        if (fsrs_enabled and f"fsrs_{option}" in effective_config) or (not fsrs_enabled and option.startswith("fsrs_")):
             continue
         option_paths = CONFIG_NAME_TO_DECK_OPTIONS_PATH[option]
         for path in option_paths:
@@ -99,7 +116,7 @@ def set_ankihub_config_for_deck(deck_id: DeckId, is_anking_deck: bool = False) -
         return
 
     if is_anking_deck and config.get_feature_flags().get("fsrs_in_recommended_deck_settings"):
-        conf = create_or_reset_deck_preset(preset_name="AnKing")
+        conf = create_or_reset_deck_preset(preset_name=ANKING_PRESET_NAME)
     else:
         conf = create_or_reset_deck_preset()
 
