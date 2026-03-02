@@ -14,10 +14,12 @@ except ImportError:
 ANKIHUB_PRESET_NAME = "AnkiHub"
 ANKING_PRESET_NAME = "AnKing"
 ANKING_OVERRIDES = {
-    "daily_limit": 9999,
+    "new_limit": 9999,
+    "review_limit": 9999,
 }
 DEFAULT_OVERRIDES = {
-    "daily_limit": [500, 50],
+    "new_limit": 50,
+    "review_limit": 500,
 }
 DECK_CONFIG: Dict[str, Any] = {
     "steps": [15, 1440],
@@ -28,7 +30,6 @@ DECK_CONFIG: Dict[str, Any] = {
     "new_mix": deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_AFTER_REVIEWS,
     "interday_learning_mix": deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_BEFORE_REVIEWS,
     "review_order": deck_config_pb2.DeckConfig.Config.ReviewCardOrder.REVIEW_CARD_ORDER_DAY,
-    "daily_limit": 9999,
     "bury": True,
     "new_intervals": [3, 4, 0],
     "easy_bonus": 1.5,
@@ -53,10 +54,8 @@ CONFIG_NAME_TO_DECK_OPTIONS_PATH: Dict[str, Tuple[str, ...]] = {
     "new_mix": ("newMix",),
     "interday_learning_mix": ("interdayLearningMix",),
     "review_order": ("reviewOrder",),
-    "daily_limit": (
-        "rev.perDay",
-        "new.perDay",
-    ),
+    "new_limit": ("new.perDay",),
+    "review_limit": ("rev.perDay",),
     "bury": ("rev.bury", "new.bury", "buryInterdayLearning"),
     "new_intervals": ("new.ints",),
     "easy_bonus": ("rev.ease4",),
