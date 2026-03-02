@@ -55,11 +55,7 @@ HTML_MEDIA_TAGS = re.compile(
 AV_TAGS = re.compile(
     r"""(?xs)
     \[sound:(.+?)\]     # 1 - the filename in a sound tag
-    |
-    \[anki:tts\]
-        \[(.*?)\]       # 2 - arguments to tts call
-        (.*?)           # 3 - field text
-    \[/anki:tts\]"""
+    """
 )
 
 LATEX = re.compile(
