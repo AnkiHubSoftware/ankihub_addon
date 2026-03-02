@@ -2123,22 +2123,25 @@ class TestMediaNameExtraction:
                 NoteInfoFactory.create(
                     mid=mid,
                     fields=[
-                        Field(name="Front", value='<img src="image1.png">'),
+                        Field(name="Front", value='<img src="image1.png"><img src="foo&amp;bar.jpg">'),
                         Field(name="Back", value="[sound:audio1.mp3]"),
                     ],
                 ),
                 NoteInfoFactory.create(
                     mid=mid,
                     fields=[
-                        Field(name="Front", value='<img src="image2.jpg"> and [sound:audio2.wav]'),
-                        Field(name="Back", value="no media here"),
+                        Field(name="Front", value="<img src='image2.png'><img src=image3.png>"),
+                        Field(
+                            name="Back",
+                            value='No media here <img src="http://example.com/remote.png"><img src="https://example.com/secure.jpg">',
+                        ),
                     ],
                 ),
             ]
 
             media_names = get_media_names_from_notes_data(notes_data, lambda mid: note_type)
 
-            assert media_names == {"image1.png", "audio1.mp3", "image2.jpg", "audio2.wav"}
+            assert media_names == {"image1.png", "foo&bar.jpg", "audio1.mp3", "image2.png", "image3.png"}
 
     def test_extracts_underscored_images_and_scripts_from_templates(
         self,
@@ -2183,59 +2186,15 @@ class TestMediaNameExtraction:
                 "_bg3.png",
             }
 
-    def test_excludes_remote_media_urls(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-    ):
-        """Remote URLs (http/https) are excluded from media extraction."""
-        from ankihub.ankihub_client.models import get_media_names_from_notes_data
-
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-            note_type = mw.col.models.by_name("Basic")
-            mid = note_type["id"]
-
-            notes_data = [
-                NoteInfoFactory.create(
-                    mid=mid,
-                    fields=[
-                        Field(name="Front", value='<img src="local.png"><img src="http://example.com/remote.png">'),
-                        Field(name="Back", value='<img src="https://example.com/secure.jpg">[sound:local.mp3]'),
-                    ],
-                ),
-            ]
-
-            media_names = get_media_names_from_notes_data(notes_data, lambda mid: note_type)
-
-            assert media_names == {"local.png", "local.mp3"}
-
-    def test_extracts_unquoted_attributes(self):
-        """Unquoted src/data values like src=foo.jpg are extracted from note fields."""
-        from ankihub.common_utils import gather_media_names_from_note_field
-
-        result = gather_media_names_from_note_field("<img src=unquoted.png other=attr>", Mock())
-        assert result == {"unquoted.png"}
-
-    def test_decodes_html_entities_in_filenames(self):
-        """HTML entities in filenames (e.g. &amp;) are decoded."""
-        from ankihub.common_utils import gather_media_names_from_note_field
-
-        result = gather_media_names_from_note_field('<img src="foo&amp;bar.jpg">', Mock())
-        assert result == {"foo&bar.jpg"}
-
-    def test_extracts_latex_from_note_fields(self):
+    @pytest.mark.parametrize("svg", [False, True])
+    def test_extracts_latex_from_note_fields(self, svg: bool):
         """LaTeX in note fields generates predictable media filenames."""
         from ankihub.common_utils import gather_media_names_from_note_field
 
-        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": False})
+        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": svg})
         assert len(result) == 1
         assert list(result)[0].startswith("latex-")
-        assert list(result)[0].endswith(".png")
-
-        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": True})
-        assert len(result) == 1
-        assert list(result)[0].startswith("latex-")
-        assert list(result)[0].endswith(".svg")
+        assert list(result)[0].endswith(".svg" if svg else ".png")
 
 
 class TestGetReviewCountForAHDeckSince:
