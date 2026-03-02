@@ -14,7 +14,7 @@ from aqt.qt import QAction
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
-from ..ankihub_client.models import DeckMedia, get_media_names_from_from_field, get_media_names_from_note_type
+from ..ankihub_client.models import DeckMedia, get_media_names_from_field, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
@@ -197,7 +197,7 @@ class _AnkiHubMediaSync:
             note_type_ids.add(note.mid)
             note_type = note.note_type()
             for field in note.values():
-                media_names.update(get_media_names_from_from_field(field, note_type))
+                media_names.update(get_media_names_from_field(field, note_type))
         for note_type_id in note_type_ids:
             note_type = aqt.mw.col.models.get(NotetypeId(note_type_id))
             media_names.update(get_media_names_from_note_type(note_type))

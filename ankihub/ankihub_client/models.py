@@ -357,7 +357,7 @@ def get_media_names_from_note_type(note_type: Dict[str, Any]) -> Set[str]:
     return gather_media_names_from_note_type(note_type)
 
 
-def get_media_names_from_from_field(field: str, note_type: Dict[str, Any]) -> Set[str]:
+def get_media_names_from_field(field: str, note_type: Dict[str, Any]) -> Set[str]:
     return gather_media_names_from_note_field(field, note_type)
 
 
