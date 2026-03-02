@@ -128,6 +128,8 @@ def _extract_html_media_refs(text: str) -> Set[str]:
     result: Set[str] = set()
     for m in HTML_MEDIA_TAGS.finditer(text):
         fname = (m.group(1) or m.group(2) or m.group(3) or "").strip()
+        if fname in ("", '""', "''"):
+            continue
         fname_decoded = _decode_entities(fname)
         if _is_local_filename(fname_decoded):
             result.add(fname_decoded)
@@ -138,6 +140,8 @@ def _extract_av_tags(text: str) -> Set[str]:
     result: Set[str] = set()
     for m in AV_TAGS.finditer(text):
         fname = m.group(1).strip()
+        if not fname:
+            continue
         fname_decoded = _decode_entities(fname)
         if _is_local_filename(fname_decoded):
             result.add(fname_decoded)

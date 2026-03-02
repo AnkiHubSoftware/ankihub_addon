@@ -2133,7 +2133,8 @@ class TestMediaNameExtraction:
                         Field(name="Front", value="<img src='image2.png'><img src=image3.png>"),
                         Field(
                             name="Back",
-                            value='No media here <img src="http://example.com/remote.png"><img src="https://example.com/secure.jpg">',
+                            value='No media here <img src="http://example.com/remote.png">'
+                            '<img src="https://example.com/secure.jpg"><img src=""><img src=\'\'>',
                         ),
                     ],
                 ),
