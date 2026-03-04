@@ -23,8 +23,9 @@ from typing import (
 )
 
 import aqt
-from anki.models import NotetypeDict, NotetypeId
+from anki.models import NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import ids2str
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import (
@@ -415,11 +416,14 @@ def _rename_and_upload_media_for_suggestions(
         original_notes_data, lambda mid: aqt.mw.col.models.get(NotetypeId(mid))
     )
 
-    def suggestion_note_type_getter(suggestion: NoteSuggestion) -> NotetypeDict:
-        ntid = aqt.mw.col.db.scalar("select mid from notes where id = ?", suggestion.anki_nid)
-        return aqt.mw.col.models.get(NotetypeId(ntid))
-
-    suggestion_media_names: Set[str] = get_media_names_from_suggestions(suggestions, suggestion_note_type_getter)
+    anki_nids = [s.anki_nid for s in suggestions]
+    nid_to_note_type = {
+        nid: ankihub_db.note_type_dict(NotetypeId(mid))
+        for nid, mid in aqt.mw.col.db.all(f"select id, mid from notes where id in {ids2str(anki_nids)}")
+    }
+    suggestion_media_names: Set[str] = get_media_names_from_suggestions(
+        suggestions, lambda s: nid_to_note_type[s.anki_nid]
+    )
 
     # Filter out unchanged media file names so we don't hash and upload media files that aren't part of the suggestion
     media_names_added_to_note = suggestion_media_names.difference(original_media_names)
