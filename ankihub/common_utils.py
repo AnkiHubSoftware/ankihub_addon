@@ -167,7 +167,7 @@ def _extract_latex(text: str, svg: bool) -> Set[str]:
 
 
 def _strip_html_for_latex(latex: str) -> str:
-    latex = LATEX_NEWLINES.sub(latex, "\n")
+    latex = LATEX_NEWLINES.sub("\n", latex)
     return strip_html(latex)
 
 
