@@ -6605,7 +6605,7 @@ class TestSuggestionsWithMedia:
     ):
         # Assert that the media name in the note is as expected.
         note.load()
-        media_name_in_note = list(get_media_names_from_note_field(note["Front"], Mock()))[0]
+        media_name_in_note = list(get_media_names_from_note_field(note["Front"], {"latexsvg": False}))[0]
         assert media_name_in_note == expected_media_name
 
         # Assert that the media name in the suggestion is as expected.
@@ -6616,7 +6616,7 @@ class TestSuggestionsWithMedia:
             suggestion = suggestion_request_mock.call_args.kwargs["new_note_suggestion"]
 
         first_field_value = suggestion.fields[0].value
-        media_name_in_suggestion = list(get_media_names_from_note_field(first_field_value, Mock()))[0]
+        media_name_in_suggestion = list(get_media_names_from_note_field(first_field_value, {"latexsvg": False}))[0]
         assert media_name_in_suggestion == expected_media_name
 
     def _assert_media_name_in_zip_as_expected(
