@@ -14,8 +14,8 @@ from aqt.qt import QAction
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
-from ..ankihub_client.models import DeckMedia, get_media_names_from_note_field
-from ..common_utils import get_media_names_from_note_type
+from ..ankihub_client.models import DeckMedia
+from ..common_utils import get_media_names_from_note_field, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
