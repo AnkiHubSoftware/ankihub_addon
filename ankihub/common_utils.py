@@ -201,7 +201,7 @@ def _prefers_svg_latex(note_type: NotetypeDict) -> bool:
     return note_type.get("latexsvg", False)
 
 
-def gather_media_names_from_note_type(note_type: NotetypeDict) -> Set[str]:
+def get_media_names_from_note_type(note_type: NotetypeDict) -> Set[str]:
     """Gather media filenames with leading underscore from note type."""
     result: Set[str] = set()
     result.update(_extract_underscored_css_imports(note_type["css"]))
@@ -211,7 +211,7 @@ def gather_media_names_from_note_type(note_type: NotetypeDict) -> Set[str]:
     return result
 
 
-def gather_media_names_from_note_field(html_content: str, note_type: NotetypeDict) -> Set[str]:
+def get_media_names_from_note_field(html_content: str, note_type: NotetypeDict) -> Set[str]:
     """Gather local media filenames from field content."""
     result: Set[str] = set()
     result.update(_extract_html_media_refs(html_content))

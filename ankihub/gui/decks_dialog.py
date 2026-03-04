@@ -29,7 +29,8 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import UserDeckRelation, get_media_names_from_note_type
+from ..ankihub_client.models import UserDeckRelation
+from ..common_utils import get_media_names_from_note_type
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
