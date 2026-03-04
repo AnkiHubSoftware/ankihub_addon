@@ -74,6 +74,10 @@ tailwind_sources = """@source "../**/*.{ts,js,html}";
 @source "../../../ankihub/gui/tutorial.py";
 """
 web_css = re.sub("@source .*", tailwind_sources, web_css)
+# Replace :root with :host as tutorial runs in a shadow root
+web_css = re.sub(r":root\[(.*?)\]", r":host([\1])", web_css)
+web_css = web_css.replace(":root", ":host")
+web_css = web_css.replace(".dark", ":host(.dark)")
 WEB_CSS_TARGET.write_text(web_css, encoding="utf-8")
 subprocess.run([shutil.which("npm"), "install"], cwd=PROJECT_ROOT / "tutorial", check=True)
 subprocess.run([shutil.which("npm"), "run", "build"], cwd=PROJECT_ROOT / "tutorial", check=True)

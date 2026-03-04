@@ -120,6 +120,9 @@ export class TutorialEffect {
 
     async create() {
         this.hostElement = document.createElement("div");
+        if (document.documentElement.classList.contains("night-mode")) {
+            this.hostElement.classList.add("dark");
+        }
         this.hostElement.style.position = "fixed";
         this.hostElement.style.top = "0";
         this.hostElement.style.left = "0";
@@ -173,11 +176,10 @@ export class TutorialEffect {
 
         }
 
-        const css = tailwindCss.replaceAll(":root", ":host");
-        injectPropertyRulesIntoDocument(css);
-        injectFontImportsIntoDocument(css);
+        injectPropertyRulesIntoDocument(tailwindCss);
+        injectFontImportsIntoDocument(tailwindCss);
         const style = document.createElement("style");
-        style.textContent = css;
+        style.textContent = tailwindCss;
         this.shadowRoot.append(style);
         Alpine.initTree(this.modalElement);
     }
