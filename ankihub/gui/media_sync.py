@@ -200,7 +200,7 @@ class _AnkiHubMediaSync:
             for field in note.values():
                 media_names.update(get_media_names_from_field(field, note_type))
         for note_type_id in note_type_ids:
-            note_type = aqt.mw.col.models.get(NotetypeId(note_type_id))
+            note_type = ankihub_db.note_type_dict(NotetypeId(note_type_id))
             media_names.update(get_media_names_from_note_type(note_type))
         return media_names
 

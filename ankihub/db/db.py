@@ -39,7 +39,7 @@ from peewee import DQ, SqliteDatabase
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
-from ..common_utils import gather_media_names_from_note_field
+from ..common_utils import get_media_names_from_note_field
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError, MissingValueError
 from .models import (
@@ -457,9 +457,7 @@ class _AnkiHubDB:
             media_name
             for note in notes
             for field_value in (note.fields.values() if note.fields else [])
-            for media_name in gather_media_names_from_note_field(
-                field_value, aqt.mw.col.models.get(note.anki_note_type_id)
-            )
+            for media_name in get_media_names_from_note_field(field_value, self.note_type_dict(note.anki_note_type_id))
         }
 
     def media_names_exist_for_ankihub_deck(self, ah_did: uuid.UUID, media_names: Set[str]) -> Dict[str, bool]:

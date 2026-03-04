@@ -413,7 +413,7 @@ def _rename_and_upload_media_for_suggestions(
         note_info for suggestion in suggestions if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
     ]
     original_media_names: Set[str] = get_media_names_from_notes_data(
-        original_notes_data, lambda mid: aqt.mw.col.models.get(NotetypeId(mid))
+        original_notes_data, lambda mid: ankihub_db.note_type_dict(NotetypeId(mid))
     )
 
     anki_nids = [s.anki_nid for s in suggestions]
