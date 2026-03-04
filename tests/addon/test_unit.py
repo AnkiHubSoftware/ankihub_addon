@@ -2190,9 +2190,9 @@ class TestMediaNameExtraction:
     @pytest.mark.parametrize("svg", [False, True])
     def test_extracts_latex_from_note_fields(self, svg: bool):
         """LaTeX in note fields generates predictable media filenames."""
-        from ankihub.common_utils import gather_media_names_from_note_field
+        from ankihub.common_utils import get_media_names_from_note_field
 
-        result = gather_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": svg})
+        result = get_media_names_from_note_field("[latex]x^2[/latex]", {"latexsvg": svg})
         assert len(result) == 1
         assert list(result)[0].startswith("latex-")
         assert list(result)[0].endswith(".svg" if svg else ".png")
