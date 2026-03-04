@@ -1399,6 +1399,7 @@ def test_suggest_new_note(
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
+        mw.col.add_note(note, DeckId(1))
         suggest_new_note(
             note=note,
             ankihub_did=ah_did,
@@ -6431,20 +6432,23 @@ class TestSuggestionsWithMedia:
         self,
         anki_session_with_addon_data: AnkiSession,
         mock_client_media_upload: Mock,
-        ankihub_basic_note_type: NotetypeDict,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
         create_new_note_suggestion: CreateNewNoteSuggestion,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
             # Add media reference to a note
             media_file_name = "testfile_1.jpeg"
-            note = mw.col.new_note(ankihub_basic_note_type)
+            note = mw.col.new_note(note_type)
             note["Front"] = f'<img src="{media_file_name}">'
-            mw.col.add_note(note, DeckId(1))
+            mw.col.add_note(note, config.deck_config(ah_did).anki_id)
 
             # Create a suggestion for the note
-            ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
             create_new_note_suggestion_mock = create_new_note_suggestion(
                 note=note, ah_did=ah_did, wait_for_media_upload=True
             )
