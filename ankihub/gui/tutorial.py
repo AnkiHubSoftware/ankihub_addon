@@ -1288,11 +1288,11 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         media_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web/media"
         steps.append(
             QtTutorialStep(
-                body="Suspended cards won't appear in study sessions. In the Browser, "
+                body="<b>Suspended cards</b> won't appear in study sessions. In the Browser, "
                 "they're shown with a <span style='background-color: #FFE77E'>yellow background</span>.<br><br>"
                 "During the tour, you can’t perform actions. Normally, to unsuspend a card, "
                 "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
-                "Click Next and we'll unsuspend a card for you as an example.<br><br>"
+                "Click <b>Next</b> and we'll unsuspend a card for you as an example.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
                 qt_target=lambda: self._browser.form.tableView,
                 parent_widget=lambda: self._browser,
