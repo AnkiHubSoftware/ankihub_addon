@@ -340,13 +340,13 @@ def _added_new_media(note: Note) -> bool:
     """Returns True if media files were added to the notes when comparing with
     the notes in the ankihub database, else False."""
     note_info_anki = to_note_data(note)
-    media_names_anki = get_media_names_from_note_info(note_info_anki)
+    media_names_anki = get_media_names_from_note_info(note_info_anki, note.note_type())
 
     note_info_ah = ankihub_db.note_data(note.id)
     if note_info_ah is None:
         return bool(media_names_anki)
 
-    media_names_ah = get_media_names_from_note_info(note_info_ah)
+    media_names_ah = get_media_names_from_note_info(note_info_ah, note.note_type())
 
     added_media_names = set(media_names_anki) - set(media_names_ah)
     result = len(added_media_names) > 0

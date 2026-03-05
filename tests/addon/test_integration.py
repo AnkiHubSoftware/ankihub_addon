@@ -130,7 +130,7 @@ from ankihub.ankihub_client.models import (
     NotesActionChoices,
     UserDeckExtensionRelation,
 )
-from ankihub.common_utils import local_media_names_from_html
+from ankihub.common_utils import get_media_names_from_note_field
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
@@ -1399,6 +1399,7 @@ def test_suggest_new_note(
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
+        mw.col.add_note(note, DeckId(1))
         suggest_new_note(
             note=note,
             ankihub_did=ah_did,
@@ -4635,7 +4636,7 @@ class TestDeckManagementDialog:
             note_type = copy.deepcopy(aqt.mw.col.models.by_name("Basic"))
             note_type["name"] = "Test Note Type"
             note_type["id"] = 0
-            note_type["tmpls"][0]["qfmt"] = '<img src="test.jpg">{{Front}}' if has_media else "{{Front}}"
+            note_type["tmpls"][0]["qfmt"] = '<img src="_test.jpg">{{Front}}' if has_media else "{{Front}}"
 
             new_mid = NotetypeId(aqt.mw.col.models.add_dict(note_type).id)
             note_type = aqt.mw.col.models.get(new_mid)
@@ -4671,7 +4672,7 @@ class TestDeckManagementDialog:
 
             # Verify media upload
             if has_media:
-                mock_media_upload.assert_called_once_with({"test.jpg"}, ah_did)
+                mock_media_upload.assert_called_once_with({"_test.jpg"}, ah_did)
             else:
                 mock_media_upload.assert_not_called()
 
@@ -4702,7 +4703,7 @@ class TestDeckManagementDialog:
             note_type = ankihub_basic_note_type
 
             # Modify note type with optional media
-            note_type["tmpls"][0]["qfmt"] = '<img src="updated.jpg">{{Front}}' if has_media else "{{Front}}"
+            note_type["tmpls"][0]["qfmt"] = '<img src="_updated.jpg">{{Front}}' if has_media else "{{Front}}"
             aqt.mw.col.models.update_dict(note_type)
 
             # Setup mocks
@@ -4733,7 +4734,7 @@ class TestDeckManagementDialog:
 
             # Verify media upload
             if has_media:
-                mock_media_upload.assert_called_once_with({"updated.jpg"}, ah_did)
+                mock_media_upload.assert_called_once_with({"_updated.jpg"}, ah_did)
             else:
                 mock_media_upload.assert_not_called()
 
@@ -6431,20 +6432,23 @@ class TestSuggestionsWithMedia:
         self,
         anki_session_with_addon_data: AnkiSession,
         mock_client_media_upload: Mock,
-        ankihub_basic_note_type: NotetypeDict,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
         create_new_note_suggestion: CreateNewNoteSuggestion,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
             # Add media reference to a note
             media_file_name = "testfile_1.jpeg"
-            note = mw.col.new_note(ankihub_basic_note_type)
+            note = mw.col.new_note(note_type)
             note["Front"] = f'<img src="{media_file_name}">'
-            mw.col.add_note(note, DeckId(1))
+            mw.col.add_note(note, config.deck_config(ah_did).anki_id)
 
             # Create a suggestion for the note
-            ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
             create_new_note_suggestion_mock = create_new_note_suggestion(
                 note=note, ah_did=ah_did, wait_for_media_upload=True
             )
@@ -6605,7 +6609,7 @@ class TestSuggestionsWithMedia:
     ):
         # Assert that the media name in the note is as expected.
         note.load()
-        media_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
+        media_name_in_note = list(get_media_names_from_note_field(note["Front"], {"latexsvg": False}))[0]
         assert media_name_in_note == expected_media_name
 
         # Assert that the media name in the suggestion is as expected.
@@ -6616,7 +6620,7 @@ class TestSuggestionsWithMedia:
             suggestion = suggestion_request_mock.call_args.kwargs["new_note_suggestion"]
 
         first_field_value = suggestion.fields[0].value
-        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[0]
+        media_name_in_suggestion = list(get_media_names_from_note_field(first_field_value, {"latexsvg": False}))[0]
         assert media_name_in_suggestion == expected_media_name
 
     def _assert_media_name_in_zip_as_expected(

@@ -14,7 +14,8 @@ from aqt.qt import QAction
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
-from ..ankihub_client.models import DeckMedia, get_media_names_from_notetype
+from ..ankihub_client.models import DeckMedia
+from ..common_utils import get_media_names_from_note_field, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
@@ -195,12 +196,12 @@ class _AnkiHubMediaSync:
             except NotFoundError:
                 continue
             note_type_ids.add(note.mid)
-            flds = "".join(note.fields)
-            # Extract media references using Anki's files_in_str (handles latex)
-            media_names.update(aqt.mw.col.media.files_in_str(note.mid, flds))
+            note_type = note.note_type()
+            for field in note.values():
+                media_names.update(get_media_names_from_note_field(field, note_type))
         for note_type_id in note_type_ids:
-            note_type = aqt.mw.col.models.get(NotetypeId(note_type_id))
-            media_names.update(get_media_names_from_notetype(note_type))
+            note_type = ankihub_db.note_type_dict(NotetypeId(note_type_id))
+            media_names.update(get_media_names_from_note_type(note_type))
         return media_names
 
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
