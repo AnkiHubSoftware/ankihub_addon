@@ -1289,7 +1289,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         steps.append(
             QtTutorialStep(
                 body="<b>Suspended cards</b> won't appear in study sessions. In the Browser, "
-                "they're shown with a <span style='background-color: #FFE77E'>yellow background</span>.<br><br>"
+                "they're shown with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
+                "yellow background</span>.<br><br>"
                 "During the tour, you can’t perform actions. Normally, to unsuspend a card, "
                 "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
                 "Click <b>Next</b> and we'll unsuspend a few cards for you as an example.<br><br>"
