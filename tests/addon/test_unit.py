@@ -1403,6 +1403,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
+        ankihub_basic_note_type["tmpls"][0]["qfmt"] += "<img src='_test4.jpg'>"
         self.mid = ankihub_basic_note_type["id"]
         note_info = NoteInfoFactory.create(
             mid=self.mid,
@@ -1430,6 +1431,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
                 "test1.jpg",
                 "test2.jpg",
                 "test3.mp3",
+                "_test4.jpg",
             }
 
 
