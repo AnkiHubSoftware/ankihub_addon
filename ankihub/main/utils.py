@@ -36,6 +36,7 @@ if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
 # The following constants are used to identify AnkiHub modifications in note types.
 ANKIHUB_SNIPPET_MARKER = "ANKIHUB MODFICATIONS"
 ANKIHUB_SNIPPET_RE = (
+    r"\n{0,2}"
     f"<!-- BEGIN {ANKIHUB_SNIPPET_MARKER} -->"
     r"[\w\W]*"
     f"<!-- END {ANKIHUB_SNIPPET_MARKER} -->"
@@ -705,8 +706,13 @@ def note_type_without_template_and_style_modifications(
     note_type["css"] = ANKIHUB_CSS_COMMENT_RE.sub("", note_type["css"]).strip()
     for template in note_type["tmpls"]:
         template["qfmt"] = ANKIHUB_HTML_END_COMMENT_RE.sub("", template["qfmt"]).strip()
+        template["qfmt"] = re.sub(
+            ANKIHUB_SNIPPET_RE,
+            "",
+            template["qfmt"],
+        )
         template["afmt"] = re.sub(
-            r"\n{0,2}" + ANKIHUB_SNIPPET_RE,
+            ANKIHUB_SNIPPET_RE,
             "",
             template["afmt"],
         )
