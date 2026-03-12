@@ -2456,6 +2456,7 @@ class TestAnkiHubImporter:
             else:
                 assert new_qfmt not in updated_qfmt
             assert ANKIHUB_HTML_END_COMMENT in updated_qfmt
+            assert ANKIHUB_SNIPPET_MARKER in updated_qfmt
 
             updated_afmt = updated_note_type["tmpls"][0]["afmt"]
             if expected_template_and_css_updated:
@@ -2465,7 +2466,6 @@ class TestAnkiHubImporter:
                 assert new_afmt not in updated_afmt
                 assert new_css not in updated_note_type["css"]
             assert ANKIHUB_HTML_END_COMMENT in updated_afmt
-            # This is only on the back template (afmt)
             assert ANKIHUB_SNIPPET_MARKER in updated_afmt
 
             # Check that there were no unwanted changes
