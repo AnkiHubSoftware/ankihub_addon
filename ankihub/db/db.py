@@ -39,7 +39,7 @@ from peewee import DQ, SqliteDatabase
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..ankihub_client.models import SuggestionType
-from ..common_utils import get_media_names_from_note_field
+from ..common_utils import get_media_names_from_note_field, get_media_names_from_note_type
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .exceptions import IntegrityError, MissingValueError
 from .models import (
@@ -452,13 +452,24 @@ class _AnkiHubDB:
             NOTE_NOT_DELETED_CONDITION,
             ankihub_deck_id=ah_did,
         )
-
-        return {
+        note_type_ids = set(note.anki_note_type_id for note in notes)
+        note_types: Dict[int, NotetypeDict] = {
+            nt.anki_note_type_id: nt.note_type_dict
+            for nt in AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id, AnkiHubNoteType.note_type_dict).filter(
+                anki_note_type_id__in=note_type_ids
+            )
+        }
+        note_type_refs = {
+            name for note_type in note_types.values() for name in get_media_names_from_note_type(note_type)
+        }
+        note_refs = {
             media_name
             for note in notes
             for field_value in (note.fields.values() if note.fields else [])
-            for media_name in get_media_names_from_note_field(field_value, self.note_type_dict(note.anki_note_type_id))
+            for media_name in get_media_names_from_note_field(field_value, note_types[note.anki_note_type_id])
         }
+
+        return {*note_type_refs, *note_refs}
 
     def media_names_exist_for_ankihub_deck(self, ah_did: uuid.UUID, media_names: Set[str]) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean
