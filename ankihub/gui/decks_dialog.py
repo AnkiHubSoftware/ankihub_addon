@@ -150,7 +150,9 @@ class DeckManagementDialog(QDialog):
         return box
 
     def _setup_box_bottom_left(self) -> QVBoxLayout:
-        self.decks_list_label = QLabel("<b>Subscribed AnkiHub Decks</b>")
+        self.decks_list_label = QLabel(
+            '<span style="font-size: 16px; font-weight: 800; line-height: 100%;">Subscribed AnkiHub Decks</span>'
+        )
         self.decks_list_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self.decks_list = QListWidget()
@@ -183,12 +185,12 @@ class DeckManagementDialog(QDialog):
         # Deck Actions
         self.box_deck_actions = self._setup_box_deck_actions()
         self.box_bottom_right.addLayout(self.box_deck_actions)
-        self.box_bottom_right.addSpacing(20)
+        self.box_bottom_right.addSpacing(16)
 
         # Deck Options
         self.box_deck_options = self._setup_box_deck_options(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_deck_options)
-        self.box_bottom_right.addSpacing(20)
+        self.box_bottom_right.addSpacing(16)
 
         if selected_ah_did not in config.deck_ids():
             self.box_bottom_right.addStretch()
@@ -255,14 +257,20 @@ class DeckManagementDialog(QDialog):
         # Setup "Remove AnkiHub deleted notes from deck"
         self.box_ankihub_deleted_notes_behavior = self._setup_box_ankihub_deleted_notes_behavior(selected_ah_did)
 
+        # Setup "Automatically protect fields when edited"
+        self.box_auto_protect_fields = self._setup_box_auto_protect_fields_when_edited(selected_ah_did)
+
         # Add individual elements to the deck options elements box
         self.box_deck_options_elements = QVBoxLayout()
         self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_existing_notes)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_new_notes)
-        self.box_deck_options_elements.addSpacing(10)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
-        self.box_deck_options_elements.addSpacing(10)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_ankihub_deleted_notes_behavior)
+        self.box_deck_options_elements.addSpacing(8)
+        self.box_deck_options_elements.addLayout(self.box_auto_protect_fields)
 
         # Add everything to the result layout
         box = QVBoxLayout()
@@ -420,11 +428,12 @@ class DeckManagementDialog(QDialog):
         self.subdecks_docs_link_label = QLabel(
             """
             <a href="https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2">
-                More about subdecks
+                Learn about subdecks
             </a>
             """
         )
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
+        self.subdecks_docs_link_label.setContentsMargins(20, 0, 0, 0)
 
         # Add everything to the result layout
         box = QVBoxLayout()
@@ -479,6 +488,53 @@ class DeckManagementDialog(QDialog):
 
         return box
 
+    def _setup_box_auto_protect_fields_when_edited(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        auto_protect_tooltip_message = (
+            "When enabled, any field you edit will be automatically protected "
+            "so your changes aren't overwritten by future note updates."
+        )
+
+        # Setup checkbox
+        self.auto_protect_fields_cb = QCheckBox("Automatically protect fields when edited")
+        set_styled_tooltip(self.auto_protect_fields_cb, auto_protect_tooltip_message)
+        self.auto_protect_fields_cb.setChecked(deck_config.auto_protect_fields_when_edited)
+        qconnect(
+            self.auto_protect_fields_cb.toggled,
+            lambda: config.set_auto_protect_fields_when_edited(
+                selected_ah_did, self.auto_protect_fields_cb.isChecked()
+            ),
+        )
+
+        # Setup tooltip icon
+        self.auto_protect_fields_icon_label = QLabel()
+        self.auto_protect_fields_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
+        set_styled_tooltip(self.auto_protect_fields_icon_label, auto_protect_tooltip_message)
+
+        # Checkbox row
+        self.auto_protect_fields_row = QHBoxLayout()
+        self.auto_protect_fields_row.addWidget(self.auto_protect_fields_cb)
+        self.auto_protect_fields_row.addWidget(self.auto_protect_fields_icon_label)
+        self.auto_protect_fields_row.addStretch()
+
+        # Help link
+        self.auto_protect_fields_docs_link_label = QLabel(
+            """
+            <a href="https://community.ankihub.net/t/protecting-fields-and-tags/165604">
+                Learn about protecting fields
+            </a>
+            """
+        )
+        self.auto_protect_fields_docs_link_label.setOpenExternalLinks(True)
+        self.auto_protect_fields_docs_link_label.setContentsMargins(20, 0, 0, 0)
+
+        box = QVBoxLayout()
+        box.addLayout(self.auto_protect_fields_row)
+        box.addWidget(self.auto_protect_fields_docs_link_label)
+
+        return box
+
     def _setup_box_new_cards_destination(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Set up the destination tooltip message
         new_cards_destination_tooltip_message = "Select the deck you want new cards to be saved to."
@@ -527,7 +583,7 @@ class DeckManagementDialog(QDialog):
         box.addLayout(self.new_cards_destination_label_row)
         box.addWidget(self.new_cards_destination_details_label)
         box.addWidget(self.set_new_cards_destination_btn)
-        box.addSpacing(5)
+        box.addSpacing(8)
         box.addWidget(self.new_cards_destination_docs_link_label)
 
         return box
@@ -538,7 +594,7 @@ class DeckManagementDialog(QDialog):
         if deck_config.user_relation != UserDeckRelation.OWNER:
             return box
 
-        self.note_types_label = QLabel("<b>📝 Note Types</b>")
+        self.note_types_label = QLabel("<b>Note Types</b>")
         self.add_note_type_btn = QPushButton("Publish note type")
         qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
         self._update_add_note_type_btn_state()
@@ -549,8 +605,11 @@ class DeckManagementDialog(QDialog):
         qconnect(self.update_templates_btn.clicked, self._on_update_templates_btn_clicked)
         self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
+        box.addSpacing(8)
         box.addWidget(self.add_note_type_btn)
+        box.addSpacing(4)
         box.addWidget(self.add_field_btn)
+        box.addSpacing(4)
         box.addWidget(self.update_templates_btn)
 
         return box
