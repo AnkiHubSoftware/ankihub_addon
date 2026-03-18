@@ -158,6 +158,8 @@ class _AnkiHubDeckUpdater:
         )
         self._import_results.append(import_result)
 
+        config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
+
         if deck_updates.latest_update:
             # latest_update is None if there were no notes in the updates
             config.save_latest_deck_update(ankihub_did, deck_updates.latest_update)
