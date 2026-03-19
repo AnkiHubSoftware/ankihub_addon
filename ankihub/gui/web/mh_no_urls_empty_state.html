@@ -1,63 +1,145 @@
+<!DOCTYPE html>
 <html class="{{ theme }}">
-<style>
-    * {
-        box-sizing: border-box;
-        padding: 0;
-        margin: 0;
-        font-family: "Merriweather Sans", sans-serif;
-    }
-    .empty-state-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem;
-        background-color: #f9fafb;
-        height: 100%;
-    }
-    .dark .empty-state-container {
-        background-color: #030712;
-    }
-    .empty-state-center-content {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-bottom: 1px solid #d1d5db;
-        height: 6rem;
-    }
-    .dark .empty-state-center-content {
-        border-bottom: 1px solid #374151;
-    }
-    .empty-state-title {
-        font-size: 1.5rem;
-        font-weight: 300;
-        color: #b45309;
-        margin-top: 0.5rem;
-        margin-bottom: 1.5rem;
-    }
-    .dark .empty-state-title {
-        color: #fcd34d;
-    }
-    .empty-state-message {
-        text-align: center;
-        margin-top: 1.5rem;
-        color: #4b5563;
-    }
-    .dark .empty-state-message {
-        color: #9ca3af;
-    }
-</style>
-<div>
-    <div class="empty-state-container">
-        <div class="empty-state-center-content">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M25.9841 23.9493C26.158 24.688 26.25 25.4583 26.25 26.25C26.25 31.7728 21.7728 36.25 16.25 36.25V28.2505M25.9841 23.9493C32.2073 19.4019 36.25 12.0479 36.25 3.75C27.9524 3.75035 20.5991 7.7931 16.052 14.0163M25.9841 23.9493C23.1365 26.0302 19.8323 27.5234 16.25 28.2505M16.052 14.0163C15.313 13.8421 14.5422 13.75 13.75 13.75C8.22715 13.75 3.75 18.2272 3.75 23.75H11.7512M16.052 14.0163C13.9714 16.8638 12.4783 20.1678 11.7512 23.75M16.25 28.2505C16.0776 28.2855 15.9047 28.3187 15.731 28.3502C14.2195 27.1516 12.8498 25.782 11.6513 24.2704C11.6828 24.0963 11.7161 23.9228 11.7512 23.75M8.01985 27.7346C6.18689 29.102 5 31.2874 5 33.75C5 34.1448 5.0305 34.5324 5.08927 34.9107C5.46757 34.9695 5.85522 35 6.25 35C8.71263 35 10.898 33.8131 12.2654 31.9801M27.5 15C27.5 16.3807 26.3807 17.5 25 17.5C23.6193 17.5 22.5 16.3807 22.5 15C22.5 13.6193 23.6193 12.5 25 12.5C26.3807 12.5 27.5 13.6193 27.5 15Z" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <h1 class="empty-state-title">Coming soon!</h1>
-        </div>
-        <p class="empty-state-message">
-            🚧 We are working on the full mapping to link extra material to this card. Keep studying and find <strong>{% if resource_type == "b&b" %}Boards & Beyond{% else %}First AID Forward{% endif %}</strong> content on other notes!
+<head>
+    <meta charset="UTF-8">
+    <title>Empty State</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            padding: 0;
+            margin: 0;
+            font-family: "Merriweather Sans", sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f9fafb;
+        }
+
+        /* 🌙 DARK MODE (page background) */
+        .dark body {
+            background-color: #111827; /* darker outer */
+        }
+
+        .empty-state {
+            padding: 2rem;
+            width: 100%;
+            max-width: 900px;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+
+            min-height: 100vh;
+
+            background-color: #f9fafb;
+        }
+
+        /* 🌙 DARK MODE (inner panel) */
+        .dark .empty-state {
+            background-color: #1f2937;
+        }
+
+        .empty-state__icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            color: #f59e0b;
+            margin-bottom: 0.75rem;
+        }
+
+        .empty-state__title {
+            font-weight: 300;
+            font-size: 1.75rem;
+            line-height: 1.4;
+            color: #b45309;
+        }
+
+        .empty-state__divider {
+            width: 60%;
+            border: none;
+            border-top: 1px solid #d4d4d4;
+            margin: 1.5rem 0;
+        }
+
+        .empty-state__text {
+            font-weight: 300;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            color: #4b5563;
+            max-width: 500px;
+        }
+
+        .empty-state__highlight {
+            font-weight: 700;
+        }
+
+        .empty-state__link {
+            text-decoration: underline;
+            color: #4f46e5;
+            font-weight: 700;
+        }
+
+        .empty-state__link:hover {
+            color: #4338ca;
+        }
+
+        /* 🌙 DARK MODE */
+        .dark .empty-state__title {
+            color: #fcd34d;
+        }
+
+        .dark .empty-state__divider {
+            border-top: 1px solid #374151;
+        }
+
+        .dark .empty-state__text {
+            color: #9ca3af;
+        }
+
+        .dark .empty-state__link {
+            color: #818cf8;
+        }
+
+        .dark .empty-state__link:hover {
+            color: #a5b4fc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="empty-state">
+
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="empty-state__icon"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+
+        <h1 class="empty-state__title">
+            No relevant content linked
+        </h1>
+
+        <hr class="empty-state__divider">
+
+        <p class="empty-state__text">
+            We couldn't find any <span class="empty-state__highlight">content</span> connected to this card.<br><br>
+            If that seems wrong, let our
+            <a href="#" class="empty-state__link">support team</a> know.
         </p>
     </div>
-</div>
-
+</body>
 </html>
