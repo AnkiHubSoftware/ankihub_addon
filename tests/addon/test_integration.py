@@ -1128,7 +1128,9 @@ class TestDownloadAndInstallDecks:
                     tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
                 )
             ]
+            protected_fields = {ankihub_basic_note_type["id"]: ["Front"]}
             mocks = mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
+            mocks["get_protected_fields"].return_value = protected_fields
 
             # Download and install the deck
             with qtbot.wait_callback() as callback:
@@ -1149,6 +1151,7 @@ class TestDownloadAndInstallDecks:
 
             # ... in the config
             assert config.deck_ids() == [deck.ah_did]
+            assert config.deck_config(deck.ah_did).globally_protected_fields == protected_fields
 
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
@@ -5450,13 +5453,14 @@ class TestDeckUpdater:
             note_info = import_ah_note(ah_did=ah_did)
             note_info.fields[0].value = "changed"
 
+            protected_fields = {note_info.mid: ["Back"]}
             latest_update = datetime.now()
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_updates",
                 return_value=DeckUpdates(
                     latest_update=latest_update,
-                    protected_fields={},
+                    protected_fields=protected_fields,
                     protected_tags=[],
                     notes=[note_info],
                 ),
@@ -5500,6 +5504,7 @@ class TestDeckUpdater:
 
             # Assert that the last update time was updated in the config
             assert config.deck_config(ah_did).latest_update == latest_update
+            assert config.deck_config(ah_did).globally_protected_fields == protected_fields
 
     @pytest.mark.parametrize(
         "initial_tags, incoming_optional_tags, expected_tags",
