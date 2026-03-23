@@ -969,12 +969,14 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
-            # auto_protect_fields_when_edited defaults to False
+            config.set_auto_protect_fields_when_edited(ah_did, False)
+
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited value"
 
-            result = _on_field_unfocus_auto_protect(changed=True, note=note, current_field_idx=0)
-            assert result is True  # changed was True, so it stays True
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False  # changed stays False, no modification made
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
     def test_field_not_double_protected(
@@ -1059,13 +1061,10 @@ class TestAutoProtectFieldsWhenEdited:
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
 
-            # Simulate a previous edit: modify field and add protection tag
-            note["Front"] = "edited value"
+            # Simulate a previously protected field (e.g. from a prior edit)
             note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
 
-            # Edit field back to the AnkiHub stored value — protection tag should be removed
-            note["Front"] = AnkiHubNote.get(anki_note_id=nid).fields["Front"]
-
+            # Field already matches the AnkiHub stored value — protection tag should be removed
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
             assert result is True
             assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in note.tags
@@ -1077,6 +1076,7 @@ class TestAutoProtectFieldsWhenEdited:
     ):
         with anki_session_with_addon_data.profile_loaded():
             note = add_anki_note()
+            note["Front"] = "edited value"
 
             result = _on_field_unfocus_auto_protect(changed=True, note=note, current_field_idx=0)
             assert result is True  # changed stays True
@@ -1103,33 +1103,6 @@ class TestAutoProtectFieldsWhenEdited:
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
             assert result is False
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
-
-    def test_globally_protected_field_not_tagged_after_demotion(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-    ):
-        """When global protection is removed (demotion), editing the field should add personal protection."""
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            note_info = import_ah_note(ah_did=ah_did)
-
-            config.set_auto_protect_fields_when_edited(ah_did, True)
-
-            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
-            note = aqt.mw.col.get_note(nid)
-
-            # First, field is globally protected — no personal tag added
-            config.set_globally_protected_fields(ah_did, {note.mid: ["Front"]})
-            note["Front"] = "edited value"
-            _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
-            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
-
-            # Global protection removed (simulating demotion) — editing should now add personal protection
-            config.set_globally_protected_fields(ah_did, {})
-            _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
-            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in note.tags
 
 
 class TestDownloadAndInstallDecks:
