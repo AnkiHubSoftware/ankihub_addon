@@ -400,10 +400,7 @@ class _Config:
         self._update_private_config()
 
     def set_globally_protected_fields(self, ankihub_did: uuid.UUID, protected_fields: Dict[int, List[str]]) -> None:
-        deck_cfg = self.deck_config(ankihub_did)
-        if deck_cfg.globally_protected_fields == protected_fields:
-            return
-        deck_cfg.globally_protected_fields = protected_fields
+        self.deck_config(ankihub_did).globally_protected_fields = protected_fields
         self._update_private_config()
 
     def set_ankihub_deleted_notes_behavior(
