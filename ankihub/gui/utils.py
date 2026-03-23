@@ -122,7 +122,7 @@ def choose_subset(
     dialog.setWindowTitle(title)
     dialog.setMinimumWidth(350)
 
-    dialog.setWindowModality(Qt.WindowModality.WindowModal)
+    dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
     layout = QVBoxLayout()
     dialog.setLayout(layout)
 
