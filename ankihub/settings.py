@@ -141,7 +141,7 @@ class DeckConfig(DataClassJSONMixin):
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
     has_note_embeddings: bool = False
-    auto_protect_fields_when_edited: bool = False
+    auto_protect_fields_when_edited: bool = True
     globally_protected_fields: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
 
     @staticmethod
