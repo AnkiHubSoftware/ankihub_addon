@@ -201,7 +201,9 @@ class _AnkiHubMediaSync:
                 media_names.update(get_media_names_from_note_field(field, note_type))
         for note_type_id in note_type_ids:
             note_type = ankihub_db.note_type_dict(NotetypeId(note_type_id))
-            media_names.update(get_media_names_from_note_type(note_type))
+            # Guard against notes converted to non-AnkiHub note types
+            if note_type:
+                media_names.update(get_media_names_from_note_type(note_type))
         return media_names
 
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
