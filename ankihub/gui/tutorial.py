@@ -819,7 +819,7 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         dialog_context=DeckBrowser,
         dialog_kwargs=dict(
             title="📘 Add cards to your study queue",
-            body="When installed, the AnKing Step Deck comes with all cards hidden. "
+            body="When installed, the AnKing Step Deck comes with all cards hidden (suspended). "
             "Take this tour to learn how to <b>select cards to study</b> and <b>set your daily limits</b>.<br><br>"
             "You can revisit this anytime in AnkiHub's Help menu.",
             secondary_button_label="Skip for now",
@@ -1257,7 +1257,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         steps.append(
             QtTutorialStep(
                 body="You can find specific cards to study using a few methods.<br><br>"
-                "One of them is typing terms on the <b>search bar</b>.",
+                "One of them is typing terms in the <b>search bar</b>.",
                 qt_target=lambda: OverlayTarget(self._browser, self._browser.form.searchEdit),
                 parent_widget=lambda: self._browser,
             )
