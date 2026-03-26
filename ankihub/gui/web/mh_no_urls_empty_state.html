@@ -23,11 +23,6 @@
             background-color: #f9fafb;
         }
 
-        /* 🌙 DARK MODE (page background) */
-        .dark body {
-            background-color: #111827; /* darker outer */
-        }
-
         .empty-state {
             padding: 2rem;
             width: 100%;
@@ -36,7 +31,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             text-align: center;
 
             min-height: 100vh;
@@ -46,7 +41,7 @@
 
         /* 🌙 DARK MODE (inner panel) */
         .dark .empty-state {
-            background-color: #1f2937;
+            background-color: #030712;
         }
 
         .empty-state__icon {
@@ -64,7 +59,7 @@
         }
 
         .empty-state__divider {
-            width: 60%;
+            width: 100%;
             border: none;
             border-top: 1px solid #d4d4d4;
             margin: 1.5rem 0;
@@ -138,7 +133,7 @@
         <p class="empty-state__text">
             We couldn't find any <span class="empty-state__highlight">content</span> connected to this card.<br><br>
             If that seems wrong, let our
-            <a href="#" class="empty-state__link">support team</a> know.
+            <a href="https://community.ankihub.net/c/support/5" class="empty-state__link" rel="external">support team</a> know.
         </p>
     </div>
 </body>
