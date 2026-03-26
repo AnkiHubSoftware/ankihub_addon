@@ -254,6 +254,7 @@ class ReviewerSidebar:
         if not self.content_webview:
             return
 
+        self.content_webview.set_open_links_externally(False)
         self.last_accessed_url = url
         if self.needs_to_accept_terms:
             self.refresh_page_content()
@@ -267,7 +268,7 @@ class ReviewerSidebar:
                 resource_type=self.get_page_type().value,
             )
             self.content_webview.setHtml(html)
-            self.content_webview.set_open_links_externally(False)
+            self.content_webview.set_open_links_externally(True)
 
     def refresh_page_content(self):
         self.content_webview.reload()
