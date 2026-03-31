@@ -449,7 +449,7 @@ def _ankihub_help_setup(parent: QMenu):
     help_menu = QMenu("🆘 Help", parent)
 
     tours_submenu = QMenu("Product tours", help_menu)
-    if config.get_feature_flags().get("onboarding_tour", False):
+    if config.is_logged_in() and config.get_feature_flags().get("onboarding_tour", False):
         q_onboarding_action = QAction("Onboarding", tours_submenu)
         qconnect(
             q_onboarding_action.triggered,
@@ -457,7 +457,11 @@ def _ankihub_help_setup(parent: QMenu):
         )
         tours_submenu.addAction(q_onboarding_action)
 
-    if config.get_feature_flags().get("step_deck_tour", False) and config.deck_config(config.anking_deck_id):
+    if (
+        config.is_logged_in()
+        and config.get_feature_flags().get("step_deck_tour", False)
+        and config.deck_config(config.anking_deck_id)
+    ):
         q_step_tour_action = QAction("AnKing Step Deck", tours_submenu)
         qconnect(
             q_step_tour_action.triggered,
