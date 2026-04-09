@@ -10,6 +10,7 @@ from anki.cards import CardId
 from anki.config import Config
 from anki.hooks import wrap
 from anki.notes import NoteId
+from anki.scheduler.v3 import Scheduler
 from aqt import gui_hooks
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
@@ -893,6 +894,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._move_to_intro_deck_overview(on_done)
 
     def _has_cards_to_review(self) -> bool:
+        assert isinstance(aqt.mw.col.sched, Scheduler)
         return bool(aqt.mw.col.sched.get_queued_cards().cards)
 
     @cached_property
