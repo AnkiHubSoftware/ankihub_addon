@@ -883,6 +883,18 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._monitor_mw_state_change(on_done)
         aqt.mw.moveToState("deckBrowser")
 
+    def _unsuspend_cards_and_move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
+        intro_deck_config = config.deck_config(config.intro_deck_id)
+        cids: set[CardId] = aqt.mw.col.find_cards(f'deck:"{intro_deck_config.name}"')
+
+        if cids:
+            aqt.mw.col.sched.unsuspend_cards(ids=list(cids))
+
+        self._move_to_intro_deck_overview(on_done)
+
+    def _has_cards_to_review(self):
+        return bool(aqt.mw.col.sched.get_queued_cards().cards)
+
     @cached_property
     def steps(self) -> list[TutorialStep]:
         steps = [
@@ -907,13 +919,20 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 intro_deck_config = None
 
         if intro_deck_config:
+            body_text = "We've already subscribed you to this deck. Click on it to open."
+            if not self._has_cards_to_review():
+                body_text = (
+                    "This deck was already reviewed. Click on <b>Next</b> and we'll "
+                    "bring the cards back so you can continue with the tour."
+                )
+
             steps.append(
                 TutorialStep(
-                    body="We've already subscribed you to this deck. Click on it to open.",
+                    body=body_text,
                     target=f"[id='{intro_deck_config.anki_id}']",
                     click_target=lambda: f"[id='{intro_deck_config.anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
-                    next_callback=self._move_to_intro_deck_overview,
+                    next_callback=self._unsuspend_cards_and_move_to_intro_deck_overview,
                 )
             )
         else:
