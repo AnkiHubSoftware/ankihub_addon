@@ -888,7 +888,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._monitor_mw_state_change(on_done)
         aqt.mw.moveToState("deckBrowser")
 
-    def _unsuspend_cards_and_move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
+    def _reset_cards_and_move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
         ah_did = config.intro_deck_id
         intro_deck_config = config.deck_config(ah_did)
         cids = list(aqt.mw.col.decks.cids(intro_deck_config.anki_id, True))
@@ -953,7 +953,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                     "This deck was already reviewed. Click on <b>Next</b> and we'll "
                     "bring the cards back so you can continue with the tour."
                 )
-                next_callback = self._unsuspend_cards_and_move_to_intro_deck_overview
+                next_callback = self._reset_cards_and_move_to_intro_deck_overview
 
             steps.append(
                 TutorialStep(
