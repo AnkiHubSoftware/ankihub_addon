@@ -3,7 +3,7 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, Union, cast
 
 import aqt
 from anki.cards import CardId
@@ -41,9 +41,11 @@ from typing_extensions import Required, Unpack
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
 from ..main.deck_unsubscribtion import uninstall_deck
+from ..main.reset_local_changes import reset_local_changes_to_notes
 from ..settings import config
 from .flashcard_selector_dialog import (
     show_flashcard_selector,
@@ -885,11 +887,17 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         aqt.mw.moveToState("deckBrowser")
 
     def _unsuspend_cards_and_move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
-        intro_deck_config = config.deck_config(config.intro_deck_id)
-        cids: Sequence[CardId] = aqt.mw.col.find_cards(f'deck:"{intro_deck_config.name}"')
+        ah_did = config.intro_deck_id
+        intro_deck_config = config.deck_config(ah_did)
+        cids = list(aqt.mw.col.decks.cids(intro_deck_config.anki_id, True))
 
         if cids:
-            aqt.mw.col.sched.unsuspend_cards(ids=list(cids))
+            aqt.mw.col.sched.unsuspend_cards(ids=cids)
+            aqt.mw.col.sched.schedule_cards_as_new(card_ids=cids, restore_position=True)
+
+        if not self._has_cards_to_review():
+            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+            reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
 
         self._move_to_intro_deck_overview(on_done)
 
