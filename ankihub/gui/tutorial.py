@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, U
 import aqt
 from anki.cards import CardId
 from anki.config import Config
+from anki.decks import DeckId
 from anki.hooks import wrap
 from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
@@ -44,6 +45,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
+from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.reset_local_changes import reset_local_changes_to_notes
 from ..settings import config
@@ -899,7 +901,22 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
             reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
 
+        if not self._has_cards_to_review():
+            self._bump_intro_deck_daily_limits(intro_deck_config.anki_id, cids)
+
         self._move_to_intro_deck_overview(on_done)
+
+    def _bump_intro_deck_daily_limits(self, anki_did: DeckId, cids: List[CardId]) -> None:
+        """Raise new/review per-day caps so intro cards can enter the queue after daily limits were hit."""
+        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        new_sub = deck_config.setdefault("new", {})
+        rev_sub = deck_config.setdefault("rev", {})
+        cur_new = int(new_sub.get("perDay", 0))
+        cur_rev = int(rev_sub.get("perDay", 0))
+        extra = max(len(cids), 20)
+        new_sub["perDay"] = cur_new + extra
+        rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
+        aqt.mw.col.decks.update_config(deck_config)
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
