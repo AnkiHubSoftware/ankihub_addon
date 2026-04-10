@@ -206,7 +206,7 @@ class AnkiHubLogin(QWidget):
         # Ensure onboarding tutorial logic is wired up whenever user state is refreshed.
         from ..user_state import add_user_state_refreshed_callback
 
-        add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+        add_user_state_refreshed_callback(_show_onboarding_tutorial_if_first_sync)
         self.close()
 
     def _is_email(self, value):
@@ -233,7 +233,7 @@ class AnkiHubLogin(QWidget):
         return cls._window
 
 
-def _maybe_show_onboarding_tutorial_after_login() -> None:
+def _show_onboarding_tutorial_if_first_sync() -> None:
     """Show the onboarding tutorial after the first successful login on this profile.
 
     This triggers when:
