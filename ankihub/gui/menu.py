@@ -244,6 +244,8 @@ def _maybe_show_onboarding_tutorial_after_login() -> None:
     if config.last_deck_sync() is not None:
         return
 
+    config.set_onboarding_tutorial_show_on_sync(False)
+
     prompt_for_onboarding_tutorial()
 
 
