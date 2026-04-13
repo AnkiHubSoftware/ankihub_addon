@@ -248,6 +248,15 @@ def _schedule_post_sync_tasks() -> None:
     aqt.mw.taskman.run_in_background(send_review_data, on_done=_on_send_review_data_done)
     _maybe_send_daily_review_summaries()
     aqt.mw.taskman.run_on_main(maybe_show_subdeck_due_date_reminders)
+    aqt.mw.taskman.run_on_main(_show_onboarding_prompt_if_first_sync)
+
+
+def _show_onboarding_prompt_if_first_sync() -> None:
+    if config.last_deck_sync() is None:
+        from ..tutorial import prompt_for_onboarding_tutorial
+
+        prompt_for_onboarding_tutorial()
+        config.update_last_deck_sync()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:

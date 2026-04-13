@@ -166,7 +166,7 @@ from ankihub.gui.js_message_handling import (
     _post_message_to_ankihub_js,
 )
 from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import AnkiHubLogin, _show_onboarding_tutorial_if_first_sync, menu_state, refresh_ankihub_menu
+from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
@@ -9959,31 +9959,37 @@ class TestPromptForOnboardingTutorial:
 
             mock_inject.assert_called()
 
-    def test_show_onboarding_tutorial_if_first_sync_calls_prompt_when_last_deck_sync_is_none(
+    def test_show_onboarding_prompt_if_first_sync_calls_prompt(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """When last_deck_sync is unset, prompt_for_onboarding_tutorial is invoked."""
+        """Test that _show_onboarding_prompt_if_first_sync calls prompt when last_deck_sync is None."""
+        from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
+
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "last_deck_sync", return_value=None)
-            mock_prompt = mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+            mock_update = mocker.patch.object(config, "update_last_deck_sync")
 
-            _show_onboarding_tutorial_if_first_sync()
+            _show_onboarding_prompt_if_first_sync()
 
             mock_prompt.assert_called_once()
+            mock_update.assert_called_once()
 
-    def test_show_onboarding_tutorial_if_first_sync_skips_when_last_deck_sync_exists(
+    def test_show_onboarding_prompt_if_first_sync_skips_when_not_first_sync(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """When last_deck_sync is set, the onboarding prompt is not shown."""
+        """Test that _show_onboarding_prompt_if_first_sync does NOT call prompt when last_deck_sync exists."""
+        from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
+
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
-            mock_prompt = mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
 
-            _show_onboarding_tutorial_if_first_sync()
+            _show_onboarding_prompt_if_first_sync()
 
             mock_prompt.assert_not_called()
 
