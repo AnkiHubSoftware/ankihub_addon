@@ -913,7 +913,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         rev_sub = deck_config.setdefault("rev", {})
         cur_new = int(new_sub.get("perDay", 0))
         cur_rev = int(rev_sub.get("perDay", 0))
-        extra = max(len(cids), 20)
+        extra = max(len(cids), 30)
         new_sub["perDay"] = cur_new + extra
         rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
         aqt.mw.col.decks.update_config(deck_config)
@@ -950,7 +950,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             next_callback = self._move_to_intro_deck_overview
             if not self._has_cards_to_review():
                 body_text = (
-                    "This deck was already reviewed. Click on <b>Next</b> and we'll "
+                    "There are no cards available right now. Click on <b>Next</b> and we'll "
                     "bring the cards back so you can continue with the tour."
                 )
                 next_callback = self._reset_cards_and_move_to_intro_deck_overview
