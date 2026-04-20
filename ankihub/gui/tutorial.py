@@ -42,6 +42,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
+from ..main.deck_unsubscribtion import uninstall_deck
 from ..settings import config
 from .flashcard_selector_dialog import (
     show_flashcard_selector,
@@ -897,6 +898,14 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         ]
 
         intro_deck_config = config.deck_config(config.intro_deck_id)
+        if intro_deck_config:
+            did = intro_deck_config.anki_id
+            has_deck_and_cards = aqt.mw.col.decks.get(did, False) and aqt.mw.col.decks.card_count(did, True)
+
+            if not has_deck_and_cards:
+                uninstall_deck(config.intro_deck_id)
+                intro_deck_config = None
+
         if intro_deck_config:
             steps.append(
                 TutorialStep(
