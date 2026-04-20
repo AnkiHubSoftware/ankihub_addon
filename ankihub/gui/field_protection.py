@@ -1,6 +1,6 @@
 """In-editor UI mockup for toggling per-field AnkiHub protection.
 
-Adds a padlock icon to each field header in the note editor. The icon reflects
+Adds a shield icon to each field header in the note editor. The icon reflects
 whether that field is currently protected by an AnkiHub_Protect::<Field> tag,
 and clicking it toggles the tag.
 
@@ -25,19 +25,16 @@ from ..main.note_conversion import (
 
 _TOGGLE_MSG_PREFIX = "ankihub_toggle_protect_field:"
 
-_LOCK_CLOSED_SVG = (
+_SHIELD_FILLED_SVG = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-    '<path d="M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V10a2 '
-    '2 0 0 0-2-2Zm-5 10a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm3-10H9V6a3 3 0 0 1 6 0v2Z"/>'
+    '<path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>'
     "</svg>"
 )
 
-_LOCK_OPEN_SVG = (
+_SHIELD_OUTLINE_SVG = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-    '<rect x="5" y="11" width="14" height="10" rx="2"/>'
-    '<path d="M8 11V7a4 4 0 0 1 7.5-2"/>'
-    '<circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/>'
+    'stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>'
     "</svg>"
 )
 
@@ -68,8 +65,8 @@ def _inject_field_protection_ui(editor: Editor) -> None:
     )
     script = (
         _JS_TEMPLATE.replace("__DATA__", payload)
-        .replace("__LOCK_CLOSED_SVG__", _LOCK_CLOSED_SVG)
-        .replace("__LOCK_OPEN_SVG__", _LOCK_OPEN_SVG)
+        .replace("__SHIELD_FILLED_SVG__", _SHIELD_FILLED_SVG)
+        .replace("__SHIELD_OUTLINE_SVG__", _SHIELD_OUTLINE_SVG)
     )
     editor.web.eval(script)
 
@@ -158,8 +155,8 @@ _JS_TEMPLATE = r"""
         document.head.appendChild(style);
     }
 
-    const LOCK_CLOSED_SVG = `__LOCK_CLOSED_SVG__`;
-    const LOCK_OPEN_SVG = `__LOCK_OPEN_SVG__`;
+    const SHIELD_FILLED_SVG = `__SHIELD_FILLED_SVG__`;
+    const SHIELD_OUTLINE_SVG = `__SHIELD_OUTLINE_SVG__`;
 
     function pickHeader(wrapper) {
         // Try common selectors used by Anki's editor field component
@@ -194,7 +191,7 @@ _JS_TEMPLATE = r"""
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'ankihub-lock-btn' + (isProtected ? ' protected' : '');
-        btn.innerHTML = isProtected ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG;
+        btn.innerHTML = isProtected ? SHIELD_FILLED_SVG : SHIELD_OUTLINE_SVG;
         btn.title = isProtected
             ? `"${fieldName}" is protected from AnkiHub updates — click to unprotect`
             : `Click to protect "${fieldName}" from AnkiHub updates`;
