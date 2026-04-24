@@ -151,7 +151,7 @@ from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_di
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import SUGGESTION_BTN_ID
+from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
@@ -390,6 +390,7 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
     deck_updates_mock.latest_update = None
+    deck_updates_mock.protected_fields = {}
     mocker.patch.object(AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock)
 
 
@@ -935,6 +936,175 @@ def test_add_note_type_fields(
         assert "New1" in ankihub_db.note_type_field_names(note_type_id)
 
 
+class TestAutoProtectFieldsWhenEdited:
+    def test_field_is_protected_when_edited(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Modify the "Front" field so it differs from the AnkiHub stored value
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is True
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in note.tags
+
+    def test_field_not_protected_when_feature_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, False)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False  # changed stays False, no modification made
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_field_not_double_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Add protection tag manually and modify field
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+            note["Front"] = "edited value"
+
+            # Calling the hook again should not add a duplicate tag
+            _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            protect_tags = [t for t in note.tags if t.startswith(f"{TAG_FOR_PROTECTING_FIELDS}::Front")]
+            assert len(protect_tags) == 1
+
+    def test_globally_protected_field_not_personally_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Modify the field and set it as globally protected
+            note["Front"] = "edited value"
+            config.set_globally_protected_fields(ah_did, {note.mid: ["Front"]})
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False  # changed stays False, no modification made
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_field_matching_ankihub_value_not_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Field value matches the AnkiHub stored value — no protection should be added
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_protection_tag_removed_when_field_edited_back_to_ankihub_value(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Simulate a previously protected field (e.g. from a prior edit)
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+
+            # Field already matches the AnkiHub stored value — protection tag should be removed
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is True
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in note.tags
+
+    def test_non_ankihub_note_not_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note = add_anki_note()
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=True, note=note, current_field_idx=0)
+            assert result is True  # changed stays True
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_ankihub_id_field_not_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            # Modify the ankihub_id field — it should never be protected
+            ankihub_id_idx = note.keys().index("ankihub_id")
+            note["ankihub_id"] = "edited value"
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
+            assert result is False
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture
     @pytest.mark.parametrize(
@@ -958,7 +1128,9 @@ class TestDownloadAndInstallDecks:
                     tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
                 )
             ]
+            protected_fields = {ankihub_basic_note_type["id"]: ["Front"]}
             mocks = mock_download_and_install_deck_dependencies(deck, notes_data, ankihub_basic_note_type)
+            mocks["get_protected_fields"].return_value = protected_fields
 
             # Download and install the deck
             with qtbot.wait_callback() as callback:
@@ -979,6 +1151,7 @@ class TestDownloadAndInstallDecks:
 
             # ... in the config
             assert config.deck_ids() == [deck.ah_did]
+            assert config.deck_config(deck.ah_did).globally_protected_fields == protected_fields
 
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
@@ -5280,13 +5453,14 @@ class TestDeckUpdater:
             note_info = import_ah_note(ah_did=ah_did)
             note_info.fields[0].value = "changed"
 
+            protected_fields = {note_info.mid: ["Back"]}
             latest_update = datetime.now()
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_updates",
                 return_value=DeckUpdates(
                     latest_update=latest_update,
-                    protected_fields={},
+                    protected_fields=protected_fields,
                     protected_tags=[],
                     notes=[note_info],
                 ),
@@ -5330,6 +5504,7 @@ class TestDeckUpdater:
 
             # Assert that the last update time was updated in the config
             assert config.deck_config(ah_did).latest_update == latest_update
+            assert config.deck_config(ah_did).globally_protected_fields == protected_fields
 
     @pytest.mark.parametrize(
         "initial_tags, incoming_optional_tags, expected_tags",

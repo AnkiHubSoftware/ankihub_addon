@@ -355,15 +355,26 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     else:
         old_fields_protected_by_tags = []
 
+    # Determine globally protected fields for this note's deck
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
+    globally_protected: List[str] = []
+    if ah_did:
+        globally_protected = config.deck_config(ah_did).globally_protected_fields.get(note.mid, [])
+
     new_fields_protected_by_tags = choose_subset(
-        "Choose which fields of this note should be protected<br>"
-        "from updates.<br><br>"
-        "Tip: If you want to protect a field on every note, <br>"
-        "consider using the "
-        "<a href='https://community.ankihub.net/t/protecting-fields-and-tags'>protected fields feature</a>.",
+        "Choose which fields of this note should be protected from updates.<br><br>"
+        "Tip: If you want to protect a field on every note, consider using the "
+        "<a href='https://community.ankihub.net/t/protecting-fields-and-tags/165604'>"
+        "protect fields feature</a> on the AnkiHub website.",
         choices=field_names,
         current=old_fields_protected_by_tags,
         description_html="This will edit the AnkiHub_Protect tags of the note.",
+        title="AnkiHub | Protect fields",
+        disable_ok_when_unchanged=True,
+        checked_and_disabled_choices=globally_protected,
+        checked_and_disabled_choices_tooltip=(
+            "This field is globally protected. Edit this setting on the AnkiHub website."
+        ),
         parent=browser,
     )
     if new_fields_protected_by_tags is None:
