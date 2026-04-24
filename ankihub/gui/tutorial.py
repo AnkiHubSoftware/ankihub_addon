@@ -8,8 +8,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, U
 import aqt
 from anki.cards import CardId
 from anki.config import Config
+from anki.decks import DeckId
 from anki.hooks import wrap
 from anki.notes import NoteId
+from anki.scheduler.v3 import Scheduler
 from aqt import gui_hooks
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
@@ -40,9 +42,12 @@ from typing_extensions import Required, Unpack
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
+from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
+from ..main.reset_local_changes import reset_local_changes_to_notes
 from ..settings import config
 from .flashcard_selector_dialog import (
     show_flashcard_selector,
@@ -883,6 +888,40 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._monitor_mw_state_change(on_done)
         aqt.mw.moveToState("deckBrowser")
 
+    def _reset_cards_and_move_to_intro_deck_overview(self, on_done: Callable[[], None]) -> None:
+        ah_did = config.intro_deck_id
+        intro_deck_config = config.deck_config(ah_did)
+        cids = list(aqt.mw.col.decks.cids(intro_deck_config.anki_id, True))
+
+        if cids:
+            aqt.mw.col.sched.unsuspend_cards(ids=cids)
+            aqt.mw.col.sched.schedule_cards_as_new(card_ids=cids, restore_position=True)
+
+        if not self._has_cards_to_review():
+            self._bump_intro_deck_daily_limits(intro_deck_config.anki_id, cids)
+
+        if not self._has_cards_to_review():
+            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+            reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
+
+        self._move_to_intro_deck_overview(on_done)
+
+    def _bump_intro_deck_daily_limits(self, anki_did: DeckId, cids: List[CardId]) -> None:
+        """Raise new/review per-day caps so intro cards can enter the queue after daily limits were hit."""
+        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
+        new_sub = deck_config.setdefault("new", {})
+        rev_sub = deck_config.setdefault("rev", {})
+        cur_new = int(new_sub.get("perDay", 0))
+        cur_rev = int(rev_sub.get("perDay", 0))
+        extra = max(len(cids), 30)
+        new_sub["perDay"] = cur_new + extra
+        rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
+        aqt.mw.col.decks.update_config(deck_config)
+
+    def _has_cards_to_review(self) -> bool:
+        assert isinstance(aqt.mw.col.sched, Scheduler)
+        return bool(aqt.mw.col.sched.get_queued_cards().cards)
+
     @cached_property
     def steps(self) -> list[TutorialStep]:
         steps = [
@@ -907,13 +946,22 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 intro_deck_config = None
 
         if intro_deck_config:
+            body_text = "We've already subscribed you to this deck. Click on it to open."
+            next_callback = self._move_to_intro_deck_overview
+            if not self._has_cards_to_review():
+                body_text = (
+                    "There are no cards available right now. Click on <b>Next</b> and we'll "
+                    "bring the cards back so you can continue with the tour."
+                )
+                next_callback = self._reset_cards_and_move_to_intro_deck_overview
+
             steps.append(
                 TutorialStep(
-                    body="We've already subscribed you to this deck. Click on it to open.",
+                    body=body_text,
                     target=f"[id='{intro_deck_config.anki_id}']",
                     click_target=lambda: f"[id='{intro_deck_config.anki_id}'] a.deck",
                     tooltip_context=aqt.mw.deckBrowser,
-                    next_callback=self._move_to_intro_deck_overview,
+                    next_callback=next_callback,
                 )
             )
         else:
