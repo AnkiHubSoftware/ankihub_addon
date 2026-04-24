@@ -24,6 +24,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
+from . import field_protection
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
@@ -35,6 +36,7 @@ VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
 def setup() -> None:
     _setup_additional_editor_buttons()
     _setup_hide_ankihub_field()
+    field_protection.setup()
 
 
 def _setup_additional_editor_buttons():
