@@ -219,6 +219,7 @@ class PrivateConfig(DataClassJSONMixin):
     user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
     onboarding_tutorial_pending: bool = False
+    onboarding_tutorial_show_on_sync: bool = True
     step_deck_tutorial_pending: bool = False
     # Show Step Deck tutorial next time the user opens the deck
     show_step_deck_tutorial: bool = False
@@ -355,6 +356,10 @@ class _Config:
 
     def set_onboarding_tutorial_pending(self, pending: bool):
         self._private_config.onboarding_tutorial_pending = pending
+        self._update_private_config()
+
+    def set_onboarding_tutorial_show_on_sync(self, show_on_sync: bool):
+        self._private_config.onboarding_tutorial_show_on_sync = show_on_sync
         self._update_private_config()
 
     def set_show_step_deck_tutorial(self, show: bool):
@@ -515,6 +520,9 @@ class _Config:
 
     def onboarding_tutorial_pending(self) -> bool:
         return self._private_config.onboarding_tutorial_pending
+
+    def onboarding_tutorial_show_on_sync(self) -> bool:
+        return self._private_config.onboarding_tutorial_show_on_sync
 
     def show_step_deck_tutorial(self) -> bool:
         return self._private_config.show_step_deck_tutorial

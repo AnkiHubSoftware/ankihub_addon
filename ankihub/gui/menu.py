@@ -32,7 +32,7 @@ from .errors import upload_logs_and_data_in_background, upload_logs_in_backgroun
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.deck_creation import create_collaborative_deck
-from .tutorial import OnboardingTutorial, StepDeckTutorial
+from .tutorial import OnboardingTutorial, StepDeckTutorial, prompt_for_onboarding_tutorial
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -203,6 +203,10 @@ class AnkiHubLogin(QWidget):
         LOGGER.info("User signed into AnkiHub.", user=username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=aqt.mw)
+        # Ensure onboarding tutorial logic is wired up whenever user state is refreshed.
+        from ..user_state import add_user_state_refreshed_callback
+
+        add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
         self.close()
 
     def _is_email(self, value):
@@ -227,6 +231,22 @@ class AnkiHubLogin(QWidget):
 
         LOGGER.info("Showed AnkiHub login dialog.")
         return cls._window
+
+
+def _maybe_show_onboarding_tutorial_after_login() -> None:
+    """Show the onboarding tutorial after the first successful login on this profile.
+
+    This triggers when:
+    - The user is logged in
+    - `last_deck_sync` is None (no previous sync/tutorial for this profile)
+    - Feature flags/user details have just been refreshed (so feature flag checks work)
+    """
+    if config.last_deck_sync() is not None:
+        return
+
+    config.set_onboarding_tutorial_show_on_sync(False)
+
+    prompt_for_onboarding_tutorial()
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
