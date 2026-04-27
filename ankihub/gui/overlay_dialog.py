@@ -73,6 +73,7 @@ class OverlayDialog(QDialog):
 
     def on_position(self) -> None:
         self.setGeometry(self.parentWidget().geometry())
+        self.raise_()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
