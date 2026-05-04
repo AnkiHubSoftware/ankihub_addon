@@ -149,6 +149,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
                 "(Learn more about protected fields "
                 "<a href='https://community.ankihub.net/t/protecting-fields-and-tags/165604'>here</a>.)"
             )
+            label.setOpenExternalLinks(True)
             sublayout.addWidget(label)
             icon_label = QLabel("")
             pixmap = tooltip_icon().pixmap(QCheckBox().iconSize())
