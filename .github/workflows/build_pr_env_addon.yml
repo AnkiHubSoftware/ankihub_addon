@@ -26,6 +26,13 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Validate pr_env_url
+        run: |
+          if [[ ! "${{ inputs.pr_env_url }}" =~ ^https://pr-[^.]+\.ankihub\.net(/.*)?$ ]]; then
+            echo "Error: pr_env_url must match https://pr-<id>.ankihub.net (got: ${{ inputs.pr_env_url }}). URL must use https:// and target a pr-<id>.ankihub.net host."
+            exit 1
+          fi
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
