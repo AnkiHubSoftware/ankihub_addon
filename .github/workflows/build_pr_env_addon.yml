@@ -43,6 +43,10 @@ jobs:
         run: |
           uv sync --locked --dev --group aqt
 
+      - name: Enable staging mode
+        run: |
+          sed -i 's/"use_staging": false/"use_staging": true/' ankihub/config.json
+
       - name: Create ankiaddon file
         run: |
           bash ./scripts/release.sh
