@@ -9564,7 +9564,7 @@ class TestBlockExamSubdeckDialog:
             dialog._on_create_subdeck()
 
             assert dialog.add_succeeded is True
-            tooltip_mock.assert_called_once_with("All selected notes are already in 'Test Subdeck'")
+            tooltip_mock.assert_called_once_with("All selected notes are already in 'Test Subdeck'", parent=aqt.mw)
 
 
 class TestGetExpiredBlockExamSubdecks:
