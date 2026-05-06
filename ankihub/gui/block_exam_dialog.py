@@ -47,6 +47,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.action_source = ActionSource.SMART_SEARCH
+        self.add_succeeded: bool = False
 
         self.setModal(True)
         self.setMinimumWidth(440)
@@ -467,8 +468,11 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        # Show success message
-        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.add_succeeded = True
+        if added_count == 0:
+            tooltip(f"All selected notes are already in '{actual_name}'", parent=aqt.mw)
+        else:
+            tooltip(f"{added_count} note(s) added to '{actual_name}'", parent=aqt.mw)
         self.accept()
 
         aqt.mw.moveToState("deckBrowser")
@@ -500,7 +504,11 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
+        self.add_succeeded = True
+        if added_count == 0:
+            tooltip(f"All selected notes are already in '{self.selected_subdeck_name}'", parent=aqt.mw)
+        else:
+            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'", parent=aqt.mw)
         self.accept()
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
@@ -543,7 +551,11 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        tooltip(f"{added_count} note(s) added to '{actual_name}'")
+        self.add_succeeded = True
+        if added_count == 0:
+            tooltip(f"All selected notes are already in '{actual_name}'", parent=aqt.mw)
+        else:
+            tooltip(f"{added_count} note(s) added to '{actual_name}'", parent=aqt.mw)
         self.accept()
 
         aqt.mw.moveToState("deckBrowser")
@@ -571,8 +583,11 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        # Show success message and close
-        tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
+        self.add_succeeded = True
+        if added_count == 0:
+            tooltip(f"All selected notes are already in '{conflicting_name}'")
+        else:
+            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
         self.accept()
 
     def _clear_layout(self):
