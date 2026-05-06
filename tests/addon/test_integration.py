@@ -7888,15 +7888,12 @@ def test_add_to_block_exam_subdeck_pycmd(
         # Simulate dialog finished with add_succeeded=True to verify postMessage payload
         dialog_instance = dialog_mock.return_value
         dialog_instance.add_succeeded = True
-        # Find the qconnect callback attached to dialog.finished and invoke it
-        if dialog_instance.finished.connect.called:
-            connect_call_args = dialog_instance.finished.connect.call_args
-            if connect_call_args:
-                callback = connect_call_args[0][0]
-                callback(1)  # QDialog.Accepted
-                post_msg_mock.assert_called_once()
-                post_msg_kwargs = post_msg_mock.call_args.kwargs
-                assert post_msg_kwargs["message"]["blockExamSubdeckResult"]["status"] == "added"
+        assert dialog_instance.finished.connect.called
+        callback = dialog_instance.finished.connect.call_args[0][0]
+        callback(1)  # QDialog.Accepted
+        post_msg_mock.assert_called_once()
+        message_arg = post_msg_mock.call_args.args[0]
+        assert message_arg["blockExamSubdeckResult"]["status"] == "added"
 
 
 @pytest.mark.sequential
