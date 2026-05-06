@@ -1,0 +1,80 @@
+name: Build PR Environment Addon
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        type: string
+      pr_env_url:
+        description: 'AnkiHub PR environment URL (e.g., https://pr-123.ankihub.net)'
+        required: true
+        type: string
+
+jobs:
+  build-pr-env:
+    name: Build PR Environment Addon
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install deps
+        run: |
+          uv sync --locked --dev --group aqt
+
+      - name: Create ankiaddon file
+        run: |
+          bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ANKIHUB_APP_URL: ${{ inputs.pr_env_url }}
+
+      - name: Sanitize branch name for tag
+        id: tag
+        run: |
+          SANITIZED=$(echo "${{ inputs.branch }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "tag_name=pr-env-${SANITIZED}" >> $GITHUB_OUTPUT
+
+      - name: Delete existing pre-release if it exists
+        run: |
+          gh release delete "${{ steps.tag.outputs.tag_name }}" --yes 2>/dev/null || true
+          git push origin ":${{ steps.tag.outputs.tag_name }}" 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: "PR Env Build: ${{ inputs.branch }}"
+          body: |
+            **Branch:** `${{ inputs.branch }}`
+            **AnkiHub URL:** ${{ inputs.pr_env_url }}
+            **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            > This is a development build targeting a PR environment. Not for production use.
+          prerelease: true
+          files: ankihub.ankiaddon
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
