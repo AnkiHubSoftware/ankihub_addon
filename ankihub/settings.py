@@ -258,9 +258,9 @@ class _Config:
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
         # Override urls with environment variables if they are set.
-        if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
-            self.app_url = app_url_from_env_var
-            self.api_url = f"{app_url_from_env_var}/api"
+        if app_url_override := os.getenv("ANKIHUB_APP_URL") or self.public_config.get("app_url"):
+            self.app_url = app_url_override
+            self.api_url = f"{app_url_override}/api"
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var

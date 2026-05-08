@@ -51,42 +51,20 @@ jobs:
         run: |
           uv sync --locked --dev --group aqt
 
-      - name: Enable staging mode
+      - name: Configure config.json for PR environment
         run: |
           sed -i 's/"use_staging": false/"use_staging": true/' ankihub/config.json
+          sed -i 's|"app_url": null|"app_url": "${{ inputs.pr_env_url }}"|' ankihub/config.json
 
       - name: Create ankiaddon file
         run: |
           bash ./scripts/release.sh
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          ANKIHUB_APP_URL: ${{ inputs.pr_env_url }}
 
-      - name: Sanitize branch name for tag
-        id: tag
-        run: |
-          SANITIZED=$(echo "${{ inputs.branch }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
-          echo "tag_name=pr-env-${SANITIZED}" >> $GITHUB_OUTPUT
-
-      - name: Delete existing pre-release if it exists
-        run: |
-          gh release delete "${{ steps.tag.outputs.tag_name }}" --yes 2>/dev/null || true
-          git push origin ":${{ steps.tag.outputs.tag_name }}" 2>/dev/null || true
-        env:
-          GH_TOKEN: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
-
-      - name: Create pre-release
-        uses: softprops/action-gh-release@v1
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.tag.outputs.tag_name }}
-          name: "PR Env Build: ${{ inputs.branch }}"
-          body: |
-            **Branch:** `${{ inputs.branch }}`
-            **AnkiHub URL:** ${{ inputs.pr_env_url }}
-            **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            > This is a development build targeting a PR environment. Not for production use.
-          prerelease: true
-          files: ankihub.ankiaddon
-        env:
-          GITHUB_TOKEN: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
+          name: ankihub-pr-env-${{ inputs.branch }}
+          path: ankihub.ankiaddon
+          retention-days: 30
