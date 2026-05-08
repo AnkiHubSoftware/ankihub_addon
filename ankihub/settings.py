@@ -257,7 +257,8 @@ class _Config:
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
-        # Override urls with environment variables if they are set.
+        # Override URLs with environment variables if they are set. `app_url` can
+        # also be overridden via the public config key `app_url`.
         if app_url_override := os.getenv("ANKIHUB_APP_URL") or self.public_config.get("app_url"):
             self.app_url = app_url_override
             self.api_url = f"{app_url_override}/api"
