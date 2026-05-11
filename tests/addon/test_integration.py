@@ -7842,6 +7842,7 @@ def test_add_to_block_exam_subdeck_pycmd(
             created_ah_nids.append(note_info.ah_nid)
 
         dialog_mock = mocker.patch("ankihub.gui.js_message_handling.BlockExamSubdeckDialog")
+        post_msg_mock = mocker.patch("ankihub.gui.js_message_handling._post_message_to_ankihub_js")
 
         # Build message based on test scenario
         message_data: dict[str, Any] = {"deckId": str(ah_did)}
@@ -7883,6 +7884,16 @@ def test_add_to_block_exam_subdeck_pycmd(
             assert len(actual_anki_note_ids) == 3
 
         dialog_mock.return_value.show.assert_called_once()
+
+        # Simulate dialog finished with add_succeeded=True to verify postMessage payload
+        dialog_instance = dialog_mock.return_value
+        dialog_instance.add_succeeded = True
+        assert dialog_instance.finished.connect.called
+        callback = dialog_instance.finished.connect.call_args[0][0]
+        callback(1)  # QDialog.Accepted
+        post_msg_mock.assert_called_once()
+        message_arg = post_msg_mock.call_args.args[0]
+        assert message_arg["blockExamSubdeckResult"]["status"] == "added"
 
 
 @pytest.mark.sequential
@@ -9479,6 +9490,81 @@ class TestBlockExamSubdeckDialog:
             dialog.name_input.setText("Invalid:Name")  # Contains invalid character
             qtbot.wait(100)
             assert dialog.create_button.isEnabled() is True  # Button state is only based on non-empty text
+
+    def test_dialog_finished_sets_add_succeeded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            mocker.patch("aqt.mw.col.decks.children", return_value=[])
+
+            deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
+            qtbot.addWidget(dialog)
+
+            mocker.patch("ankihub.gui.block_exam_dialog.create_block_exam_subdeck", return_value=("Test Subdeck", None))
+            mocker.patch("ankihub.gui.block_exam_dialog.add_notes_to_block_exam_subdeck", return_value=3)
+
+            assert dialog.add_succeeded is False
+            dialog.name_input.setText("Test Subdeck")
+            dialog._on_create_subdeck()
+
+            assert dialog.add_succeeded is True
+
+    def test_reject_does_not_set_add_succeeded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            mocker.patch("aqt.mw.col.decks.children", return_value=[])
+
+            deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
+            qtbot.addWidget(dialog)
+
+            assert dialog.add_succeeded is False
+            dialog.reject()
+            assert dialog.add_succeeded is False
+
+    def test_dialog_zero_added_still_emits_added_status(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            mocker.patch("aqt.mw.col.decks.children", return_value=[])
+
+            tooltip_mock = mocker.patch("ankihub.gui.block_exam_dialog.tooltip")
+
+            deck_config = config.deck_config(ah_did)
+            root_deck_id = deck_config.anki_id
+            dialog = BlockExamSubdeckDialog(root_deck_id, self.note_ids, parent=None)
+            qtbot.addWidget(dialog)
+
+            mocker.patch("ankihub.gui.block_exam_dialog.create_block_exam_subdeck", return_value=("Test Subdeck", None))
+            mocker.patch("ankihub.gui.block_exam_dialog.add_notes_to_block_exam_subdeck", return_value=0)
+
+            dialog.name_input.setText("Test Subdeck")
+            dialog._on_create_subdeck()
+
+            assert dialog.add_succeeded is True
+            tooltip_mock.assert_called_once_with("All selected notes are already in 'Test Subdeck'", parent=aqt.mw)
 
 
 class TestGetExpiredBlockExamSubdecks:

@@ -47,6 +47,7 @@ class BlockExamSubdeckDialog(QDialog):
         self.selected_subdeck_id: Optional[DeckId] = None
 
         self.action_source = ActionSource.SMART_SEARCH
+        self.add_succeeded: bool = False
 
         self.setModal(True)
         self.setMinimumWidth(440)
@@ -467,10 +468,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        # Show success message
-        tooltip(f"{added_count} note(s) added to '{actual_name}'")
-        self.accept()
-
+        self._finish_with_added(added_count, actual_name)
         aqt.mw.moveToState("deckBrowser")
 
     def _on_add_notes(self):
@@ -500,8 +498,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'")
-        self.accept()
+        self._finish_with_added(added_count, self.selected_subdeck_name)
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
@@ -543,9 +540,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        tooltip(f"{added_count} note(s) added to '{actual_name}'")
-        self.accept()
-
+        self._finish_with_added(added_count, actual_name)
         aqt.mw.moveToState("deckBrowser")
 
     def _handle_conflict_merge(self, conflicting_name: str):
@@ -571,8 +566,14 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        # Show success message and close
-        tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
+        self._finish_with_added(added_count, conflicting_name)
+
+    def _finish_with_added(self, added_count: int, subdeck_name: str) -> None:
+        self.add_succeeded = True
+        if added_count == 0:
+            tooltip(f"All selected notes are already in '{subdeck_name}'", parent=aqt.mw)
+        else:
+            tooltip(f"{added_count} note(s) added to '{subdeck_name}'", parent=aqt.mw)
         self.accept()
 
     def _clear_layout(self):
