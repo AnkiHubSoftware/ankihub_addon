@@ -1,14 +1,17 @@
 name: Build PR Environment Addon
 
 on:
+  push:
+    branches:
+      - feat/pr-env-build-action
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to build from'
+        description: "Branch to build from"
         required: true
         type: string
       pr_env_url:
-        description: 'AnkiHub PR environment URL (e.g., https://pr-123.ankihub.net)'
+        description: "AnkiHub PR environment URL (e.g., https://pr-123.ankihub.net)"
         required: true
         type: string
 
