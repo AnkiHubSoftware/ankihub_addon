@@ -12,10 +12,12 @@ from anki.decks import DeckId
 from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import webview_did_receive_js_message
+from aqt.qt import qconnect, sip
 from aqt.utils import openLink, tooltip
 from aqt.webview import AnkiWebView
 from jinja2 import Template
 
+from .. import LOGGER
 from ..db import ankihub_db
 from ..gui.block_exam_dialog import BlockExamSubdeckDialog
 from ..gui.terms_dialog import TermsAndConditionsDialog
@@ -152,7 +154,21 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             note_ids = list(aqt.mw.col.find_notes(search_string))
 
         deck_config = config.deck_config(uuid.UUID(ankihub_did))
-        BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw).show()
+        dialog = BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw)
+        web = context.web
+
+        def on_dialog_finished(_result: int) -> None:
+            if web is None or sip.isdeleted(web):
+                LOGGER.warning("ADD_TO_BLOCK_EXAM_SUBDECK: web is None or deleted, dropping result")
+                return
+            status = "added" if dialog.add_succeeded else "cancelled"
+            _post_message_to_ankihub_js(
+                {"blockExamSubdeckResult": {"status": status}},
+                web=web,
+            )
+
+        qconnect(dialog.finished, on_dialog_finished)
+        dialog.show()
 
         return (True, None)
 
