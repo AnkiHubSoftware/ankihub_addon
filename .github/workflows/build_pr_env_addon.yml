@@ -65,9 +65,12 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
+      - name: Sanitize branch name for artifact
+        run: echo "SAFE_BRANCH=$(echo '${{ inputs.branch }}' | tr '/' '-')" >> $GITHUB_ENV
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ankihub-pr-env-${{ inputs.branch }}
+          name: ankihub-pr-env-${{ env.SAFE_BRANCH }}
           path: ankihub.ankiaddon
           retention-days: 30
