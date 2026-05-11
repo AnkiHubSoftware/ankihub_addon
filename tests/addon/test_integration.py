@@ -9517,7 +9517,7 @@ class TestBlockExamSubdeckDialog:
 
             assert dialog.add_succeeded is True
 
-    def test_dialog_finished_emits_cancelled_status_on_reject(
+    def test_reject_does_not_set_add_succeeded(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
