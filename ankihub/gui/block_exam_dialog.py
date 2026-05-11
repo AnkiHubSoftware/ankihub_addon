@@ -468,13 +468,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        self.add_succeeded = True
-        if added_count == 0:
-            tooltip(f"All selected notes are already in '{actual_name}'", parent=aqt.mw)
-        else:
-            tooltip(f"{added_count} note(s) added to '{actual_name}'", parent=aqt.mw)
-        self.accept()
-
+        self._finish_with_added(added_count, actual_name)
         aqt.mw.moveToState("deckBrowser")
 
     def _on_add_notes(self):
@@ -504,12 +498,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        self.add_succeeded = True
-        if added_count == 0:
-            tooltip(f"All selected notes are already in '{self.selected_subdeck_name}'", parent=aqt.mw)
-        else:
-            tooltip(f"{added_count} note(s) added to '{self.selected_subdeck_name}'", parent=aqt.mw)
-        self.accept()
+        self._finish_with_added(added_count, self.selected_subdeck_name)
 
     def _rename_subdeck(self, old_subdeck_path: str, new_subdeck_path: str):
         """Rename an existing subdeck."""
@@ -551,13 +540,7 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
-        self.add_succeeded = True
-        if added_count == 0:
-            tooltip(f"All selected notes are already in '{actual_name}'", parent=aqt.mw)
-        else:
-            tooltip(f"{added_count} note(s) added to '{actual_name}'", parent=aqt.mw)
-        self.accept()
-
+        self._finish_with_added(added_count, actual_name)
         aqt.mw.moveToState("deckBrowser")
 
     def _handle_conflict_merge(self, conflicting_name: str):
@@ -583,11 +566,14 @@ class BlockExamSubdeckDialog(QDialog):
             action_source=self.action_source,
         )
 
+        self._finish_with_added(added_count, conflicting_name)
+
+    def _finish_with_added(self, added_count: int, subdeck_name: str) -> None:
         self.add_succeeded = True
         if added_count == 0:
-            tooltip(f"All selected notes are already in '{conflicting_name}'")
+            tooltip(f"All selected notes are already in '{subdeck_name}'", parent=aqt.mw)
         else:
-            tooltip(f"{added_count} note(s) added to '{conflicting_name}'")
+            tooltip(f"{added_count} note(s) added to '{subdeck_name}'", parent=aqt.mw)
         self.accept()
 
     def _clear_layout(self):
