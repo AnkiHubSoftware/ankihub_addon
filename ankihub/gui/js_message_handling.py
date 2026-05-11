@@ -151,14 +151,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
             note_ids = [anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid]
         elif search_string.strip():
-            try:
-                note_ids = list(aqt.mw.col.find_notes(search_string))
-            except Exception:
-                LOGGER.warning(
-                    "ADD_TO_BLOCK_EXAM_SUBDECK: invalid search string, treating as empty",
-                    search_string=search_string,
-                )
-                note_ids = []
+            note_ids = list(aqt.mw.col.find_notes(search_string))
 
         deck_config = config.deck_config(uuid.UUID(ankihub_did))
         dialog = BlockExamSubdeckDialog(root_deck_id=DeckId(deck_config.anki_id), note_ids=note_ids, parent=aqt.mw)
