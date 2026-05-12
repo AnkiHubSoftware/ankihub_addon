@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 
 import aqt
 from anki.decks import DeckId
+from anki.notes import Note
 from anki.utils import is_mac
 from aqt import QCheckBox, dialogs, sync
 from aqt.addons import check_and_prompt_for_updates
@@ -49,6 +50,16 @@ ButtonParam = Union[
     str,
     Tuple[str, QDialogButtonBox.ButtonRole],
 ]
+
+
+def update_notes_with_named_undo(label: str, notes: Union[Note, Sequence[Note]]) -> None:
+    """Persist note(s) wrapped in a labeled custom undo entry."""
+    undo_entry_id = aqt.mw.col.add_custom_undo_entry(label)
+    if isinstance(notes, Note):
+        aqt.mw.col.update_note(notes)
+    else:
+        aqt.mw.col.update_notes(list(notes))
+    aqt.mw.col.merge_undo_entries(undo_entry_id)
 
 
 def add_button_from_param(button_box: QDialogButtonBox, button_param: ButtonParam) -> QPushButton:

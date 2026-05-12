@@ -3,7 +3,6 @@
 import functools
 from typing import Any, List, Tuple, cast
 
-import aqt
 from anki.models import NoteType
 from anki.notes import Note
 from aqt import gui_hooks
@@ -27,6 +26,7 @@ from ..settings import (
     url_view_note_history,
 )
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
+from .utils import update_notes_with_named_undo
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
@@ -95,20 +95,14 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     if should_be_protected and protection_tag not in note.tags:
         # Field differs from AnkiHub version — add protection if not already present
         note.tags.append(protection_tag)
-        _save_with_named_undo(note, f"AnkiHub | Auto-protect {field_name}")
+        update_notes_with_named_undo(f"AnkiHub | Auto-protect {field_name}", note)
         return True
     if not should_be_protected and protection_tag in note.tags:
         # Field matches AnkiHub version — remove protection tag if present
         note.tags.remove(protection_tag)
-        _save_with_named_undo(note, f"AnkiHub | Auto-unprotect {field_name}")
+        update_notes_with_named_undo(f"AnkiHub | Auto-unprotect {field_name}", note)
         return True
     return changed
-
-
-def _save_with_named_undo(note: Note, undo_label: str) -> None:
-    undo_entry_id = aqt.mw.col.add_custom_undo_entry(undo_label)
-    aqt.mw.col.update_note(note)
-    aqt.mw.col.merge_undo_entries(undo_entry_id)
 
 
 def _on_suggestion_button_press(editor: Editor) -> None:

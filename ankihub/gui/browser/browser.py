@@ -77,6 +77,7 @@ from ..utils import (
     choose_list,
     choose_subset,
     sparkles_icon,
+    update_notes_with_named_undo,
 )
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -405,10 +406,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
             # add new tags for protecting fields
             note.tags += new_tags_for_protecting_fields
 
-        # update the notes and add an undo entry
-        undo_entry_id = aqt.mw.col.add_custom_undo_entry("Protect fields of note(s) using tags")
-        aqt.mw.col.update_notes(notes)
-        aqt.mw.col.merge_undo_entries(undo_entry_id)
+        update_notes_with_named_undo("Protect fields of note(s) using tags", notes)
 
     def on_done(future: Future) -> None:
         future.result()

@@ -149,7 +149,7 @@ from ankihub.gui.browser.custom_search_nodes import AnkiHubNoteSearchNode, Updat
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
-from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
+from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, _strip_redundant_protect_tags, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
 from ankihub.gui.errors import upload_logs_and_data_in_background
@@ -1092,8 +1092,6 @@ class TestAutoProtectFieldsWhenEdited:
         import_ah_note: ImportAHNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            from ankihub.main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS
-
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
@@ -1136,11 +1134,12 @@ class TestAutoProtectFieldsWhenEdited:
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
     ):
-        from ankihub.gui.deck_updater import _strip_redundant_protect_tags
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-            note_info = import_ah_note(ah_did=ah_did)
+            # Import into the deck registered for this AH deck so the sync sweep's
+            # deck-scoped search finds the note.
+            anki_did = config.deck_config(ah_did).anki_id
+            note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
             front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
