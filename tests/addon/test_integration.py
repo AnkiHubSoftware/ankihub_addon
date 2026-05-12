@@ -1523,7 +1523,7 @@ class TestFieldsToSuggestFilters:
             assert sent.added_tags == ["added_a"]
             assert sent.removed_tags == ["removed_a"]
 
-    def test_last_field_selection_round_trip(
+    def test_last_deselected_fields_round_trip(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -1534,14 +1534,14 @@ class TestFieldsToSuggestFilters:
             note_info = import_ah_note(ah_did=ah_did)
             mid = note_info.mid
 
-            assert config.last_field_selection(ah_did, mid) is None
+            assert config.last_deselected_fields(ah_did, mid) == []
 
-            config.set_last_field_selection(ah_did, mid, ["Front"])
-            assert config.last_field_selection(ah_did, mid) == ["Front"]
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
 
             # Short-circuit: setting the same value shouldn't error or rewrite.
-            config.set_last_field_selection(ah_did, mid, ["Front"])
-            assert config.last_field_selection(ah_did, mid) == ["Front"]
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
 
 
 class TestSuggestNotesInBulk:

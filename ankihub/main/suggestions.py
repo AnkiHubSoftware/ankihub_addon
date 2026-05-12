@@ -14,6 +14,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -76,26 +77,29 @@ def _has_empty_first_field(note: Note) -> bool:
     return not note.fields[0].strip()
 
 
-def edited_field_names(note: Note) -> List[str]:
+def edited_field_names(note: Note, ah_note: Optional[NoteInfo] = None) -> List[str]:
     """Names of fields whose current value differs from the AnkiHub-stored value.
 
     Returns an empty list if the note is not in the AnkiHub DB. Includes fields that
     carry personal AnkiHub_Protect tags; the suggestion dialog filters at the user's
-    direction rather than here.
+    direction rather than here. Pass `ah_note` to skip the DB lookup when caller has
+    already fetched it (used by the bulk dialog to avoid an N+1 pattern).
     """
-    ah_note = ankihub_db.note_data(note.id)
     if ah_note is None:
-        return []
-    cur_fields = to_note_data(note, include_empty_fields=True).fields
-    return [c.name for c, p in zip(cur_fields, ah_note.fields) if c.value != p.value]
+        ah_note = ankihub_db.note_data(note.id)
+        if ah_note is None:
+            return []
+    cur_fields = to_note_data(note, include_empty_fields=True, include_protected_fields=True).fields
+    return [f.name for f in _fields_that_changed(prev_fields=ah_note.fields, cur_fields=cur_fields)]
 
 
-def tag_changes(note: Note) -> Tuple[List[str], List[str]]:
+def tag_changes(note: Note, ah_note: Optional[NoteInfo] = None) -> Tuple[List[str], List[str]]:
     """Returns (added_tags, removed_tags) for the note vs its AnkiHub-stored state."""
-    ah_note = ankihub_db.note_data(note.id)
     if ah_note is None:
-        return [], []
-    cur_tags = to_note_data(note).tags or []
+        ah_note = ankihub_db.note_data(note.id)
+        if ah_note is None:
+            return [], []
+    cur_tags = to_note_data(note, include_protected_fields=True).tags or []
     return _added_and_removed_tags(prev_tags=ah_note.tags or [], cur_tags=cur_tags)
 
 
@@ -193,7 +197,7 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
     media_upload_cb: MediaUploadCallback,
-    fields_to_include_by_mid: Optional[Dict[NotetypeId, Sequence[str]]] = None,
+    fields_to_include_by_mid: Optional[Mapping[NotetypeId, Sequence[str]]] = None,
     tags_to_add: Optional[Sequence[str]] = None,
     tags_to_remove: Optional[Sequence[str]] = None,
 ) -> BulkNoteSuggestionsResult:
@@ -301,7 +305,7 @@ def _suggestions_for_notes(
     ankihub_did: uuid.UUID,
     change_type: SuggestionType,
     comment: str,
-    fields_to_include_by_mid: Optional[Dict[NotetypeId, Sequence[str]]] = None,
+    fields_to_include_by_mid: Optional[Mapping[NotetypeId, Sequence[str]]] = None,
     tags_to_add: Optional[Sequence[str]] = None,
     tags_to_remove: Optional[Sequence[str]] = None,
 ) -> Tuple[
@@ -392,7 +396,7 @@ def _suggestions_for_notes(
 
 
 def _new_note_suggestion(note: Note, ah_did: uuid.UUID, comment: str) -> NewNoteSuggestion:
-    note_data = to_note_data(note, set_new_id=True)
+    note_data = to_note_data(note, set_new_id=True, include_protected_fields=True)
 
     return NewNoteSuggestion(
         ah_did=ah_did,
@@ -415,7 +419,7 @@ def _change_note_suggestion(
     tags_to_add: Optional[Sequence[str]] = None,
     tags_to_remove: Optional[Sequence[str]] = None,
 ) -> Optional[ChangeNoteSuggestion]:
-    note_from_anki_db = to_note_data(note, include_empty_fields=True)
+    note_from_anki_db = to_note_data(note, include_empty_fields=True, include_protected_fields=True)
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None

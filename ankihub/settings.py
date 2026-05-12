@@ -141,7 +141,10 @@ class DeckConfig(DataClassJSONMixin):
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
     has_note_embeddings: bool = False
-    last_field_selection_per_note_type: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
+    # Per-note-type record of fields the user explicitly deselected in the Suggest dialog.
+    # Storing deselected (rather than selected) means a field edited for the first time
+    # defaults to checked, while a field the user previously unchecked stays unchecked.
+    last_deselected_fields_per_note_type: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
 
     @staticmethod
     def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
@@ -400,16 +403,19 @@ class _Config:
         self.deck_config(ankihub_did).behavior_on_remote_note_deleted = note_delete_behavior
         self._update_private_config()
 
-    def set_last_field_selection(self, ankihub_did: uuid.UUID, mid: int, fields: List[str]) -> None:
-        """Remember the user's last Fields-to-Suggest selection for a note type within a deck."""
-        cache = self.deck_config(ankihub_did).last_field_selection_per_note_type
+    def set_last_deselected_fields(self, ankihub_did: uuid.UUID, mid: int, fields: List[str]) -> None:
+        """Remember which fields the user explicitly deselected in the Suggest dialog for this
+        (deck, note type), so a subsequent open keeps those fields unchecked while newly-edited
+        fields default to checked.
+        """
+        cache = self.deck_config(ankihub_did).last_deselected_fields_per_note_type
         if cache.get(mid) == fields:
             return
         cache[mid] = list(fields)
         self._update_private_config()
 
-    def last_field_selection(self, ankihub_did: uuid.UUID, mid: int) -> Optional[List[str]]:
-        return self.deck_config(ankihub_did).last_field_selection_per_note_type.get(mid)
+    def last_deselected_fields(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
+        return self.deck_config(ankihub_did).last_deselected_fields_per_note_type.get(mid, [])
 
     def set_feature_flags(self, feature_flags: Optional[dict]):
         self._private_config.feature_flags = feature_flags

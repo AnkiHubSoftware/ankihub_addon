@@ -13,14 +13,25 @@ from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .note_conversion import (
+    get_fields_protected_by_tags,
     is_internal_tag,
     is_optional_tag,
 )
 
 
-def to_note_data(note: Note, set_new_id: bool = False, include_empty_fields: bool = False) -> NoteInfo:
+def to_note_data(
+    note: Note,
+    set_new_id: bool = False,
+    include_empty_fields: bool = False,
+    include_protected_fields: bool = False,
+) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed).
+
+    Personally-protected fields (those carrying `AnkiHub_Protect::FieldName` tags) are stripped
+    by default — historic behavior, kept so that paths without an explicit user filter (e.g.
+    deck creation upload) don't silently ship local annotations. The suggestion dialog opts in
+    with `include_protected_fields=True` and filters at the user's direction instead.
     """
 
     if set_new_id:
@@ -29,7 +40,7 @@ def to_note_data(note: Note, set_new_id: bool = False, include_empty_fields: boo
         ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
     tags = _prepare_tags(note)
-    fields = _prepare_fields(note, include_empty=include_empty_fields)
+    fields = _prepare_fields(note, include_empty=include_empty_fields, include_protected=include_protected_fields)
 
     return NoteInfo(
         ah_nid=ah_nid,
@@ -41,25 +52,26 @@ def to_note_data(note: Note, set_new_id: bool = False, include_empty_fields: boo
     )
 
 
-def _prepare_fields(note: Note, include_empty: bool = False) -> List[Field]:
+def _prepare_fields(note: Note, include_empty: bool = False, include_protected: bool = False) -> List[Field]:
     note_type = ankihub_db.note_type_dict(note_type_id=NotetypeId(note.mid))
     if note_type is None:
         # When creating a deck the note type is not yet in the AnkiHub DB
         note_type = note.note_type()
 
     note_fields_dict = dict(note.items())
+    protected = set() if include_protected else set(get_fields_protected_by_tags(note))
 
     result = []
     for field in note_type["flds"]:
         field_name = field["name"]
         value = note_fields_dict.get(field_name)
-        if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME and (include_empty or value):
-            result.append(
-                Field(
-                    name=field_name,
-                    value=_prepared_field_html(value),
-                )
-            )
+        if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
+            continue
+        if field_name in protected:
+            continue
+        if not (include_empty or value):
+            continue
+        result.append(Field(name=field_name, value=_prepared_field_html(value)))
 
     return result
 

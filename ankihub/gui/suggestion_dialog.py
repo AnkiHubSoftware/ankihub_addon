@@ -32,6 +32,7 @@ from aqt.utils import show_info, showInfo, showText
 from .. import LOGGER
 from ..ankihub_client import (
     AnkiHubHTTPError,
+    NoteInfo,
     SuggestionType,
     get_media_names_from_note_info,
 )
@@ -330,7 +331,7 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
 def _added_new_media(note: Note) -> bool:
     """Returns True if media files were added to the notes when comparing with
     the notes in the ankihub database, else False."""
-    note_info_anki = to_note_data(note)
+    note_info_anki = to_note_data(note, include_protected_fields=True)
     media_names_anki = get_media_names_from_note_info(note_info_anki, note.note_type())
 
     note_info_ah = ankihub_db.note_data(note.id)
@@ -517,7 +518,6 @@ class SuggestionDialog(QDialog):
 
         self.layout_.addSpacing(10)
 
-        # Set up Fields to Suggest selector (change suggestions only; hidden on DELETE)
         if not self._is_new_note_suggestion and self._notes and self._ah_did is not None:
             self._fields_widget = FieldsToSuggestWidget(notes=self._notes, ah_did=self._ah_did)
             self.layout_.addWidget(self._fields_widget)
@@ -549,7 +549,7 @@ class SuggestionDialog(QDialog):
         qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
     def accept(self) -> None:
-        if self._fields_widget is not None and self._fields_widget.isVisible():
+        if self._fields_widget_active():
             self._fields_widget.save_selection()
         self._callback(self.suggestion_meta())
         super().accept()
@@ -558,11 +558,15 @@ class SuggestionDialog(QDialog):
         self._callback(None)
         super().reject()
 
+    def _fields_widget_active(self) -> bool:
+        """The Fields-to-Suggest selector is in scope (not new-note) and visible (not DELETE)."""
+        return self._fields_widget is not None and self._fields_widget.isVisible()
+
     def suggestion_meta(self) -> Optional[SuggestionMetadata]:
         fields_filter: Optional[Dict[NotetypeId, List[str]]] = None
         tags_to_add: Optional[List[str]] = None
         tags_to_remove: Optional[List[str]] = None
-        if self._fields_widget is not None and self._fields_widget.isVisible():
+        if self._fields_widget_active():
             fields_filter = self._fields_widget.selected_field_names_by_mid()
             tags_to_add = self._fields_widget.selected_tag_additions()
             tags_to_remove = self._fields_widget.selected_tag_removals()
@@ -624,12 +628,9 @@ class SuggestionDialog(QDialog):
         if self._source_needed() and not self.source_widget.is_valid():
             return False
 
-        if (
-            self._fields_widget is not None
-            and self._fields_widget.isVisible()
-            and self._fields_widget.has_any_edits()
-            and not self._fields_widget.has_any_selection()
-        ):
+        if self._fields_widget_active() and not self._fields_widget.has_any_selection():
+            # Covers both "user unchecked everything" and "no edits to suggest in the first place"
+            # — submitting either would just produce a NO_CHANGES tooltip on the server round-trip.
             return False
 
         return True
@@ -809,17 +810,6 @@ class SourceWidget(QWidget):
             return None
 
 
-class _TagChange:
-    """A single tag-change checkbox: kind is 'add' or 'remove', tag is the tag name."""
-
-    __slots__ = ("kind", "tag", "checkbox")
-
-    def __init__(self, kind: str, tag: str, checkbox: QCheckBox) -> None:
-        self.kind = kind
-        self.tag = tag
-        self.checkbox = checkbox
-
-
 class FieldsToSuggestWidget(QWidget):
     """Selector for which edited fields and tag changes to include in the outgoing
     suggestion. Visible only for change-suggestion flow (skipped for new-note and
@@ -835,10 +825,9 @@ class FieldsToSuggestWidget(QWidget):
         super().__init__(parent)
         self._notes = list(notes)
         self._ah_did = ah_did
-        # mid -> {field_name -> QCheckBox}
         self._field_checkboxes: Dict[NotetypeId, Dict[str, QCheckBox]] = {}
-        # All tag-change checkboxes (single dialog-level section, union across notes).
-        self._tag_changes: List[_TagChange] = []
+        self._added_tag_boxes: Dict[str, QCheckBox] = {}
+        self._removed_tag_boxes: Dict[str, QCheckBox] = {}
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -870,24 +859,25 @@ class FieldsToSuggestWidget(QWidget):
     def _populate(self) -> None:
         is_bulk = len(self._notes) > 1
 
-        # Collect edited fields per note type (union across notes of that type for bulk).
+        # Batch-fetch the AnkiHub-stored versions to avoid an N+1 DB pattern in bulk mode.
+        ah_notes_by_anki_nid: Dict[NoteId, NoteInfo] = {
+            NoteId(ah_note.anki_nid): ah_note
+            for ah_note in ankihub_db.notes_data_for_anki_nids([note.id for note in self._notes])
+        }
+
+        # Union of edited fields per note type across all notes of that type (bulk).
         fields_by_mid: Dict[NotetypeId, List[str]] = {}
         note_type_name_by_mid: Dict[NotetypeId, str] = {}
         for note in self._notes:
             mid = NotetypeId(note.mid)
             note_type_name_by_mid.setdefault(mid, note.note_type()["name"])
-            fields = edited_field_names(note)
-            fields_by_mid.setdefault(mid, [])
-            for f in fields:
-                if f not in fields_by_mid[mid]:
-                    fields_by_mid[mid].append(f)
+            fields = edited_field_names(note, ah_note=ah_notes_by_anki_nid.get(note.id))
+            fields_by_mid[mid] = list(dict.fromkeys((*fields_by_mid.get(mid, ()), *fields)))
 
-        # Render field section(s).
         for mid, fields in fields_by_mid.items():
             if not fields:
                 continue
-            saved = config.last_field_selection(self._ah_did, mid)
-            checked_set = set(saved) if saved is not None else set(fields)
+            deselected = set(config.last_deselected_fields(self._ah_did, mid))
 
             if is_bulk:
                 group = QGroupBox(f"Note type: {note_type_name_by_mid[mid]}")
@@ -901,40 +891,38 @@ class FieldsToSuggestWidget(QWidget):
             mid_map: Dict[str, QCheckBox] = {}
             for field_name in fields:
                 cb = QCheckBox(field_name)
-                cb.setChecked(field_name in checked_set)
+                cb.setChecked(field_name not in deselected)
                 qconnect(cb.toggled, self._on_toggle)
                 container.addWidget(cb)
                 mid_map[field_name] = cb
             self._field_checkboxes[mid] = mid_map
 
-        # Collect tag changes (union across notes).
+        # Tag changes are listed in a single dialog-level section as the union across all notes.
         added_tags: List[str] = []
         removed_tags: List[str] = []
         for note in self._notes:
-            added, removed = tag_changes(note)
-            for t in added:
-                if t not in added_tags:
-                    added_tags.append(t)
-            for t in removed:
-                if t not in removed_tags:
-                    removed_tags.append(t)
+            added, removed = tag_changes(note, ah_note=ah_notes_by_anki_nid.get(note.id))
+            added_tags.extend(added)
+            removed_tags.extend(removed)
+        added_tags = list(dict.fromkeys(added_tags))
+        removed_tags = list(dict.fromkeys(removed_tags))
 
         if added_tags or removed_tags:
             tag_group = QGroupBox("Tag changes")
             tag_layout = QVBoxLayout()
             tag_group.setLayout(tag_layout)
-            for t in added_tags:
-                cb = QCheckBox(f"+ {t}")
+            for tag in added_tags:
+                cb = QCheckBox(f"+ {tag}")
                 cb.setChecked(True)
                 qconnect(cb.toggled, self._on_toggle)
                 tag_layout.addWidget(cb)
-                self._tag_changes.append(_TagChange("add", t, cb))
-            for t in removed_tags:
-                cb = QCheckBox(f"− {t}")
+                self._added_tag_boxes[tag] = cb
+            for tag in removed_tags:
+                cb = QCheckBox(f"− {tag}")
                 cb.setChecked(True)
                 qconnect(cb.toggled, self._on_toggle)
                 tag_layout.addWidget(cb)
-                self._tag_changes.append(_TagChange("remove", t, cb))
+                self._removed_tag_boxes[tag] = cb
             self._body_layout.addWidget(tag_group)
 
         self._body_layout.addStretch()
@@ -947,7 +935,8 @@ class FieldsToSuggestWidget(QWidget):
         boxes: List[QCheckBox] = []
         for mid_map in self._field_checkboxes.values():
             boxes.extend(mid_map.values())
-        boxes.extend(tc.checkbox for tc in self._tag_changes)
+        boxes.extend(self._added_tag_boxes.values())
+        boxes.extend(self._removed_tag_boxes.values())
         return boxes
 
     def _refresh_counter(self) -> None:
@@ -970,12 +959,13 @@ class FieldsToSuggestWidget(QWidget):
         }
 
     def selected_tag_additions(self) -> List[str]:
-        return [tc.tag for tc in self._tag_changes if tc.kind == "add" and tc.checkbox.isChecked()]
+        return [tag for tag, cb in self._added_tag_boxes.items() if cb.isChecked()]
 
     def selected_tag_removals(self) -> List[str]:
-        return [tc.tag for tc in self._tag_changes if tc.kind == "remove" and tc.checkbox.isChecked()]
+        return [tag for tag, cb in self._removed_tag_boxes.items() if cb.isChecked()]
 
     def save_selection(self) -> None:
-        """Persist the current selection per (ah_did, mid). Called on dialog accept."""
-        for mid, selected in self.selected_field_names_by_mid().items():
-            config.set_last_field_selection(self._ah_did, mid, selected)
+        """Persist the user's deselected-fields choice per (ah_did, mid). Called on dialog accept."""
+        for mid, mid_map in self._field_checkboxes.items():
+            deselected = [name for name, cb in mid_map.items() if not cb.isChecked()]
+            config.set_last_deselected_fields(self._ah_did, mid, deselected)
