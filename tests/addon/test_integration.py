@@ -1543,6 +1543,44 @@ class TestFieldsToSuggestFilters:
             config.set_last_deselected_fields(ah_did, mid, ["Back"])
             assert config.last_deselected_fields(ah_did, mid) == ["Back"]
 
+    def test_protected_fields_stripped_when_feature_flag_off(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        """With the feature flag off, the suggestion path keeps the legacy behavior:
+        fields carrying personal AnkiHub_Protect tags are stripped from the outgoing
+        suggestion. (When on, the dialog filters at the user's direction instead.)
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::{field_names[0]}")
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": False})
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            sent_field_names = [f.name for f in sent.fields]
+            # Protected field is stripped; the other change still goes out.
+            assert field_names[0] not in sent_field_names
+            assert field_names[1] in sent_field_names
+
     def test_save_selection_merges_with_prior_deselections(
         self,
         anki_session_with_addon_data: AnkiSession,

@@ -47,6 +47,7 @@ from ..main.suggestions import (
     ChangeSuggestionResult,
     edited_field_names,
     get_anki_nid_to_ah_dids_dict,
+    is_new_suggest_workflow_enabled,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -331,7 +332,7 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
 def _added_new_media(note: Note) -> bool:
     """Returns True if media files were added to the notes when comparing with
     the notes in the ankihub database, else False."""
-    note_info_anki = to_note_data(note, include_protected_fields=True)
+    note_info_anki = to_note_data(note, include_protected_fields=is_new_suggest_workflow_enabled())
     media_names_anki = get_media_names_from_note_info(note_info_anki, note.note_type())
 
     note_info_ah = ankihub_db.note_data(note.id)
@@ -518,7 +519,12 @@ class SuggestionDialog(QDialog):
 
         self.layout_.addSpacing(10)
 
-        if not self._is_new_note_suggestion and self._notes and self._ah_did is not None:
+        if (
+            is_new_suggest_workflow_enabled()
+            and not self._is_new_note_suggestion
+            and self._notes
+            and self._ah_did is not None
+        ):
             self._fields_widget = FieldsToSuggestWidget(notes=self._notes, ah_did=self._ah_did)
             self.layout_.addWidget(self._fields_widget)
             self.layout_.addSpacing(10)

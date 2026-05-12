@@ -43,9 +43,18 @@ from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
+from ..settings import config
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 from .utils import get_anki_nid_to_mid_dict, is_tag_in_list, md5_file_hash
+
+
+def is_new_suggest_workflow_enabled() -> bool:
+    """The Fields-to-Suggest selector + protected-field passthrough share the same flag as
+    the auto-protect hook (PR #1259). The two features are coupled: auto-protect's silent
+    tagging only makes sense if the dialog surfaces those tags back to the user."""
+    return bool((config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False))
+
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -396,7 +405,7 @@ def _suggestions_for_notes(
 
 
 def _new_note_suggestion(note: Note, ah_did: uuid.UUID, comment: str) -> NewNoteSuggestion:
-    note_data = to_note_data(note, set_new_id=True, include_protected_fields=True)
+    note_data = to_note_data(note, set_new_id=True, include_protected_fields=is_new_suggest_workflow_enabled())
 
     return NewNoteSuggestion(
         ah_did=ah_did,
@@ -419,7 +428,9 @@ def _change_note_suggestion(
     tags_to_add: Optional[Sequence[str]] = None,
     tags_to_remove: Optional[Sequence[str]] = None,
 ) -> Optional[ChangeNoteSuggestion]:
-    note_from_anki_db = to_note_data(note, include_empty_fields=True, include_protected_fields=True)
+    note_from_anki_db = to_note_data(
+        note, include_empty_fields=True, include_protected_fields=is_new_suggest_workflow_enabled()
+    )
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None
