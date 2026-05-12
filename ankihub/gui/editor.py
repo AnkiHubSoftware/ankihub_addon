@@ -66,6 +66,11 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     the original value of `changed`. Anki re-loads the note from the DB when this
     returns True, so the tag mutation is persisted via update_note() before returning.
     """
+    # Server-controlled rollout gate: the suggestion dialog needs to ship before
+    # auto-protect is safe to enable (otherwise edits get silently stripped on suggest).
+    if not (config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False):
+        return changed
+
     ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
     if not ah_did:
         return changed

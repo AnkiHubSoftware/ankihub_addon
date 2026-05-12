@@ -947,6 +947,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -971,6 +972,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, False)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -991,6 +993,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1015,6 +1018,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1038,6 +1042,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1058,6 +1063,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1078,6 +1084,7 @@ class TestAutoProtectFieldsWhenEdited:
         add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             note = add_anki_note()
             note["Front"] = "edited value"
 
@@ -1095,6 +1102,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1116,6 +1124,7 @@ class TestAutoProtectFieldsWhenEdited:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
 
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1125,6 +1134,28 @@ class TestAutoProtectFieldsWhenEdited:
             ankihub_id_idx = note.keys().index("ankihub_id")
             note["ankihub_id"] = "edited value"
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
+            assert result is False
+            assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_hook_is_no_op_when_feature_flag_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            # Per-deck setting is on, but the server-side rollout flag is off.
+            config.set_feature_flags({"auto_protect_fields_when_edited": False})
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
             assert result is False
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
