@@ -1571,8 +1571,8 @@ class TestFieldsToSuggestFilters:
 
             widget = FieldsToSuggestWidget(notes=[note], ah_did=ah_did)
             # Widget renders only Front; Back is absent.
-            front_cb = widget._field_checkboxes[mid]["Front"]
-            assert "Back" not in widget._field_checkboxes[mid]
+            front_cb = widget._field_checkboxes[NotetypeId(mid)]["Front"]
+            assert "Back" not in widget._field_checkboxes[NotetypeId(mid)]
 
             # User deselects Front and saves. Prior Back deselection must survive.
             front_cb.setChecked(False)
