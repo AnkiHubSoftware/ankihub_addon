@@ -1543,6 +1543,47 @@ class TestFieldsToSuggestFilters:
             config.set_last_deselected_fields(ah_did, mid, ["Back"])
             assert config.last_deselected_fields(ah_did, mid) == ["Back"]
 
+    def test_save_selection_merges_with_prior_deselections(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """A field deselected in a prior session should stay deselected even when it's not
+        shown in the current widget (because the user hasn't edited it this time). Re-checking
+        a field explicitly clears its deselection.
+        """
+        from ankihub.gui.suggestion_dialog import FieldsToSuggestWidget
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            # Prior session: user deselected "Back".
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+
+            # Current session: only "Front" is edited (Back isn't shown in the widget).
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            widget = FieldsToSuggestWidget(notes=[note], ah_did=ah_did)
+            # Widget renders only Front; Back is absent.
+            front_cb = widget._field_checkboxes[mid]["Front"]
+            assert "Back" not in widget._field_checkboxes[mid]
+
+            # User deselects Front and saves. Prior Back deselection must survive.
+            front_cb.setChecked(False)
+            widget.save_selection()
+            assert sorted(config.last_deselected_fields(ah_did, mid)) == ["Back", "Front"]
+
+            # User re-checks Front and saves. Front's deselection is cleared; Back stays.
+            front_cb.setChecked(True)
+            widget.save_selection()
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
+
 
 class TestSuggestNotesInBulk:
     def test_new_note_suggestion(

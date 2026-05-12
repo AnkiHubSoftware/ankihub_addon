@@ -965,7 +965,15 @@ class FieldsToSuggestWidget(QWidget):
         return [tag for tag, cb in self._removed_tag_boxes.items() if cb.isChecked()]
 
     def save_selection(self) -> None:
-        """Persist the user's deselected-fields choice per (ah_did, mid). Called on dialog accept."""
+        """Persist the user's deselected-fields choice per (ah_did, mid). Called on dialog accept.
+
+        Merges with prior state so a deselection survives sessions where the same field isn't
+        edited (and therefore isn't shown in the widget). Explicit re-selection in the current
+        session clears the deselection.
+        """
         for mid, mid_map in self._field_checkboxes.items():
-            deselected = [name for name, cb in mid_map.items() if not cb.isChecked()]
-            config.set_last_deselected_fields(self._ah_did, mid, deselected)
+            currently_selected = {name for name, cb in mid_map.items() if cb.isChecked()}
+            currently_deselected = {name for name, cb in mid_map.items() if not cb.isChecked()}
+            prior = set(config.last_deselected_fields(self._ah_did, mid))
+            merged = (prior - currently_selected) | currently_deselected
+            config.set_last_deselected_fields(self._ah_did, mid, sorted(merged))
