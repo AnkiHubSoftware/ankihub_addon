@@ -958,6 +958,8 @@ class TestAutoProtectFieldsWhenEdited:
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
             assert result is True
             assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in note.tags
+            # Persisted: reload from DB and confirm the tag survives.
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in aqt.mw.col.get_note(nid).tags
 
     def test_field_not_protected_when_feature_disabled(
         self,
@@ -1068,6 +1070,7 @@ class TestAutoProtectFieldsWhenEdited:
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
             assert result is True
             assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in note.tags
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in aqt.mw.col.get_note(nid).tags
 
     def test_non_ankihub_note_not_protected(
         self,
@@ -1081,6 +1084,29 @@ class TestAutoProtectFieldsWhenEdited:
             result = _on_field_unfocus_auto_protect(changed=True, note=note, current_field_idx=0)
             assert result is True  # changed stays True
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_field_not_protected_when_all_fields_already_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            from ankihub.main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS
+
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note.tags.append(TAG_FOR_PROTECTING_ALL_FIELDS)
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in note.tags
 
     def test_ankihub_id_field_not_protected(
         self,
@@ -1103,6 +1129,31 @@ class TestAutoProtectFieldsWhenEdited:
             result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
             assert result is False
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
+    def test_sync_strips_personal_tags_for_globally_protected_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        from ankihub.gui.deck_updater import _strip_redundant_protect_tags
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
+            back_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Back"
+            note.tags.extend([front_tag, back_tag])
+            aqt.mw.col.update_note(note)
+
+            # Front becomes globally protected; Back stays user-controlled.
+            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
+
+            reloaded = aqt.mw.col.get_note(nid)
+            assert front_tag not in reloaded.tags
+            assert back_tag in reloaded.tags
 
 
 class TestDownloadAndInstallDecks:

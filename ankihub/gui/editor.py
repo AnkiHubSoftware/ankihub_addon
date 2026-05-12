@@ -3,6 +3,7 @@
 import functools
 from typing import Any, List, Tuple, cast
 
+import aqt
 from anki.models import NoteType
 from anki.notes import Note
 from aqt import gui_hooks
@@ -15,7 +16,7 @@ from .. import settings
 from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
-from ..main.note_conversion import TAG_FOR_PROTECTING_FIELDS
+from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
 from ..settings import (
     ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -62,8 +63,8 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     """Hook handler for editor_did_unfocus_field.
 
     Returns True if the note was modified (tag added or removed), otherwise returns
-    the original value of `changed`. Anki uses the return value to decide whether to
-    save the note.
+    the original value of `changed`. Anki re-loads the note from the DB when this
+    returns True, so the tag mutation is persisted via update_note() before returning.
     """
     ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
     if not ah_did:
@@ -73,33 +74,41 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     if not deck_config.auto_protect_fields_when_edited:
         return changed
 
-    field_name = note.keys()[current_field_idx]
+    # If all fields are already covered by the "All" tag, no per-field tag is needed.
+    if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+        return changed
+
+    field_name = note.note_type()["flds"][current_field_idx]["name"]
     if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
         return changed
 
     # Skip if globally protected for this deck (managed by deck owner, not locally)
-    if field_name in deck_config.globally_protected_fields.get(note.mid, []):
+    if field_name in config.globally_protected_fields_for_note_type(ah_did, note.mid):
         return changed
 
-    protection_tag = f"{TAG_FOR_PROTECTING_FIELDS}::{field_name.replace(' ', '_')}"
     ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
-    ah_field_value = ah_note.fields.get(field_name, "") if ah_note and ah_note.fields else None
-
-    if ah_field_value is None:
+    if not ah_note or not ah_note.fields or field_name not in ah_note.fields:
         return changed
 
-    if note[field_name] != ah_field_value:
+    protection_tag = protection_tag_for_field(field_name)
+    should_be_protected = note[field_name] != ah_note.fields[field_name]
+    if should_be_protected and protection_tag not in note.tags:
         # Field differs from AnkiHub version — add protection if not already present
-        if protection_tag not in note.tags:
-            note.tags.append(protection_tag)
-            return True
-    else:
+        note.tags.append(protection_tag)
+        _save_with_named_undo(note, f"AnkiHub | Auto-protect {field_name}")
+        return True
+    if not should_be_protected and protection_tag in note.tags:
         # Field matches AnkiHub version — remove protection tag if present
-        if protection_tag in note.tags:
-            note.tags.remove(protection_tag)
-            return True
-
+        note.tags.remove(protection_tag)
+        _save_with_named_undo(note, f"AnkiHub | Auto-unprotect {field_name}")
+        return True
     return changed
+
+
+def _save_with_named_undo(note: Note, undo_label: str) -> None:
+    undo_entry_id = aqt.mw.col.add_custom_undo_entry(undo_label)
+    aqt.mw.col.update_note(note)
+    aqt.mw.col.merge_undo_entries(undo_entry_id)
 
 
 def _on_suggestion_button_press(editor: Editor) -> None:

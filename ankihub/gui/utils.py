@@ -115,7 +115,7 @@ def choose_subset(
     if not parent:
         parent = active_window_or_mw()
 
-    checked_and_disabled_choices_set = set(checked_and_disabled_choices or [])
+    locked_set = set(checked_and_disabled_choices or [])
 
     dialog = QDialog(parent)
     disable_help_button(dialog)
@@ -135,9 +135,10 @@ def choose_subset(
     layout.addSpacing(5)
 
     # Populate list items; disabled choices appear checked and non-interactive
+    interactive_items: List[QListWidgetItem] = []
     for choice in choices:
         item = QListWidgetItem(choice)
-        if choice in checked_and_disabled_choices_set:
+        if choice in locked_set:
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable & ~Qt.ItemFlag.ItemIsEnabled)  # type: ignore
             item.setCheckState(Qt.CheckState.Checked)
             if checked_and_disabled_choices_tooltip:
@@ -145,6 +146,7 @@ def choose_subset(
         else:
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)  # type: ignore
             item.setCheckState(Qt.CheckState.Checked if choice in current else Qt.CheckState.Unchecked)
+            interactive_items.append(item)
         list_widget.addItem(item)
 
     if description_html:
@@ -158,18 +160,10 @@ def choose_subset(
 
     # "Select All" toggles all interactive items; deselects all if all are already selected
     def select_all() -> None:
-        all_enabled_selected = all(
-            list_widget.item(i).checkState() == Qt.CheckState.Checked
-            for i in range(list_widget.count())
-            if list_widget.item(i).text() not in checked_and_disabled_choices_set
-        )
-        for i in range(list_widget.count()):
-            if list_widget.item(i).text() in checked_and_disabled_choices_set:
-                continue
-            if all_enabled_selected:
-                list_widget.item(i).setCheckState(Qt.CheckState.Unchecked)
-            else:
-                list_widget.item(i).setCheckState(Qt.CheckState.Checked)
+        all_selected = all(item.checkState() == Qt.CheckState.Checked for item in interactive_items)
+        new_state = Qt.CheckState.Unchecked if all_selected else Qt.CheckState.Checked
+        for item in interactive_items:
+            item.setCheckState(new_state)
 
     select_all_button = QPushButton(select_all_text)
     qconnect(select_all_button.clicked, select_all)
@@ -190,8 +184,8 @@ def choose_subset(
         list_widget.setMinimumHeight(list_widget.sizeHintForRow(0) * list_widget.count() + 20)
 
     # Manage OK button enabled state based on require_at_least_one / disable_ok_when_unchanged
-    def _get_accept_button():
-        return next(
+    if require_at_least_one or disable_ok_when_unchanged:
+        accept_button = next(
             (
                 button
                 for button in button_box.buttons()
@@ -199,49 +193,32 @@ def choose_subset(
             ),
             None,
         )
+        baseline_selection = sorted(c for c in current if c not in locked_set)
 
-    def update_accept_button_state():
-        accept_button = _get_accept_button()
-        if not accept_button:
-            return
-
-        if require_at_least_one:
-            has_checked = any(
-                list_widget.item(i).checkState() == Qt.CheckState.Checked
-                for i in range(list_widget.count())
-                if list_widget.item(i).text() not in checked_and_disabled_choices_set
-            )
-            if not has_checked:
+        def update_accept_button_state():
+            if not accept_button:
+                return
+            if require_at_least_one and not any(
+                item.checkState() == Qt.CheckState.Checked for item in interactive_items
+            ):
                 accept_button.setEnabled(False)
                 return
+            if disable_ok_when_unchanged:
+                current_selection = sorted(
+                    item.text() for item in interactive_items if item.checkState() == Qt.CheckState.Checked
+                )
+                if current_selection == baseline_selection:
+                    accept_button.setEnabled(False)
+                    return
+            accept_button.setEnabled(True)
 
-        if disable_ok_when_unchanged:
-            current_selection = sorted(
-                list_widget.item(i).text()
-                for i in range(list_widget.count())
-                if list_widget.item(i).checkState() == Qt.CheckState.Checked
-                and list_widget.item(i).text() not in checked_and_disabled_choices_set
-            )
-            if current_selection == sorted(c for c in current if c not in checked_and_disabled_choices_set):
-                accept_button.setEnabled(False)
-                return
-
-        accept_button.setEnabled(True)
-
-    if require_at_least_one or disable_ok_when_unchanged:
         qconnect(list_widget.itemChanged, lambda _: update_accept_button_state())
         update_accept_button_state()
 
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None
 
-    result = [
-        list_widget.item(i).text()
-        for i in range(list_widget.count())
-        if list_widget.item(i).checkState() == Qt.CheckState.Checked
-        and list_widget.item(i).text() not in checked_and_disabled_choices_set
-    ]
-    return result
+    return [item.text() for item in interactive_items if item.checkState() == Qt.CheckState.Checked]
 
 
 class SearchableSelectionDialog(StudyDeck):

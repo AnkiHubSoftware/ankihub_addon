@@ -400,8 +400,14 @@ class _Config:
         self._update_private_config()
 
     def set_globally_protected_fields(self, ankihub_did: uuid.UUID, protected_fields: Dict[int, List[str]]) -> None:
-        self.deck_config(ankihub_did).globally_protected_fields = protected_fields
+        deck_config = self.deck_config(ankihub_did)
+        if deck_config.globally_protected_fields == protected_fields:
+            return
+        deck_config.globally_protected_fields = protected_fields
         self._update_private_config()
+
+    def globally_protected_fields_for_note_type(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
+        return self.deck_config(ankihub_did).globally_protected_fields.get(mid, [])
 
     def set_ankihub_deleted_notes_behavior(
         self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted

@@ -56,6 +56,7 @@ from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
     optional_tag_prefix_for_group,
+    protection_tag_for_field,
 )
 from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
@@ -348,6 +349,16 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         )
         return
 
+    # The same note type can be shared across AnkiHub decks; require a single deck
+    # so the globally-protected-fields lock applies consistently to all selected notes.
+    ah_dids = {did for did in ankihub_db.ankihub_dids_for_anki_nids(nids) if did is not None}
+    if len(ah_dids) > 1:
+        showInfo(
+            "Please select notes from only one AnkiHub deck.",
+            parent=browser,
+        )
+        return
+
     note = aqt.mw.col.get_note(nids[0])
     field_names: List[str] = [field_name for field_name in note.keys() if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME]
     if len(nids) == 1:
@@ -356,10 +367,8 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         old_fields_protected_by_tags = []
 
     # Determine globally protected fields for this note's deck
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
-    globally_protected: List[str] = []
-    if ah_did:
-        globally_protected = config.deck_config(ah_did).globally_protected_fields.get(note.mid, [])
+    ah_did = next(iter(ah_dids), None)
+    globally_protected = config.globally_protected_fields_for_note_type(ah_did, note.mid) if ah_did else []
 
     new_fields_protected_by_tags = choose_subset(
         "Choose which fields of this note should be protected from updates.<br><br>"
@@ -368,7 +377,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         "protect fields feature</a> on the AnkiHub website.",
         choices=field_names,
         current=old_fields_protected_by_tags,
-        description_html="This will edit the AnkiHub_Protect tags of the note.",
+        description_html=f"This will edit the {TAG_FOR_PROTECTING_FIELDS} tags of the note.",
         title="AnkiHub | Protect fields",
         disable_ok_when_unchanged=True,
         checked_and_disabled_choices=globally_protected,
@@ -384,11 +393,8 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         # if all fields are protected, we can just use the tag for protecting all fields
         new_tags_for_protecting_fields = [TAG_FOR_PROTECTING_ALL_FIELDS]
     else:
-        # otherwise we need to create a tag for each field.
-        # spaces are not allowed in tags, so we replace them with underscores
-        new_tags_for_protecting_fields = [
-            f"{TAG_FOR_PROTECTING_FIELDS}::{field.replace(' ', '_')}" for field in new_fields_protected_by_tags
-        ]
+        # otherwise we need to create a tag for each field
+        new_tags_for_protecting_fields = [protection_tag_for_field(field) for field in new_fields_protected_by_tags]
 
     def update_note_tags() -> None:
         notes = [aqt.mw.col.get_note(nid) for nid in nids]
