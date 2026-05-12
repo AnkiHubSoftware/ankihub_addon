@@ -1435,6 +1435,115 @@ def test_suggest_new_note(
         assert exc is not None and exc.response.status_code == 403
 
 
+class TestFieldsToSuggestFilters:
+    """Covers the user-controlled filter introduced for the suggestion-dialog overhaul:
+    edited_field_names + the fields_to_include / tags_to_add / tags_to_remove allowlists.
+    """
+
+    def test_edited_field_names_includes_personally_protected_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        from ankihub.main.suggestions import edited_field_names
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            # Personally protect the Front field and edit it. The previous _prepare_fields
+            # behavior would have stripped Front from the diff; the dialog needs to see it.
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            assert "Front" in edited_field_names(note)
+
+    def test_suggest_note_update_fields_to_include_filters(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            # Only allow the first field through.
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                fields_to_include=[field_names[0]],
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            sent_field_names = [f.name for f in sent.fields]
+            assert sent_field_names == [field_names[0]]
+
+    def test_suggest_note_update_tag_filters(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            note.tags = ["stays", "removed_a", "removed_b"]
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            note.tags = ["stays", "added_a", "added_b"]
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            # Allow only one addition and one removal through.
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                tags_to_add=["added_a"],
+                tags_to_remove=["removed_a"],
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            assert sent.added_tags == ["added_a"]
+            assert sent.removed_tags == ["removed_a"]
+
+    def test_last_field_selection_round_trip(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            assert config.last_field_selection(ah_did, mid) is None
+
+            config.set_last_field_selection(ah_did, mid, ["Front"])
+            assert config.last_field_selection(ah_did, mid) == ["Front"]
+
+            # Short-circuit: setting the same value shouldn't error or rewrite.
+            config.set_last_field_selection(ah_did, mid, ["Front"])
+            assert config.last_field_selection(ah_did, mid) == ["Front"]
+
+
 class TestSuggestNotesInBulk:
     def test_new_note_suggestion(
         self,

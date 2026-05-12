@@ -13,7 +13,6 @@ from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .note_conversion import (
-    get_fields_protected_by_tags,
     is_internal_tag,
     is_optional_tag,
 )
@@ -21,8 +20,7 @@ from .note_conversion import (
 
 def to_note_data(note: Note, set_new_id: bool = False, include_empty_fields: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
-    Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
-    Protected fields are removed.
+    Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed).
     """
 
     if set_new_id:
@@ -50,17 +48,12 @@ def _prepare_fields(note: Note, include_empty: bool = False) -> List[Field]:
         note_type = note.note_type()
 
     note_fields_dict = dict(note.items())
-    fields_protected_by_tags = get_fields_protected_by_tags(note)
 
     result = []
     for field in note_type["flds"]:
         field_name = field["name"]
         value = note_fields_dict.get(field_name)
-        if (
-            field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
-            and field_name not in fields_protected_by_tags
-            and (include_empty or value)
-        ):
+        if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME and (include_empty or value):
             result.append(
                 Field(
                     name=field_name,

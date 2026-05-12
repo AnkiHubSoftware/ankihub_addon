@@ -76,22 +76,59 @@ def _has_empty_first_field(note: Note) -> bool:
     return not note.fields[0].strip()
 
 
+def edited_field_names(note: Note) -> List[str]:
+    """Names of fields whose current value differs from the AnkiHub-stored value.
+
+    Returns an empty list if the note is not in the AnkiHub DB. Includes fields that
+    carry personal AnkiHub_Protect tags; the suggestion dialog filters at the user's
+    direction rather than here.
+    """
+    ah_note = ankihub_db.note_data(note.id)
+    if ah_note is None:
+        return []
+    cur_fields = to_note_data(note, include_empty_fields=True).fields
+    return [c.name for c, p in zip(cur_fields, ah_note.fields) if c.value != p.value]
+
+
+def tag_changes(note: Note) -> Tuple[List[str], List[str]]:
+    """Returns (added_tags, removed_tags) for the note vs its AnkiHub-stored state."""
+    ah_note = ankihub_db.note_data(note.id)
+    if ah_note is None:
+        return [], []
+    cur_tags = to_note_data(note).tags or []
+    return _added_and_removed_tags(prev_tags=ah_note.tags or [], cur_tags=cur_tags)
+
+
 def suggest_note_update(
     note: Note,
     change_type: SuggestionType,
     comment: str,
     media_upload_cb: MediaUploadCallback,
     auto_accept: bool = False,
+    fields_to_include: Optional[Sequence[str]] = None,
+    tags_to_add: Optional[Sequence[str]] = None,
+    tags_to_remove: Optional[Sequence[str]] = None,
 ) -> ChangeSuggestionResult:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a ChangeSuggestionResult enum value.
+
+    fields_to_include / tags_to_add / tags_to_remove are optional allowlists reflecting
+    the user's selection in the suggestion dialog. When None (default), today's
+    behavior is preserved: all detected changes go out.
     """
 
     if _has_empty_first_field(note):
         return ChangeSuggestionResult.EMPTY_FIRST_FIELD
 
-    suggestion = _change_note_suggestion(note, change_type, comment)
+    suggestion = _change_note_suggestion(
+        note,
+        change_type,
+        comment,
+        fields_to_include=fields_to_include,
+        tags_to_add=tags_to_add,
+        tags_to_remove=tags_to_remove,
+    )
     if suggestion is None:
         return ChangeSuggestionResult.NO_CHANGES
 
@@ -156,6 +193,9 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
     media_upload_cb: MediaUploadCallback,
+    fields_to_include_by_mid: Optional[Dict[NotetypeId, Sequence[str]]] = None,
+    tags_to_add: Optional[Sequence[str]] = None,
+    tags_to_remove: Optional[Sequence[str]] = None,
 ) -> BulkNoteSuggestionsResult:
     """
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
@@ -164,14 +204,28 @@ def suggest_notes_in_bulk(
     that the note has no changes when compared to the remote AnkiHub
     database. To create suggestions for notes that differ from the
     remote database but not from the local database, users have to
-    sync first (so that the local database is up to date)."""
+    sync first (so that the local database is up to date).
+
+    fields_to_include_by_mid / tags_to_add / tags_to_remove are optional allowlists
+    reflecting the user's selection in the suggestion dialog. Field allowlists are
+    keyed by note type id (the dialog groups by note type). When None (default),
+    today's behavior is preserved.
+    """
     (
         new_note_suggestions,
         change_note_suggestions,
         nids_without_changes,
         nids_deleted_on_remote,
         nids_with_empty_first_field,
-    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
+    ) = _suggestions_for_notes(
+        notes,
+        ankihub_did,
+        change_type,
+        comment,
+        fields_to_include_by_mid=fields_to_include_by_mid,
+        tags_to_add=tags_to_add,
+        tags_to_remove=tags_to_remove,
+    )
 
     new_note_suggestions = cast(
         Sequence[NewNoteSuggestion],
@@ -243,7 +297,13 @@ def get_anki_nid_to_ah_dids_dict(
 
 
 def _suggestions_for_notes(
-    notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
+    notes: List[Note],
+    ankihub_did: uuid.UUID,
+    change_type: SuggestionType,
+    comment: str,
+    fields_to_include_by_mid: Optional[Dict[NotetypeId, Sequence[str]]] = None,
+    tags_to_add: Optional[Sequence[str]] = None,
+    tags_to_remove: Optional[Sequence[str]] = None,
 ) -> Tuple[
     Sequence[NewNoteSuggestion],
     Sequence[ChangeNoteSuggestion],
@@ -297,6 +357,11 @@ def _suggestions_for_notes(
             note=note,
             change_type=change_type,
             comment=comment,
+            fields_to_include=(
+                fields_to_include_by_mid.get(NotetypeId(note.mid)) if fields_to_include_by_mid is not None else None
+            ),
+            tags_to_add=tags_to_add,
+            tags_to_remove=tags_to_remove,
         )
         for note in notes_for_change_note_suggestions
     }
@@ -342,7 +407,14 @@ def _new_note_suggestion(note: Note, ah_did: uuid.UUID, comment: str) -> NewNote
     )
 
 
-def _change_note_suggestion(note: Note, change_type: SuggestionType, comment: str) -> Optional[ChangeNoteSuggestion]:
+def _change_note_suggestion(
+    note: Note,
+    change_type: SuggestionType,
+    comment: str,
+    fields_to_include: Optional[Sequence[str]] = None,
+    tags_to_add: Optional[Sequence[str]] = None,
+    tags_to_remove: Optional[Sequence[str]] = None,
+) -> Optional[ChangeNoteSuggestion]:
     note_from_anki_db = to_note_data(note, include_empty_fields=True)
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
@@ -362,6 +434,16 @@ def _change_note_suggestion(note: Note, change_type: SuggestionType, comment: st
         fields_that_changed = _fields_that_changed(
             prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
         )
+
+        if fields_to_include is not None:
+            allowed = set(fields_to_include)
+            fields_that_changed = [f for f in fields_that_changed if f.name in allowed]
+        if tags_to_add is not None:
+            allowed = set(tags_to_add)
+            added_tags = [t for t in added_tags if t in allowed]
+        if tags_to_remove is not None:
+            allowed = set(tags_to_remove)
+            removed_tags = [t for t in removed_tags if t in allowed]
 
         if not added_tags and not removed_tags and not fields_that_changed:
             return None

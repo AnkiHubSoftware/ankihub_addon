@@ -5,14 +5,14 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Callable, Collection, List, Optional, Set
+from typing import Callable, Collection, Dict, List, Optional, Sequence, Set
 
 import aqt
+from anki.models import NotetypeId
 from anki.notes import Note, NoteId
 from aqt.qt import (
     QCheckBox,
     QComboBox,
-    QCursor,
     QDialog,
     QDialogButtonBox,
     QGroupBox,
@@ -20,8 +20,8 @@ from aqt.qt import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QScrollArea,
     QSpacerItem,
-    Qt,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
@@ -44,20 +44,20 @@ from ..main.suggestions import (
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
     ChangeSuggestionResult,
+    edited_field_names,
     get_anki_nid_to_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
+    tag_changes,
 )
 from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, config
 from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
-    show_dialog,
     show_error_dialog,
     show_tooltip,
-    tooltip_icon,
 )
 
 
@@ -81,6 +81,10 @@ class SuggestionMetadata:
     auto_accept: bool = False
     change_type: Optional[SuggestionType] = None
     source: Optional[SuggestionSource] = None
+    # User-selected filters for the outgoing suggestion. None = unfiltered (today's behavior).
+    fields_to_include_by_mid: Optional[Dict[NotetypeId, List[str]]] = None
+    tags_to_add: Optional[List[str]] = None
+    tags_to_remove: Optional[List[str]] = None
 
 
 def open_suggestion_dialog_for_single_suggestion(
@@ -114,6 +118,8 @@ def open_suggestion_dialog_for_single_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
+        notes=[note],
+        ah_did=ah_did,
         preselected_change_type=preselected_change_type,
         parent=parent,
     )
@@ -132,37 +138,10 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             report_exception_and_upload_logs(e)
         all_no_changes_errors = all(ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors)
         if all_no_changes_errors:
-            dialog = show_dialog(
-                title="Invalid suggestion",
-                text=(
-                    "No field or tag changes were detected. "
-                    "Please verify that the changes you made were not to a protected field and try again.<br><br>"
-                ),
-                parent=parent,
-                open_dialog=False,
-            )
-            layout = dialog.content_layout
-            sublayout = QHBoxLayout()
-            subwidget = QWidget()
-            subwidget.setLayout(sublayout)
-            label = QLabel(
-                "(Learn more about protected fields "
-                "<a href='https://community.ankihub.net/t/protecting-fields-and-tags/165604'>here</a>.)"
-            )
-            label.setOpenExternalLinks(True)
-            sublayout.addWidget(label)
-            icon_label = QLabel("")
-            pixmap = tooltip_icon().pixmap(QCheckBox().iconSize())
-            icon_label.setPixmap(pixmap)
-            icon_label.setToolTip(
-                "Protecting a field allows you to add anything you want to a field\n"
-                "without it being overwritten via AnkiHub suggestions."
-            )
-            icon_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            sublayout.addWidget(icon_label)
-            layout.insertWidget(layout.count() - 1, subwidget)
-            dialog.adjustSize()
-            dialog.open()
+            # The dialog OK button is gated on at least one field/tag change being
+            # selected, so this branch should be unreachable in normal use. If it
+            # still fires (e.g. sync racing with submit), fall through to a tooltip.
+            show_tooltip("No changes to suggest.", parent=parent)
         else:
             showInfo(
                 text=(f"There are some problems with this suggestion:<br><br><b>{error_message}</b>"),
@@ -195,6 +174,9 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
+        fields_for_note: Optional[List[str]] = None
+        if suggestion_meta.fields_to_include_by_mid is not None:
+            fields_for_note = suggestion_meta.fields_to_include_by_mid.get(NotetypeId(note.mid), [])
         try:
             suggestion_result = suggest_note_update(
                 note=note,
@@ -202,6 +184,9 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 comment=_comment_with_source(suggestion_meta),
                 media_upload_cb=media_sync.start_media_upload,
                 auto_accept=suggestion_meta.auto_accept,
+                fields_to_include=fields_for_note,
+                tags_to_add=suggestion_meta.tags_to_add,
+                tags_to_remove=suggestion_meta.tags_to_remove,
             )
         except AnkiHubHTTPError as e:
             _handle_suggestion_error(e, parent)
@@ -274,6 +259,8 @@ def open_suggestion_dialog_for_bulk_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
+        notes=notes,
+        ah_did=ah_did,
         preselected_change_type=preselected_change_type,
         parent=parent,
     )
@@ -302,6 +289,9 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_upload_cb,
+            fields_to_include_by_mid=suggestion_meta.fields_to_include_by_mid,
+            tags_to_add=suggestion_meta.tags_to_add,
+            tags_to_remove=suggestion_meta.tags_to_remove,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
@@ -447,6 +437,8 @@ class SuggestionDialog(QDialog):
         can_submit_without_review: bool,
         added_new_media: bool,
         callback: Callable[[Optional[SuggestionMetadata]], None],
+        notes: Sequence[Note] = (),
+        ah_did: Optional[uuid.UUID] = None,
         preselected_change_type: Optional[SuggestionType] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -459,7 +451,10 @@ class SuggestionDialog(QDialog):
         self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
         self._callback = callback
+        self._notes = list(notes)
+        self._ah_did = ah_did
         self._preselected_change_type = preselected_change_type
+        self._fields_widget: Optional[FieldsToSuggestWidget] = None
 
         self._setup_ui()
 
@@ -510,6 +505,7 @@ class SuggestionDialog(QDialog):
         self.layout_.addWidget(label)
 
         self.rationale_edit = QPlainTextEdit()
+        self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
         self.layout_.addWidget(self.rationale_edit)
 
         def limit_length():
@@ -520,6 +516,14 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, self._validate)
 
         self.layout_.addSpacing(10)
+
+        # Set up Fields to Suggest selector (change suggestions only; hidden on DELETE)
+        if not self._is_new_note_suggestion and self._notes and self._ah_did is not None:
+            self._fields_widget = FieldsToSuggestWidget(notes=self._notes, ah_did=self._ah_did)
+            self.layout_.addWidget(self._fields_widget)
+            self.layout_.addSpacing(10)
+            qconnect(self._fields_widget.selection_changed, self._validate)
+            self._refresh_fields_widget_visibility()
 
         # Add note about media source if a media file was added
         if self._added_new_media and self._is_for_anking_deck:
@@ -545,6 +549,8 @@ class SuggestionDialog(QDialog):
         qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
     def accept(self) -> None:
+        if self._fields_widget is not None and self._fields_widget.isVisible():
+            self._fields_widget.save_selection()
         self._callback(self.suggestion_meta())
         super().accept()
 
@@ -553,17 +559,34 @@ class SuggestionDialog(QDialog):
         super().reject()
 
     def suggestion_meta(self) -> Optional[SuggestionMetadata]:
+        fields_filter: Optional[Dict[NotetypeId, List[str]]] = None
+        tags_to_add: Optional[List[str]] = None
+        tags_to_remove: Optional[List[str]] = None
+        if self._fields_widget is not None and self._fields_widget.isVisible():
+            fields_filter = self._fields_widget.selected_field_names_by_mid()
+            tags_to_add = self._fields_widget.selected_tag_additions()
+            tags_to_remove = self._fields_widget.selected_tag_removals()
         return SuggestionMetadata(
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
             source=(self.source_widget.suggestion_source() if self._source_needed() else None),
+            fields_to_include_by_mid=fields_filter,
+            tags_to_add=tags_to_add,
+            tags_to_remove=tags_to_remove,
         )
 
     def _on_change_type_changed(self) -> None:
         self._refresh_source_widget()
         self._refresh_hint_for_note_deletions()
+        self._refresh_fields_widget_visibility()
         self._validate()
+
+    def _refresh_fields_widget_visibility(self) -> None:
+        if self._fields_widget is None:
+            return
+        # Hide for DELETE — the field-selection logic doesn't apply.
+        self._fields_widget.setVisible(self._change_type() != SuggestionType.DELETE)
 
     def _refresh_source_widget(self):
         if self._source_needed():
@@ -599,6 +622,14 @@ class SuggestionDialog(QDialog):
             return False
 
         if self._source_needed() and not self.source_widget.is_valid():
+            return False
+
+        if (
+            self._fields_widget is not None
+            and self._fields_widget.isVisible()
+            and self._fields_widget.has_any_edits()
+            and not self._fields_widget.has_any_selection()
+        ):
             return False
 
         return True
@@ -641,14 +672,21 @@ source_type_to_source_label = {
     SourceType.UWORLD: "UWorld Question ID",
     SourceType.SOCIETY_GUIDELINES: "Link",
     SourceType.DUPLICATE_NOTE: "Anki note ID of duplicate note",
-    SourceType.OTHER: "",
+    SourceType.OTHER: "More details",
 }
 
 # Maps source types to the placeholder text that is shown in the source input field.
 # If a source type is not in this dict, no placeholder text is shown.
 source_type_to_source_place_holder_text = {
+    SourceType.AMBOSS: "Paste AMBOSS link",
+    SourceType.UWORLD: "e.g. 12345",
+    SourceType.SOCIETY_GUIDELINES: "Paste link to guidelines",
     SourceType.DUPLICATE_NOTE: "[Include ID, if applicable]",
+    SourceType.OTHER: "Describe the source",
 }
+
+# Placeholder shown in the Rationale-for-change textarea.
+RATIONALE_FOR_CHANGE_PLACEHOLDER = "Why should this change be applied?"
 
 source_types_where_input_is_optional = [
     SourceType.DUPLICATE_NOTE,
@@ -769,3 +807,175 @@ class SourceWidget(QWidget):
             return SourceType(self.source_type_select.currentText())
         else:
             return None
+
+
+class _TagChange:
+    """A single tag-change checkbox: kind is 'add' or 'remove', tag is the tag name."""
+
+    __slots__ = ("kind", "tag", "checkbox")
+
+    def __init__(self, kind: str, tag: str, checkbox: QCheckBox) -> None:
+        self.kind = kind
+        self.tag = tag
+        self.checkbox = checkbox
+
+
+class FieldsToSuggestWidget(QWidget):
+    """Selector for which edited fields and tag changes to include in the outgoing
+    suggestion. Visible only for change-suggestion flow (skipped for new-note and
+    delete flows).
+
+    Single-note: flat list. Bulk: one group per note type. Globally-protected fields
+    appear inline indistinguishably; the server/reviewers decide whether to apply them.
+    """
+
+    selection_changed = pyqtSignal()
+
+    def __init__(self, notes: Sequence[Note], ah_did: uuid.UUID, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._notes = list(notes)
+        self._ah_did = ah_did
+        # mid -> {field_name -> QCheckBox}
+        self._field_checkboxes: Dict[NotetypeId, Dict[str, QCheckBox]] = {}
+        # All tag-change checkboxes (single dialog-level section, union across notes).
+        self._tag_changes: List[_TagChange] = []
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(outer)
+
+        title_row = QHBoxLayout()
+        self._title_label = QLabel("<b>Fields to Suggest</b>")
+        self._counter_label = QLabel("")
+        title_row.addWidget(self._title_label)
+        title_row.addStretch()
+        title_row.addWidget(self._counter_label)
+        outer.addLayout(title_row)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setMinimumHeight(120)
+        body = QWidget()
+        self._body_layout = QVBoxLayout()
+        self._body_layout.setContentsMargins(4, 4, 4, 4)
+        body.setLayout(self._body_layout)
+        self._scroll.setWidget(body)
+        outer.addWidget(self._scroll)
+
+        self._populate()
+        self._refresh_counter()
+
+    def _populate(self) -> None:
+        is_bulk = len(self._notes) > 1
+
+        # Collect edited fields per note type (union across notes of that type for bulk).
+        fields_by_mid: Dict[NotetypeId, List[str]] = {}
+        note_type_name_by_mid: Dict[NotetypeId, str] = {}
+        for note in self._notes:
+            mid = NotetypeId(note.mid)
+            note_type_name_by_mid.setdefault(mid, note.note_type()["name"])
+            fields = edited_field_names(note)
+            fields_by_mid.setdefault(mid, [])
+            for f in fields:
+                if f not in fields_by_mid[mid]:
+                    fields_by_mid[mid].append(f)
+
+        # Render field section(s).
+        for mid, fields in fields_by_mid.items():
+            if not fields:
+                continue
+            saved = config.last_field_selection(self._ah_did, mid)
+            checked_set = set(saved) if saved is not None else set(fields)
+
+            if is_bulk:
+                group = QGroupBox(f"Note type: {note_type_name_by_mid[mid]}")
+                group_layout = QVBoxLayout()
+                group.setLayout(group_layout)
+                container = group_layout
+                self._body_layout.addWidget(group)
+            else:
+                container = self._body_layout
+
+            mid_map: Dict[str, QCheckBox] = {}
+            for field_name in fields:
+                cb = QCheckBox(field_name)
+                cb.setChecked(field_name in checked_set)
+                qconnect(cb.toggled, self._on_toggle)
+                container.addWidget(cb)
+                mid_map[field_name] = cb
+            self._field_checkboxes[mid] = mid_map
+
+        # Collect tag changes (union across notes).
+        added_tags: List[str] = []
+        removed_tags: List[str] = []
+        for note in self._notes:
+            added, removed = tag_changes(note)
+            for t in added:
+                if t not in added_tags:
+                    added_tags.append(t)
+            for t in removed:
+                if t not in removed_tags:
+                    removed_tags.append(t)
+
+        if added_tags or removed_tags:
+            tag_group = QGroupBox("Tag changes")
+            tag_layout = QVBoxLayout()
+            tag_group.setLayout(tag_layout)
+            for t in added_tags:
+                cb = QCheckBox(f"+ {t}")
+                cb.setChecked(True)
+                qconnect(cb.toggled, self._on_toggle)
+                tag_layout.addWidget(cb)
+                self._tag_changes.append(_TagChange("add", t, cb))
+            for t in removed_tags:
+                cb = QCheckBox(f"− {t}")
+                cb.setChecked(True)
+                qconnect(cb.toggled, self._on_toggle)
+                tag_layout.addWidget(cb)
+                self._tag_changes.append(_TagChange("remove", t, cb))
+            self._body_layout.addWidget(tag_group)
+
+        self._body_layout.addStretch()
+
+    def _on_toggle(self, _checked: bool) -> None:
+        self._refresh_counter()
+        self.selection_changed.emit()
+
+    def _all_checkboxes(self) -> List[QCheckBox]:
+        boxes: List[QCheckBox] = []
+        for mid_map in self._field_checkboxes.values():
+            boxes.extend(mid_map.values())
+        boxes.extend(tc.checkbox for tc in self._tag_changes)
+        return boxes
+
+    def _refresh_counter(self) -> None:
+        boxes = self._all_checkboxes()
+        total = len(boxes)
+        selected = sum(1 for cb in boxes if cb.isChecked())
+        self._counter_label.setText(f"{selected} / {total} selected" if total else "")
+
+    def has_any_edits(self) -> bool:
+        """True if there's anything to potentially suggest (regardless of selection)."""
+        return bool(self._all_checkboxes())
+
+    def has_any_selection(self) -> bool:
+        return any(cb.isChecked() for cb in self._all_checkboxes())
+
+    def selected_field_names_by_mid(self) -> Dict[NotetypeId, List[str]]:
+        return {
+            mid: [name for name, cb in mid_map.items() if cb.isChecked()]
+            for mid, mid_map in self._field_checkboxes.items()
+        }
+
+    def selected_tag_additions(self) -> List[str]:
+        return [tc.tag for tc in self._tag_changes if tc.kind == "add" and tc.checkbox.isChecked()]
+
+    def selected_tag_removals(self) -> List[str]:
+        return [tc.tag for tc in self._tag_changes if tc.kind == "remove" and tc.checkbox.isChecked()]
+
+    def save_selection(self) -> None:
+        """Persist the current selection per (ah_did, mid). Called on dialog accept."""
+        for mid, selected in self.selected_field_names_by_mid().items():
+            config.set_last_field_selection(self._ah_did, mid, selected)
