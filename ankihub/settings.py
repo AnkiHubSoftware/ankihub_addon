@@ -262,6 +262,7 @@ class _Config:
         if override_url := (
             os.getenv("ANKIHUB_APP_URL") or build_config.get("app_url") or self.public_config.get("app_url")
         ):
+            override_url = override_url.rstrip("/")
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
 
