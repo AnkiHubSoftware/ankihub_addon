@@ -56,8 +56,8 @@ jobs:
 
       - name: Configure addon for PR environment
         run: |
-          sed -i 's/"use_staging": false/"use_staging": true/' ankihub/config.json
           sed -i 's|"app_url": null|"app_url": "${{ inputs.pr_env_url }}"|' ankihub/build_config.json
+          sed -i 's/"use_staging": false/"use_staging": true/' ankihub/build_config.json
 
       - name: Create ankiaddon file
         run: |

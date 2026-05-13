@@ -240,7 +240,9 @@ class _Config:
         migrate_public_config()
         self.load_public_config()
 
-        if self.public_config.get("use_staging"):
+        build_config = _get_build_config()
+
+        if build_config.get("use_staging") or self.public_config.get("use_staging"):
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
@@ -258,7 +260,7 @@ class _Config:
         # Priority chain for app_url (lowest to highest):
         # staging/prod (above) < user config (non-null) < build_config.json < env var
         if override_url := (
-            os.getenv("ANKIHUB_APP_URL") or _get_build_config_app_url() or self.public_config.get("app_url")
+            os.getenv("ANKIHUB_APP_URL") or build_config.get("app_url") or self.public_config.get("app_url")
         ):
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
@@ -733,13 +735,13 @@ class _Config:
             )
 
 
-def _get_build_config_app_url() -> Optional[str]:
+def _get_build_config() -> dict:
     build_config_path = ADDON_PATH / "build_config.json"
     try:
         with open(build_config_path) as f:
-            return json.load(f).get("app_url")
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return None
+        return {}
 
 
 config = _Config()
