@@ -1,9 +1,6 @@
 name: Build PR Environment Addon
 
 on:
-  push:
-    branches:
-      - feat/pr-env-build-action
   workflow_dispatch:
     inputs:
       branch:
