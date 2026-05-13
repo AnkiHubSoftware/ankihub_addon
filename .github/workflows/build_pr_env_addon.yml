@@ -1,0 +1,75 @@
+name: Build PR Environment Addon
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build from"
+        required: true
+        type: string
+      pr_env_url:
+        description: "AnkiHub PR environment URL (e.g., https://pr-123.ankihub.net)"
+        required: true
+        type: string
+
+jobs:
+  build-pr-env:
+    name: Build PR Environment Addon
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
+          ref: ${{ inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Validate pr_env_url
+        run: |
+          if [[ ! "${{ inputs.pr_env_url }}" =~ ^https://pr-[^.]+\.ankihub\.net(/.*)?$ ]]; then
+            echo "Error: pr_env_url must match https://pr-<id>.ankihub.net (got: ${{ inputs.pr_env_url }}). URL must use https:// and target a pr-<id>.ankihub.net host."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install deps
+        run: |
+          uv sync --locked --dev --group aqt
+
+      - name: Configure addon for PR environment
+        env:
+          PR_ENV_URL: ${{ inputs.pr_env_url }}
+        run: |
+          jq --arg url "$PR_ENV_URL" '.app_url = $url | .use_staging = true' ankihub/build_config.json > tmp.json
+          mv tmp.json ankihub/build_config.json
+
+      - name: Create ankiaddon file
+        run: |
+          bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
+      - name: Sanitize branch name for artifact
+        run: echo "SAFE_BRANCH=$(echo '${{ inputs.branch }}' | tr '/' '-')" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ankihub-pr-env-${{ env.SAFE_BRANCH }}
+          path: ankihub.ankiaddon
+          retention-days: 30

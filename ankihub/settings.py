@@ -240,16 +240,16 @@ class _Config:
         migrate_public_config()
         self.load_public_config()
 
-        if self.public_config.get("use_staging"):
+        build_config = _get_build_config()
+
+        if build_config.get("use_staging") or self.public_config.get("use_staging"):
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
-            if staging_anking_deck_id := self.public_config.get("staging_anking_deck_id"):
-                self.anking_deck_id = staging_anking_deck_id
-            else:
-                self.anking_deck_id = uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
+            self.anking_deck_id = uuid.UUID(
+                self.public_config.get("staging_anking_deck_id") or "dfe7f548-f66e-4277-932b-c7a63db3223a"
+            )
             self.intro_deck_id = uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
-
         else:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
@@ -257,10 +257,14 @@ class _Config:
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
-        # Override urls with environment variables if they are set.
-        if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
-            self.app_url = app_url_from_env_var
-            self.api_url = f"{app_url_from_env_var}/api"
+        # Priority chain for app_url (lowest to highest):
+        # staging/prod (above) < user config (non-null) < build_config.json < env var
+        if override_url := (
+            os.getenv("ANKIHUB_APP_URL") or build_config.get("app_url") or self.public_config.get("app_url")
+        ):
+            override_url = override_url.rstrip("/")
+            self.app_url = override_url
+            self.api_url = f"{override_url}/api"
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
@@ -730,6 +734,15 @@ class _Config:
                 FSRS_LAST_OPTIMIZATION_REMINDER_DATE_KEY,
                 date_.isoformat(),
             )
+
+
+def _get_build_config() -> dict:
+    build_config_path = ADDON_PATH / "build_config.json"
+    try:
+        with open(build_config_path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 
 config = _Config()

@@ -78,6 +78,10 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.ankihub_client import (
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_S3_BUCKET_URL,
+    STAGING_API_URL,
+    STAGING_APP_URL,
+    STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
 from ankihub.ankihub_client.models import (  # type: ignore
@@ -3885,3 +3889,85 @@ class TestShowSubdeckDueDateReminders:
         assert _reminder_dialog_state.queue == expired_subdecks
         # Verify _show_next_due_date_reminder_dialog was called to start the flow
         mock_show_next.assert_called_once()
+
+
+class TestSetupPublicConfigAndOtherSettings:
+    @pytest.fixture(autouse=True)
+    def anki_session_with_addon_data(self):
+        """Override the global autouse fixture — these tests don't need a full Anki session."""
+        yield
+
+    @pytest.fixture(autouse=True)
+    def base_setup(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setattr("ankihub.settings.migrate_public_config", lambda: None)
+        monkeypatch.setattr(config, "load_public_config", lambda: None)
+        monkeypatch.delenv("ANKIHUB_APP_URL", raising=False)
+        monkeypatch.delenv("S3_BUCKET_URL", raising=False)
+        monkeypatch.delenv("ANKING_DECK_ID", raising=False)
+        monkeypatch.delenv("INTRO_DECK_ID", raising=False)
+        monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
+
+    def test_production_defaults(self):
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.app_url == DEFAULT_APP_URL
+        assert config.api_url == DEFAULT_API_URL
+        assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
+        assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
+        assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
+
+    def test_staging_defaults(self):
+        config.public_config = {"use_staging": True}
+        config.setup_public_config_and_other_settings()
+        assert config.app_url == STAGING_APP_URL
+        assert config.api_url == STAGING_API_URL
+        assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
+        assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
+        assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
+
+    def test_staging_anking_deck_id_override(self):
+        custom_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        config.public_config = {"use_staging": True, "staging_anking_deck_id": custom_id}
+        config.setup_public_config_and_other_settings()
+        assert config.anking_deck_id == uuid.UUID(custom_id)
+
+    def test_build_config_app_url(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {"app_url": "https://build.example.com"})
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.app_url == "https://build.example.com"
+        assert config.api_url == "https://build.example.com/api"
+
+    def test_build_config_app_url_overrides_user_config(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {"app_url": "https://build.example.com"})
+        config.public_config = {"app_url": "https://user.example.com"}
+        config.setup_public_config_and_other_settings()
+        assert config.app_url == "https://build.example.com"
+        assert config.api_url == "https://build.example.com/api"
+
+    def test_env_var_app_url_overrides_user_config(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIHUB_APP_URL", "https://env.example.com")
+        config.public_config = {"app_url": "https://user.example.com"}
+        config.setup_public_config_and_other_settings()
+        assert config.app_url == "https://env.example.com"
+        assert config.api_url == "https://env.example.com/api"
+
+    def test_s3_bucket_url_env_var_override(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("S3_BUCKET_URL", "https://custom-s3.example.com")
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.s3_bucket_url == "https://custom-s3.example.com"
+
+    def test_anking_deck_id_env_var_override(self, monkeypatch: MonkeyPatch):
+        custom_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        monkeypatch.setenv("ANKING_DECK_ID", custom_id)
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.anking_deck_id == uuid.UUID(custom_id)
+
+    def test_intro_deck_id_env_var_override(self, monkeypatch: MonkeyPatch):
+        custom_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+        monkeypatch.setenv("INTRO_DECK_ID", custom_id)
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.intro_deck_id == uuid.UUID(custom_id)
