@@ -52,9 +52,11 @@ jobs:
           uv sync --locked --dev --group aqt
 
       - name: Configure addon for PR environment
+        env:
+          PR_ENV_URL: ${{ inputs.pr_env_url }}
         run: |
-          sed -i 's|"app_url": null|"app_url": "${{ inputs.pr_env_url }}"|' ankihub/build_config.json
-          sed -i 's/"use_staging": false/"use_staging": true/' ankihub/build_config.json
+          jq --arg url "$PR_ENV_URL" '.app_url = $url | .use_staging = true' ankihub/build_config.json > tmp.json
+          mv tmp.json ankihub/build_config.json
 
       - name: Create ankiaddon file
         run: |
