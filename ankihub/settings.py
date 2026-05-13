@@ -256,9 +256,9 @@ class _Config:
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
         # Priority chain for app_url (lowest to highest):
-        # staging/prod (above) < build_config.json < user config (non-null) < env var
+        # staging/prod (above) < user config (non-null) < build_config.json < env var
         if override_url := (
-            os.getenv("ANKIHUB_APP_URL") or self.public_config.get("app_url") or _get_build_config_app_url()
+            os.getenv("ANKIHUB_APP_URL") or _get_build_config_app_url() or self.public_config.get("app_url")
         ):
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
