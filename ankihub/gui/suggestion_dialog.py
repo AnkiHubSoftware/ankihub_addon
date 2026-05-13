@@ -468,56 +468,10 @@ class SuggestionDialog(QDialog):
     def _setup_ui(self) -> None:
         self.setWindowTitle("Note Suggestion(s)")
 
-        self.layout_ = QVBoxLayout()
-        self.setLayout(self.layout_)
-
-        # Set up change type dropdown
-        self.change_type_select = QComboBox()
-        if not self._is_new_note_suggestion:
-            self.change_type_select.addItems([x.value[1] for x in SuggestionType])
-            label = QLabel("Change Type")
-            self.layout_.addWidget(label)
-            self.layout_.addWidget(self.change_type_select)
-            qconnect(
-                self.change_type_select.currentTextChanged,
-                self._on_change_type_changed,
-            )
-            self.layout_.addSpacing(10)
-
-        # Set up source widget in a group box (group box is for styling purposes)
-        self.source_widget = SourceWidget()
-        self.source_widget_group_box = QGroupBox("Source")
-        self.layout_.addWidget(self.source_widget_group_box)
-        self.source_widget_group_box_layout = QVBoxLayout()
-        self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
-
-        self.source_widget_group_box_layout.addWidget(self.source_widget)
-        qconnect(self.source_widget.validation_signal, self._validate)
-        self.layout_.addSpacing(10)
-
-        self._refresh_source_widget()
-
-        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes<br>to fields will not be applied.")
-        self.hint_for_note_deletions.hide()
-        self.layout_.addWidget(self.hint_for_note_deletions)
-        self.layout_.addSpacing(10)
-
-        # Set up rationale field
-        label = QLabel("Rationale for Change (Required)")
-        self.layout_.addWidget(label)
-
-        self.rationale_edit = QPlainTextEdit()
-        self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
-        self.layout_.addWidget(self.rationale_edit)
-
-        def limit_length():
-            while len(self.rationale_edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
-                self.rationale_edit.textCursor().deletePreviousChar()
-
-        qconnect(self.rationale_edit.textChanged, limit_length)
-        qconnect(self.rationale_edit.textChanged, self._validate)
-
-        self.layout_.addSpacing(10)
+        # Two-column layout: Fields-to-Suggest panel on the left, everything else on the right.
+        # Left column is hidden when the panel isn't applicable (new-note, DELETE, flag off).
+        main_layout = QHBoxLayout()
+        self.setLayout(main_layout)
 
         if (
             is_new_suggest_workflow_enabled()
@@ -526,30 +480,84 @@ class SuggestionDialog(QDialog):
             and self._ah_did is not None
         ):
             self._fields_widget = FieldsToSuggestWidget(notes=self._notes, ah_did=self._ah_did)
-            self.layout_.addWidget(self._fields_widget)
-            self.layout_.addSpacing(10)
+            self._fields_widget.setMinimumWidth(220)
+            main_layout.addWidget(self._fields_widget)
             qconnect(self._fields_widget.selection_changed, self._validate)
-            self._refresh_fields_widget_visibility()
+
+        # Right column holds the form
+        right_layout = QVBoxLayout()
+        main_layout.addLayout(right_layout, 1)
+
+        # Set up change type dropdown
+        self.change_type_select = QComboBox()
+        if not self._is_new_note_suggestion:
+            self.change_type_select.addItems([x.value[1] for x in SuggestionType])
+            right_layout.addWidget(QLabel("Change Type"))
+            right_layout.addWidget(self.change_type_select)
+            qconnect(
+                self.change_type_select.currentTextChanged,
+                self._on_change_type_changed,
+            )
+            right_layout.addSpacing(10)
+
+        # Set up source widget in a group box (group box is for styling purposes)
+        self.source_widget = SourceWidget()
+        self.source_widget_group_box = QGroupBox("Source")
+        right_layout.addWidget(self.source_widget_group_box)
+        self.source_widget_group_box_layout = QVBoxLayout()
+        self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
+
+        self.source_widget_group_box_layout.addWidget(self.source_widget)
+        qconnect(self.source_widget.validation_signal, self._validate)
+        right_layout.addSpacing(10)
+
+        self._refresh_source_widget()
+
+        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes<br>to fields will not be applied.")
+        self.hint_for_note_deletions.hide()
+        right_layout.addWidget(self.hint_for_note_deletions)
+        right_layout.addSpacing(10)
+
+        # Set up rationale field
+        right_layout.addWidget(QLabel("Rationale for Change (Required)"))
+
+        self.rationale_edit = QPlainTextEdit()
+        self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
+        right_layout.addWidget(self.rationale_edit)
+
+        def limit_length():
+            while len(self.rationale_edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
+                self.rationale_edit.textCursor().deletePreviousChar()
+
+        qconnect(self.rationale_edit.textChanged, limit_length)
+        qconnect(self.rationale_edit.textChanged, self._validate)
+
+        right_layout.addSpacing(10)
 
         # Add note about media source if a media file was added
         if self._added_new_media and self._is_for_anking_deck:
-            label = QLabel(
-                "Please provide the source of images or audio files<br>"
-                "in the rationale field. For example:<br>"
-                "Photo credit: The AnKing [www.ankingmed.com]"
+            right_layout.addWidget(
+                QLabel(
+                    "Please provide the source of images or audio files<br>"
+                    "in the rationale field. For example:<br>"
+                    "Photo credit: The AnKing [www.ankingmed.com]"
+                )
             )
-            self.layout_.addWidget(label)
-            self.layout_.addSpacing(10)
+            right_layout.addSpacing(10)
 
         # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review.")
         self.auto_accept_cb.setVisible(self._can_submit_without_review)
-        self.layout_.addWidget(self.auto_accept_cb)
+        right_layout.addWidget(self.auto_accept_cb)
 
         # Set up button box
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         qconnect(self.button_box.accepted, self.accept)
-        self.layout_.addWidget(self.button_box)
+        right_layout.addWidget(self.button_box)
+
+        # Now that change_type_select exists, refresh widget visibility (depends on _change_type()).
+        if self._fields_widget is not None:
+            self._refresh_fields_widget_visibility()
 
         self._set_submit_button_enabled_state(False)
         qconnect(self.validation_signal, self._set_submit_button_enabled_state)
