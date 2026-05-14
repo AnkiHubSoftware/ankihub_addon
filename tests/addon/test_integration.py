@@ -10071,6 +10071,37 @@ class TestPromptForOnboardingTutorial:
             mock_inject.assert_not_called()
             assert config.onboarding_tutorial_show_on_sync() is False
 
+    def test_maybe_show_onboarding_tutorial_after_login_removes_itself_from_refresh_callbacks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """The callback must fire only once per session so dismissing 'Maybe later' is final.
+
+        Subsequent user-state refreshes (periodic timer, post-sync, etc.) should not
+        re-show the prompt while ``last_deck_sync`` is still ``None``.
+        """
+        from ankihub.user_state import (
+            _state,
+            add_user_state_refreshed_callback,
+            remove_user_state_refreshed_callback,
+        )
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+
+            add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+            try:
+                assert _maybe_show_onboarding_tutorial_after_login in _state.user_state_refreshed_callbacks
+
+                _maybe_show_onboarding_tutorial_after_login()
+
+                assert _maybe_show_onboarding_tutorial_after_login not in _state.user_state_refreshed_callbacks
+            finally:
+                remove_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+
 
 class TestSubscribeToIntroDeck:
     @pytest.mark.qt_no_exception_capture

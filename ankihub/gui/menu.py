@@ -236,11 +236,19 @@ class AnkiHubLogin(QWidget):
 def _maybe_show_onboarding_tutorial_after_login() -> None:
     """Show the onboarding tutorial after the first successful login on this profile.
 
+    Fires once: removes itself from the user-state refresh callbacks before doing
+    anything else so subsequent refreshes (periodic timer, post-sync, etc.) cannot
+    re-show the prompt after the user dismissed it.
+
     This triggers when:
     - The user is logged in
     - `last_deck_sync` is None (no previous sync/tutorial for this profile)
     - Feature flags/user details have just been refreshed (so feature flag checks work)
     """
+    from ..user_state import remove_user_state_refreshed_callback
+
+    remove_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+
     if config.last_deck_sync() is not None:
         return
 
