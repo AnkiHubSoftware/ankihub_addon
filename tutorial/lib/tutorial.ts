@@ -317,12 +317,14 @@ export class TutorialEffect {
 
 let activeEffect: TutorialEffect | null = null;
 let targetResizeHandler: (() => void) | null = null;
+let pendingModalPosition: PositionTargetArgs | null = null;
 
 export function destroyActiveTutorialEffect() {
     if (activeEffect) {
         activeEffect.destroy();
         activeEffect = null;
     }
+    pendingModalPosition = null;
 }
 
 async function createAndShowEffect(options: Partial<TutorialEffectOptions>): Promise<TutorialEffect> {
@@ -330,6 +332,11 @@ async function createAndShowEffect(options: Partial<TutorialEffectOptions>): Pro
     const effect = new TutorialEffect(options);
     await effect.show();
     activeEffect = effect;
+    if (pendingModalPosition) {
+        const { top, left, width, height } = pendingModalPosition;
+        pendingModalPosition = null;
+        effect.setModalPosition(top, left, width, height);
+    }
     return effect;
 }
 
@@ -417,6 +424,8 @@ type PositionTargetArgs = {
 export function positionTutorialModal({ top, left, width, height }: PositionTargetArgs) {
     if (activeEffect) {
         activeEffect.setModalPosition(top, left, width, height);
+    } else {
+        pendingModalPosition = { top, left, width, height };
     }
 }
 
