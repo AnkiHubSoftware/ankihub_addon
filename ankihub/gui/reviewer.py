@@ -186,6 +186,7 @@ class ReviewerSidebar:
         self.set_content_url(url)
 
         self._update_header_webview()
+        self.content_webview.setFocus()
 
     def _update_header_button_state(self):
         if not self.resources:
@@ -286,6 +287,8 @@ class ReviewerSidebar:
             return
 
         if ok:
+            if self.page_type == SidebarPageType.CHATBOT:
+                self.content_webview.setFocus()
             return
 
         def check_auth_failure_callback(value: str) -> None:
