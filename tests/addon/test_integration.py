@@ -1435,6 +1435,194 @@ def test_suggest_new_note(
         assert exc is not None and exc.response.status_code == 403
 
 
+class TestFieldsToSuggestFilters:
+    """Covers the user-controlled filter introduced for the suggestion-dialog overhaul:
+    edited_field_names + the fields_to_include / tags_to_add / tags_to_remove allowlists.
+    """
+
+    def test_edited_field_names_includes_personally_protected_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        from ankihub.main.suggestions import edited_field_names
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            # Personally protect the Front field and edit it. The previous _prepare_fields
+            # behavior would have stripped Front from the diff; the dialog needs to see it.
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            assert "Front" in edited_field_names(note)
+
+    def test_suggest_note_update_fields_to_include_filters(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            # Only allow the first field through.
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                fields_to_include=[field_names[0]],
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            sent_field_names = [f.name for f in sent.fields]
+            assert sent_field_names == [field_names[0]]
+
+    def test_suggest_note_update_tag_filters(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            note.tags = ["stays", "removed_a", "removed_b"]
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            note.tags = ["stays", "added_a", "added_b"]
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            # Allow only one addition and one removal through.
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                tags_to_add=["added_a"],
+                tags_to_remove=["removed_a"],
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            assert sent.added_tags == ["added_a"]
+            assert sent.removed_tags == ["removed_a"]
+
+    def test_last_deselected_fields_round_trip(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            assert config.last_deselected_fields(ah_did, mid) == []
+
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
+
+            # Short-circuit: setting the same value shouldn't error or rewrite.
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
+
+    def test_protected_fields_stripped_when_feature_flag_off(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        """With the feature flag off, the suggestion path keeps the legacy behavior:
+        fields carrying personal AnkiHub_Protect tags are stripped from the outgoing
+        suggestion. (When on, the dialog filters at the user's direction instead.)
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::{field_names[0]}")
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": False})
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            sent_field_names = [f.name for f in sent.fields]
+            # Protected field is stripped; the other change still goes out.
+            assert field_names[0] not in sent_field_names
+            assert field_names[1] in sent_field_names
+
+    def test_save_selection_merges_with_prior_deselections(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """A field deselected in a prior session should stay deselected even when it's not
+        shown in the current widget (because the user hasn't edited it this time). Re-checking
+        a field explicitly clears its deselection.
+        """
+        from ankihub.gui.suggestion_dialog import FieldsToSuggestWidget
+
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            # Prior session: user deselected "Back".
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+
+            # Current session: only "Front" is edited (Back isn't shown in the widget).
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            widget = FieldsToSuggestWidget(notes=[note], ah_did=ah_did)
+            # Widget renders only Front; Back is absent.
+            front_cb = widget._field_checkboxes[NotetypeId(mid)]["Front"]
+            assert "Back" not in widget._field_checkboxes[NotetypeId(mid)]
+
+            # User deselects Front and saves. Prior Back deselection must survive.
+            front_cb.setChecked(False)
+            widget.save_selection()
+            assert sorted(config.last_deselected_fields(ah_did, mid)) == ["Back", "Front"]
+
+            # User re-checks Front and saves. Front's deselection is cleared; Back stays.
+            front_cb.setChecked(True)
+            widget.save_selection()
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
+
+
 class TestSuggestNotesInBulk:
     def test_new_note_suggestion(
         self,
