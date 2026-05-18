@@ -1354,9 +1354,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
                 "Click <b>Next</b> and we'll unsuspend a few cards for you as an example.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
-                qt_target=lambda: self._browser.form.tableView,
+                qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
-                target_outline=False,
+                target_outline=True,
                 next_callback=self._unsuspend_cards_and_move_to_next_step,
             )
         )
