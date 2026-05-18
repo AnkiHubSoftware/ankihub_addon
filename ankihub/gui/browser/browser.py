@@ -60,7 +60,7 @@ from ...main.note_conversion import (
 )
 from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
+from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type, update_notes_with_named_undo
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError
 from ..flashcard_selector_dialog import show_flashcard_selector
@@ -77,7 +77,6 @@ from ..utils import (
     choose_list,
     choose_subset,
     sparkles_icon,
-    update_notes_with_named_undo,
 )
 from .custom_columns import (
     AnkiHubIdColumn,

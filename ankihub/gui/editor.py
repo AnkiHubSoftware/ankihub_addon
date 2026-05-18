@@ -16,6 +16,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
+from ..main.utils import update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -26,7 +27,6 @@ from ..settings import (
     url_view_note_history,
 )
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
-from .utils import update_notes_with_named_undo
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
