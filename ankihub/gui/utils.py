@@ -2,7 +2,7 @@ import inspect
 import uuid
 from functools import partial, wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar, Union
 
 import aqt
 from anki.decks import DeckId
@@ -148,7 +148,7 @@ class _ChooseSubsetDialog(QDialog):
         layout: QVBoxLayout,
         choices: List[str],
         current: List[str],
-        locked_set: set,
+        locked_set: Set[str],
         locked_tooltip: Optional[str],
     ) -> None:
         self._list_widget = CustomListWidget()
