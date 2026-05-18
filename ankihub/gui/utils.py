@@ -155,9 +155,6 @@ def choose_subset(
 
     layout.addSpacing(10)
 
-    # Build button row
-    button_box = QDialogButtonBox()
-
     # "Select All" toggles all interactive items; deselects all if all are already selected
     def select_all() -> None:
         all_selected = all(item.checkState() == Qt.CheckState.Checked for item in interactive_items)
@@ -167,18 +164,24 @@ def choose_subset(
 
     select_all_button = QPushButton(select_all_text)
     qconnect(select_all_button.clicked, select_all)
-    button_box.addButton(select_all_button, QDialogButtonBox.ButtonRole.ActionRole)
 
-    # Add other buttons
+    # Accept/reject buttons live in a standard button box on the right
+    button_box = QDialogButtonBox()
     if buttons:
         for button_param in buttons:
             add_button_from_param(button_box, button_param)
     else:
+        button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
         button_box.addButton(QDialogButtonBox.StandardButton.Ok)
-
     qconnect(button_box.accepted, dialog.accept)
     qconnect(button_box.rejected, dialog.reject)
-    layout.addWidget(button_box)
+
+    # Select All on the left, accept/reject on the right
+    button_row = QHBoxLayout()
+    button_row.addWidget(select_all_button)
+    button_row.addStretch()
+    button_row.addWidget(button_box)
+    layout.addLayout(button_row)
 
     if adjust_height_to_content:
         list_widget.setMinimumHeight(list_widget.sizeHintForRow(0) * list_widget.count() + 20)
