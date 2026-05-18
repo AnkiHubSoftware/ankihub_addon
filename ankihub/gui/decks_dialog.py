@@ -496,8 +496,10 @@ class DeckManagementDialog(QDialog):
         deck_config = config.deck_config(selected_ah_did)
 
         auto_protect_tooltip_message = (
-            "When enabled, any field you edit will be automatically protected "
-            "so your changes aren't overwritten by future note updates."
+            "When enabled, any field you edit\n"
+            "will be automatically protected\n"
+            "so your changes aren't overwritten\n"
+            "by future note updates."
         )
 
         # Setup checkbox

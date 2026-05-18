@@ -92,11 +92,13 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
         return changed
 
     ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
-    if not ah_note or not ah_note.fields or field_name not in ah_note.fields:
+    if not ah_note:
         return changed
 
+    # ah_note.fields omits empty fields, so treat a missing field name as empty
+    ah_field_value = (ah_note.fields or {}).get(field_name, "")
     protection_tag = protection_tag_for_field(field_name)
-    should_be_protected = note[field_name] != ah_note.fields[field_name]
+    should_be_protected = note[field_name] != ah_field_value
     if should_be_protected and protection_tag not in note.tags:
         # Field differs from AnkiHub version — add protection if not already present
         note.tags.append(protection_tag)

@@ -349,16 +349,6 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         )
         return
 
-    # The same note type can be shared across AnkiHub decks; require a single deck
-    # so the globally-protected-fields lock applies consistently to all selected notes.
-    ah_dids = {did for did in ankihub_db.ankihub_dids_for_anki_nids(nids) if did is not None}
-    if len(ah_dids) > 1:
-        showInfo(
-            "Please select notes from only one AnkiHub deck.",
-            parent=browser,
-        )
-        return
-
     note = aqt.mw.col.get_note(nids[0])
     field_names: List[str] = [field_name for field_name in note.keys() if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME]
     if len(nids) == 1:
@@ -366,8 +356,8 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     else:
         old_fields_protected_by_tags = []
 
-    # Determine globally protected fields for this note's deck
-    ah_did = next(iter(ah_dids), None)
+    # Note types are 1:1 with AH decks, so the single mid uniquely determines the deck.
+    ah_did = ankihub_db.ankihub_did_for_note_type(next(iter(mids)))
     globally_protected = config.globally_protected_fields_for_note_type(ah_did, note.mid) if ah_did else []
 
     new_fields_protected_by_tags = choose_subset(
@@ -382,7 +372,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         disable_ok_when_unchanged=True,
         checked_and_disabled_choices=globally_protected,
         checked_and_disabled_choices_tooltip=(
-            "This field is globally protected. Edit this setting on the AnkiHub website."
+            "This field is globally protected.\nEdit this setting on the AnkiHub website."
         ),
         parent=browser,
     )
