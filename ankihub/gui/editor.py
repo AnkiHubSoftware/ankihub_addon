@@ -16,7 +16,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
-from ..main.utils import update_notes_with_named_undo
+from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -80,7 +80,7 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
         return changed
 
     # If all fields are already covered by the "All" tag, no per-field tag is needed.
-    if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+    if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
         return changed
 
     field_name = note.note_type()["flds"][current_field_idx]["name"]
@@ -99,14 +99,14 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     ah_field_value = (ah_note.fields or {}).get(field_name, "")
     protection_tag = protection_tag_for_field(field_name)
     should_be_protected = note[field_name] != ah_field_value
-    if should_be_protected and protection_tag not in note.tags:
+    if should_be_protected and not is_tag_in_list(protection_tag, note.tags):
         # Field differs from AnkiHub version — add protection if not already present
         note.tags.append(protection_tag)
         update_notes_with_named_undo(f"AnkiHub | Auto-protect {field_name}", note)
         return True
-    if not should_be_protected and protection_tag in note.tags:
+    if not should_be_protected and is_tag_in_list(protection_tag, note.tags):
         # Field matches AnkiHub version — remove protection tag if present
-        note.tags.remove(protection_tag)
+        note.tags = [t for t in note.tags if t.lower() != protection_tag.lower()]
         update_notes_with_named_undo(f"AnkiHub | Auto-unprotect {field_name}", note)
         return True
     return changed

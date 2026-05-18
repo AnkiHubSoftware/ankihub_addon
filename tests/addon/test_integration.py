@@ -1159,31 +1159,110 @@ class TestAutoProtectFieldsWhenEdited:
             assert result is False
             assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
-    def test_sync_strips_personal_tags_for_globally_protected_fields(
+    def test_field_not_double_protected_when_lowercase_tag_present(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
     ):
+        # Anki tags are case-insensitive — a pre-existing lowercase variant should
+        # block the hook from appending the canonical-cased duplicate.
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-            # Import into the deck registered for this AH deck so the sync sweep's
-            # deck-scoped search finds the note.
-            anki_did = config.deck_config(ah_did).anki_id
-            note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
-            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
-            back_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Back"
-            note.tags.extend([front_tag, back_tag])
-            aqt.mw.col.update_note(note)
 
-            # Front becomes globally protected; Back stays user-controlled.
-            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
+            lowercase_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front".lower()
+            note.tags.append(lowercase_tag)
+            note["Front"] = "edited value"
 
-            reloaded = aqt.mw.col.get_note(nid)
-            assert front_tag not in reloaded.tags
-            assert back_tag in reloaded.tags
+            _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+
+            front_tags = [t for t in note.tags if t.lower() == lowercase_tag]
+            assert len(front_tags) == 1
+
+    def test_protection_tag_removed_when_lowercase_variant_present(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        # Removal must succeed even when the existing tag's casing differs from
+        # the canonical form (Anki tags are case-insensitive).
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+
+            lowercase_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front".lower()
+            note.tags.append(lowercase_tag)
+            # Field already matches the AnkiHub stored value — tag should be removed.
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is True
+            assert not any(t.lower() == lowercase_tag for t in note.tags)
+
+    def test_field_not_protected_when_lowercase_all_tag_present(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        # The "All" short-circuit must match a lowercase variant of the tag too.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note.tags.append(TAG_FOR_PROTECTING_ALL_FIELDS.lower())
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is False
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in note.tags
+
+    def test_field_protected_when_field_missing_from_ah_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        # The upsert logic omits empty fields from ah_note.fields. When the field
+        # name is missing there, a non-empty local value should be treated as
+        # differing from the AnkiHub stored value and trigger protection.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(
+                ah_did=ah_did,
+                note_data=NoteInfoFactory.create(
+                    fields=[Field(name="Front", value=""), Field(name="Back", value="back-value")],
+                ),
+            )
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_auto_protect_fields_when_edited(ah_did, True)
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited value"
+
+            result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+            assert result is True
+            assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in note.tags
 
 
 class TestDownloadAndInstallDecks:
@@ -5737,6 +5816,32 @@ class TestDeckUpdater:
             # Assert that the deck config was updated with the incoming relation
             assert config.deck_config(ah_did).user_relation == incoming_relation
             assert config.deck_config(ah_did).has_note_embeddings is True
+
+    def test_sync_strips_personal_tags_for_globally_protected_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            # Import into the deck registered for this AH deck so the sync sweep's
+            # deck-scoped search finds the note.
+            anki_did = config.deck_config(ah_did).anki_id
+            note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
+            back_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Back"
+            note.tags.extend([front_tag, back_tag])
+            aqt.mw.col.update_note(note)
+
+            # Front becomes globally protected; Back stays user-controlled.
+            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
+
+            reloaded = aqt.mw.col.get_note(nid)
+            assert front_tag not in reloaded.tags
+            assert back_tag in reloaded.tags
 
 
 class TestSyncWithAnkiHub:
