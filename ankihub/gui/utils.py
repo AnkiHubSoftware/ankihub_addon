@@ -181,21 +181,21 @@ class _ChooseSubsetDialog(QDialog):
         select_all_button = QPushButton(select_all_text)
         qconnect(select_all_button.clicked, self._select_all)
 
-        self._button_box = QDialogButtonBox()
+        self.button_box = QDialogButtonBox()
         if buttons:
             for button_param in buttons:
-                add_button_from_param(self._button_box, button_param)
+                add_button_from_param(self.button_box, button_param)
         else:
-            self._button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
-            self._button_box.addButton(QDialogButtonBox.StandardButton.Ok)
-        qconnect(self._button_box.accepted, self.accept)
-        qconnect(self._button_box.rejected, self.reject)
+            self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+            self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        qconnect(self.button_box.accepted, self.accept)
+        qconnect(self.button_box.rejected, self.reject)
 
         # Select All on the left, accept/reject on the right
         button_row = QHBoxLayout()
         button_row.addWidget(select_all_button)
         button_row.addStretch()
-        button_row.addWidget(self._button_box)
+        button_row.addWidget(self.button_box)
         layout.addLayout(button_row)
 
     def _adjust_list_height(self) -> None:
@@ -218,13 +218,15 @@ class _ChooseSubsetDialog(QDialog):
         accept_button = next(
             (
                 button
-                for button in self._button_box.buttons()
-                if self._button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole
+                for button in self.button_box.buttons()
+                if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole
             ),
             None,
         )
-        if not accept_button:
-            return
+        assert accept_button is not None, (
+            "require_at_least_one / disable_ok_when_unchanged need a button with AcceptRole; "
+            "custom `buttons` lists must include one."
+        )
 
         def update() -> None:
             if require_at_least_one and not any(
