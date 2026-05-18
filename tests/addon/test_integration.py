@@ -5825,10 +5825,7 @@ class TestDeckUpdater:
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-            # Import into the deck registered for this AH deck so the sync sweep's
-            # deck-scoped search finds the note.
-            anki_did = config.deck_config(ah_did).anki_id
-            note_info = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            note_info = import_ah_note(ah_did=ah_did)
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
             front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
@@ -5842,6 +5839,51 @@ class TestDeckUpdater:
             reloaded = aqt.mw.col.get_note(nid)
             assert front_tag not in reloaded.tags
             assert back_tag in reloaded.tags
+
+    def test_sync_strips_tag_on_note_in_other_anki_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        # The sweep is scoped by note type, not by Anki deck, so notes that
+        # belong to the AH deck but live in a different Anki deck (e.g. the
+        # user moved them to a personal study deck) are still cleaned up.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            other_anki_did = aqt.mw.col.decks.add_normal_deck_with_name("other").id
+            note_info = import_ah_note(ah_did=ah_did, anki_did=other_anki_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
+            note.tags.append(front_tag)
+            aqt.mw.col.update_note(note)
+
+            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
+
+            assert front_tag not in aqt.mw.col.get_note(nid).tags
+
+    def test_sync_strips_tag_on_not_yet_submitted_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        add_anki_note: AddAnkiNote,
+    ):
+        # A note created locally with an AH note type but not yet suggested
+        # to AnkiHub has no row in the AH DB. The sweep should still catch
+        # its redundant protect tags via the note-type-based query.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            mid = ankihub_db.note_types_for_ankihub_deck(ah_did)[0]
+            note_type = aqt.mw.col.models.get(mid)
+            unsubmitted_note = add_anki_note(note_type=note_type)
+            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
+            unsubmitted_note.tags.append(front_tag)
+            aqt.mw.col.update_note(unsubmitted_note)
+
+            _strip_redundant_protect_tags(ah_did, {mid: ["Front"]})
+
+            assert front_tag not in aqt.mw.col.get_note(unsubmitted_note.id).tags
 
 
 class TestSyncWithAnkiHub:
