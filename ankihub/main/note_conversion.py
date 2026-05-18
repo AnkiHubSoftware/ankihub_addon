@@ -15,6 +15,11 @@ TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 TAG_FOR_OPTIONAL_TAGS = "AnkiHub_Optional"
 
 
+def protection_tag_for_field(field_name: str) -> str:
+    # Spaces aren't allowed in tags, so they're replaced with underscores.
+    return f"{TAG_FOR_PROTECTING_FIELDS}::{field_name.replace(' ', '_')}"
+
+
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
     TAG_FOR_PROTECTING_FIELDS,

@@ -7,7 +7,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 from uuid import UUID
 
 import aqt
@@ -850,3 +850,13 @@ def mh_tag_to_resource(tag: str) -> Optional[Resource]:
         return None
 
     return Resource(title=title, url=url_mh_integrations_preview(slug), usmle_step=step)
+
+
+def update_notes_with_named_undo(label: str, notes: Union[Note, Sequence[Note]]) -> None:
+    """Persist note(s) wrapped in a labeled custom undo entry."""
+    undo_entry_id = aqt.mw.col.add_custom_undo_entry(label)
+    if isinstance(notes, Note):
+        aqt.mw.col.update_note(notes)
+    else:
+        aqt.mw.col.update_notes(list(notes))
+    aqt.mw.col.merge_undo_entries(undo_entry_id)

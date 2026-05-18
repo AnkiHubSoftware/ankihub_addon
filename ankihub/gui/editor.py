@@ -3,9 +3,8 @@
 import functools
 from typing import Any, List, Tuple, cast
 
-import anki
-import aqt
 from anki.models import NoteType
+from anki.notes import Note
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
@@ -16,8 +15,11 @@ from .. import settings
 from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
+from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
+from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
+    ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ICONS_PATH,
     AnkiHubCommands,
     config,
@@ -35,6 +37,7 @@ VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
 def setup() -> None:
     _setup_additional_editor_buttons()
     _setup_hide_ankihub_field()
+    _setup_auto_protect_fields_when_edited()
 
 
 def _setup_additional_editor_buttons():
@@ -52,6 +55,63 @@ def _setup_hide_ankihub_field():
     gui_hooks.editor_will_load_note.append(_hide_ankihub_field_in_editor)
 
 
+def _setup_auto_protect_fields_when_edited():
+    gui_hooks.editor_did_unfocus_field.append(_on_field_unfocus_auto_protect)
+
+
+def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx: int) -> bool:
+    """Hook handler for editor_did_unfocus_field.
+
+    Returns True if the note was modified (tag added or removed), otherwise returns
+    the original value of `changed`. Anki re-loads the note from the DB when this
+    returns True, so the tag mutation is persisted via update_note() before returning.
+    """
+    # Server-controlled rollout gate: the suggestion dialog needs to ship before
+    # auto-protect is safe to enable (otherwise edits get silently stripped on suggest).
+    if not (config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False):
+        return changed
+
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    if not ah_did:
+        return changed
+
+    deck_config = config.deck_config(ah_did)
+    if not deck_config.auto_protect_fields_when_edited:
+        return changed
+
+    # If all fields are already covered by the "All" tag, no per-field tag is needed.
+    if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
+        return changed
+
+    field_name = note.note_type()["flds"][current_field_idx]["name"]
+    if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
+        return changed
+
+    # Skip if globally protected for this deck (managed by deck owner, not locally)
+    if field_name in config.globally_protected_fields_for_note_type(ah_did, note.mid):
+        return changed
+
+    ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
+    if not ah_note:
+        return changed
+
+    # ah_note.fields omits empty fields, so treat a missing field name as empty
+    ah_field_value = (ah_note.fields or {}).get(field_name, "")
+    protection_tag = protection_tag_for_field(field_name)
+    should_be_protected = note[field_name] != ah_field_value
+    if should_be_protected and not is_tag_in_list(protection_tag, note.tags):
+        # Field differs from AnkiHub version — add protection if not already present
+        note.tags.append(protection_tag)
+        update_notes_with_named_undo(f"AnkiHub | Auto-protect {field_name}", note)
+        return True
+    if not should_be_protected and is_tag_in_list(protection_tag, note.tags):
+        # Field matches AnkiHub version — remove protection tag if present
+        note.tags = [t for t in note.tags if t.lower() != protection_tag.lower()]
+        update_notes_with_named_undo(f"AnkiHub | Auto-unprotect {field_name}", note)
+        return True
+    return changed
+
+
 def _on_suggestion_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
@@ -64,7 +124,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
 
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
-    def on_did_add_note(note: anki.notes.Note) -> None:
+    def on_did_add_note(note: Note) -> None:
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
         if not sip.isdeleted(editor.widget):
             open_suggestion_dialog_for_single_suggestion(note, parent=editor.widget)
@@ -175,7 +235,7 @@ def _on_view_note_history_button_press(editor: Editor) -> None:
     openLink(url)
 
 
-def _hide_ankihub_field_in_editor(js: str, note: anki.notes.Note, _: aqt.editor.Editor) -> str:
+def _hide_ankihub_field_in_editor(js: str, note: Note, _: Editor) -> str:
     """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
     hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
     if ANKI_INT_VERSION >= 50:
