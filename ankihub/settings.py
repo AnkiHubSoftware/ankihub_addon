@@ -407,7 +407,8 @@ class _Config:
         self._update_private_config()
 
     def globally_protected_fields_for_note_type(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
-        return self.deck_config(ankihub_did).globally_protected_fields.get(mid, [])
+        # Return a copy so callers can't mutate the cached list.
+        return list(self.deck_config(ankihub_did).globally_protected_fields.get(mid, []))
 
     def set_ankihub_deleted_notes_behavior(
         self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted

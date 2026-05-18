@@ -356,8 +356,8 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     else:
         old_fields_protected_by_tags = []
 
-    # Note types are 1:1 with AH decks, so the single mid uniquely determines the deck.
-    ah_did = ankihub_db.ankihub_did_for_note_type(next(iter(mids)))
+    # Note types are 1:1 with AH decks, so the note's mid uniquely determines the deck.
+    ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
     globally_protected = config.globally_protected_fields_for_note_type(ah_did, note.mid) if ah_did else []
 
     new_fields_protected_by_tags = choose_subset(

@@ -161,12 +161,11 @@ class _AnkiHubDeckUpdater:
         )
         self._import_results.append(import_result)
 
-        # Compare against the cached value before updating so we can detect changes
-        # and run the redundant-tag sweep only when needed.
-        old_globally_protected = dict(deck_config.globally_protected_fields)
-        config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
-        if old_globally_protected != deck_updates.protected_fields:
+        # Sweep first, then update the cache — if the sweep raises, leave the
+        # cached value stale so the next sync retries the cleanup.
+        if dict(deck_config.globally_protected_fields) != deck_updates.protected_fields:
             _strip_redundant_protect_tags(ankihub_did, deck_updates.protected_fields)
+            config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
 
         if deck_updates.latest_update:
             # latest_update is None if there were no notes in the updates

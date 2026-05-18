@@ -5706,7 +5706,7 @@ class TestDeckUpdater:
         # user moved them to a personal study deck) are still cleaned up.
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-            other_anki_did = aqt.mw.col.decks.add_normal_deck_with_name("other").id
+            other_anki_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name("other").id)
             note_info = import_ah_note(ah_did=ah_did, anki_did=other_anki_did)
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
             note = aqt.mw.col.get_note(nid)
