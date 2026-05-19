@@ -1119,6 +1119,23 @@ class TestAutoProtectFieldsWhenEdited:
             assert result is True
             assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in note.tags
 
+    def test_locally_added_field_not_protected(self, auto_protect_note):
+        # Fields the user added to the note type locally aren't on AnkiHub,
+        # so auto-protecting them would just leave orphan tags.
+        _, note = auto_protect_note
+        # Add a new field to the local note type
+        note_type = note.note_type()
+        new_field = aqt.mw.col.models.new_field("LocalOnly")
+        aqt.mw.col.models.add_field(note_type, new_field)
+        aqt.mw.col.models.save(note_type)
+        note.load()
+        local_field_idx = note.keys().index("LocalOnly")
+        note["LocalOnly"] = "edited value"
+
+        result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=local_field_idx)
+        assert result is False
+        assert not any(tag.startswith(f"{TAG_FOR_PROTECTING_FIELDS}::LocalOnly") for tag in note.tags)
+
 
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture

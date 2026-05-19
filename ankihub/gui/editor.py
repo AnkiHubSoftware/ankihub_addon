@@ -3,7 +3,7 @@
 import functools
 from typing import Any, List, Tuple, cast
 
-from anki.models import NoteType
+from anki.models import NoteType, NotetypeId
 from anki.notes import Note
 from aqt import gui_hooks
 from aqt.addcards import AddCards
@@ -93,6 +93,12 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
 
     ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
     if not ah_note:
+        return changed
+
+    # Skip fields the user added locally to the note type — they don't exist on
+    # AnkiHub, so protecting them has no effect and just leaves stale tags.
+    ah_field_names_lower = {f.lower() for f in ankihub_db.note_type_field_names(NotetypeId(note.mid))}
+    if field_name.lower() not in ah_field_names_lower:
         return changed
 
     # ah_note.fields omits empty fields, so treat a missing field name as empty
