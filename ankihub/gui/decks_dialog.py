@@ -508,9 +508,7 @@ class DeckManagementDialog(QDialog):
         self.auto_protect_fields_cb.setChecked(deck_config.auto_protect_fields_when_edited)
         qconnect(
             self.auto_protect_fields_cb.toggled,
-            lambda: config.set_auto_protect_fields_when_edited(
-                selected_ah_did, self.auto_protect_fields_cb.isChecked()
-            ),
+            lambda checked: self._on_auto_protect_fields_toggled(selected_ah_did, checked),
         )
 
         # Setup tooltip icon
@@ -540,6 +538,10 @@ class DeckManagementDialog(QDialog):
         box.addWidget(self.auto_protect_fields_docs_link_label)
 
         return box
+
+    def _on_auto_protect_fields_toggled(self, ah_did: uuid.UUID, checked: bool) -> None:
+        config.set_auto_protect_fields_when_edited(ah_did, checked)
+        LOGGER.info("auto_protect_fields_toggled", value=checked, ah_did=str(ah_did))
 
     def _setup_box_new_cards_destination(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Set up the destination tooltip message
