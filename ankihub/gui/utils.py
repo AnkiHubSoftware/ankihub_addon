@@ -185,6 +185,11 @@ def choose_subset(
 
     if adjust_height_to_content:
         list_widget.setMinimumHeight(list_widget.sizeHintForRow(0) * list_widget.count() + 20)
+        # Pin the dialog's min height to its content-fitting size; otherwise the user can
+        # drag the dialog shorter than the list's minimum and Qt lets the description label
+        # / buttons overlap the bottom list rows.
+        dialog.adjustSize()
+        dialog.setMinimumHeight(dialog.height())
 
     # Manage OK button enabled state based on require_at_least_one / disable_ok_when_unchanged
     if require_at_least_one or disable_ok_when_unchanged:
