@@ -9,19 +9,23 @@ import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId, NotetypeNameId
 from aqt.qt import (
+    QApplication,
     QBoxLayout,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     Qt,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 from aqt.theme import theme_manager
@@ -96,8 +100,8 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Deck Management")
-        self.setMinimumWidth(640)
-        self.setMinimumHeight(750)
+        self.setMinimumWidth(720)
+        self.setMinimumHeight(820)
 
         self.box_main = QVBoxLayout()
 
@@ -109,23 +113,43 @@ class DeckManagementDialog(QDialog):
 
         self.box_bottom = QHBoxLayout()
 
-        # Set up the bottom-left layout and add it to the bottom layout
+        # Set up the bottom-left layout and add it to the bottom layout. The left
+        # column only needs to display deck names, so give it a smaller share of the
+        # horizontal space via stretch factors below.
         self.box_bottom_left = self._setup_box_bottom_left()
         self.box_bottom_left.addSpacing(10)
         self.box_bottom.addSpacing(10)
-        self.box_bottom.addLayout(self.box_bottom_left)
+        self.box_bottom.addLayout(self.box_bottom_left, 2)
 
-        # Set up the bottom-right layout and add it to the bottom layout
+        # Set up the bottom-right layout inside a scroll area so that adding deck-option
+        # rows can never truncate labels on platforms where Qt font metrics are larger
+        # (e.g. macOS) or when the dialog is sized down to fit smaller screens.
         self.box_bottom_right = QVBoxLayout()
         self._refresh_box_bottom_right()
         self.box_bottom_right.addSpacing(10)
+
+        right_container = QWidget()
+        right_container.setLayout(self.box_bottom_right)
+
+        self.right_scroll_area = QScrollArea()
+        self.right_scroll_area.setWidget(right_container)
+        self.right_scroll_area.setWidgetResizable(True)
+        self.right_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.right_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.right_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
         self.box_bottom.addSpacing(10)
-        self.box_bottom.addLayout(self.box_bottom_right)
+        self.box_bottom.addWidget(self.right_scroll_area, 3)
         self.box_bottom.addSpacing(10)
 
         self.box_main.addLayout(self.box_bottom)
 
         self.setLayout(self.box_main)
+
+        # Cap the dialog's height to the screen so it stays usable on small displays.
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            self.setMaximumHeight(int(screen.availableGeometry().height() * 0.9))
 
     def _setup_box_top(self) -> QVBoxLayout:
         self.box_top_buttons = QHBoxLayout()
