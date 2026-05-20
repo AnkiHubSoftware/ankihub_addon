@@ -18,7 +18,6 @@ from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import (
     is_tag_for_group,
-    protection_tag_for_field,
 )
 from ..main.utils import create_backup
 from ..settings import config
@@ -161,11 +160,7 @@ class _AnkiHubDeckUpdater:
         )
         self._import_results.append(import_result)
 
-        # Sweep first, then update the cache — if the sweep raises, leave the
-        # cached value stale so the next sync retries the cleanup.
-        if dict(deck_config.globally_protected_fields) != deck_updates.protected_fields:
-            _strip_redundant_protect_tags(ankihub_did, deck_updates.protected_fields)
-            config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
+        config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
 
         if deck_updates.latest_update:
             # latest_update is None if there were no notes in the updates
@@ -303,46 +298,6 @@ def show_tooltip_about_last_deck_updates_results() -> None:
             f"AnkiHub: Updated {total} note{'' if total == 1 else 's'}.",
             parent=aqt.mw,
         )
-
-
-def _strip_redundant_protect_tags(ah_did: uuid.UUID, globally_protected_fields: Dict[int, List[str]]) -> None:
-    """Remove personal AnkiHub_Protect::<field> tags that duplicate now-globally-protected fields.
-
-    Runs after the sync caches a new globally_protected_fields value for the deck. Without this,
-    personal protection tags added before the deck owner globally protected a field would silently
-    keep blocking updates if the global protection were later removed.
-    """
-    # Anki tags are case-preserving but case-insensitive, so compare in lowercase
-    # to match variants like `ankihub_protect::front` against `AnkiHub_Protect::Front`.
-    redundant_tags_by_mid: Dict[int, set] = {
-        mid: {protection_tag_for_field(f).lower() for f in fields}
-        for mid, fields in globally_protected_fields.items()
-        if fields
-    }
-    if not redundant_tags_by_mid:
-        return
-
-    notes_to_update = []
-    for mid, redundant_tags in redundant_tags_by_mid.items():
-        tag_filter = " OR ".join(f'"tag:{tag}"' for tag in redundant_tags)
-        nids = aqt.mw.col.find_notes(f"mid:{mid} ({tag_filter})")
-        for nid in nids:
-            note = aqt.mw.col.get_note(nid)
-            new_tags = [t for t in note.tags if t.lower() not in redundant_tags]
-            if new_tags == note.tags:
-                continue
-            note.tags = new_tags
-            notes_to_update.append(note)
-
-    if not notes_to_update:
-        return
-
-    aqt.mw.col.update_notes(notes_to_update)
-    LOGGER.info(
-        "Removed redundant AnkiHub_Protect tags from notes overlapping globally protected fields.",
-        ah_did=ah_did,
-        note_count=len(notes_to_update),
-    )
 
 
 def _update_deck_updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID) -> None:

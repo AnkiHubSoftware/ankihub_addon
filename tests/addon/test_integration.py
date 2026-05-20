@@ -149,7 +149,7 @@ from ankihub.gui.browser.custom_search_nodes import AnkiHubNoteSearchNode, Updat
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
-from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, _strip_redundant_protect_tags, ah_deck_updater
+from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
 from ankihub.gui.errors import upload_logs_and_data_in_background
@@ -5688,74 +5688,6 @@ class TestDeckUpdater:
             # Assert that the deck config was updated with the incoming relation
             assert config.deck_config(ah_did).user_relation == incoming_relation
             assert config.deck_config(ah_did).has_note_embeddings is True
-
-    def test_sync_strips_personal_tags_for_globally_protected_fields(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            note_info = import_ah_note(ah_did=ah_did)
-            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
-            note = aqt.mw.col.get_note(nid)
-            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
-            back_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Back"
-            note.tags.extend([front_tag, back_tag])
-            aqt.mw.col.update_note(note)
-
-            # Front becomes globally protected; Back stays user-controlled.
-            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
-
-            reloaded = aqt.mw.col.get_note(nid)
-            assert front_tag not in reloaded.tags
-            assert back_tag in reloaded.tags
-
-    def test_sync_strips_tag_on_note_in_other_anki_deck(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-    ):
-        # The sweep is scoped by note type, not by Anki deck, so notes that
-        # belong to the AH deck but live in a different Anki deck (e.g. the
-        # user moved them to a personal study deck) are still cleaned up.
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            other_anki_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name("other").id)
-            note_info = import_ah_note(ah_did=ah_did, anki_did=other_anki_did)
-            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
-            note = aqt.mw.col.get_note(nid)
-            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
-            note.tags.append(front_tag)
-            aqt.mw.col.update_note(note)
-
-            _strip_redundant_protect_tags(ah_did, {note.mid: ["Front"]})
-
-            assert front_tag not in aqt.mw.col.get_note(nid).tags
-
-    def test_sync_strips_tag_on_not_yet_submitted_note(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        add_anki_note: AddAnkiNote,
-    ):
-        # A note created locally with an AH note type but not yet suggested
-        # to AnkiHub has no row in the AH DB. The sweep should still catch
-        # its redundant protect tags via the note-type-based query.
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            mid = ankihub_db.note_types_for_ankihub_deck(ah_did)[0]
-            note_type = aqt.mw.col.models.get(mid)
-            unsubmitted_note = add_anki_note(note_type=note_type)
-            front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
-            unsubmitted_note.tags.append(front_tag)
-            aqt.mw.col.update_note(unsubmitted_note)
-
-            _strip_redundant_protect_tags(ah_did, {mid: ["Front"]})
-
-            assert front_tag not in aqt.mw.col.get_note(unsubmitted_note.id).tags
 
 
 class TestSyncWithAnkiHub:
