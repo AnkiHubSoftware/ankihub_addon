@@ -16,7 +16,9 @@ from ..ankihub_client import AnkiHubHTTPError, DeckExtension
 from ..ankihub_client.models import NotesActionChoices
 from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
-from ..main.note_conversion import is_tag_for_group
+from ..main.note_conversion import (
+    is_tag_for_group,
+)
 from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
@@ -157,6 +159,8 @@ class _AnkiHubDeckUpdater:
             clear_ah_note_types_before_import=True,
         )
         self._import_results.append(import_result)
+
+        config.set_globally_protected_fields(ankihub_did, deck_updates.protected_fields)
 
         if deck_updates.latest_update:
             # latest_update is None if there were no notes in the updates

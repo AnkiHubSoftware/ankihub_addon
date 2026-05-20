@@ -141,6 +141,8 @@ class DeckConfig(DataClassJSONMixin):
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
     has_note_embeddings: bool = False
+    auto_protect_fields_when_edited: bool = True
+    globally_protected_fields: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
 
     @staticmethod
     def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
@@ -396,6 +398,21 @@ class _Config:
     def set_suspend_new_cards_of_existing_notes(self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes):
         self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
         self._update_private_config()
+
+    def set_auto_protect_fields_when_edited(self, ankihub_did: uuid.UUID, value: bool) -> None:
+        self.deck_config(ankihub_did).auto_protect_fields_when_edited = value
+        self._update_private_config()
+
+    def set_globally_protected_fields(self, ankihub_did: uuid.UUID, protected_fields: Dict[int, List[str]]) -> None:
+        deck_config = self.deck_config(ankihub_did)
+        if deck_config.globally_protected_fields == protected_fields:
+            return
+        deck_config.globally_protected_fields = protected_fields
+        self._update_private_config()
+
+    def globally_protected_fields_for_note_type(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
+        # Return a copy so callers can't mutate the cached list.
+        return list(self.deck_config(ankihub_did).globally_protected_fields.get(mid, []))
 
     def set_ankihub_deleted_notes_behavior(
         self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted

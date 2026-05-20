@@ -9,19 +9,23 @@ import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId, NotetypeNameId
 from aqt.qt import (
+    QApplication,
     QBoxLayout,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     Qt,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 from aqt.theme import theme_manager
@@ -96,8 +100,8 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Deck Management")
-        self.setMinimumWidth(640)
-        self.setMinimumHeight(750)
+        self.setMinimumWidth(680)
+        self.setMinimumHeight(820)
 
         self.box_main = QVBoxLayout()
 
@@ -109,23 +113,48 @@ class DeckManagementDialog(QDialog):
 
         self.box_bottom = QHBoxLayout()
 
-        # Set up the bottom-left layout and add it to the bottom layout
+        # Set up the bottom-left layout and add it to the bottom layout. The left
+        # column only needs to display deck names, so give it a smaller share of the
+        # horizontal space via stretch factors below.
         self.box_bottom_left = self._setup_box_bottom_left()
         self.box_bottom_left.addSpacing(10)
         self.box_bottom.addSpacing(10)
-        self.box_bottom.addLayout(self.box_bottom_left)
+        self.box_bottom.addLayout(self.box_bottom_left, 2)
 
-        # Set up the bottom-right layout and add it to the bottom layout
+        # Set up the bottom-right layout inside a scroll area so that adding deck-option
+        # rows can never truncate labels on platforms where Qt font metrics are larger
+        # (e.g. macOS) or when the dialog is sized down to fit smaller screens.
         self.box_bottom_right = QVBoxLayout()
         self._refresh_box_bottom_right()
         self.box_bottom_right.addSpacing(10)
+
+        right_container = QWidget()
+        right_container.setLayout(self.box_bottom_right)
+
+        self.right_scroll_area = QScrollArea()
+        self.right_scroll_area.setWidget(right_container)
+        self.right_scroll_area.setWidgetResizable(True)
+        self.right_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.right_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.right_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
         self.box_bottom.addSpacing(10)
-        self.box_bottom.addLayout(self.box_bottom_right)
+        self.box_bottom.addWidget(self.right_scroll_area, 3)
         self.box_bottom.addSpacing(10)
 
         self.box_main.addLayout(self.box_bottom)
 
         self.setLayout(self.box_main)
+
+        # Cap the dialog's height to the screen so it stays usable on small displays.
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            self.setMaximumHeight(int(screen.availableGeometry().height() * 0.9))
+
+        # Force initial size to the minimum so platforms whose content sizeHint
+        # would otherwise open the dialog wider (observed on Linux) don't waste
+        # horizontal space. Users can still drag wider.
+        self.resize(680, 820)
 
     def _setup_box_top(self) -> QVBoxLayout:
         self.box_top_buttons = QHBoxLayout()
@@ -150,7 +179,9 @@ class DeckManagementDialog(QDialog):
         return box
 
     def _setup_box_bottom_left(self) -> QVBoxLayout:
-        self.decks_list_label = QLabel("<b>Subscribed AnkiHub Decks</b>")
+        self.decks_list_label = QLabel(
+            '<span style="font-size: 16px; font-weight: 800; line-height: 100%;">Subscribed AnkiHub Decks</span>'
+        )
         self.decks_list_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self.decks_list = QListWidget()
@@ -183,12 +214,12 @@ class DeckManagementDialog(QDialog):
         # Deck Actions
         self.box_deck_actions = self._setup_box_deck_actions()
         self.box_bottom_right.addLayout(self.box_deck_actions)
-        self.box_bottom_right.addSpacing(20)
+        self.box_bottom_right.addSpacing(16)
 
         # Deck Options
         self.box_deck_options = self._setup_box_deck_options(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_deck_options)
-        self.box_bottom_right.addSpacing(20)
+        self.box_bottom_right.addSpacing(16)
 
         if selected_ah_did not in config.deck_ids():
             self.box_bottom_right.addStretch()
@@ -255,14 +286,24 @@ class DeckManagementDialog(QDialog):
         # Setup "Remove AnkiHub deleted notes from deck"
         self.box_ankihub_deleted_notes_behavior = self._setup_box_ankihub_deleted_notes_behavior(selected_ah_did)
 
+        # Setup "Automatically protect fields when edited" (gated on a server-controlled flag
+        # — the suggestion dialog needs to ship before this option is meaningful to users)
+        auto_protect_enabled = (config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False)
+        if auto_protect_enabled:
+            self.box_auto_protect_fields = self._setup_box_auto_protect_fields_when_edited(selected_ah_did)
+
         # Add individual elements to the deck options elements box
         self.box_deck_options_elements = QVBoxLayout()
         self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_existing_notes)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_suspend_new_cards_of_new_notes)
-        self.box_deck_options_elements.addSpacing(10)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
-        self.box_deck_options_elements.addSpacing(10)
+        self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_ankihub_deleted_notes_behavior)
+        if auto_protect_enabled:
+            self.box_deck_options_elements.addSpacing(8)
+            self.box_deck_options_elements.addLayout(self.box_auto_protect_fields)
 
         # Add everything to the result layout
         box = QVBoxLayout()
@@ -420,11 +461,12 @@ class DeckManagementDialog(QDialog):
         self.subdecks_docs_link_label = QLabel(
             """
             <a href="https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2">
-                More about subdecks
+                Learn about subdecks
             </a>
             """
         )
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
+        self.subdecks_docs_link_label.setContentsMargins(20, 0, 0, 0)
 
         # Add everything to the result layout
         box = QVBoxLayout()
@@ -479,6 +521,57 @@ class DeckManagementDialog(QDialog):
 
         return box
 
+    def _setup_box_auto_protect_fields_when_edited(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        auto_protect_tooltip_message = (
+            "When enabled, any field you edit\n"
+            "will be automatically protected\n"
+            "so your changes aren't overwritten\n"
+            "by future note updates."
+        )
+
+        # Setup checkbox
+        self.auto_protect_fields_cb = QCheckBox("Automatically protect fields when edited")
+        set_styled_tooltip(self.auto_protect_fields_cb, auto_protect_tooltip_message)
+        self.auto_protect_fields_cb.setChecked(deck_config.auto_protect_fields_when_edited)
+        qconnect(
+            self.auto_protect_fields_cb.toggled,
+            lambda checked: self._on_auto_protect_fields_toggled(selected_ah_did, checked),
+        )
+
+        # Setup tooltip icon
+        self.auto_protect_fields_icon_label = QLabel()
+        self.auto_protect_fields_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
+        set_styled_tooltip(self.auto_protect_fields_icon_label, auto_protect_tooltip_message)
+
+        # Checkbox row
+        self.auto_protect_fields_row = QHBoxLayout()
+        self.auto_protect_fields_row.addWidget(self.auto_protect_fields_cb)
+        self.auto_protect_fields_row.addWidget(self.auto_protect_fields_icon_label)
+        self.auto_protect_fields_row.addStretch()
+
+        # Help link
+        self.auto_protect_fields_docs_link_label = QLabel(
+            """
+            <a href="https://community.ankihub.net/t/protecting-fields-and-tags/165604">
+                Learn about protecting fields
+            </a>
+            """
+        )
+        self.auto_protect_fields_docs_link_label.setOpenExternalLinks(True)
+        self.auto_protect_fields_docs_link_label.setContentsMargins(20, 0, 0, 0)
+
+        box = QVBoxLayout()
+        box.addLayout(self.auto_protect_fields_row)
+        box.addWidget(self.auto_protect_fields_docs_link_label)
+
+        return box
+
+    def _on_auto_protect_fields_toggled(self, ah_did: uuid.UUID, checked: bool) -> None:
+        config.set_auto_protect_fields_when_edited(ah_did, checked)
+        LOGGER.info("auto_protect_fields_toggled", value=checked, ah_did=str(ah_did))
+
     def _setup_box_new_cards_destination(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Set up the destination tooltip message
         new_cards_destination_tooltip_message = "Select the deck you want new cards to be saved to."
@@ -527,7 +620,7 @@ class DeckManagementDialog(QDialog):
         box.addLayout(self.new_cards_destination_label_row)
         box.addWidget(self.new_cards_destination_details_label)
         box.addWidget(self.set_new_cards_destination_btn)
-        box.addSpacing(5)
+        box.addSpacing(8)
         box.addWidget(self.new_cards_destination_docs_link_label)
 
         return box
@@ -538,7 +631,7 @@ class DeckManagementDialog(QDialog):
         if deck_config.user_relation != UserDeckRelation.OWNER:
             return box
 
-        self.note_types_label = QLabel("<b>📝 Note Types</b>")
+        self.note_types_label = QLabel("<b>Note Types</b>")
         self.add_note_type_btn = QPushButton("Publish note type")
         qconnect(self.add_note_type_btn.clicked, self._on_add_note_type_btn_clicked)
         self._update_add_note_type_btn_state()
@@ -549,8 +642,11 @@ class DeckManagementDialog(QDialog):
         qconnect(self.update_templates_btn.clicked, self._on_update_templates_btn_clicked)
         self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
+        box.addSpacing(8)
         box.addWidget(self.add_note_type_btn)
+        box.addSpacing(4)
         box.addWidget(self.add_field_btn)
+        box.addSpacing(4)
         box.addWidget(self.update_templates_btn)
 
         return box
