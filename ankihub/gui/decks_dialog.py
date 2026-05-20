@@ -100,7 +100,7 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle("AnkiHub | Deck Management")
-        self.setMinimumWidth(720)
+        self.setMinimumWidth(680)
         self.setMinimumHeight(820)
 
         self.box_main = QVBoxLayout()
@@ -150,6 +150,11 @@ class DeckManagementDialog(QDialog):
         screen = QApplication.primaryScreen()
         if screen is not None:
             self.setMaximumHeight(int(screen.availableGeometry().height() * 0.9))
+
+        # Force initial size to the minimum so platforms whose content sizeHint
+        # would otherwise open the dialog wider (observed on Linux) don't waste
+        # horizontal space. Users can still drag wider.
+        self.resize(680, 820)
 
     def _setup_box_top(self) -> QVBoxLayout:
         self.box_top_buttons = QHBoxLayout()
