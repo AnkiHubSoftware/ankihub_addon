@@ -4441,6 +4441,51 @@ def test_protect_fields_action(
         qtbot.wait_until(assert_note_has_expected_tag)
 
 
+@pytest.mark.qt_no_exception_capture
+def test_protect_fields_action_preserves_per_note_tag_on_globally_protected_field(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    mocker: MockerFixture,
+    qtbot: QtBot,
+):
+    # When the user opens Protect Fields and edits a non-globally-protected field,
+    # any pre-existing per-note AnkiHub_Protect::<globally-protected-field> tag must
+    # survive the strip-and-rewrite. choose_subset excludes locked choices from its
+    # return value; _on_protect_fields_action preserves them explicitly before the
+    # rewrite so the user's authored intent survives a later removal of global
+    # protection.
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _anki_did, ah_did = install_sample_ah_deck()
+
+        # Pick a note, add a per-note Front tag, mark Front as globally protected.
+        nid = mw.col.find_notes("Front:*")[0]
+        note = mw.col.get_note(nid)
+        front_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Front"
+        back_tag = f"{TAG_FOR_PROTECTING_FIELDS}::Back"
+        note.tags.append(front_tag)
+        mw.col.update_note(note)
+        config.set_globally_protected_fields(ah_did, {note.mid: ["Front"]})
+
+        # Mock choose_subset to return only Back — mirrors the real dialog excluding
+        # the locked Front from its return value.
+        mocker.patch(
+            "ankihub.gui.browser.browser.choose_subset",
+            return_value={"Back"},
+        )
+
+        browser: Browser = dialogs.open("Browser", mw)
+        _on_protect_fields_action(browser, [nid])
+
+        def assert_both_tags_present():
+            tags = mw.col.get_note(nid).tags
+            assert front_tag in tags, "per-note Front tag was dropped (preservation regression)"
+            assert back_tag in tags, "Back tag from the dialog selection was not applied"
+
+        qtbot.wait_until(assert_both_tags_present)
+
+
 class TestDeckManagementDialog:
     @pytest.mark.parametrize(
         "nightmode",
