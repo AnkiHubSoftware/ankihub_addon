@@ -107,8 +107,9 @@ def choose_subset(
     """Show a dialog for selecting a subset of choices.
 
     checked_and_disabled_choices are displayed as checked and non-interactive (grayed out).
-    They are excluded from the returned list — the return value contains only choices the
-    user actively selected from the interactive items.
+    They are included in the returned list along with whatever interactive choices the
+    user kept checked — the return value reflects the dialog's full final selection,
+    so callers don't have to remember to fold the locked choices back in.
 
     Returns the selected choices, or None if the dialog was cancelled.
     """
@@ -226,7 +227,9 @@ def choose_subset(
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None
 
-    return [item.text() for item in interactive_items if item.checkState() == Qt.CheckState.Checked]
+    return [item.text() for item in interactive_items if item.checkState() == Qt.CheckState.Checked] + list(
+        checked_and_disabled_choices or []
+    )
 
 
 class SearchableSelectionDialog(StudyDeck):
