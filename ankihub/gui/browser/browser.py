@@ -386,14 +386,23 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         # otherwise we need to create a tag for each field
         new_tags_for_protecting_fields = [protection_tag_for_field(field) for field in new_fields_protected_by_tags]
 
+    # `choose_subset` excludes locked (globally protected) fields from its return.
+    # Per-note `AnkiHub_Protect::<globally-protected-field>` tags that existed
+    # before this dialog represent user-authored intent (the user explicitly
+    # tagged the field, possibly before it was globally protected) and must
+    # survive the strip-and-rewrite below. Otherwise removing global protection
+    # later would silently leave the field unprotected.
+    globally_protected_tag_set_lower = {protection_tag_for_field(f).lower() for f in globally_protected}
+
     def update_note_tags() -> None:
         notes = [aqt.mw.col.get_note(nid) for nid in nids]
         for note in notes:
+            preserved_tags = [tag for tag in note.tags if tag.lower() in globally_protected_tag_set_lower]
             # remove old tags for protecting fields
             note.tags = [tag for tag in note.tags if not tag.lower().startswith(TAG_FOR_PROTECTING_FIELDS.lower())]
 
-            # add new tags for protecting fields
-            note.tags += new_tags_for_protecting_fields
+            # add new tags for protecting fields, plus tags preserved for globally-protected fields
+            note.tags += new_tags_for_protecting_fields + preserved_tags
 
         update_notes_with_named_undo("Protect fields of note(s) using tags", notes)
 
