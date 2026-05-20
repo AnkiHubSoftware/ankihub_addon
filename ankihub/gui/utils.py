@@ -200,6 +200,11 @@ class _ChooseSubsetDialog(QDialog):
 
     def _adjust_list_height(self) -> None:
         self._list_widget.setMinimumHeight(self._list_widget.sizeHintForRow(0) * self._list_widget.count() + 20)
+        # Pin the dialog's min height to its content-fitting size; otherwise the
+        # user can drag the dialog shorter than the list's minimum and Qt will
+        # let the description label / buttons overlap the bottom rows.
+        self.adjustSize()
+        self.setMinimumHeight(self.height())
 
     def _select_all(self) -> None:
         all_selected = all(item.checkState() == Qt.CheckState.Checked for item in self._interactive_items)
