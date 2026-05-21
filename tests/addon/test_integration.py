@@ -5372,19 +5372,22 @@ def test_reset_local_changes_to_notes(
         basic_note_1 = mw.col.get_note(NoteId(1608240029527))
         basic_note_2 = mw.col.get_note(NoteId(1608240057545))
 
-        # change the content of a note, tag the edited field as personally-protected
-        # (mirrors what the auto-protect-on-edit hook does on real edits), and move
-        # the note to a different deck
-        basic_note_1["Front"] = "changed"
-        basic_note_1.tags = ["AnkiHub_Protect::Front"]
+        # Edit Front + Back, tag both as personally-protected (mirrors the auto-protect
+        # hook's behaviour on real edits), and move the note to a different deck. Back is
+        # also marked as globally protected for this note type — its protect tag should
+        # survive the reset (user-authored intent that should outlast global protection).
+        basic_note_1["Front"] = "changed front"
+        basic_note_1["Back"] = "changed back"
+        basic_note_1.tags = ["AnkiHub_Protect::Front", "AnkiHub_Protect::Back"]
         basic_note_1.flush()
         mw.col.set_deck(basic_note_1.card_ids(), 1)
+        config.set_globally_protected_fields(ah_did, {basic_note_1.mid: ["Back"]})
 
         # delete a note
         mw.col.remove_notes([basic_note_2.id])
 
         # mock the client functions that are called to get the data needed for resetting local changes
-        mocker.patch.object(AnkiHubClient, "get_protected_fields")
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={basic_note_1.mid: ["Back"]})
         mocker.patch.object(AnkiHubClient, "get_protected_tags")
         mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
 
@@ -5392,13 +5395,15 @@ def test_reset_local_changes_to_notes(
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
 
-        # assert that basic_note_1 was changed back is still in the deck it was moved to
-        # (resetting local changes to notes should not move existing notes between decks as the
-        # user might not want that). The personal-protect tag must also be stripped, otherwise
-        # the importer would have honoured it and skipped resetting Front.
+        # Front: not globally protected → personal-protect tag stripped, field reset.
+        # Back: globally protected → field stays edited (importer respects protected_fields)
+        # and the personal-protect tag survives.
+        # Note is still in the deck it was moved to (Reset shouldn't move cards between decks).
         basic_note_1.load()
         assert basic_note_1["Front"] == "This is the front 1"
-        assert not any(t.lower().startswith("ankihub_protect::") for t in basic_note_1.tags)
+        assert basic_note_1["Back"] == "changed back"
+        assert "AnkiHub_Protect::Front" not in basic_note_1.tags
+        assert "AnkiHub_Protect::Back" in basic_note_1.tags
         assert basic_note_1.cards()
         for card in basic_note_1.cards():
             assert card.did == 1

@@ -13,7 +13,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
 from .importing import AnkiHubImporter
-from .note_conversion import is_protect_tag
+from .note_conversion import is_protect_tag, protection_tag_for_field
 
 
 def reset_local_changes_to_notes(
@@ -32,8 +32,11 @@ def reset_local_changes_to_notes(
     # by the user or the auto-protect-on-edit hook to keep specific fields from
     # being overwritten on sync. "Reset local changes" wipes local state, so strip
     # them first; otherwise the importer's `_prepare_fields` honours them and
-    # refuses to reset the very fields the user edited.
-    _strip_personal_protect_tags(nids)
+    # refuses to reset the very fields the user edited. Tags matching a currently
+    # globally-protected field are preserved — they encode user intent that should
+    # survive if global protection is later removed (same convention as the
+    # browser "Protect Fields" dialog).
+    _strip_personal_protect_tags(nids, ah_did)
 
     notes_data = ankihub_db.notes_data_for_anki_nids(nids)
     note_types = {
@@ -63,7 +66,7 @@ def reset_local_changes_to_notes(
     ankihub_db.reset_mod_values_in_anki_db(list(nids))
 
 
-def _strip_personal_protect_tags(nids: Sequence[NoteId]) -> None:
+def _strip_personal_protect_tags(nids: Sequence[NoteId], ah_did: uuid.UUID) -> None:
     # Some nids may refer to locally-deleted notes — the importer recreates them
     # later in the reset flow, so silently skip them here.
     changed = []
@@ -72,7 +75,11 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId]) -> None:
             note = aqt.mw.col.get_note(nid)
         except NotFoundError:
             continue
-        new_tags = [t for t in note.tags if not is_protect_tag(t)]
+        preserved = {
+            protection_tag_for_field(f).lower()
+            for f in config.globally_protected_fields_for_note_type(ah_did, note.mid)
+        }
+        new_tags = [t for t in note.tags if not is_protect_tag(t) or t.lower() in preserved]
         if new_tags != note.tags:
             note.tags = new_tags
             changed.append(note)
