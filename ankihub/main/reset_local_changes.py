@@ -5,12 +5,14 @@
 import uuid
 from typing import Sequence
 
+import aqt
 from anki.notes import NoteId
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
 from .importing import AnkiHubImporter
+from .note_conversion import TAG_FOR_PROTECTING_FIELDS
 
 
 def reset_local_changes_to_notes(
@@ -24,6 +26,13 @@ def reset_local_changes_to_notes(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
+
+    # Personal-protect tags (AnkiHub_Protect[::field]) are part of local state —
+    # added by the user or the auto-protect-on-edit hook to keep specific fields
+    # from being overwritten on sync. "Reset local changes" wipes local state,
+    # so strip them first; otherwise the importer's `_prepare_fields` honours
+    # them and refuses to reset the very fields the user edited.
+    _strip_personal_protect_tags(nids)
 
     notes_data = ankihub_db.notes_data_for_anki_nids(nids)
     note_types = {
@@ -51,3 +60,16 @@ def reset_local_changes_to_notes(
 
     # this way the notes won't be marked as "changed after sync" anymore
     ankihub_db.reset_mod_values_in_anki_db(list(nids))
+
+
+def _strip_personal_protect_tags(nids: Sequence[NoteId]) -> None:
+    prefix = f"{TAG_FOR_PROTECTING_FIELDS}::".lower()
+    changed = []
+    for nid in nids:
+        note = aqt.mw.col.get_note(nid)
+        new_tags = [t for t in note.tags if not t.lower().startswith(prefix)]
+        if new_tags != note.tags:
+            note.tags = new_tags
+            changed.append(note)
+    if changed:
+        aqt.mw.col.update_notes(changed)
