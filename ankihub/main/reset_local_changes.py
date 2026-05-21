@@ -6,6 +6,7 @@ import uuid
 from typing import Sequence
 
 import aqt
+from anki.errors import NotFoundError
 from anki.notes import NoteId
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -63,9 +64,14 @@ def reset_local_changes_to_notes(
 
 
 def _strip_personal_protect_tags(nids: Sequence[NoteId]) -> None:
+    # Some nids may refer to locally-deleted notes — the importer recreates them
+    # later in the reset flow, so silently skip them here.
     changed = []
     for nid in nids:
-        note = aqt.mw.col.get_note(nid)
+        try:
+            note = aqt.mw.col.get_note(nid)
+        except NotFoundError:
+            continue
         new_tags = [t for t in note.tags if not is_protect_tag(t)]
         if new_tags != note.tags:
             note.tags = new_tags
