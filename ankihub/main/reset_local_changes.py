@@ -12,7 +12,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
 from .importing import AnkiHubImporter
-from .note_conversion import TAG_FOR_PROTECTING_FIELDS
+from .note_conversion import is_protect_tag
 
 
 def reset_local_changes_to_notes(
@@ -63,11 +63,10 @@ def reset_local_changes_to_notes(
 
 
 def _strip_personal_protect_tags(nids: Sequence[NoteId]) -> None:
-    prefix = f"{TAG_FOR_PROTECTING_FIELDS}::".lower()
     changed = []
     for nid in nids:
         note = aqt.mw.col.get_note(nid)
-        new_tags = [t for t in note.tags if not t.lower().startswith(prefix)]
+        new_tags = [t for t in note.tags if not is_protect_tag(t)]
         if new_tags != note.tags:
             note.tags = new_tags
             changed.append(note)

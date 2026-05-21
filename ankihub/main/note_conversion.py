@@ -41,6 +41,15 @@ def is_internal_tag(tag: str) -> bool:
     return bool(INTERNAL_TAGS_REGEX.match(tag))
 
 
+def is_protect_tag(tag: str) -> bool:
+    """True for `AnkiHub_Protect::<field>` and `AnkiHub_Protect::All` (case-insensitive).
+
+    Does not match the bare `AnkiHub_Protect` top-level tag — `protection_tag_for_field`
+    always appends `::<field>`.
+    """
+    return tag.lower().startswith(f"{TAG_FOR_PROTECTING_FIELDS}::".lower())
+
+
 def is_optional_tag(tag: str) -> bool:
     return bool(OPTIONAL_TAG_REGEX.match(tag))
 
