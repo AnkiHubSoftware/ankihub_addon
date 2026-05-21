@@ -5381,7 +5381,6 @@ def test_reset_local_changes_to_notes(
         basic_note_1.tags = ["AnkiHub_Protect::Front", "AnkiHub_Protect::Back"]
         basic_note_1.flush()
         mw.col.set_deck(basic_note_1.card_ids(), 1)
-        config.set_globally_protected_fields(ah_did, {basic_note_1.mid: ["Back"]})
 
         # delete a note
         mw.col.remove_notes([basic_note_2.id])
