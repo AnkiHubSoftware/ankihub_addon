@@ -28,11 +28,11 @@ def reset_local_changes_to_notes(
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
 
-    # Personal-protect tags (AnkiHub_Protect[::field]) are part of local state —
-    # added by the user or the auto-protect-on-edit hook to keep specific fields
-    # from being overwritten on sync. "Reset local changes" wipes local state,
-    # so strip them first; otherwise the importer's `_prepare_fields` honours
-    # them and refuses to reset the very fields the user edited.
+    # Personal-protect tags (AnkiHub_Protect::*) are part of local state — added
+    # by the user or the auto-protect-on-edit hook to keep specific fields from
+    # being overwritten on sync. "Reset local changes" wipes local state, so strip
+    # them first; otherwise the importer's `_prepare_fields` honours them and
+    # refuses to reset the very fields the user edited.
     _strip_personal_protect_tags(nids)
 
     notes_data = ankihub_db.notes_data_for_anki_nids(nids)
