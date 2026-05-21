@@ -5372,8 +5372,11 @@ def test_reset_local_changes_to_notes(
         basic_note_1 = mw.col.get_note(NoteId(1608240029527))
         basic_note_2 = mw.col.get_note(NoteId(1608240057545))
 
-        # change the content of a note and move it to a different deck
+        # change the content of a note, tag the edited field as personally-protected
+        # (mirrors what the auto-protect-on-edit hook does on real edits), and move
+        # the note to a different deck
         basic_note_1["Front"] = "changed"
+        basic_note_1.tags = ["AnkiHub_Protect::Front"]
         basic_note_1.flush()
         mw.col.set_deck(basic_note_1.card_ids(), 1)
 
@@ -5391,9 +5394,11 @@ def test_reset_local_changes_to_notes(
 
         # assert that basic_note_1 was changed back is still in the deck it was moved to
         # (resetting local changes to notes should not move existing notes between decks as the
-        # user might not want that)
+        # user might not want that). The personal-protect tag must also be stripped, otherwise
+        # the importer would have honoured it and skipped resetting Front.
         basic_note_1.load()
         assert basic_note_1["Front"] == "This is the front 1"
+        assert not any(t.lower().startswith("ankihub_protect::") for t in basic_note_1.tags)
         assert basic_note_1.cards()
         for card in basic_note_1.cards():
             assert card.did == 1
