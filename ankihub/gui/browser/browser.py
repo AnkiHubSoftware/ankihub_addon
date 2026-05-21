@@ -55,6 +55,7 @@ from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
+    is_protect_tag,
     optional_tag_prefix_for_group,
     protection_tag_for_field,
 )
@@ -399,7 +400,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
         for note in notes:
             preserved_tags = [tag for tag in note.tags if tag.lower() in globally_protected_tag_set_lower]
             # remove old tags for protecting fields
-            note.tags = [tag for tag in note.tags if not tag.lower().startswith(TAG_FOR_PROTECTING_FIELDS.lower())]
+            note.tags = [tag for tag in note.tags if not is_protect_tag(tag)]
 
             # add new tags for protecting fields, plus tags preserved for globally-protected fields
             note.tags += new_tags_for_protecting_fields + preserved_tags

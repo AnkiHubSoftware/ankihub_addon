@@ -3,14 +3,17 @@
 """
 
 import uuid
-from typing import Sequence
+from typing import Dict, List, Sequence
 
+import aqt
+from anki.errors import NotFoundError
 from anki.notes import NoteId
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
 from .importing import AnkiHubImporter
+from .note_conversion import is_protect_tag, protection_tag_for_field
 
 
 def reset_local_changes_to_notes(
@@ -24,6 +27,16 @@ def reset_local_changes_to_notes(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
+
+    # Personal-protect tags (AnkiHub_Protect::*) block the importer's
+    # `_prepare_fields` from resetting their field. Strip them so Reset actually
+    # resets; otherwise the very fields the user edited stay edited (especially
+    # visible since the NRT-748 auto-protect-on-edit hook started adding these
+    # tags automatically). Tags matching a currently globally-protected field
+    # are preserved — those fields are typically the user's personal content
+    # (e.g. Lecture Notes) that should outlive a later removal of global
+    # protection; same convention as the browser "Protect Fields" dialog.
+    _strip_personal_protect_tags(nids, protected_fields)
 
     notes_data = ankihub_db.notes_data_for_anki_nids(nids)
     note_types = {
@@ -51,3 +64,24 @@ def reset_local_changes_to_notes(
 
     # this way the notes won't be marked as "changed after sync" anymore
     ankihub_db.reset_mod_values_in_anki_db(list(nids))
+
+
+def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[int, List[str]]) -> None:
+    # Some nids may refer to locally-deleted notes — the importer recreates them
+    # later in the reset flow, so silently skip them here.
+    # `protected_fields` is the same freshly-fetched dict passed to the importer,
+    # so preservation and the importer's reset decisions stay in lockstep even if
+    # the cached config is stale.
+    changed = []
+    for nid in nids:
+        try:
+            note = aqt.mw.col.get_note(nid)
+        except NotFoundError:
+            continue
+        preserved = {protection_tag_for_field(f).lower() for f in protected_fields.get(note.mid, [])}
+        new_tags = [t for t in note.tags if not is_protect_tag(t) or t.lower() in preserved]
+        if new_tags != note.tags:
+            note.tags = new_tags
+            changed.append(note)
+    if changed:
+        aqt.mw.col.update_notes(changed)
