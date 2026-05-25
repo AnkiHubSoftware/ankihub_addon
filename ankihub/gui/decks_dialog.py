@@ -47,6 +47,7 @@ from ..main.note_type_management import (
     update_note_type_templates_and_styles,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
+from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
 from ..main.utils import (
     all_notes_in_deck,
     get_deck_for_ah_did,
@@ -288,7 +289,7 @@ class DeckManagementDialog(QDialog):
 
         # Setup "Automatically protect fields when edited" (gated on a server-controlled flag
         # — the suggestion dialog needs to ship before this option is meaningful to users)
-        auto_protect_enabled = (config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False)
+        auto_protect_enabled = config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
         if auto_protect_enabled:
             self.box_auto_protect_fields = self._setup_box_auto_protect_fields_when_edited(selected_ah_did)
 
