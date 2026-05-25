@@ -143,6 +143,10 @@ class DeckConfig(DataClassJSONMixin):
     has_note_embeddings: bool = False
     auto_protect_fields_when_edited: bool = True
     globally_protected_fields: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
+    # Per-note-type record of fields the user explicitly deselected in the Suggest dialog.
+    # Storing deselected (rather than selected) means a field edited for the first time
+    # defaults to checked, while a field the user previously unchecked stays unchecked.
+    last_deselected_fields_per_note_type: Dict[int, List[str]] = dataclasses.field(default_factory=dict)
 
     @staticmethod
     def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
@@ -410,9 +414,24 @@ class _Config:
         deck_config.globally_protected_fields = protected_fields
         self._update_private_config()
 
-    def globally_protected_fields_for_note_type(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
+    def globally_protected_fields(self, ankihub_did: uuid.UUID) -> Dict[int, List[str]]:
+        # Return a copy so callers can't mutate the cached map.
+        return {mid: list(names) for mid, names in self.deck_config(ankihub_did).globally_protected_fields.items()}
+
+    def set_last_deselected_fields(self, ankihub_did: uuid.UUID, mid: int, fields: List[str]) -> None:
+        """Remember which fields the user explicitly deselected in the Suggest dialog for this
+        (deck, note type), so a subsequent open keeps those fields unchecked while newly-edited
+        fields default to checked.
+        """
+        store = self.deck_config(ankihub_did).last_deselected_fields_per_note_type
+        if store.get(mid) == fields:
+            return
+        store[mid] = list(fields)
+        self._update_private_config()
+
+    def last_deselected_fields(self, ankihub_did: uuid.UUID, mid: int) -> List[str]:
         # Return a copy so callers can't mutate the cached list.
-        return list(self.deck_config(ankihub_did).globally_protected_fields.get(mid, []))
+        return list(self.deck_config(ankihub_did).last_deselected_fields_per_note_type.get(mid, []))
 
     def set_ankihub_deleted_notes_behavior(
         self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted
