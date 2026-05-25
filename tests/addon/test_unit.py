@@ -20,7 +20,7 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from approvaltests.approvals import verify  # type: ignore
 from approvaltests.namer import NamerFactory  # type: ignore
-from aqt.qt import QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
+from aqt.qt import QCheckBox, QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -122,7 +122,10 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
+    _GroupController,
     _on_suggest_notes_in_bulk_done,
+    _SelectAllCheckBox,
+    _TagLabel,
     get_anki_nid_to_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
@@ -552,6 +555,33 @@ def test_prepared_field_html():
     assert _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">') == '<img src="foo.jpg">'
 
 
+def test_tag_label_elide():
+    elide = _TagLabel._elide
+
+    # Short tag → as-is.
+    assert elide("Pathology") == "Pathology"
+    assert elide("Hierarchy::A::B") == "Hierarchy::A::B"
+
+    # Long hierarchical tag → `…::leaf`.
+    long_hierarchical = (
+        "AnkiHub::Internal::AnKing::Pharmacology::Antiarrhythmics::Class_III::Amiodarone::Cardiovascular::Specifics"
+    )
+    assert elide(long_hierarchical) == "…::Specifics"
+
+    # Long flat tag (no `::`) → plain ellipsis at the end.
+    long_flat = "x" * 120
+    flat_result = elide(long_flat)
+    assert flat_result.endswith("…")
+    assert len(flat_result) <= 85
+
+    # Long hierarchical tag whose leaf alone exceeds the budget → leaf truncated too.
+    bulky_leaf = "y" * 120
+    leaf_result = elide(f"Hierarchy::{bulky_leaf}")
+    assert leaf_result.startswith("…::")
+    assert leaf_result.endswith("…")
+    assert len(leaf_result) <= 85
+
+
 def test_remove_note_type_name_modifications():
     name = "Basic (deck_name / user_name)"
     assert note_type_name_without_ankihub_modifications(name) == "Basic"
@@ -900,6 +930,85 @@ class TestSuggestionDialog:
         dialog.show()
 
         assert dialog.auto_accept_cb.isVisible() == can_submit_without_review
+
+
+class TestSelectAllGroupController:
+    """Pin down the tri-state interaction in `_GroupController` + `_SelectAllCheckBox`.
+
+    The custom `nextCheckState` override is the bit that fixes Qt's default
+    Unchecked → PartiallyChecked cycle on user click, so without these tests a
+    'simplification' that drops the override would regress silently.
+    """
+
+    def _build(self, qtbot: QtBot, initial_checked):
+        toggles: List[bool] = []
+        parent = _SelectAllCheckBox("Select all")
+        qtbot.add_widget(parent)
+        controller = _GroupController(parent, on_child_toggle=lambda: toggles.append(True))
+        # Anchor the controller to the qtbot-tracked parent so it doesn't get GC'd
+        # mid-test; Qt drops the bound-method `toggled` connections when the Python
+        # controller dies and child→parent state propagation silently stops.
+        parent._test_controller_ref = controller  # type: ignore[attr-defined]
+        children = []
+        for state in initial_checked:
+            cb = QCheckBox("child")
+            cb.setChecked(state)
+            qtbot.add_widget(cb)
+            controller.add_child(cb)
+            children.append(cb)
+        controller.refresh_parent()
+        return parent, children, controller, toggles, Qt.CheckState
+
+    def test_select_all_check_box_user_click_skips_partially_checked(self, qtbot: QtBot):
+        """The override is the load-bearing bit — without it, an unchecked-group click
+        lands on PartiallyChecked and the controller treats that as "uncheck all"."""
+        cb = _SelectAllCheckBox("Select all")
+        qtbot.add_widget(cb)
+
+        # Unchecked → click → Checked (default Qt cycle would have gone to PartiallyChecked).
+        assert cb.checkState() == Qt.CheckState.Unchecked
+        cb.click()
+        assert cb.checkState() == Qt.CheckState.Checked
+
+        # Programmatic PartiallyChecked → click → Checked (also not the default).
+        cb.setCheckState(Qt.CheckState.PartiallyChecked)
+        cb.click()
+        assert cb.checkState() == Qt.CheckState.Checked
+
+        # Checked → click → Unchecked (same as default).
+        cb.click()
+        assert cb.checkState() == Qt.CheckState.Unchecked
+
+    @pytest.mark.parametrize(
+        "initial,target",
+        [
+            ([False, False, False], True),  # unchecked group → select all
+            ([True, True, True], False),  # checked group → clear all
+            ([True, False, True], True),  # partial group → select all (Qt fix: not "clear")
+        ],
+    )
+    def test_parent_click_sets_all_children(self, qtbot: QtBot, initial, target):
+        parent, children, controller, toggles, _ = self._build(qtbot, initial)
+        # Simulate the post-`nextCheckState` state Qt puts us in after a user click.
+        parent.setCheckState(Qt.CheckState.Checked if target else Qt.CheckState.Unchecked)
+        controller._on_parent_clicked(target)
+        assert all(c.isChecked() == target for c in children)
+        expected = Qt.CheckState.Checked if target else Qt.CheckState.Unchecked
+        assert parent.checkState() == expected
+        assert toggles
+
+    @pytest.mark.parametrize(
+        "initial,child_idx,new_state,expected_parent",
+        [
+            ([True, True, True], 1, False, "PartiallyChecked"),  # un-check one → partial
+            ([True, False, True], 1, True, "Checked"),  # complete the set → checked
+            ([True, False, False], 0, False, "Unchecked"),  # last one off → unchecked
+        ],
+    )
+    def test_child_toggle_propagates_to_parent(self, qtbot: QtBot, initial, child_idx, new_state, expected_parent):
+        parent, children, _, _, _ = self._build(qtbot, initial)
+        children[child_idx].setChecked(new_state)
+        assert parent.checkState() == getattr(Qt.CheckState, expected_parent)
 
 
 class TestSuggestionDialogGetAnkiNidToAHDidsDict:
