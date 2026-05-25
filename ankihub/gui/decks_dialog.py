@@ -228,7 +228,9 @@ class DeckManagementDialog(QDialog):
         # Destination for new cards
         self.box_new_cards_destination = self._setup_box_new_cards_destination(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
-        self.box_bottom_right.addStretch()
+        # Keep sections stacked at the top with the same spacing as the others; a single
+        # trailing stretch (below) absorbs slack so content doesn't float/jump between decks.
+        self.box_bottom_right.addSpacing(16)
 
         # Note Types
         self.box_note_types = self._setup_box_note_types(selected_ah_did)
@@ -459,11 +461,8 @@ class DeckManagementDialog(QDialog):
 
         # Initialize and set up the subdecks documentation link label
         self.subdecks_docs_link_label = QLabel(
-            """
-            <a href="https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2">
-                Learn about subdecks
-            </a>
-            """
+            '<a href="https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2">'
+            "Learn about subdecks</a>"
         )
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
         self.subdecks_docs_link_label.setContentsMargins(20, 0, 0, 0)
@@ -553,11 +552,8 @@ class DeckManagementDialog(QDialog):
 
         # Help link
         self.auto_protect_fields_docs_link_label = QLabel(
-            """
-            <a href="https://community.ankihub.net/t/protecting-fields-and-tags/165604">
-                Learn about protecting fields
-            </a>
-            """
+            '<a href="https://community.ankihub.net/t/protecting-fields-and-tags/165604">'
+            "Learn about protecting fields</a>"
         )
         self.auto_protect_fields_docs_link_label.setOpenExternalLinks(True)
         self.auto_protect_fields_docs_link_label.setContentsMargins(20, 0, 0, 0)
@@ -607,11 +603,8 @@ class DeckManagementDialog(QDialog):
 
         # Initialize and set up the documentation link label
         self.new_cards_destination_docs_link_label = QLabel(
-            """
-            <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
-                More about destinations for new cards
-            </a>
-            """
+            '<a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">'
+            "More about destinations for new cards</a>"
         )
         self.new_cards_destination_docs_link_label.setOpenExternalLinks(True)
 
@@ -643,11 +636,14 @@ class DeckManagementDialog(QDialog):
         self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
         box.addSpacing(8)
-        box.addWidget(self.add_note_type_btn)
-        box.addSpacing(4)
-        box.addWidget(self.add_field_btn)
-        box.addSpacing(4)
-        box.addWidget(self.update_templates_btn)
+        # Group the buttons in their own layout with tight spacing so they sit close
+        # together, independent of the parent layout's larger default item spacing.
+        buttons_layout = QVBoxLayout()
+        buttons_layout.setSpacing(4)
+        buttons_layout.addWidget(self.add_note_type_btn)
+        buttons_layout.addWidget(self.add_field_btn)
+        buttons_layout.addWidget(self.update_templates_btn)
+        box.addLayout(buttons_layout)
 
         return box
 
