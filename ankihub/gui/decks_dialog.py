@@ -2,6 +2,7 @@
 
 import uuid
 from concurrent.futures import Future
+from html import escape
 from typing import List, Optional
 from uuid import UUID
 
@@ -185,6 +186,10 @@ class DeckManagementDialog(QDialog):
         self.decks_list_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self.decks_list = QListWidget()
+        # Elide long deck names with a trailing "…" instead of showing a horizontal
+        # scrollbar; the full name is available via each item's tooltip.
+        self.decks_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.decks_list.setTextElideMode(Qt.TextElideMode.ElideRight)
         qconnect(self.decks_list.itemSelectionChanged, self._refresh_box_bottom_right)
 
         box = QVBoxLayout()
@@ -883,6 +888,10 @@ class DeckManagementDialog(QDialog):
                 item = QListWidgetItem(f"{deck.name} (Maintained by you)")
             else:
                 item = QListWidgetItem(deck.name)
+            # Full name on hover, since long names are elided in the list. Wrap it in
+            # HTML so Qt renders the tooltip as a word-wrapped block instead of one long
+            # thin line; escape the name so any "<"/"&" in it isn't treated as markup.
+            item.setToolTip(f"<div>{escape(item.text())}</div>")
             item.setData(Qt.ItemDataRole.UserRole, deck)
             self.decks_list.addItem(item)
 
