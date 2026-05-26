@@ -1210,13 +1210,35 @@ class DeckManagementDialog(QDialog):
     def _refresh_subdecks_checkbox(self):
         ah_did = self._selected_ah_did()
 
-        has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
-        self.subdecks_cb.setEnabled(has_subdeck_tags)
-        self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }" if not has_subdeck_tags else "")
-        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
-
+        # The stored enabled/checked state doesn't require a DB query, so reflect it
+        # immediately.
         deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
+        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
+
+        # Whether the checkbox is interactive depends on whether the deck has subdeck
+        # tags, which requires scanning every note's tags in the AnkiHub DB. For large
+        # decks (tens of thousands of notes with long tag strings) this takes ~100ms,
+        # so run it off the main thread to keep deck selection responsive, then apply
+        # the result once it returns.
+        self.subdecks_cb.setEnabled(False)
+        self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }")
+
+        AddonQueryOp(
+            op=lambda _: deck_contains_subdeck_tags(ah_did),
+            success=lambda has_subdeck_tags: self._apply_subdecks_checkbox_state(ah_did, has_subdeck_tags),
+            parent=self,
+        ).without_collection().run_in_background()
+
+    def _apply_subdecks_checkbox_state(self, ah_did: UUID, has_subdeck_tags: bool) -> None:
+        # Ignore stale results: the user may have selected a different deck while the
+        # query was running, in which case self.subdecks_cb now belongs to that deck.
+        if self._selected_ah_did() != ah_did:
+            return
+
+        self.subdecks_cb.setEnabled(has_subdeck_tags)
+        self.subdecks_cb.setStyleSheet("" if has_subdeck_tags else "QCheckBox { color: grey }")
+        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
 
     @classmethod
     def display_subscribe_window(cls):
