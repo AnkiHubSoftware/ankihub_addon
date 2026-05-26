@@ -1224,21 +1224,36 @@ class DeckManagementDialog(QDialog):
         self.subdecks_cb.setEnabled(False)
         self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }")
 
+        # Capture the specific checkbox this op is started for. If the panel rebuilds
+        # before the op completes (deck switch, toggle, auto-refresh, ...) self.subdecks_cb
+        # will point to a new widget and we'll skip applying this now-stale result.
+        checkbox = self.subdecks_cb
+
+        # Best-effort check: on failure, log and leave the checkbox in its loading-state
+        # disabled rather than surfacing the add-on's default error dialog for a
+        # transient DB / profile-close error.
         AddonQueryOp(
             op=lambda _: deck_contains_subdeck_tags(ah_did),
-            success=lambda has_subdeck_tags: self._apply_subdecks_checkbox_state(ah_did, has_subdeck_tags),
+            success=lambda has_subdeck_tags: self._apply_subdecks_checkbox_state(ah_did, has_subdeck_tags, checkbox),
             parent=self,
+        ).failure(
+            lambda exc: LOGGER.warning("Subdeck-tag check failed", ah_did=str(ah_did), error=repr(exc))
         ).without_collection().run_in_background()
 
-    def _apply_subdecks_checkbox_state(self, ah_did: UUID, has_subdeck_tags: bool) -> None:
-        # Ignore stale results: the user may have selected a different deck while the
-        # query was running, in which case self.subdecks_cb now belongs to that deck.
-        if self._selected_ah_did() != ah_did:
+    def _apply_subdecks_checkbox_state(self, ah_did: UUID, has_subdeck_tags: bool, checkbox: QCheckBox) -> None:
+        # Guard against the dialog or the captured checkbox being torn down between op
+        # launch and completion (e.g. profile switch mid-query).
+        if sip.isdeleted(self) or sip.isdeleted(checkbox):
             return
 
-        self.subdecks_cb.setEnabled(has_subdeck_tags)
-        self.subdecks_cb.setStyleSheet("" if has_subdeck_tags else "QCheckBox { color: grey }")
-        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
+        # Ignore stale results: a different deck may have been selected (self.subdecks_cb
+        # is then a different widget) or this checkbox may have been rebuilt for the same
+        # deck. Either way, the now-current op will set the right state.
+        if self._selected_ah_did() != ah_did or self.subdecks_cb is not checkbox:
+            return
+
+        checkbox.setEnabled(has_subdeck_tags)
+        checkbox.setStyleSheet("" if has_subdeck_tags else "QCheckBox { color: grey }")
 
     @classmethod
     def display_subscribe_window(cls):
