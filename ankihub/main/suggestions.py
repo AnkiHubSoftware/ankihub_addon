@@ -87,15 +87,16 @@ def _has_empty_first_field(note: Note) -> bool:
 
 @dataclass
 class PerNoteFilters:
-    """Allowlists and denylist that select what content goes into one note's
-    suggestion. `None` for any list means "no filter for this dimension"
-    (legacy behavior: ship everything the diff detected).
+    """Allowlists that select what content goes into one note's suggestion.
+    `None` for any list means "no filter for this dimension" (legacy
+    behavior: ship everything the diff detected). Globally-protected fields
+    are stripped *before* the dialog renders, so they never enter the
+    allowlist — server-side enforcement is the only backstop at submit.
     """
 
     fields_to_include: Optional[Collection[str]] = None
     tags_to_add: Optional[Collection[str]] = None
     tags_to_remove: Optional[Collection[str]] = None
-    globally_protected_fields: Optional[Collection[str]] = None
 
 
 @dataclass
@@ -108,7 +109,6 @@ class BulkSuggestionFilters:
     fields_to_include_by_mid: Optional[Mapping[NotetypeId, Collection[str]]] = None
     tags_to_add: Optional[Collection[str]] = None
     tags_to_remove: Optional[Collection[str]] = None
-    globally_protected_fields_by_mid: Optional[Mapping[NotetypeId, Collection[str]]] = None
 
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
         # `fields_to_include_by_mid` non-None but missing this mid means the
@@ -121,11 +121,6 @@ class BulkSuggestionFilters:
             ),
             tags_to_add=self.tags_to_add,
             tags_to_remove=self.tags_to_remove,
-            globally_protected_fields=(
-                self.globally_protected_fields_by_mid.get(mid)
-                if self.globally_protected_fields_by_mid is not None
-                else None
-            ),
         )
 
 
@@ -544,23 +539,15 @@ def _suggestions_for_notes(
     )
 
 
-def _apply_field_filters(
-    fields: List[Field],
-    allowlist: Optional[Collection[str]],
-    denylist: Optional[Collection[str]],
-) -> List[Field]:
-    """Drop fields not in the user's allowlist, then drop any in the denylist.
-
-    `allowlist=None` means "no user filter" (legacy behavior); `denylist` carries
-    globally-protected names that the server would reject anyway.
+def _apply_field_allowlist(fields: List[Field], allowlist: Optional[Collection[str]]) -> List[Field]:
+    """Drop fields not in the user's allowlist. `allowlist=None` means "no user filter"
+    (legacy behavior — ships everything the diff detected). Globally-protected fields are
+    excluded by the dialog *before* the user picks; server-side enforcement is the backstop.
     """
-    if allowlist is not None:
-        allowed = set(allowlist)
-        fields = [f for f in fields if f.name in allowed]
-    if denylist:
-        denied = set(denylist)
-        fields = [f for f in fields if f.name not in denied]
-    return fields
+    if allowlist is None:
+        return fields
+    allowed = set(allowlist)
+    return [f for f in fields if f.name in allowed]
 
 
 def _apply_tag_allowlist(tags: List[str], allowlist: Optional[Collection[str]]) -> List[str]:
@@ -582,7 +569,7 @@ def _new_note_suggestion(
     note_data = to_note_data(
         note, set_new_id=True, include_protected_fields=config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
     )
-    fields = _apply_field_filters(list(note_data.fields), filters.fields_to_include, filters.globally_protected_fields)
+    fields = _apply_field_allowlist(list(note_data.fields), filters.fields_to_include)
     tags = _apply_tag_allowlist(list(note_data.tags or []), filters.tags_to_add)
 
     # The server requires the first field; user-deselect or globally-protected
@@ -639,9 +626,7 @@ def _change_note_suggestion(
             prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
         )
 
-        fields_that_changed = _apply_field_filters(
-            fields_that_changed, filters.fields_to_include, filters.globally_protected_fields
-        )
+        fields_that_changed = _apply_field_allowlist(fields_that_changed, filters.fields_to_include)
         added_tags = _apply_tag_allowlist(added_tags, filters.tags_to_add)
         removed_tags = _apply_tag_allowlist(removed_tags, filters.tags_to_remove)
 
