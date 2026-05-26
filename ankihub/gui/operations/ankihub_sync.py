@@ -27,7 +27,7 @@ from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
-from ..utils import extract_argument, logged_into_ankiweb, sync_with_ankiweb
+from ..utils import active_window_or_mw, extract_argument, logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
@@ -101,7 +101,9 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None], skip_summary: bo
             AddonQueryOp(
                 op=lambda _: get_subscriptions_and_clean_up(),
                 success=partial(_on_subscriptions_fetched, on_done=on_done, skip_summary=skip_summary),
-                parent=aqt.mw,
+                # Parent to the active dialog (e.g. Deck Management) so the progress popup layers
+                # above it instead of hiding behind it on macOS (NRT-764).
+                parent=active_window_or_mw(),
             )
             .failure(lambda e: on_done(future_with_exception(e)))
             .with_progress()
@@ -116,7 +118,7 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None], skip_summary: bo
         AddonQueryOp(
             op=lambda _: subscribe_to_intro_deck(),
             success=lambda _: get_subscriptions_in_background(),
-            parent=aqt.mw,
+            parent=active_window_or_mw(),
         ).failure(lambda e: on_done(future_with_exception(e))).with_progress().run_in_background()
     else:
         get_subscriptions_in_background()
@@ -169,7 +171,7 @@ def update_decks_and_media(on_done: Callable[[Future], None], ah_dids: List[UUID
                 start_media_sync=start_media_sync,
             ),
             success=lambda _: on_success(do_full_upload=do_full_upload),
-            parent=aqt.mw,
+            parent=active_window_or_mw(),
         ).failure(on_failure).with_progress().run_in_background()
 
     def on_failure(exception: Exception) -> None:
@@ -183,7 +185,7 @@ def update_decks_and_media(on_done: Callable[[Future], None], ah_dids: List[UUID
             changes=exception.affected_note_type_ids,
         )
 
-        dialog = ChangesRequireFullSyncDialog(changes_require_full_sync_error=exception, parent=aqt.mw)
+        dialog = ChangesRequireFullSyncDialog(changes_require_full_sync_error=exception, parent=active_window_or_mw())
 
         qconnect(dialog.rejected, lambda: _on_sync_done(on_done=on_done))
         qconnect(
