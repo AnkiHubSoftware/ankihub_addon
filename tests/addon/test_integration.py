@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QEvent, Qt, QUrl, QWidget
+from aqt.qt import QAction, QDialog, QEvent, Qt, QUrl, QWidget
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -4686,6 +4686,125 @@ class TestDeckManagementDialog:
             mocker.patch.object(dialog, "isActiveWindow", return_value=True)
             dialog.changeEvent(activation_event)
             start_mock.assert_called_once()
+
+    def test_auto_refresh_discards_stale_async_result_after_sync_refresh(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        """If a sync refresh runs while an async auto-refresh is in flight, the
+        stale async result must be dropped on completion (generation guard) so it
+        can't clobber the newer list.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            deck_name = "Existing Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+            existing_deck = DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+
+            get_subs_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[existing_deck])
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            assert dialog.decks_list.count() == 1
+
+            # Capture the async on_success without firing it, so we control when (and
+            # against which generation) the stale result lands.
+            captured: dict = {}
+
+            class FakeQueryOp:
+                def __init__(self, *, op, success, parent):
+                    captured["success"] = success
+
+                def failure(self, failure):
+                    return self
+
+                def run_in_background(self):
+                    pass  # never actually runs the op
+
+            mocker.patch("ankihub.gui.decks_dialog.AddonQueryOp", FakeQueryOp)
+
+            # Start the async auto-refresh: its on_success closure captures the
+            # current generation. The op never runs (FakeQueryOp), so the in-flight
+            # result is effectively pending.
+            dialog._auto_refresh_decks_list()
+            assert "success" in captured
+
+            # A sync refresh (e.g. an unsubscribe) lands while the async is in flight,
+            # rebuilds the list to a new state, and bumps the fetch generation.
+            get_subs_mock.return_value = []
+            dialog._refresh_decks_list()
+            assert dialog.decks_list.count() == 0
+
+            # Now fire the in-flight async's on_success with the stale list (still
+            # containing the deck). The captured generation no longer matches, so the
+            # result must be discarded — apply must not run, list must stay empty.
+            apply_spy = mocker.spy(dialog, "_apply_fetched_subscriptions")
+            captured["success"]([existing_deck])
+
+            apply_spy.assert_not_called()
+            assert dialog.decks_list.count() == 0
+
+    def test_auto_refresh_modal_and_popup_guard(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        """The debounce timeout must skip when a child modal/popup is open, but the
+        dialog itself being application-modal must NOT block its own refresh — the
+        `is not self` carve-out is what keeps auto-refresh working at all.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            ah_did = install_ah_deck()
+            anki_did = config.deck_config(ah_did).anki_id
+            deck = DeckFactory.create(ah_did=ah_did, anki_did=anki_did)
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[deck])
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+
+            active_modal_mock = mocker.patch(
+                "ankihub.gui.decks_dialog.QApplication.activeModalWidget", return_value=None
+            )
+            active_popup_mock = mocker.patch(
+                "ankihub.gui.decks_dialog.QApplication.activePopupWidget", return_value=None
+            )
+            auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
+            timer_start_mock = mocker.patch.object(dialog._refresh_debounce_timer, "start")
+
+            # (a) A child modal dialog is open -> skip; closing it would re-trigger via
+            # ActivationChange, so nothing is lost (no fetch, no re-arm here).
+            active_modal_mock.return_value = QDialog(dialog)
+            active_popup_mock.return_value = None
+            auto_refresh_mock.reset_mock()
+            timer_start_mock.reset_mock()
+            dialog._on_refresh_debounce_timeout()
+            auto_refresh_mock.assert_not_called()
+            timer_start_mock.assert_not_called()
+
+            # (b) The dialog itself is the active modal (it's application-modal) -> the
+            # `is not self` carve-out lets the refresh proceed.
+            active_modal_mock.return_value = dialog
+            active_popup_mock.return_value = None
+            auto_refresh_mock.reset_mock()
+            dialog._subscriptions_fetch_in_flight = False
+            dialog._on_refresh_debounce_timeout()
+            auto_refresh_mock.assert_called_once()
+
+            # (c) A popup (e.g. combo dropdown) is open -> skip (no fetch, no re-arm).
+            active_modal_mock.return_value = None
+            active_popup_mock.return_value = QWidget()
+            auto_refresh_mock.reset_mock()
+            timer_start_mock.reset_mock()
+            dialog._on_refresh_debounce_timeout()
+            auto_refresh_mock.assert_not_called()
+            timer_start_mock.assert_not_called()
 
     def test_toggle_subdecks(
         self,
