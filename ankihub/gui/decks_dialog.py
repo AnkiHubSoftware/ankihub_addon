@@ -92,27 +92,31 @@ class DeckManagementDialog(QDialog):
     # Minimum seconds between automatic deck-list refreshes triggered by the
     # dialog regaining focus. Keeps frequent window activations (alt-tab, child
     # dialogs closing) from each firing a network request.
-    _AUTO_REFRESH_COOLDOWN_SECONDS = 2.0
-
-    # Activations within this window of the last fetch (notably the WindowActivate
-    # emitted while the dialog is being shown) are ignored — the list is already
-    # current, so there's nothing to refresh and no point scheduling a deferred one.
-    _AUTO_REFRESH_ACTIVATION_GRACE_SECONDS = 0.5
+    # Coalesce bursts of window activations (alt-tab, child dialogs closing) into a
+    # single refresh fired once focus settles.
+    _REFRESH_DEBOUNCE_MS = 400
+    # Skip a refresh if we fetched within this window — suppresses the activation
+    # emitted while the dialog is being shown (it lands right after the initial
+    # synchronous load) and throttles repeated quick returns.
+    _REFRESH_MIN_INTERVAL_SECONDS = 1.0
 
     def __init__(self):
         super(DeckManagementDialog, self).__init__(aqt.mw)
         self.client = AnkiHubClient()
 
-        # Auto-refresh bookkeeping (see _maybe_auto_refresh_decks_list). Seed the
+        # Auto-refresh bookkeeping (see _on_refresh_debounce_timeout). Seed the
         # timestamp now so the WindowActivate fired while showing the dialog
-        # doesn't trigger an immediate redundant fetch right after the initial load.
+        # doesn't trigger a redundant fetch right after the initial load.
         self._last_subscriptions_fetch = time.monotonic()
         self._subscriptions_fetch_in_flight = False
-        self._subscriptions_refetch_pending = False
-        self._subscriptions_refresh_scheduled = False
         # Bumped on every fetch (sync or async); an async result whose generation is
         # stale (a newer fetch/refresh started meanwhile) is discarded on completion.
         self._subscriptions_fetch_generation = 0
+        # Debounces focus-triggered refreshes; parented to self so it can't fire
+        # after the dialog is deleted.
+        self._refresh_debounce_timer = QTimer(self)
+        self._refresh_debounce_timer.setSingleShot(True)
+        qconnect(self._refresh_debounce_timer.timeout, self._on_refresh_debounce_timeout)
 
         self._setup_ui()
         self._refresh_decks_list()
@@ -943,69 +947,46 @@ class DeckManagementDialog(QDialog):
         self._refresh_box_bottom_right()
 
     @staticmethod
-    def _snapshot_for_decks(decks: List[Deck]) -> List[Tuple[UUID, str, UserDeckRelation]]:
-        """A comparable summary of exactly what the list renders for each deck."""
-        return [(deck.ah_did, deck.name, deck.user_relation) for deck in decks]
+    def _deck_snapshot(deck: Deck) -> Tuple[UUID, str, UserDeckRelation]:
+        """A comparable summary of exactly what the list renders for a deck."""
+        return (deck.ah_did, deck.name, deck.user_relation)
 
     def _current_decks_snapshot(self) -> List[Tuple[UUID, str, UserDeckRelation]]:
-        result = []
-        for i in range(self.decks_list.count()):
-            deck = self.decks_list.item(i).data(Qt.ItemDataRole.UserRole)
-            result.append((deck.ah_did, deck.name, deck.user_relation))
-        return result
+        return [
+            self._deck_snapshot(self.decks_list.item(i).data(Qt.ItemDataRole.UserRole))
+            for i in range(self.decks_list.count())
+        ]
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)
         # Returning from the external browser (or any other app) raises a window
         # activation event rather than a focus-in/show, so this is where we catch
-        # "the user is looking at the dialog again" and refresh the deck list.
+        # "the user is looking at the dialog again". Debounce so a burst of
+        # activations (alt-tab, child dialogs closing) coalesces into one refresh.
         if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow():
-            self._maybe_auto_refresh_decks_list()
+            self._refresh_debounce_timer.start(self._REFRESH_DEBOUNCE_MS)
 
-    def _maybe_auto_refresh_decks_list(self) -> None:
-        if not config.is_logged_in():
+    def _on_refresh_debounce_timeout(self) -> None:
+        # The singleton keeps the dialog alive after close, so it may be hidden
+        # (not deleted) by the time this fires — don't refresh a closed dialog.
+        if sip.isdeleted(self) or not self.isVisible() or not config.is_logged_in():
             return
         # Don't rebuild the list out from under an open child dialog (unsubscribe
         # confirmation, note-type/destination pickers) or popup (combo dropdown);
-        # those workflows are deck-scoped and a refresh could change the selection or
-        # tear down widgets mid-action. The dialog itself is application-modal, so
+        # those workflows are deck-scoped. The dialog itself is application-modal, so
         # exclude it from the check — otherwise auto-refresh would never run.
         active_modal = QApplication.activeModalWidget()
         if (active_modal is not None and active_modal is not self) or QApplication.activePopupWidget() is not None:
             return
+        # A fetch is already running; its result will refresh the list. A genuine
+        # later return re-triggers this via another activation.
         if self._subscriptions_fetch_in_flight:
-            # Remember that something happened during the request so we fetch once
-            # more when it returns (the in-flight response may predate the change).
-            self._subscriptions_refetch_pending = True
             return
-        elapsed = time.monotonic() - self._last_subscriptions_fetch
-        if elapsed < self._AUTO_REFRESH_ACTIVATION_GRACE_SECONDS:
-            # Just fetched (e.g. the activation emitted while showing the dialog):
-            # the list is current, so don't fetch or schedule a redundant refresh.
-            return
-        remaining = self._AUTO_REFRESH_COOLDOWN_SECONDS - elapsed
-        if remaining > 0:
-            # Past the grace window but still within the cooldown: defer instead of
-            # dropping the event, otherwise an activation from a quick browser round
-            # trip would be lost and a newly subscribed deck wouldn't show up.
-            self._schedule_auto_refresh(remaining)
+        # Skip if we just fetched — notably the activation emitted while showing the
+        # dialog, which lands right after the initial synchronous load.
+        if time.monotonic() - self._last_subscriptions_fetch < self._REFRESH_MIN_INTERVAL_SECONDS:
             return
         self._auto_refresh_decks_list()
-
-    def _schedule_auto_refresh(self, delay_seconds: float) -> None:
-        if self._subscriptions_refresh_scheduled:
-            return
-        self._subscriptions_refresh_scheduled = True
-
-        def on_timeout() -> None:
-            self._subscriptions_refresh_scheduled = False
-            # The singleton keeps the dialog alive after close, so it may be hidden
-            # (not deleted) by the time this fires — don't refresh a closed dialog.
-            if sip.isdeleted(self) or not self.isVisible():
-                return
-            self._maybe_auto_refresh_decks_list()
-
-        QTimer.singleShot(int(delay_seconds * 1000) + 50, on_timeout)
 
     def _auto_refresh_decks_list(self) -> None:
         self._subscriptions_fetch_in_flight = True
@@ -1028,22 +1009,13 @@ class DeckManagementDialog(QDialog):
                 except Exception as exc:
                     # Best-effort: a render failure must not surface an error popup.
                     LOGGER.warning("Applying auto-refreshed deck subscriptions failed.", exc_info=exc)
-            if self._subscriptions_refetch_pending:
-                self._subscriptions_refetch_pending = False
-                self._maybe_auto_refresh_decks_list()
 
         def on_failure(exc: Exception) -> None:
             # Auto-refresh is best-effort; never surface an error popup on every
-            # focus (e.g. when offline). The cooldown timestamp is still advanced.
+            # focus (e.g. when offline).
             self._subscriptions_fetch_in_flight = False
             self._last_subscriptions_fetch = time.monotonic()
             LOGGER.warning("Auto-refresh of deck subscriptions failed.", exc_info=exc)
-            if sip.isdeleted(self) or not self.isVisible():
-                return
-            # A change observed mid-request still deserves another attempt.
-            if self._subscriptions_refetch_pending:
-                self._subscriptions_refetch_pending = False
-                self._maybe_auto_refresh_decks_list()
 
         AddonQueryOp(
             op=lambda _: self.client.get_deck_subscriptions(),
@@ -1055,7 +1027,7 @@ class DeckManagementDialog(QDialog):
         current_snapshot = self._current_decks_snapshot()
         # Order-insensitive: a reordered-but-identical list isn't a real change, so
         # comparing as sets avoids a needless rebuild (and visible reshuffle).
-        if set(self._snapshot_for_decks(decks)) == set(current_snapshot):
+        if {self._deck_snapshot(deck) for deck in decks} == set(current_snapshot):
             # Nothing changed: skip the rebuild so the list doesn't flicker and the
             # current selection / right-panel state is left untouched.
             return

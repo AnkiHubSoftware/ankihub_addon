@@ -4618,7 +4618,7 @@ class TestDeckManagementDialog:
             populate_spy.assert_not_called()
             assert dialog._selected_ah_did() == ah_did
 
-    def test_auto_refresh_defers_during_cooldown_then_fetches(
+    def test_auto_refresh_throttles_and_skips_in_flight(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -4635,31 +4635,28 @@ class TestDeckManagementDialog:
             dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
 
-            # Isolate the cooldown branching from the "child dialog open" guard (the
-            # test harness leaves sibling modal dialogs around).
+            # Isolate the throttle/in-flight branching from the "child dialog open"
+            # guard (the test harness leaves sibling modal dialogs around).
             mocker.patch("ankihub.gui.decks_dialog.QApplication.activeModalWidget", return_value=None)
             mocker.patch("ankihub.gui.decks_dialog.QApplication.activePopupWidget", return_value=None)
 
             auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
-            schedule_mock = mocker.patch.object(dialog, "_schedule_auto_refresh")
 
-            # Just fetched (within the grace window, e.g. the activation emitted while
-            # showing the dialog) -> ignore: neither fetch nor schedule.
+            # Just fetched (within the min interval, e.g. the activation emitted while
+            # showing the dialog) -> no fetch.
             dialog._last_subscriptions_fetch = monotonic()
-            dialog._maybe_auto_refresh_decks_list()
+            dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_not_called()
-            schedule_mock.assert_not_called()
 
-            # Past the grace window but within the cooldown -> defer (don't drop) the
-            # activation rather than fetch immediately.
-            dialog._last_subscriptions_fetch = monotonic() - 1.0
-            dialog._maybe_auto_refresh_decks_list()
+            # Past the min interval but a fetch is already in flight -> no fetch.
+            dialog._last_subscriptions_fetch = monotonic() - (dialog._REFRESH_MIN_INTERVAL_SECONDS + 1.0)
+            dialog._subscriptions_fetch_in_flight = True
+            dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_not_called()
-            schedule_mock.assert_called_once()
 
-            # Past the cooldown -> fetch immediately.
-            dialog._last_subscriptions_fetch = monotonic() - (dialog._AUTO_REFRESH_COOLDOWN_SECONDS + 1.0)
-            dialog._maybe_auto_refresh_decks_list()
+            # Past the min interval and nothing in flight -> fetch.
+            dialog._subscriptions_fetch_in_flight = False
+            dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_called_once()
 
     def test_toggle_subdecks(
