@@ -102,8 +102,10 @@ class DeckManagementDialog(QDialog):
         # genuine return (deactivate -> reactivate), not the activation Qt emits
         # while the dialog is first shown.
         self._was_deactivated = False
-        # Bumped on every fetch (sync or async); an async result whose generation is
-        # stale (a newer fetch/refresh started meanwhile) is discarded on completion.
+        # Prevents a slow async auto-refresh from clobbering a newer refresh with
+        # stale data (e.g. an unsubscribe rebuilt the list while the fetch was still
+        # in flight). Every fetch — sync or async — bumps this counter, and an async
+        # result is only applied if its generation still matches on completion.
         self._subscriptions_fetch_generation = 0
         # Debounces focus-triggered refreshes; parented to self so it can't fire
         # after the dialog is deleted.
