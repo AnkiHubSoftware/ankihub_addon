@@ -257,10 +257,14 @@ class _AnkiHubDeckUpdater:
             response_data = exc.response.json()
             error_message = response_data.get("detail")
             if error_message:
-                show_error_dialog(
-                    error_message,
-                    title="Error while downloading updates for deck :(",
-                    parent=sync_dialog_parent(),
+                # Resolve the parent on the main thread: _handle_exception runs in a background
+                # thread and sync_dialog_parent() touches Qt widget state (NRT-764).
+                aqt.mw.taskman.run_on_main(
+                    lambda: show_error_dialog(
+                        error_message,
+                        title="Error while downloading updates for deck :(",
+                        parent=sync_dialog_parent(),
+                    )
                 )
                 return True
             else:
