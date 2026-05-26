@@ -1210,33 +1210,32 @@ class DeckManagementDialog(QDialog):
     def _refresh_subdecks_checkbox(self):
         ah_did = self._selected_ah_did()
 
-        # The stored enabled/checked state doesn't require a DB query, so reflect it
-        # immediately.
+        # Apply the parts that don't require a DB query immediately: the checked state
+        # from config, and the static tooltip.
         deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
         set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
 
         # Whether the checkbox is interactive depends on whether the deck has subdeck
-        # tags, which requires scanning every note's tags in the AnkiHub DB. For large
-        # decks (tens of thousands of notes with long tag strings) this takes ~100ms,
-        # so run it off the main thread to keep deck selection responsive, then apply
-        # the result once it returns.
+        # tags — a scan over every note's tags in the AnkiHub DB. For large decks this
+        # takes ~100ms, so run it off the main thread and apply the result once it
+        # returns.
         self.subdecks_cb.setEnabled(False)
         self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }")
 
         # Capture the specific checkbox this op is started for. If the panel rebuilds
-        # before the op completes (deck switch, toggle, auto-refresh, ...) self.subdecks_cb
+        # before the op completes (deck switch, toggle, auto-refresh) self.subdecks_cb
         # will point to a new widget and we'll skip applying this now-stale result.
         checkbox = self.subdecks_cb
 
-        # Best-effort check: on failure, log and leave the checkbox in its loading-state
-        # disabled rather than surfacing the add-on's default error dialog for a
-        # transient DB / profile-close error.
         AddonQueryOp(
             op=lambda _: deck_contains_subdeck_tags(ah_did),
             success=lambda has_subdeck_tags: self._apply_subdecks_checkbox_state(ah_did, has_subdeck_tags, checkbox),
             parent=self,
         ).failure(
+            # Best-effort check: on failure, log and leave the checkbox in its loading-
+            # state disabled rather than surfacing the add-on's default error dialog
+            # for a transient DB / profile-close error.
             lambda exc: LOGGER.warning("Subdeck-tag check failed", ah_did=str(ah_did), error=repr(exc))
         ).without_collection().run_in_background()
 
