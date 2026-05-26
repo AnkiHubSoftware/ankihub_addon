@@ -154,6 +154,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import (
     NO_CHANGES_TO_SUGGEST_TOOLTIP,
+    NOTE_DELETED_TOOLTIP,
     SUGGESTION_BTN_ID,
     _on_field_unfocus_auto_protect,
     _on_suggestion_button_press,
@@ -885,6 +886,41 @@ class TestEditor:
             _on_suggestion_button_press(add_cards_dialog.editor)
 
             tooltip_mock.assert_called_once_with(NO_CHANGES_TO_SUGGEST_TOOLTIP)
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_action_gate_blocks_deleted_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.ankihub_note_id == ah_note.ah_nid
+            ).execute()
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # Keyboard shortcut fires even when the button is disabled; a note
+            # deleted on AnkiHub must not reach the dialog.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with(NOTE_DELETED_TOOLTIP)
             assert not open_dialog_mock.called
 
             add_cards_dialog.editor.cleanup()

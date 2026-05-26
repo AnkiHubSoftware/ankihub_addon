@@ -31,6 +31,7 @@ from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 NO_CHANGES_TO_SUGGEST_TOOLTIP = "No changes to suggest"
+NOTE_DELETED_TOOLTIP = "This note has been deleted from AnkiHub. No new suggestions can be made."
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
 VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
 VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
@@ -134,9 +135,13 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     note = editor.note
     if note is not None and note.id != 0:
         ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
-        if ah_note is not None and not cast(AnkiHubNote, ah_note).was_deleted() and _no_changes_gate_active(note):
-            tooltip(NO_CHANGES_TO_SUGGEST_TOOLTIP)
-            return
+        if ah_note is not None:
+            if cast(AnkiHubNote, ah_note).was_deleted():
+                tooltip(NOTE_DELETED_TOOLTIP)
+                return
+            if _no_changes_gate_active(note):
+                tooltip(NO_CHANGES_TO_SUGGEST_TOOLTIP)
+                return
 
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
@@ -382,10 +387,7 @@ def _refresh_buttons(editor: Editor) -> None:
         if ah_note.was_deleted():
             _enable_buttons(editor, [VIEW_NOTE_HISTORY_BTN_ID])
             _disable_buttons(editor, [SUGGESTION_BTN_ID, VIEW_NOTE_BTN_ID])
-            _set_suggestion_button_tooltip(
-                editor,
-                "This note has been deleted from AnkiHub. No new suggestions can be made.",
-            )
+            _set_suggestion_button_tooltip(editor, NOTE_DELETED_TOOLTIP)
         else:
             _enable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
             if _no_changes_gate_active(note):
@@ -447,11 +449,13 @@ def _track_editor(editor: Editor) -> None:
 
 
 def _on_editor_typing_timer(note: Note) -> None:
+    # Match by object identity, not note.id: unsaved Add-Cards notes all share
+    # id 0, so an id comparison would refresh every open Add-Cards editor.
     for tracked in list(_tracked_editors):
         if sip.isdeleted(tracked.widget):
             _tracked_editors.remove(tracked)
             continue
-        if tracked.note is not None and tracked.note.id == note.id:
+        if tracked.note is note:
             _refresh_buttons(tracked)
 
 
