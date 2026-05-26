@@ -885,6 +885,10 @@ class TestSuggestionDialog:
         assert dialog.change_type_select.isVisible() == change_type_needed
         assert dialog.source_widget_group_box.isVisible() == source_needed
         assert dialog.hint_for_note_deletions.isVisible() == (suggestion_type == SuggestionType.DELETE)
+        if source_needed:
+            # DELETE's source (Duplicate Note) is optional, so its group box must not claim "(Required)".
+            expected_title = "Source" if suggestion_type == SuggestionType.DELETE else "Source (Required)"
+            assert dialog.source_widget_group_box.title() == expected_title
 
         # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
         assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
@@ -910,6 +914,34 @@ class TestSuggestionDialog:
                 source=expected_source,
             )
         )
+
+    def test_delete_suggestion_source_is_optional(self, qtbot: QtBot, mocker: MockerFixture):
+        """DELETE's Duplicate-Note source is optional: the OK button enables with an empty
+        source (just a rationale), and the group box drops the "(Required)" label.
+        """
+        callback_mock = mocker.stub()
+        dialog = SuggestionDialog(
+            is_for_anking_deck=False,
+            is_new_note_suggestion=False,
+            added_new_media=False,
+            can_submit_without_review=True,
+            callback=callback_mock,
+        )
+        dialog.show()
+        dialog.change_type_select.setCurrentText(SuggestionType.DELETE.value[1])
+
+        assert dialog.source_widget_group_box.isVisible()
+        assert dialog.source_widget_group_box.title() == "Source"
+
+        # Rationale only — source left empty. OK must enable.
+        dialog.rationale_edit.setPlainText("dupe of another note")
+        assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+
+        dialog.accept()
+        qtbot.wait_until(lambda: callback_mock.called)
+        meta = callback_mock.call_args.args[0]
+        assert meta.change_type == SuggestionType.DELETE
+        assert meta.source.source_text == ""
 
     @pytest.mark.parametrize(
         "can_submit_without_review",

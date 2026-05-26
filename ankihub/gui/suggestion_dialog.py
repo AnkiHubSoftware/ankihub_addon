@@ -661,6 +661,9 @@ class SuggestionDialog(QDialog):
     def _refresh_source_widget(self):
         if self._source_needed():
             self.source_widget.setup_for_change_type(change_type=self._change_type())
+            # DELETE's source (Duplicate Note) is optional, so don't claim "(Required)" there.
+            title = "Source (Required)" if self.source_widget.input_is_required() else "Source"
+            self.source_widget_group_box.setTitle(title)
             self.source_widget_group_box.show()
         else:
             self.source_widget_group_box.hide()
@@ -833,6 +836,12 @@ class SourceWidget(QWidget):
             source = f"{step} {source}"
 
         return SuggestionSource(source_type=source_type, source_text=source)
+
+    def input_is_required(self) -> bool:
+        """Whether the current source type requires the user to fill the input. DELETE's only
+        source type (Duplicate Note) is optional, so callers can drop the "(Required)" label.
+        """
+        return self._source_type() not in source_types_where_input_is_optional
 
     def is_valid(self) -> bool:
         if self._source_type() in source_types_where_input_is_optional:
