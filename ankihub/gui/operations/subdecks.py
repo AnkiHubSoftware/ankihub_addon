@@ -71,6 +71,6 @@ def _on_subdecks_updated(future: Future[None]) -> None:
     future.result()
 
     LOGGER.info("Subdecks updated.")
-    tooltip("Subdecks updated.", parent=aqt.mw)
+    tooltip("Subdecks updated.", parent=dialog_parent_state.get())
 
     refresh_anki_ui_after_moving_cards()
