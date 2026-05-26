@@ -23,6 +23,7 @@ from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
 from .operations.scheduling import unsuspend_notes
+from .sync_dialog_parent import sync_dialog_parent
 from .utils import deck_download_progress_cb, show_error_dialog
 
 
@@ -259,6 +260,7 @@ class _AnkiHubDeckUpdater:
                 show_error_dialog(
                     error_message,
                     title="Error while downloading updates for deck :(",
+                    parent=sync_dialog_parent(),
                 )
                 return True
             else:
@@ -269,6 +271,7 @@ class _AnkiHubDeckUpdater:
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to get other deck updates.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
+                    parent=sync_dialog_parent(),
                 )
             )
             LOGGER.info(
