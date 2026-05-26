@@ -4546,13 +4546,46 @@ class TestDeckManagementDialog:
             dialog.display_subscribe_window()
             assert dialog.decks_list.count() == 1
 
-            # A new deck appears, as if the user subscribed to it on the web.
+            # A new deck appears, as if the user subscribed to it on the web. Nothing
+            # is selected yet, so the single new deck is auto-selected.
             new_deck = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck")
             dialog._apply_fetched_subscriptions([existing_deck, new_deck])
 
             assert dialog.decks_list.count() == 2
             # The single newly-added deck is auto-selected so its panel is surfaced.
             assert dialog._selected_ah_did() == new_deck.ah_did
+
+    def test_auto_refresh_keeps_existing_selection_when_deck_added(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            existing_deck_name = "Existing Deck"
+            ah_did = install_ah_deck(ah_deck_name=existing_deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+            existing_deck = DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=existing_deck_name)
+
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[existing_deck])
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            # The user has a deck selected (e.g. is configuring it).
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+            assert dialog._selected_ah_did() == ah_did
+
+            # A new deck appears while the user has a selection -> the selection must
+            # not be stolen (a refresh could otherwise retarget an in-progress workflow).
+            new_deck = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck")
+            dialog._apply_fetched_subscriptions([existing_deck, new_deck])
+
+            assert dialog.decks_list.count() == 2
+            assert dialog._selected_ah_did() == ah_did
 
     def test_auto_refresh_is_noop_when_subscriptions_unchanged(
         self,
@@ -4585,7 +4618,7 @@ class TestDeckManagementDialog:
             populate_spy.assert_not_called()
             assert dialog._selected_ah_did() == ah_did
 
-    def test_auto_refresh_skips_fetch_during_cooldown(
+    def test_auto_refresh_defers_during_cooldown_then_fetches(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -4602,13 +4635,21 @@ class TestDeckManagementDialog:
             dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
 
-            auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
+            # Isolate the cooldown branching from the "child dialog open" guard (the
+            # test harness leaves sibling modal dialogs around).
+            mocker.patch("ankihub.gui.decks_dialog.QApplication.activeModalWidget", return_value=None)
+            mocker.patch("ankihub.gui.decks_dialog.QApplication.activePopupWidget", return_value=None)
 
-            # Within the cooldown window after the initial load -> no fetch.
+            auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
+            schedule_mock = mocker.patch.object(dialog, "_schedule_auto_refresh")
+
+            # Within the cooldown window after the initial load -> defer (don't drop)
+            # the activation rather than fetch immediately.
             dialog._maybe_auto_refresh_decks_list()
             auto_refresh_mock.assert_not_called()
+            schedule_mock.assert_called_once()
 
-            # Past the cooldown -> a fetch is triggered.
+            # Past the cooldown -> fetch immediately.
             dialog._last_subscriptions_fetch = 0.0
             dialog._maybe_auto_refresh_decks_list()
             auto_refresh_mock.assert_called_once()

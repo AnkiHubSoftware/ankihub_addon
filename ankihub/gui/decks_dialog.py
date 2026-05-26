@@ -26,6 +26,7 @@ from aqt.qt import (
     QScrollArea,
     QSizePolicy,
     Qt,
+    QTimer,
     QVBoxLayout,
     QWidget,
     qconnect,
@@ -103,6 +104,10 @@ class DeckManagementDialog(QDialog):
         self._last_subscriptions_fetch = time.monotonic()
         self._subscriptions_fetch_in_flight = False
         self._subscriptions_refetch_pending = False
+        self._subscriptions_refresh_scheduled = False
+        # Bumped on every fetch (sync or async); an async result whose generation is
+        # stale (a newer fetch/refresh started meanwhile) is discarded on completion.
+        self._subscriptions_fetch_generation = 0
 
         self._setup_ui()
         self._refresh_decks_list()
@@ -899,6 +904,7 @@ class DeckManagementDialog(QDialog):
         (initial load, unsubscribe, reopen). The focus-triggered auto-refresh uses the
         non-blocking path in _auto_refresh_decks_list instead.
         """
+        self._subscriptions_fetch_generation += 1
         subscribed_decks = self.client.get_deck_subscriptions()
         self._last_subscriptions_fetch = time.monotonic()
         self._populate_decks_list(subscribed_decks, select_ah_did=self._selected_ah_did())
@@ -925,6 +931,7 @@ class DeckManagementDialog(QDialog):
                 if select_ah_did is not None and deck.ah_did == select_ah_did:
                     item.setSelected(True)
                     self.decks_list.setCurrentItem(item)
+                    self.decks_list.scrollToItem(item)
         finally:
             self.decks_list.blockSignals(False)
 
@@ -953,35 +960,76 @@ class DeckManagementDialog(QDialog):
     def _maybe_auto_refresh_decks_list(self) -> None:
         if not config.is_logged_in():
             return
+        # Don't rebuild the list out from under an open child dialog (unsubscribe
+        # confirmation, note-type/destination pickers) or popup (combo dropdown);
+        # those workflows are deck-scoped and a refresh could change the selection or
+        # tear down widgets mid-action. The dialog itself is application-modal, so
+        # exclude it from the check — otherwise auto-refresh would never run.
+        active_modal = QApplication.activeModalWidget()
+        if (active_modal is not None and active_modal is not self) or QApplication.activePopupWidget() is not None:
+            return
         if self._subscriptions_fetch_in_flight:
             # Remember that something happened during the request so we fetch once
             # more when it returns (the in-flight response may predate the change).
             self._subscriptions_refetch_pending = True
             return
-        if time.monotonic() - self._last_subscriptions_fetch < self._AUTO_REFRESH_COOLDOWN_SECONDS:
+        remaining = self._AUTO_REFRESH_COOLDOWN_SECONDS - (time.monotonic() - self._last_subscriptions_fetch)
+        if remaining > 0:
+            # Within the cooldown: defer instead of dropping the event, otherwise an
+            # activation that lands right after the initial load (user subscribes and
+            # returns quickly) would be lost and the new deck wouldn't show up.
+            self._schedule_auto_refresh(remaining)
             return
         self._auto_refresh_decks_list()
 
+    def _schedule_auto_refresh(self, delay_seconds: float) -> None:
+        if self._subscriptions_refresh_scheduled:
+            return
+        self._subscriptions_refresh_scheduled = True
+
+        def on_timeout() -> None:
+            self._subscriptions_refresh_scheduled = False
+            if sip.isdeleted(self):
+                return
+            self._maybe_auto_refresh_decks_list()
+
+        QTimer.singleShot(int(delay_seconds * 1000) + 50, on_timeout)
+
     def _auto_refresh_decks_list(self) -> None:
         self._subscriptions_fetch_in_flight = True
+        self._subscriptions_fetch_generation += 1
+        generation = self._subscriptions_fetch_generation
 
         def on_success(decks: List[Deck]) -> None:
             self._subscriptions_fetch_in_flight = False
             self._last_subscriptions_fetch = time.monotonic()
             if sip.isdeleted(self):
                 return
-            self._apply_fetched_subscriptions(decks)
+            # Discard a result that a newer fetch/refresh has superseded (e.g. an
+            # unsubscribe ran a synchronous refresh while this request was in flight),
+            # otherwise the stale list would clobber the up-to-date one.
+            if generation == self._subscriptions_fetch_generation:
+                try:
+                    self._apply_fetched_subscriptions(decks)
+                except Exception as exc:
+                    # Best-effort: a render failure must not surface an error popup.
+                    LOGGER.warning("Applying auto-refreshed deck subscriptions failed.", exc_info=exc)
             if self._subscriptions_refetch_pending:
                 self._subscriptions_refetch_pending = False
-                self._auto_refresh_decks_list()
+                self._maybe_auto_refresh_decks_list()
 
         def on_failure(exc: Exception) -> None:
             # Auto-refresh is best-effort; never surface an error popup on every
             # focus (e.g. when offline). The cooldown timestamp is still advanced.
             self._subscriptions_fetch_in_flight = False
-            self._subscriptions_refetch_pending = False
             self._last_subscriptions_fetch = time.monotonic()
             LOGGER.warning("Auto-refresh of deck subscriptions failed.", exc_info=exc)
+            if sip.isdeleted(self):
+                return
+            # A change observed mid-request still deserves another attempt.
+            if self._subscriptions_refetch_pending:
+                self._subscriptions_refetch_pending = False
+                self._maybe_auto_refresh_decks_list()
 
         AddonQueryOp(
             op=lambda _: self.client.get_deck_subscriptions(),
@@ -991,7 +1039,9 @@ class DeckManagementDialog(QDialog):
 
     def _apply_fetched_subscriptions(self, decks: List[Deck]) -> None:
         current_snapshot = self._current_decks_snapshot()
-        if self._snapshot_for_decks(decks) == current_snapshot:
+        # Order-insensitive: a reordered-but-identical list isn't a real change, so
+        # comparing as sets avoids a needless rebuild (and visible reshuffle).
+        if set(self._snapshot_for_decks(decks)) == set(current_snapshot):
             # Nothing changed: skip the rebuild so the list doesn't flicker and the
             # current selection / right-panel state is left untouched.
             return
@@ -1000,12 +1050,14 @@ class DeckManagementDialog(QDialog):
         new_ids = {deck.ah_did for deck in decks}
         added_ids = new_ids - old_ids
 
-        if len(added_ids) == 1:
-            # Exactly one new subscription (the common "just subscribed on the web"
-            # case): select it so its panel — including "Sync to install" — is shown.
+        current = self._selected_ah_did()
+        if current is None and len(added_ids) == 1:
+            # Nothing selected and exactly one new subscription (the common "just
+            # subscribed on the web" case): select it so its panel — including
+            # "Sync to install" — is shown. If the user already has a deck selected
+            # we keep it, so a refresh can't retarget an in-progress workflow.
             select_ah_did: Optional[UUID] = next(iter(added_ids))
         else:
-            current = self._selected_ah_did()
             select_ah_did = current if current in new_ids else None
 
         self._populate_decks_list(decks, select_ah_did=select_ah_did)
