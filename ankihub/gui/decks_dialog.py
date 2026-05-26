@@ -1,6 +1,5 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 
-import time
 import uuid
 from concurrent.futures import Future
 from typing import List, Optional, Tuple
@@ -89,24 +88,15 @@ class DeckManagementDialog(QDialog):
     _window: Optional["DeckManagementDialog"] = None
     silentlyClose = True
 
-    # Minimum seconds between automatic deck-list refreshes triggered by the
-    # dialog regaining focus. Keeps frequent window activations (alt-tab, child
-    # dialogs closing) from each firing a network request.
     # Coalesce bursts of window activations (alt-tab, child dialogs closing) into a
     # single refresh fired once focus settles.
     _REFRESH_DEBOUNCE_MS = 400
-    # Throttle: at most one auto-refresh fetch per this interval. Requests that
-    # arrive sooner are deferred to the end of the interval, not dropped.
-    _REFRESH_MIN_INTERVAL_SECONDS = 1.0
 
     def __init__(self):
         super(DeckManagementDialog, self).__init__(aqt.mw)
         self.client = AnkiHubClient()
 
-        # Auto-refresh bookkeeping (see _on_refresh_debounce_timeout). Seed the
-        # timestamp now so the WindowActivate fired while showing the dialog
-        # doesn't trigger a redundant fetch right after the initial load.
-        self._last_subscriptions_fetch = time.monotonic()
+        # Auto-refresh bookkeeping (see _on_refresh_debounce_timeout).
         self._subscriptions_fetch_in_flight = False
         # True once the dialog has lost activation, so we only auto-refresh on a
         # genuine return (deactivate -> reactivate), not the activation Qt emits
@@ -921,7 +911,6 @@ class DeckManagementDialog(QDialog):
         self._was_deactivated = False
         self._subscriptions_fetch_generation += 1
         subscribed_decks = self.client.get_deck_subscriptions()
-        self._last_subscriptions_fetch = time.monotonic()
         self._populate_decks_list(subscribed_decks, select_ah_did=self._selected_ah_did())
 
     def _populate_decks_list(self, decks: List[Deck], select_ah_did: Optional[UUID]) -> None:
@@ -992,16 +981,10 @@ class DeckManagementDialog(QDialog):
         active_modal = QApplication.activeModalWidget()
         if (active_modal is not None and active_modal is not self) or QApplication.activePopupWidget() is not None:
             return
-        # A fetch is already running: defer until it finishes rather than dropping
+        # A fetch is already running: retry once it finishes rather than dropping
         # this return, so a change it didn't capture is still picked up.
         if self._subscriptions_fetch_in_flight:
             self._refresh_debounce_timer.start(self._REFRESH_DEBOUNCE_MS)
-            return
-        # Throttle: at most one fetch per min interval. Defer to the end of the
-        # interval rather than dropping the request.
-        remaining = self._REFRESH_MIN_INTERVAL_SECONDS - (time.monotonic() - self._last_subscriptions_fetch)
-        if remaining > 0:
-            self._refresh_debounce_timer.start(int(remaining * 1000) + 50)
             return
         self._auto_refresh_decks_list()
 
@@ -1012,7 +995,6 @@ class DeckManagementDialog(QDialog):
 
         def on_success(decks: List[Deck]) -> None:
             self._subscriptions_fetch_in_flight = False
-            self._last_subscriptions_fetch = time.monotonic()
             # Dialog closed (kept alive by the singleton, so not necessarily deleted)
             # or hidden: nothing to update.
             if sip.isdeleted(self) or not self.isVisible():
@@ -1031,7 +1013,6 @@ class DeckManagementDialog(QDialog):
             # Auto-refresh is best-effort; never surface an error popup on every
             # focus (e.g. when offline).
             self._subscriptions_fetch_in_flight = False
-            self._last_subscriptions_fetch = time.monotonic()
             LOGGER.warning("Auto-refresh of deck subscriptions failed.", exc_info=exc)
 
         AddonQueryOp(

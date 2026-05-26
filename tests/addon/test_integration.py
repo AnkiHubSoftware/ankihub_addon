@@ -9,7 +9,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from time import monotonic, sleep, time
+from time import sleep, time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Set, Tuple, Union, cast
 from unittest.mock import Mock
 from zipfile import ZipFile
@@ -4618,7 +4618,7 @@ class TestDeckManagementDialog:
             populate_spy.assert_not_called()
             assert dialog._selected_ah_did() == ah_did
 
-    def test_auto_refresh_defers_rather_than_drops_then_fetches(
+    def test_auto_refresh_defers_while_fetch_in_flight(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -4635,29 +4635,21 @@ class TestDeckManagementDialog:
             dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
 
-            # Isolate the throttle/in-flight branching from the "child dialog open"
-            # guard (the test harness leaves sibling modal dialogs around).
+            # Isolate the in-flight branching from the "child dialog open" guard (the
+            # test harness leaves sibling modal dialogs around).
             mocker.patch("ankihub.gui.decks_dialog.QApplication.activeModalWidget", return_value=None)
             mocker.patch("ankihub.gui.decks_dialog.QApplication.activePopupWidget", return_value=None)
 
             auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
             defer_mock = mocker.patch.object(dialog._refresh_debounce_timer, "start")
 
-            # Within the min interval -> defer (re-arm the timer), don't drop or fetch.
-            dialog._last_subscriptions_fetch = monotonic()
-            dialog._on_refresh_debounce_timeout()
-            auto_refresh_mock.assert_not_called()
-            defer_mock.assert_called_once()
-
-            # Past the min interval but a fetch is in flight -> defer, don't fetch.
-            defer_mock.reset_mock()
-            dialog._last_subscriptions_fetch = monotonic() - (dialog._REFRESH_MIN_INTERVAL_SECONDS + 1.0)
+            # A fetch is already in flight -> defer (re-arm the timer), don't drop or fetch.
             dialog._subscriptions_fetch_in_flight = True
             dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_not_called()
             defer_mock.assert_called_once()
 
-            # Past the min interval and nothing in flight -> fetch.
+            # Nothing in flight -> fetch.
             dialog._subscriptions_fetch_in_flight = False
             dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_called_once()
