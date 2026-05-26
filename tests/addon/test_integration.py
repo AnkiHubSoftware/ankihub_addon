@@ -9,7 +9,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from time import sleep, time
+from time import monotonic, sleep, time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Set, Tuple, Union, cast
 from unittest.mock import Mock
 from zipfile import ZipFile
@@ -4643,14 +4643,22 @@ class TestDeckManagementDialog:
             auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
             schedule_mock = mocker.patch.object(dialog, "_schedule_auto_refresh")
 
-            # Within the cooldown window after the initial load -> defer (don't drop)
-            # the activation rather than fetch immediately.
+            # Just fetched (within the grace window, e.g. the activation emitted while
+            # showing the dialog) -> ignore: neither fetch nor schedule.
+            dialog._last_subscriptions_fetch = monotonic()
+            dialog._maybe_auto_refresh_decks_list()
+            auto_refresh_mock.assert_not_called()
+            schedule_mock.assert_not_called()
+
+            # Past the grace window but within the cooldown -> defer (don't drop) the
+            # activation rather than fetch immediately.
+            dialog._last_subscriptions_fetch = monotonic() - 1.0
             dialog._maybe_auto_refresh_decks_list()
             auto_refresh_mock.assert_not_called()
             schedule_mock.assert_called_once()
 
             # Past the cooldown -> fetch immediately.
-            dialog._last_subscriptions_fetch = 0.0
+            dialog._last_subscriptions_fetch = monotonic() - (dialog._AUTO_REFRESH_COOLDOWN_SECONDS + 1.0)
             dialog._maybe_auto_refresh_decks_list()
             auto_refresh_mock.assert_called_once()
 
