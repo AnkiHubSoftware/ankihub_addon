@@ -870,11 +870,9 @@ class SourceWidget(QWidget):
 
     def _refresh_source_input_label(self) -> None:
         source_type = self._source_type()
-        text = source_type_to_source_label[source_type]
-        if source_type not in source_types_where_input_is_optional:
-            text = f"{text} (Required)"
-
-        self.source_input_label.setText(text)
+        # The "(Required)" indicator lives on the Source group box title (set by the dialog),
+        # so the inner field label stays bare to avoid showing "(Required)" twice.
+        self.source_input_label.setText(source_type_to_source_label[source_type])
 
         place_holder_text = source_type_to_source_place_holder_text.get(source_type, "")
         self.source_edit.setPlaceholderText(place_holder_text)
