@@ -3828,9 +3828,7 @@ class TestShowNextDueDateReminderDialog:
 
         _show_next_due_date_reminder_dialog()
 
-        mock_dialog_class.assert_called_once_with(
-            subdeck_config, parent=mock_dialog_parent_state.get.return_value
-        )
+        mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_dialog_parent_state.get.return_value)
         mock_dialog.show.assert_called_once()
         assert _reminder_dialog_state.queue == []
 
