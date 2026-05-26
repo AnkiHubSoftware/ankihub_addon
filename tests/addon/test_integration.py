@@ -43,6 +43,7 @@ from aqt.gui_hooks import (
     browser_will_show,
     browser_will_show_context_menu,
     deck_options_did_load,
+    editor_did_fire_typing_timer,
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
@@ -151,7 +152,12 @@ from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_di
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
+from ankihub.gui.editor import (
+    NO_CHANGES_TO_SUGGEST_TOOLTIP,
+    SUGGESTION_BTN_ID,
+    _on_field_unfocus_auto_protect,
+    _on_suggestion_button_press,
+)
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
@@ -726,6 +732,163 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    @pytest.mark.parametrize("has_change", [True, False])
+    def test_suggestion_button_gated_on_edit_state(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+        has_change: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            if has_change:
+                anki_note["Front"] = "edited value"
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_change
+            )
+            if not has_change:
+                self.assert_suggestion_button_tooltip(
+                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=NO_CHANGES_TO_SUGGEST_TOOLTIP
+                )
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_button_not_gated_when_flag_off(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": False})
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # Flag off: button stays enabled even with no changes (legacy behavior).
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_button_gate_ignores_globally_protected_edit(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_globally_protected_fields(ah_did, {anki_note.mid: ["Front"]})
+
+            # The only edit is to a globally-protected field, which would be stripped
+            # at submit — so the button stays disabled.
+            anki_note["Front"] = "edited value"
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_button_refreshes_live_on_typing_timer(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # No changes yet: disabled.
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
+
+            # Edit a field and fire the typing timer; the button should enable live,
+            # without reloading the note.
+            add_cards_dialog.editor.note["Front"] = "edited value"
+            editor_did_fire_typing_timer(add_cards_dialog.editor.note)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_action_gate_blocks_when_no_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # Invoke the action directly to cover the keyboard-shortcut path, which
+            # fires even when the button is visually disabled.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with(NO_CHANGES_TO_SUGGEST_TOOLTIP)
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
     def test_with_note_deleted_on_ankihub(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -795,6 +958,14 @@ class TestEditor:
                 callback,
             )
         callback.assert_called_with(not expected_enabled)
+
+    def assert_suggestion_button_tooltip(self, qtbot: QtBot, addcards: AddCards, expected_tooltip: str) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}').title",
+                callback,
+            )
+        callback.assert_called_with(expected_tooltip)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
         addcards.editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').click()")

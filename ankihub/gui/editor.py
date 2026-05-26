@@ -16,7 +16,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
-from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
+from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG, any_suggestible_from_diffs, compute_note_diffs
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
@@ -30,6 +30,7 @@ from ..settings import (
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
+NO_CHANGES_TO_SUGGEST_TOOLTIP = "No changes to suggest"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
 VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
 VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
@@ -47,6 +48,8 @@ def _setup_additional_editor_buttons():
     gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)
     gui_hooks.editor_did_load_note.append(_refresh_buttons)
+    gui_hooks.editor_did_init.append(_track_editor)
+    gui_hooks.editor_did_fire_typing_timer.append(_on_editor_typing_timer)
     gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
@@ -124,6 +127,16 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     if not config.is_logged_in():
         AnkiHubLogin.display_login()
         return
+
+    # Covers the keyboard-shortcut path, which fires even when the button is
+    # visually disabled. New notes (no AH-DB row) are never gated here — they
+    # always carry content to suggest.
+    note = editor.note
+    if note is not None and note.id != 0:
+        ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
+        if ah_note is not None and not cast(AnkiHubNote, ah_note).was_deleted() and _no_changes_gate_active(note):
+            tooltip(NO_CHANGES_TO_SUGGEST_TOOLTIP)
+            return
 
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
@@ -205,6 +218,26 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
 
 def _default_suggestion_button_tooltip() -> str:
     return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
+
+
+def _no_changes_gate_active(note: Note) -> bool:
+    """True when the 'No changes to suggest' gate should block suggesting `note`.
+
+    Behind AUTO_PROTECT_FEATURE_FLAG. Reuses the dialog's suggestibility check so
+    the editor button and the dialog's pre-open gate agree on what counts as a
+    suggestible change (field edit outside the globally-protected denylist, or a
+    tag change).
+    """
+    if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
+        return False
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    globally_protected = (
+        {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
+        if ah_did
+        else {}
+    )
+    diffs = compute_note_diffs([note])
+    return not any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected)
 
 
 def _suggestion_button_hotkey():
@@ -354,11 +387,13 @@ def _refresh_buttons(editor: Editor) -> None:
                 "This note has been deleted from AnkiHub. No new suggestions can be made.",
             )
         else:
-            _enable_buttons(editor, all_button_ids)
-            _set_suggestion_button_tooltip(
-                editor,
-                _default_suggestion_button_tooltip(),
-            )
+            _enable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
+            if _no_changes_gate_active(note):
+                _disable_buttons(editor, [SUGGESTION_BTN_ID])
+                _set_suggestion_button_tooltip(editor, NO_CHANGES_TO_SUGGEST_TOOLTIP)
+            else:
+                _enable_buttons(editor, [SUGGESTION_BTN_ID])
+                _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip())
     else:
         command = AnkiHubCommands.NEW.value
 
@@ -401,6 +436,23 @@ def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
 
 
 editor: Editor
+
+# Live editors tracked so the typing-timer hook (which only receives a Note) can
+# locate the owning editor and refresh its button state as the user types.
+_tracked_editors: List[Editor] = []
+
+
+def _track_editor(editor: Editor) -> None:
+    _tracked_editors.append(editor)
+
+
+def _on_editor_typing_timer(note: Note) -> None:
+    for tracked in list(_tracked_editors):
+        if sip.isdeleted(tracked.widget):
+            _tracked_editors.remove(tracked)
+            continue
+        if tracked.note is not None and tracked.note.id == note.id:
+            _refresh_buttons(tracked)
 
 
 def _on_add_cards_init(add_cards: AddCards) -> None:
