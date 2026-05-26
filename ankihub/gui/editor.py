@@ -139,7 +139,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             if cast(AnkiHubNote, ah_note).was_deleted():
                 tooltip(NOTE_DELETED_TOOLTIP)
                 return
-            if _no_changes_gate_active(note):
+            if _should_block_for_no_changes(note):
                 tooltip(NO_CHANGES_TO_SUGGEST_TOOLTIP)
                 return
 
@@ -225,7 +225,7 @@ def _default_suggestion_button_tooltip() -> str:
     return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
 
 
-def _no_changes_gate_active(note: Note) -> bool:
+def _should_block_for_no_changes(note: Note) -> bool:
     """True when the 'No changes to suggest' gate should block suggesting `note`.
 
     Behind AUTO_PROTECT_FEATURE_FLAG. Reuses the dialog's suggestibility check so
@@ -390,7 +390,7 @@ def _refresh_buttons(editor: Editor) -> None:
             _set_suggestion_button_tooltip(editor, NOTE_DELETED_TOOLTIP)
         else:
             _enable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-            if _no_changes_gate_active(note):
+            if _should_block_for_no_changes(note):
                 _disable_buttons(editor, [SUGGESTION_BTN_ID])
                 _set_suggestion_button_tooltip(editor, NO_CHANGES_TO_SUGGEST_TOOLTIP)
             else:
