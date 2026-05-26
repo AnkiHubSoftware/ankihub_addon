@@ -825,6 +825,37 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_button_enabled_for_locally_protected_field_edit(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            # A personal AnkiHub_Protect tag stops sync from overwriting the local
+            # edit; it must NOT exclude the field from the gate (only globally
+            # protected fields do). The user can still suggest the edit.
+            anki_note["Front"] = "edited value"
+            anki_note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+
+            add_cards_dialog.editor.cleanup()
+
     def test_suggestion_button_refreshes_live_on_typing_timer(
         self,
         anki_session_with_addon_data: AnkiSession,
