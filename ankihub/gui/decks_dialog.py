@@ -1,8 +1,9 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 
+import time
 import uuid
 from concurrent.futures import Future
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 import aqt
@@ -15,6 +16,7 @@ from aqt.qt import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QEvent,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -27,13 +29,14 @@ from aqt.qt import (
     QVBoxLayout,
     QWidget,
     qconnect,
+    sip,
 )
 from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import UserDeckRelation
+from ..ankihub_client.models import Deck, UserDeckRelation
 from ..common_utils import get_media_names_from_note_type
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
@@ -85,9 +88,22 @@ class DeckManagementDialog(QDialog):
     _window: Optional["DeckManagementDialog"] = None
     silentlyClose = True
 
+    # Minimum seconds between automatic deck-list refreshes triggered by the
+    # dialog regaining focus. Keeps frequent window activations (alt-tab, child
+    # dialogs closing) from each firing a network request.
+    _AUTO_REFRESH_COOLDOWN_SECONDS = 2.0
+
     def __init__(self):
         super(DeckManagementDialog, self).__init__(aqt.mw)
         self.client = AnkiHubClient()
+
+        # Auto-refresh bookkeeping (see _maybe_auto_refresh_decks_list). Seed the
+        # timestamp now so the WindowActivate fired while showing the dialog
+        # doesn't trigger an immediate redundant fetch right after the initial load.
+        self._last_subscriptions_fetch = time.monotonic()
+        self._subscriptions_fetch_in_flight = False
+        self._subscriptions_refetch_pending = False
+
         self._setup_ui()
         self._refresh_decks_list()
 
@@ -877,18 +893,123 @@ class DeckManagementDialog(QDialog):
             )
 
     def _refresh_decks_list(self) -> None:
-        self.decks_list.clear()
+        """Synchronously fetch subscriptions and repopulate the list, preserving selection.
 
+        Used by callers that already run in a context where blocking briefly is acceptable
+        (initial load, unsubscribe, reopen). The focus-triggered auto-refresh uses the
+        non-blocking path in _auto_refresh_decks_list instead.
+        """
         subscribed_decks = self.client.get_deck_subscriptions()
-        for deck in subscribed_decks:
-            if deck.is_user_relation_owner:
-                item = QListWidgetItem(f"{deck.name} (Created by you)")
-            elif deck.is_user_relation_maintainer:
-                item = QListWidgetItem(f"{deck.name} (Maintained by you)")
-            else:
-                item = QListWidgetItem(deck.name)
-            item.setData(Qt.ItemDataRole.UserRole, deck)
-            self.decks_list.addItem(item)
+        self._last_subscriptions_fetch = time.monotonic()
+        self._populate_decks_list(subscribed_decks, select_ah_did=self._selected_ah_did())
+
+    def _populate_decks_list(self, decks: List[Deck], select_ah_did: Optional[UUID]) -> None:
+        """Rebuild the deck list from `decks`, re-selecting `select_ah_did` if present.
+
+        Signals are blocked during the rebuild so the transient empty state doesn't fire
+        itemSelectionChanged -> _refresh_box_bottom_right (which would flash the right panel
+        to "Choose deck…"); the right panel is refreshed once at the end instead.
+        """
+        self.decks_list.blockSignals(True)
+        try:
+            self.decks_list.clear()
+            for deck in decks:
+                if deck.is_user_relation_owner:
+                    item = QListWidgetItem(f"{deck.name} (Created by you)")
+                elif deck.is_user_relation_maintainer:
+                    item = QListWidgetItem(f"{deck.name} (Maintained by you)")
+                else:
+                    item = QListWidgetItem(deck.name)
+                item.setData(Qt.ItemDataRole.UserRole, deck)
+                self.decks_list.addItem(item)
+                if select_ah_did is not None and deck.ah_did == select_ah_did:
+                    item.setSelected(True)
+                    self.decks_list.setCurrentItem(item)
+        finally:
+            self.decks_list.blockSignals(False)
+
+        self._refresh_box_bottom_right()
+
+    @staticmethod
+    def _snapshot_for_decks(decks: List[Deck]) -> List[Tuple[UUID, str, UserDeckRelation]]:
+        """A comparable summary of exactly what the list renders for each deck."""
+        return [(deck.ah_did, deck.name, deck.user_relation) for deck in decks]
+
+    def _current_decks_snapshot(self) -> List[Tuple[UUID, str, UserDeckRelation]]:
+        result = []
+        for i in range(self.decks_list.count()):
+            deck = self.decks_list.item(i).data(Qt.ItemDataRole.UserRole)
+            result.append((deck.ah_did, deck.name, deck.user_relation))
+        return result
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        # Returning from the external browser (or any other app) raises a window
+        # activation event rather than a focus-in/show, so this is where we catch
+        # "the user is looking at the dialog again" and refresh the deck list.
+        if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow():
+            self._maybe_auto_refresh_decks_list()
+
+    def _maybe_auto_refresh_decks_list(self) -> None:
+        if not config.is_logged_in():
+            return
+        if self._subscriptions_fetch_in_flight:
+            # Remember that something happened during the request so we fetch once
+            # more when it returns (the in-flight response may predate the change).
+            self._subscriptions_refetch_pending = True
+            return
+        if time.monotonic() - self._last_subscriptions_fetch < self._AUTO_REFRESH_COOLDOWN_SECONDS:
+            return
+        self._auto_refresh_decks_list()
+
+    def _auto_refresh_decks_list(self) -> None:
+        self._subscriptions_fetch_in_flight = True
+
+        def on_success(decks: List[Deck]) -> None:
+            self._subscriptions_fetch_in_flight = False
+            self._last_subscriptions_fetch = time.monotonic()
+            if sip.isdeleted(self):
+                return
+            self._apply_fetched_subscriptions(decks)
+            if self._subscriptions_refetch_pending:
+                self._subscriptions_refetch_pending = False
+                self._auto_refresh_decks_list()
+
+        def on_failure(exc: Exception) -> None:
+            # Auto-refresh is best-effort; never surface an error popup on every
+            # focus (e.g. when offline). The cooldown timestamp is still advanced.
+            self._subscriptions_fetch_in_flight = False
+            self._subscriptions_refetch_pending = False
+            self._last_subscriptions_fetch = time.monotonic()
+            LOGGER.warning("Auto-refresh of deck subscriptions failed.", exc_info=exc)
+
+        AddonQueryOp(
+            op=lambda _: self.client.get_deck_subscriptions(),
+            success=on_success,
+            parent=aqt.mw,
+        ).failure(on_failure).run_in_background()
+
+    def _apply_fetched_subscriptions(self, decks: List[Deck]) -> None:
+        current_snapshot = self._current_decks_snapshot()
+        if self._snapshot_for_decks(decks) == current_snapshot:
+            # Nothing changed: skip the rebuild so the list doesn't flicker and the
+            # current selection / right-panel state is left untouched.
+            return
+
+        old_ids = {ah_did for ah_did, _, _ in current_snapshot}
+        new_ids = {deck.ah_did for deck in decks}
+        added_ids = new_ids - old_ids
+
+        if len(added_ids) == 1:
+            # Exactly one new subscription (the common "just subscribed on the web"
+            # case): select it so its panel — including "Sync to install" — is shown.
+            select_ah_did: Optional[UUID] = next(iter(added_ids))
+        else:
+            current = self._selected_ah_did()
+            select_ah_did = current if current in new_ids else None
+
+        self._populate_decks_list(decks, select_ah_did=select_ah_did)
+        LOGGER.info("deck_management_dialog_auto_refreshed", added_decks=len(added_ids))
 
     def _selected_ah_did(self) -> Optional[UUID]:
         selection = self.decks_list.selectedItems()
