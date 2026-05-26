@@ -6,9 +6,9 @@ from .... import LOGGER
 from ....db import ankihub_db
 from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
+from ...dialog_parent import dialog_parent_state
 from ...exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ...operations.deck_installation import download_and_install_decks
-from ...sync_dialog_parent import sync_dialog_parent
 from ...utils import ask_user
 
 
@@ -51,7 +51,7 @@ def _try_reinstall_decks_with_missing_deck_configs(
             "Do you want to fix the missing values now?"
         ),
         title="AnkiHub Database Check",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     ):
 
         def on_download_and_install_done(future: Future) -> None:

@@ -11,7 +11,7 @@ from ....db import NOTE_NOT_DELETED_CONDITION, ankihub_db, flat
 from ....db.models import AnkiHubNote
 from ....main.reset_local_changes import reset_local_changes_to_notes
 from ....settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
-from ...sync_dialog_parent import sync_dialog_parent
+from ...dialog_parent import dialog_parent_state
 from ...utils import ask_user
 
 
@@ -53,13 +53,13 @@ def _check_missing_ankihub_nids() -> None:
             "Do you want to fix this now?"
         ),
         title="AnkiHub Database Check",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     ):
         aqt.mw.taskman.with_progress(
             lambda: _reset_decks(ah_dids_with_missing_ah_nids),
             on_done=_on_done,
             label="Resetting local changes...",
-            parent=sync_dialog_parent(),
+            parent=dialog_parent_state.get(),
         )
 
 
@@ -67,7 +67,7 @@ def _on_done(future: Future):
     future.result()
 
     LOGGER.info("Done resetting local changes.")
-    showInfo("Missing values have been restored.", parent=sync_dialog_parent())
+    showInfo("Missing values have been restored.", parent=dialog_parent_state.get())
 
 
 def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
@@ -151,7 +151,7 @@ def _check_ankihub_update_tags() -> None:
         "The <b>AnkiHub_Update</b> tags can be safely removed from all notes. "
         "Do you want to remove the <b>AnkiHub_Update</b> tags from all notes now?",
         title="AnkiHub",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     ):
         LOGGER.info("User chose not to remove AnkiHub_Update tags.")
         return
@@ -159,14 +159,14 @@ def _check_ankihub_update_tags() -> None:
     def on_done(future: Future):
         future.result()
 
-        showInfo("AnkiHub_Update tags removed from all notes.", parent=sync_dialog_parent())
+        showInfo("AnkiHub_Update tags removed from all notes.", parent=dialog_parent_state.get())
         LOGGER.info("AnkiHub_Update tags removed from all notes.")
 
     aqt.mw.taskman.with_progress(
         task=_remove_ankihub_update_tags,
         on_done=on_done,
         label="Removing AnkiHub_Update tags...",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     )
 
 

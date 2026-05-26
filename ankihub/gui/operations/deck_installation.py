@@ -28,10 +28,10 @@ from ...settings import (
     DeckConfig,
     config,
 )
+from ..dialog_parent import dialog_parent_state
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..sync_dialog_parent import sync_dialog_parent
 from ..utils import deck_download_progress_cb, logged_into_ankiweb, show_dialog
 from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -64,7 +64,7 @@ def download_and_install_decks(
             skip_summary=skip_summary,
         ),
         label="Getting deck information...",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     )
 
 
@@ -87,7 +87,7 @@ def _on_deck_infos_fetched(
         ),
         on_done=partial(_on_install_done, on_done=on_done, skip_summary=skip_summary),
         label="Downloading decks from AnkiHub...",
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     )
 
 
@@ -168,7 +168,7 @@ def _show_deck_import_summary_dialog_inner(
             DeckManagementDialog.display_subscribe_window()
 
     # Open window-modal so it renders as a sheet attached to its parent (e.g. Deck Management) on
-    # macOS, not as a free-floating window beside it (NRT-764).
+    # macOS, not as a free-floating window beside it.
     dialog = show_dialog(
         message,
         title="AnkiHub | Deck Import Summary",
@@ -177,7 +177,7 @@ def _show_deck_import_summary_dialog_inner(
         scrollable=True,
         callback=on_button_clicked,
         open_dialog=False,
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     )
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     dialog.open()
@@ -315,5 +315,5 @@ def _install_deck(
 def _cleanup_after_deck_install() -> None:
     """Clears unused tags and empty cards. We do this because importing a deck which the user
     already has in their collection can result in many unused tags and empty cards."""
-    clear_unused_tags(parent=sync_dialog_parent()).run_in_background()
+    clear_unused_tags(parent=dialog_parent_state.get()).run_in_background()
     clear_empty_cards()

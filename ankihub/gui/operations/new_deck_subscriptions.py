@@ -9,8 +9,8 @@ from ... import LOGGER
 from ...ankihub_client import Deck
 from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
 from ...settings import ANKI_INT_VERSION, config
+from ..dialog_parent import dialog_parent_state
 from ..messages import messages
-from ..sync_dialog_parent import sync_dialog_parent
 from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -62,7 +62,7 @@ def check_and_install_new_deck_subscriptions(
     confirmation_dialog = show_dialog(
         title="AnkiHub | Sync",
         text=messages.deck_install_confirmation(decks, logged_to_ankiweb=logged_into_ankiweb()),
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
         buttons=[
             ("Skip", QDialogButtonBox.ButtonRole.RejectRole),
             ("Install", QDialogButtonBox.ButtonRole.AcceptRole),
@@ -83,7 +83,7 @@ def check_and_install_new_deck_subscriptions(
         recommended_deck_settings_cb,
     )
     confirmation_dialog.adjustSize()
-    # Window-modal so it is interactive above an ApplicationModal parent (e.g. Deck Management) (NRT-764).
+    # Window-modal so it is interactive above an ApplicationModal parent (e.g. Deck Management).
     confirmation_dialog.setWindowModality(Qt.WindowModality.WindowModal)
     confirmation_dialog.open()
 

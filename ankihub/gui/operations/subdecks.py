@@ -8,7 +8,7 @@ from anki.notes import NoteId
 from ... import LOGGER
 from ...main.subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
 from ...settings import config
-from ..sync_dialog_parent import sync_dialog_parent
+from ..dialog_parent import dialog_parent_state
 from ..utils import ask_user, refresh_anki_ui_after_moving_cards, tooltip
 
 
@@ -21,7 +21,7 @@ def build_subdecks_and_move_cards_to_them_in_background(
         label="Building subdecks and moving cards...",
         task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ankihub_did, nids=nids),
         on_done=_on_subdecks_updated,
-        parent=sync_dialog_parent(),
+        parent=dialog_parent_state.get(),
     )
     config.set_subdecks(ankihub_did, True)
 

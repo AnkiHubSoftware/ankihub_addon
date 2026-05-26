@@ -21,9 +21,9 @@ from ..main.note_conversion import (
 )
 from ..main.utils import create_backup
 from ..settings import config
+from .dialog_parent import dialog_parent_state
 from .media_sync import media_sync
 from .operations.scheduling import unsuspend_notes
-from .sync_dialog_parent import sync_dialog_parent
 from .utils import deck_download_progress_cb, show_error_dialog
 
 
@@ -258,12 +258,12 @@ class _AnkiHubDeckUpdater:
             error_message = response_data.get("detail")
             if error_message:
                 # Resolve the parent on the main thread: _handle_exception runs in a background
-                # thread and sync_dialog_parent() touches Qt widget state (NRT-764).
+                # thread and dialog_parent_state.get() touches Qt widget state.
                 aqt.mw.taskman.run_on_main(
                     lambda: show_error_dialog(
                         error_message,
                         title="Error while downloading updates for deck :(",
-                        parent=sync_dialog_parent(),
+                        parent=dialog_parent_state.get(),
                     )
                 )
                 return True
@@ -275,7 +275,7 @@ class _AnkiHubDeckUpdater:
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to get other deck updates.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
-                    parent=sync_dialog_parent(),
+                    parent=dialog_parent_state.get(),
                 )
             )
             LOGGER.info(

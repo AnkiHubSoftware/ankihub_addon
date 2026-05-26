@@ -3809,8 +3809,11 @@ class TestShowNextDueDateReminderDialog:
 
     @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_log_context")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateReminderDialog")
+    @patch("ankihub.gui.subdeck_due_date_dialog.dialog_parent_state")
     @patch("ankihub.gui.subdeck_due_date_dialog.aqt")
-    def test_show_next_due_date_reminder_dialog_success(self, mock_aqt, mock_dialog_class, mock_get_log_context):
+    def test_show_next_due_date_reminder_dialog_success(
+        self, mock_aqt, mock_dialog_parent_state, mock_dialog_class, mock_get_log_context
+    ):
         """Test successfully showing a due date reminder dialog from the queue."""
         mock_subdeck = {"name": "Test Deck::Exam Subdeck", "id": 456}
         mock_aqt.mw.col.decks.get.return_value = mock_subdeck
@@ -3825,7 +3828,9 @@ class TestShowNextDueDateReminderDialog:
 
         _show_next_due_date_reminder_dialog()
 
-        mock_dialog_class.assert_called_once_with(subdeck_config, parent=mock_aqt.mw)
+        mock_dialog_class.assert_called_once_with(
+            subdeck_config, parent=mock_dialog_parent_state.get.return_value
+        )
         mock_dialog.show.assert_called_once()
         assert _reminder_dialog_state.queue == []
 
