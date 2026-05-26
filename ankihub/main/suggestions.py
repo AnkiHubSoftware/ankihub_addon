@@ -266,9 +266,9 @@ def suggest_note_update(
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a ChangeSuggestionResult enum value.
 
-    `filters` carries optional allowlists (fields, added/removed tags) and the
-    server-protected denylist. `None` for any list means "no filter for that
-    dimension"; the absent `filters` arg is equivalent to no filters at all.
+    `filters` carries the user's optional allowlists for fields and added/removed
+    tags. `None` for any list means "no filter for that dimension"; the absent
+    `filters` arg is equivalent to no filters at all.
     """
 
     # DELETE doesn't carry field content, so the empty-first-field requirement
