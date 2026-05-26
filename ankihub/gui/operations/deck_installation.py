@@ -10,7 +10,7 @@ from typing import Callable, Dict, List, cast
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 from aqt.operations.tag import clear_unused_tags
-from aqt.qt import QDialogButtonBox
+from aqt.qt import QDialogButtonBox, Qt
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -167,16 +167,20 @@ def _show_deck_import_summary_dialog_inner(
         if button_index == 0:
             DeckManagementDialog.display_subscribe_window()
 
-    show_dialog(
+    # Open window-modal so it renders as a sheet attached to its parent (e.g. Deck Management) on
+    # macOS, not as a free-floating window beside it (NRT-764).
+    dialog = show_dialog(
         message,
         title="AnkiHub | Deck Import Summary",
         buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
         default_button_idx=1,
         scrollable=True,
         callback=on_button_clicked,
-        use_show=True,
+        open_dialog=False,
         parent=sync_dialog_parent(),
     )
+    dialog.setWindowModality(Qt.WindowModality.WindowModal)
+    dialog.open()
 
 
 def _download_and_install_decks_inner(
