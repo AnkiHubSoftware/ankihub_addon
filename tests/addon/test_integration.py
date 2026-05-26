@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, Qt, QUrl, QWidget
+from aqt.qt import QAction, QEvent, Qt, QUrl, QWidget
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -4618,7 +4618,7 @@ class TestDeckManagementDialog:
             populate_spy.assert_not_called()
             assert dialog._selected_ah_did() == ah_did
 
-    def test_auto_refresh_throttles_and_skips_in_flight(
+    def test_auto_refresh_defers_rather_than_drops_then_fetches(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -4641,23 +4641,59 @@ class TestDeckManagementDialog:
             mocker.patch("ankihub.gui.decks_dialog.QApplication.activePopupWidget", return_value=None)
 
             auto_refresh_mock = mocker.patch.object(dialog, "_auto_refresh_decks_list")
+            defer_mock = mocker.patch.object(dialog._refresh_debounce_timer, "start")
 
-            # Just fetched (within the min interval, e.g. the activation emitted while
-            # showing the dialog) -> no fetch.
+            # Within the min interval -> defer (re-arm the timer), don't drop or fetch.
             dialog._last_subscriptions_fetch = monotonic()
             dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_not_called()
+            defer_mock.assert_called_once()
 
-            # Past the min interval but a fetch is already in flight -> no fetch.
+            # Past the min interval but a fetch is in flight -> defer, don't fetch.
+            defer_mock.reset_mock()
             dialog._last_subscriptions_fetch = monotonic() - (dialog._REFRESH_MIN_INTERVAL_SECONDS + 1.0)
             dialog._subscriptions_fetch_in_flight = True
             dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_not_called()
+            defer_mock.assert_called_once()
 
             # Past the min interval and nothing in flight -> fetch.
             dialog._subscriptions_fetch_in_flight = False
             dialog._on_refresh_debounce_timeout()
             auto_refresh_mock.assert_called_once()
+
+    def test_auto_refresh_only_triggers_on_genuine_return(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            ah_did = install_ah_deck()
+            anki_did = config.deck_config(ah_did).anki_id
+            deck = DeckFactory.create(ah_did=ah_did, anki_did=anki_did)
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[deck])
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+
+            start_mock = mocker.patch.object(dialog._refresh_debounce_timer, "start")
+            activation_event = QEvent(QEvent.Type.ActivationChange)
+
+            # Activation without a prior deactivation (e.g. while first showing the
+            # dialog) must not schedule a refresh.
+            mocker.patch.object(dialog, "isActiveWindow", return_value=True)
+            dialog.changeEvent(activation_event)
+            start_mock.assert_not_called()
+
+            # Losing then regaining activation is a genuine return -> schedule one.
+            mocker.patch.object(dialog, "isActiveWindow", return_value=False)
+            dialog.changeEvent(activation_event)
+            mocker.patch.object(dialog, "isActiveWindow", return_value=True)
+            dialog.changeEvent(activation_event)
+            start_mock.assert_called_once()
 
     def test_toggle_subdecks(
         self,
