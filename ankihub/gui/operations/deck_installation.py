@@ -31,6 +31,7 @@ from ...settings import (
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
+from ..sync_dialog_parent import sync_dialog_parent
 from ..utils import deck_download_progress_cb, logged_into_ankiweb, show_dialog
 from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
@@ -63,6 +64,7 @@ def download_and_install_decks(
             skip_summary=skip_summary,
         ),
         label="Getting deck information...",
+        parent=sync_dialog_parent(),
     )
 
 
@@ -85,6 +87,7 @@ def _on_deck_infos_fetched(
         ),
         on_done=partial(_on_install_done, on_done=on_done, skip_summary=skip_summary),
         label="Downloading decks from AnkiHub...",
+        parent=sync_dialog_parent(),
     )
 
 
@@ -172,6 +175,7 @@ def _show_deck_import_summary_dialog_inner(
         scrollable=True,
         callback=on_button_clicked,
         use_show=True,
+        parent=sync_dialog_parent(),
     )
 
 

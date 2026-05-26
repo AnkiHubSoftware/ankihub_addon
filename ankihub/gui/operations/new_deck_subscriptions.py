@@ -10,7 +10,8 @@ from ...ankihub_client import Deck
 from ...gui.deck_options import MIN_ANKI_VERSION_FOR_FSRS_FEATURES
 from ...settings import ANKI_INT_VERSION, config
 from ..messages import messages
-from ..utils import active_window_or_mw, logged_into_ankiweb, show_dialog, sync_with_ankiweb
+from ..sync_dialog_parent import sync_dialog_parent
+from ..utils import logged_into_ankiweb, show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -61,9 +62,7 @@ def check_and_install_new_deck_subscriptions(
     confirmation_dialog = show_dialog(
         title="AnkiHub | Sync",
         text=messages.deck_install_confirmation(decks, logged_to_ankiweb=logged_into_ankiweb()),
-        # Parent to the active dialog (e.g. Deck Management) rather than the main window, so on macOS
-        # this dialog layers above it instead of attaching as a sheet behind it (NRT-764).
-        parent=active_window_or_mw(),
+        parent=sync_dialog_parent(),
         buttons=[
             ("Skip", QDialogButtonBox.ButtonRole.RejectRole),
             ("Install", QDialogButtonBox.ButtonRole.AcceptRole),

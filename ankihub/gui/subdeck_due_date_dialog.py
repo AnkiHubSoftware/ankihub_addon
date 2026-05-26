@@ -19,6 +19,7 @@ from ..main.block_exam_subdecks import (
     set_subdeck_due_date,
 )
 from ..settings import ActionSource, BlockExamSubdeckConfig, BlockExamSubdeckOrigin, config
+from .sync_dialog_parent import sync_dialog_parent
 
 
 @dataclass
@@ -300,7 +301,7 @@ def _show_next_due_date_reminder_dialog() -> None:
         return
 
     # Create dialog for this subdeck
-    dialog = SubdeckDueDateReminderDialog(subdeck_config, parent=aqt.mw)
+    dialog = SubdeckDueDateReminderDialog(subdeck_config, parent=sync_dialog_parent())
 
     _reminder_dialog_state.dialog = dialog
 
