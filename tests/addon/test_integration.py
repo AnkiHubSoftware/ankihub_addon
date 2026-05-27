@@ -4579,14 +4579,17 @@ class TestDeckManagementDialog:
             dialog.display_subscribe_window()
             assert dialog.decks_list.count() == 1
 
-            # Two new decks appear at once, with nothing selected.
-            new_deck_a = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck A")
-            new_deck_b = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck B")
-            dialog._apply_fetched_subscriptions([existing_deck, new_deck_a, new_deck_b])
+            # Two new decks appear at once, with nothing selected. Give the deck that
+            # comes LAST in the response the LOWER ah_did, so a passing assertion can
+            # only be explained by "last in response" — not by first-in-response or by
+            # any id/set ordering.
+            new_deck_first = DeckFactory.create(ah_did=uuid.UUID(int=2), name="Newly Subscribed Deck A")
+            new_deck_last = DeckFactory.create(ah_did=uuid.UUID(int=1), name="Newly Subscribed Deck B")
+            dialog._apply_fetched_subscriptions([existing_deck, new_deck_first, new_deck_last])
 
             assert dialog.decks_list.count() == 3
-            # The last newly-added deck in the response is auto-selected.
-            assert dialog._selected_ah_did() == new_deck_b.ah_did
+            # The deck appearing last in the response is auto-selected.
+            assert dialog._selected_ah_did() == new_deck_last.ah_did
 
     def test_auto_refresh_keeps_existing_selection_when_deck_added(
         self,
