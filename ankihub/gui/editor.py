@@ -44,7 +44,6 @@ def setup() -> None:
 
 
 def _setup_additional_editor_buttons():
-    gui_hooks.add_cards_did_init.append(_on_add_cards_init)
     gui_hooks.editor_did_init_buttons.append(_setup_editor_buttons)
     gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)
@@ -438,16 +437,21 @@ def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
     editor.web.eval(set_tooltip_script.format(text))
 
 
-editor: Editor
-
-# Live editors tracked so the field-typing and tag-update hooks (which only
-# receive a Note) can locate the owning editor and refresh its button state as
-# the user edits.
+# Live editors tracked so hooks that don't hand us the Editor — the field-typing
+# and tag-update hooks (Note only) and the note-type-change hook (note types
+# only) — can still find the editor(s) to refresh.
 _tracked_editors: List[Editor] = []
 
 
 def _track_editor(editor: Editor) -> None:
     _tracked_editors.append(editor)
+
+
+def _live_tracked_editors() -> List[Editor]:
+    """Tracked editors whose widget is still alive, pruning the rest in place."""
+    live = [e for e in _tracked_editors if not sip.isdeleted(e.widget)]
+    _tracked_editors[:] = live
+    return live
 
 
 def _refresh_buttons_for_edited_note(note: Note) -> None:
@@ -458,22 +462,16 @@ def _refresh_buttons_for_edited_note(note: Note) -> None:
     """
     # Match by object identity, not note.id: unsaved Add-Cards notes all share
     # id 0, so an id comparison would refresh every open Add-Cards editor.
-    for tracked in list(_tracked_editors):
-        if sip.isdeleted(tracked.widget):
-            _tracked_editors.remove(tracked)
-            continue
+    for tracked in _live_tracked_editors():
         if tracked.note is note:
             _refresh_buttons(tracked)
 
 
-def _on_add_cards_init(add_cards: AddCards) -> None:
-    global editor
-    editor = add_cards.editor
-
-
 def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
-    global editor
-    _refresh_buttons(editor)
+    # The hook gives us the note types, not the editor, so refresh every live
+    # editor. _refresh_buttons is idempotent UI-only work.
+    for tracked in _live_tracked_editors():
+        _refresh_buttons(tracked)
 
 
 def _setup_editor_did_load_js_message(editor: Editor) -> None:
