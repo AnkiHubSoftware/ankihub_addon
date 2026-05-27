@@ -139,18 +139,23 @@ def _on_suggestion_button_press(editor: Editor) -> None:
         AnkiHubLogin.display_login()
         return
 
-    # Covers the keyboard-shortcut path, which fires even when the button is
-    # visually disabled — including empty new notes, which must not fall through
-    # to add_current_note below.
+    # The visual gate disables every button when the note isn't an AnkiHub
+    # note type; the keyboard shortcut still fires, but there's nothing to do
+    # (and the dialog opener below would otherwise hit an assert).
     note = editor.note
-    if note is not None and ankihub_db.is_ankihub_note_type(note.mid):
-        ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id) if note.id != 0 else None
-        if ah_note is not None and cast(AnkiHubNote, ah_note).was_deleted():
-            tooltip(NOTE_DELETED_TOOLTIP)
-            return
-        if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
-            tooltip(gate_tooltip)
-            return
+    if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
+        return
+
+    # Cover the rest of the keyboard-shortcut path: it fires even when the
+    # button is visually disabled, including for empty new notes that must
+    # not fall through to add_current_note below.
+    ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id) if note.id != 0 else None
+    if ah_note is not None and cast(AnkiHubNote, ah_note).was_deleted():
+        tooltip(NOTE_DELETED_TOOLTIP)
+        return
+    if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
+        tooltip(gate_tooltip)
+        return
 
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.

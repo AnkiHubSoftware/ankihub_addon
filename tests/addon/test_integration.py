@@ -1097,6 +1097,34 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_action_gate_no_op_for_non_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            anki_note = add_anki_note()  # non-AnkiHub note type
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # The button is visually disabled for non-AnkiHub notes; the hotkey
+            # still fires, but it must be a no-op (used to hit an assert in the
+            # dialog opener).
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
     def test_with_note_deleted_on_ankihub(
         self,
         anki_session_with_addon_data: AnkiSession,
