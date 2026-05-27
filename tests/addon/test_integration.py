@@ -756,10 +756,7 @@ class TestEditor:
             if has_change:
                 anki_note["Front"] = "edited value"
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_enabled_status(
                 qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_change
@@ -787,10 +784,7 @@ class TestEditor:
 
             config.set_feature_flags({"auto_protect_fields_when_edited": False})
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # Flag off: button stays enabled even with no changes (legacy behavior).
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
@@ -818,10 +812,7 @@ class TestEditor:
             # at submit — so the button stays disabled.
             anki_note["Front"] = "edited value"
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
 
@@ -849,10 +840,7 @@ class TestEditor:
             anki_note["Front"] = "edited value"
             anki_note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
 
@@ -882,9 +870,7 @@ class TestEditor:
             if has_content:
                 anki_note["Front"] = "content"
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_text(
                 qtbot=qtbot, addcards=add_cards_dialog, expected_text=AnkiHubCommands.NEW.value
@@ -923,9 +909,7 @@ class TestEditor:
             anki_note["Front"] = "content"
             config.set_globally_protected_fields(ah_did, {anki_note.mid: ["Front"]})
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
 
@@ -951,9 +935,7 @@ class TestEditor:
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
             tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # The hotkey fires even when the button is disabled; an empty new note
             # must be gated here, not fall through to add_current_note.
@@ -980,9 +962,7 @@ class TestEditor:
 
             config.set_feature_flags({"auto_protect_fields_when_edited": True})
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # No changes yet: disabled.
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
@@ -990,6 +970,37 @@ class TestEditor:
             # Edit a field and fire the typing timer; the button should enable live,
             # without reloading the note.
             add_cards_dialog.editor.note["Front"] = "edited value"
+            editor_did_fire_typing_timer(add_cards_dialog.editor.note)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_new_note_button_refreshes_live_as_first_field_is_filled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+            anki_note = aqt.mw.col.new_note(ah_note_type)  # empty first field
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # Empty new note: disabled.
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
+
+            # Fill the first field and fire the typing timer; the live-refresh
+            # path must enable the button even for an unsaved (id 0) note —
+            # identity-matching `tracked.note is note` makes this work.
+            add_cards_dialog.editor.note["Front"] = "content"
             editor_did_fire_typing_timer(add_cards_dialog.editor.note)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
@@ -1012,9 +1023,7 @@ class TestEditor:
 
             config.set_feature_flags({"auto_protect_fields_when_edited": True})
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # No changes yet: disabled.
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
@@ -1049,9 +1058,7 @@ class TestEditor:
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
             tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # Invoke the action directly to cover the keyboard-shortcut path, which
             # fires even when the button is visually disabled.
@@ -1084,9 +1091,7 @@ class TestEditor:
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
             tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # Keyboard shortcut fires even when the button is disabled; a note
             # deleted on AnkiHub must not reach the dialog.
@@ -1115,9 +1120,7 @@ class TestEditor:
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
             login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
 
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             # The button is visually disabled for non-AnkiHub notes; the hotkey
             # still fires, but it must be a no-op — even when logged out, since
@@ -1178,6 +1181,13 @@ class TestEditor:
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
+
+    def _open_addcards(self, anki_note: Note, qtbot: QtBot, mocker: MockerFixture) -> AddCards:
+        """Open AddCards with `anki_note`, then wait for the first button refresh."""
+        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+        add_cards_dialog.editor.set_note(anki_note)
+        self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+        return add_cards_dialog
 
     def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
