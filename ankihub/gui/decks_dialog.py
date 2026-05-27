@@ -2,7 +2,7 @@
 
 import uuid
 from concurrent.futures import Future
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 import aqt
@@ -16,6 +16,7 @@ from aqt.qt import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QEvent,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -26,16 +27,18 @@ from aqt.qt import (
     QScrollArea,
     QSizePolicy,
     Qt,
+    QTimer,
     QVBoxLayout,
     QWidget,
     qconnect,
+    sip,
 )
 from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import UserDeckRelation
+from ..ankihub_client.models import Deck, UserDeckRelation
 from ..common_utils import get_media_names_from_note_type
 from ..db import ankihub_db
 from ..gui.operations.deck_creation import create_collaborative_deck
@@ -87,9 +90,31 @@ class DeckManagementDialog(QDialog):
     _window: Optional["DeckManagementDialog"] = None
     silentlyClose = True
 
+    # Coalesce bursts of window activations (alt-tab, child dialogs closing) into a
+    # single refresh fired once focus settles.
+    _REFRESH_DEBOUNCE_MS = 400
+
     def __init__(self):
         super(DeckManagementDialog, self).__init__(aqt.mw)
         self.client = AnkiHubClient()
+
+        # Auto-refresh bookkeeping (see _on_refresh_debounce_timeout).
+        self._subscriptions_fetch_in_flight = False
+        # True once the dialog has lost activation, so we only auto-refresh on a
+        # genuine return (deactivate -> reactivate), not the activation Qt emits
+        # while the dialog is first shown.
+        self._was_deactivated = False
+        # Prevents a slow async auto-refresh from clobbering a newer refresh with
+        # stale data (e.g. an unsubscribe rebuilt the list while the fetch was still
+        # in flight). Every fetch — sync or async — bumps this counter, and an async
+        # result is only applied if its generation still matches on completion.
+        self._subscriptions_fetch_generation = 0
+        # Debounces focus-triggered refreshes; parented to self so it can't fire
+        # after the dialog is deleted.
+        self._refresh_debounce_timer = QTimer(self)
+        self._refresh_debounce_timer.setSingleShot(True)
+        qconnect(self._refresh_debounce_timer.timeout, self._on_refresh_debounce_timeout)
+
         self._setup_ui()
         self._refresh_decks_list()
 
@@ -895,18 +920,156 @@ class DeckManagementDialog(QDialog):
             )
 
     def _refresh_decks_list(self) -> None:
-        self.decks_list.clear()
+        """Synchronously fetch subscriptions and repopulate the list, preserving selection.
 
+        Used by callers that already run in a context where blocking briefly is acceptable
+        (initial load, unsubscribe, reopen). The focus-triggered auto-refresh uses the
+        non-blocking path in _auto_refresh_decks_list instead.
+        """
+        # This full refresh supersedes any pending/auto refresh.
+        self._refresh_debounce_timer.stop()
+        self._was_deactivated = False
+        self._subscriptions_fetch_generation += 1
         subscribed_decks = self.client.get_deck_subscriptions()
-        for deck in subscribed_decks:
-            if deck.is_user_relation_owner:
-                item = QListWidgetItem(f"{deck.name} (Created by you)")
-            elif deck.is_user_relation_maintainer:
-                item = QListWidgetItem(f"{deck.name} (Maintained by you)")
+        self._populate_decks_list(subscribed_decks, select_ah_did=self._selected_ah_did())
+
+    def _populate_decks_list(self, decks: List[Deck], select_ah_did: Optional[UUID]) -> None:
+        """Rebuild the deck list from `decks`, re-selecting `select_ah_did` if present.
+
+        Signals are blocked during the rebuild so the transient empty state doesn't fire
+        itemSelectionChanged -> _refresh_box_bottom_right (which would flash the right panel
+        to "Choose deck…"); the right panel is refreshed once at the end instead.
+        """
+        self.decks_list.blockSignals(True)
+        try:
+            self.decks_list.clear()
+            for deck in decks:
+                if deck.is_user_relation_owner:
+                    item = QListWidgetItem(f"{deck.name} (Created by you)")
+                elif deck.is_user_relation_maintainer:
+                    item = QListWidgetItem(f"{deck.name} (Maintained by you)")
+                else:
+                    item = QListWidgetItem(deck.name)
+                item.setData(Qt.ItemDataRole.UserRole, deck)
+                self.decks_list.addItem(item)
+                if select_ah_did is not None and deck.ah_did == select_ah_did:
+                    item.setSelected(True)
+                    self.decks_list.setCurrentItem(item)
+                    self.decks_list.scrollToItem(item)
+        finally:
+            self.decks_list.blockSignals(False)
+
+        self._refresh_box_bottom_right()
+
+    @staticmethod
+    def _deck_snapshot(deck: Deck) -> Tuple[UUID, str, UserDeckRelation]:
+        """A comparable summary of exactly what the list renders for a deck."""
+        return (deck.ah_did, deck.name, deck.user_relation)
+
+    def _current_decks_snapshot(self) -> List[Tuple[UUID, str, UserDeckRelation]]:
+        return [
+            self._deck_snapshot(self.decks_list.item(i).data(Qt.ItemDataRole.UserRole))
+            for i in range(self.decks_list.count())
+        ]
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        # Returning from the external browser (or any other app) raises a window
+        # activation event rather than a focus-in/show, so this is where we catch
+        # "the user is looking at the dialog again".
+        if event.type() == QEvent.Type.ActivationChange:
+            if self.isActiveWindow():
+                # Only refresh on a genuine return (we lost activation and regained
+                # it), not the activation emitted while the dialog is first shown.
+                # Debounce so a burst of activations coalesces into one refresh.
+                if self._was_deactivated:
+                    self._was_deactivated = False
+                    self._refresh_debounce_timer.start(self._REFRESH_DEBOUNCE_MS)
             else:
-                item = QListWidgetItem(deck.name)
-            item.setData(Qt.ItemDataRole.UserRole, deck)
-            self.decks_list.addItem(item)
+                self._was_deactivated = True
+
+    def _on_refresh_debounce_timeout(self) -> None:
+        # The singleton keeps the dialog alive after close, so it may be hidden
+        # (not deleted) by the time this fires — don't refresh a closed dialog.
+        if sip.isdeleted(self) or not self.isVisible() or not config.is_logged_in():
+            return
+        # Don't rebuild the list out from under an open child dialog (unsubscribe
+        # confirmation, note-type/destination pickers) or popup (combo dropdown);
+        # those workflows are deck-scoped. The dialog itself is application-modal, so
+        # exclude it from the check — otherwise auto-refresh would never run. Closing
+        # the child reactivates us, which re-triggers this, so nothing is lost.
+        active_modal = QApplication.activeModalWidget()
+        if (active_modal is not None and active_modal is not self) or QApplication.activePopupWidget() is not None:
+            return
+        # A fetch is already running: retry once it finishes rather than dropping
+        # this return, so a change it didn't capture is still picked up.
+        if self._subscriptions_fetch_in_flight:
+            self._refresh_debounce_timer.start(self._REFRESH_DEBOUNCE_MS)
+            return
+        self._auto_refresh_decks_list()
+
+    def _auto_refresh_decks_list(self) -> None:
+        self._subscriptions_fetch_in_flight = True
+        self._subscriptions_fetch_generation += 1
+        generation = self._subscriptions_fetch_generation
+
+        def on_success(decks: List[Deck]) -> None:
+            self._subscriptions_fetch_in_flight = False
+            # Dialog closed (kept alive by the singleton, so not necessarily deleted)
+            # or hidden: nothing to update.
+            if sip.isdeleted(self) or not self.isVisible():
+                return
+            # Discard a result that a newer fetch/refresh has superseded (e.g. an
+            # unsubscribe ran a synchronous refresh while this request was in flight),
+            # otherwise the stale list would clobber the up-to-date one.
+            if generation == self._subscriptions_fetch_generation:
+                try:
+                    self._apply_fetched_subscriptions(decks)
+                except Exception as exc:
+                    # Best-effort: a render failure must not surface an error popup.
+                    LOGGER.warning("Applying auto-refreshed deck subscriptions failed.", exc_info=exc)
+
+        def on_failure(exc: Exception) -> None:
+            # Auto-refresh is best-effort; never surface an error popup on every
+            # focus (e.g. when offline).
+            self._subscriptions_fetch_in_flight = False
+            LOGGER.warning("Auto-refresh of deck subscriptions failed.", exc_info=exc)
+
+        AddonQueryOp(
+            op=lambda _: self.client.get_deck_subscriptions(),
+            success=on_success,
+            parent=aqt.mw,
+        ).failure(on_failure).run_in_background()
+
+    def _apply_fetched_subscriptions(self, decks: List[Deck]) -> None:
+        current_snapshot = self._current_decks_snapshot()
+        # Order-insensitive: a reordered-but-identical list isn't a real change, so
+        # comparing as sets avoids a needless rebuild (and visible reshuffle).
+        if {self._deck_snapshot(deck) for deck in decks} == set(current_snapshot):
+            # Nothing changed: skip the rebuild so the list doesn't flicker and the
+            # current selection / right-panel state is left untouched.
+            return
+
+        old_ids = {ah_did for ah_did, _, _ in current_snapshot}
+        new_ids = {deck.ah_did for deck in decks}
+        added_ids = new_ids - old_ids
+
+        current = self._selected_ah_did()
+        if current is None and added_ids:
+            # Nothing selected and at least one new subscription (the common "just
+            # subscribed on the web" case): auto-select one so its panel — including
+            # "Sync to install" — is shown. When the user subscribed to several decks
+            # before returning, pick the one that appears last in the server response
+            # (we have no per-deck "subscribed_at" timestamp; this is the closest
+            # proxy for "last added" and matches the order rendered in the list).
+            # If the user already has a deck selected we keep it, so a refresh can't
+            # retarget an in-progress workflow.
+            select_ah_did: Optional[UUID] = next(deck.ah_did for deck in reversed(decks) if deck.ah_did in added_ids)
+        else:
+            select_ah_did = current if current in new_ids else None
+
+        self._populate_decks_list(decks, select_ah_did=select_ah_did)
+        LOGGER.info("deck_management_dialog_auto_refreshed", added_decks=len(added_ids))
 
     def _selected_ah_did(self) -> Optional[UUID]:
         selection = self.decks_list.selectedItems()
@@ -1069,13 +1232,49 @@ class DeckManagementDialog(QDialog):
     def _refresh_subdecks_checkbox(self):
         ah_did = self._selected_ah_did()
 
-        has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
-        self.subdecks_cb.setEnabled(has_subdeck_tags)
-        self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }" if not has_subdeck_tags else "")
-        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
-
+        # Apply the parts that don't require a DB query immediately: the checked state
+        # from config, and the static tooltip.
         deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
+        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
+
+        # Whether the checkbox is interactive depends on whether the deck has subdeck
+        # tags — a scan over every note's tags in the AnkiHub DB. For large decks this
+        # takes ~100ms, so run it off the main thread and apply the result once it
+        # returns.
+        self.subdecks_cb.setEnabled(False)
+        self.subdecks_cb.setStyleSheet("QCheckBox { color: grey }")
+
+        # Capture the specific checkbox this op is started for. If the panel rebuilds
+        # before the op completes (deck switch, toggle, auto-refresh) self.subdecks_cb
+        # will point to a new widget and we'll skip applying this now-stale result.
+        checkbox = self.subdecks_cb
+
+        AddonQueryOp(
+            op=lambda _: deck_contains_subdeck_tags(ah_did),
+            success=lambda has_subdeck_tags: self._apply_subdecks_checkbox_state(ah_did, has_subdeck_tags, checkbox),
+            parent=self,
+        ).failure(
+            # Best-effort check: on failure, log and leave the checkbox in its loading-
+            # state disabled rather than surfacing the add-on's default error dialog
+            # for a transient DB / profile-close error.
+            lambda exc: LOGGER.warning("Subdeck-tag check failed", ah_did=str(ah_did), error=repr(exc))
+        ).without_collection().run_in_background()
+
+    def _apply_subdecks_checkbox_state(self, ah_did: UUID, has_subdeck_tags: bool, checkbox: QCheckBox) -> None:
+        # Guard against the dialog or the captured checkbox being torn down between op
+        # launch and completion (e.g. profile switch mid-query).
+        if sip.isdeleted(self) or sip.isdeleted(checkbox):
+            return
+
+        # Ignore stale results: a different deck may have been selected (self.subdecks_cb
+        # is then a different widget) or this checkbox may have been rebuilt for the same
+        # deck. Either way, the now-current op will set the right state.
+        if self._selected_ah_did() != ah_did or self.subdecks_cb is not checkbox:
+            return
+
+        checkbox.setEnabled(has_subdeck_tags)
+        checkbox.setStyleSheet("" if has_subdeck_tags else "QCheckBox { color: grey }")
 
     @classmethod
     def display_subscribe_window(cls):
