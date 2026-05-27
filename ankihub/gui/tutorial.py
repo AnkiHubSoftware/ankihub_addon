@@ -1181,8 +1181,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         def before_setup_table(browser: Browser) -> None:
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
 
-        def before_close(browser: Browser, evt: Optional[QCloseEvent]) -> None:
-            if not self._browser_closed_by_us:
+        def after_close(browser: Browser, evt: Optional[QCloseEvent]) -> None:
+            if not self._browser_closed_by_us and evt.isAccepted():
                 self.go_to_step("browse_button")
 
         def wrapped_init(*args, **kwargs) -> None:
@@ -1195,7 +1195,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             is_startup = True
 
         unwrap_init = wrap_method(Browser, "__init__", wrapped_init, "around")
-        unwrap_close = wrap_method(Browser, "closeEvent", before_close, "before")
+        unwrap_close = wrap_method(Browser, "closeEvent", after_close, "after")
         unwrap_setup = wrap_method(Browser, "setup_table", before_setup_table, "before")
         unwrap_build = wrap_method(SidebarTreeView, "_deck_tree", _build_deck_tree, "around")
 
