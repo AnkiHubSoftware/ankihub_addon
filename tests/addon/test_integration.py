@@ -539,6 +539,53 @@ class TestEntryPoint:
         on_profile_did_open_mock.assert_called_once()
 
 
+# Mutators that prepare a note before TestEditor's visual-gate tests open AddCards.
+# Each row of the parametrized tests names one of these (via `pytest.param(... id=...)`)
+# so failures point at a specific scenario rather than a tuple index.
+
+
+def _no_mutation(ah_did: uuid.UUID, note: Note) -> None:
+    pass
+
+
+def _set_front(ah_did: uuid.UUID, note: Note) -> None:
+    note["Front"] = "edited value"
+
+
+def _globally_protect_front_and_set(ah_did: uuid.UUID, note: Note) -> None:
+    config.set_globally_protected_fields(ah_did, {note.mid: ["Front"]})
+    note["Front"] = "edited value"
+
+
+def _locally_protect_front_and_set(ah_did: uuid.UUID, note: Note) -> None:
+    note["Front"] = "edited value"
+    note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+
+
+# Setup callables for the parametrized action-gate-blocks test below. Each takes
+# the three fixtures the test passes through and returns the prepared note.
+
+
+def _action_setup_unchanged_existing_note(install_ah_deck, import_ah_note, import_ah_note_type) -> Note:
+    ah_did = install_ah_deck()
+    return aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
+
+
+def _action_setup_deleted_existing_note(install_ah_deck, import_ah_note, import_ah_note_type) -> Note:
+    ah_did = install_ah_deck()
+    ah_note = import_ah_note(ah_did=ah_did)
+    AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+        AnkiHubNote.ankihub_note_id == ah_note.ah_nid
+    ).execute()
+    return aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+
+def _action_setup_empty_new_note(install_ah_deck, import_ah_note, import_ah_note_type) -> Note:
+    ah_did = install_ah_deck()
+    ah_note_type = import_ah_note_type(ah_did=ah_did)
+    return aqt.mw.col.new_note(ah_note_type)
+
+
 # The JS in the webviews is flaky if not run in sequential mode
 @pytest.mark.sequential
 class TestEditor:
@@ -735,140 +782,94 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
-    @pytest.mark.parametrize("has_change", [True, False])
-    def test_suggestion_button_gated_on_edit_state(
+    @pytest.mark.parametrize(
+        "mutate,flag_on,expected_enabled,expected_tooltip",
+        [
+            # Flag-on covers the full gate matrix; flag-off is the regression
+            # row confirming the gate is a true no-op when the feature is off.
+            pytest.param(_no_mutation, True, False, NO_CHANGES_TO_SUGGEST_TOOLTIP, id="no_change_disabled"),
+            pytest.param(_set_front, True, True, None, id="field_edit_enabled"),
+            pytest.param(
+                _globally_protect_front_and_set,
+                True,
+                False,
+                NO_CHANGES_TO_SUGGEST_TOOLTIP,
+                id="globally_protected_only_edit_disabled",
+            ),
+            pytest.param(
+                _locally_protect_front_and_set,
+                True,
+                True,
+                None,
+                id="locally_protected_edit_enabled",
+            ),
+            pytest.param(_no_mutation, False, True, None, id="flag_off_no_change_enabled"),
+        ],
+    )
+    def test_visual_gate_on_existing_ah_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         qtbot: QtBot,
-        has_change: bool,
+        mutate: Callable[[uuid.UUID, Note], None],
+        flag_on: bool,
+        expected_enabled: bool,
+        expected_tooltip: Optional[str],
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+            anki_note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            if has_change:
-                anki_note["Front"] = "edited value"
+            config.set_feature_flags({"auto_protect_fields_when_edited": flag_on})
+            mutate(ah_did, anki_note)
 
             add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
             self.assert_suggestion_button_enabled_status(
-                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_change
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=expected_enabled
             )
-            if not has_change:
+            if expected_tooltip is not None:
                 self.assert_suggestion_button_tooltip(
-                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=NO_CHANGES_TO_SUGGEST_TOOLTIP
+                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=expected_tooltip
                 )
 
             add_cards_dialog.editor.cleanup()
 
-    def test_suggestion_button_not_gated_when_flag_off(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": False})
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            # Flag off: button stays enabled even with no changes (legacy behavior).
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_suggestion_button_gate_ignores_globally_protected_edit(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-            config.set_globally_protected_fields(ah_did, {anki_note.mid: ["Front"]})
-
-            # The only edit is to a globally-protected field, which would be stripped
-            # at submit — so the button stays disabled.
-            anki_note["Front"] = "edited value"
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_suggestion_button_enabled_for_locally_protected_field_edit(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            # A personal AnkiHub_Protect tag stops sync from overwriting the local
-            # edit; it must NOT exclude the field from the gate (only globally
-            # protected fields do). The user can still suggest the edit.
-            anki_note["Front"] = "edited value"
-            anki_note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
-
-            add_cards_dialog.editor.cleanup()
-
-    @pytest.mark.parametrize("has_content", [True, False])
-    def test_new_note_suggestion_button_gated_on_content(
+    @pytest.mark.parametrize(
+        "mutate,expected_enabled,expected_tooltip",
+        [
+            pytest.param(_no_mutation, False, EMPTY_FIRST_FIELD_TOOLTIP, id="empty_first_field_disabled"),
+            pytest.param(_set_front, True, None, id="first_field_filled_enabled"),
+            pytest.param(
+                _globally_protect_front_and_set,
+                False,
+                NO_CHANGES_TO_SUGGEST_TOOLTIP,
+                id="globally_protected_first_field_disabled",
+            ),
+        ],
+    )
+    def test_visual_gate_on_new_ah_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         qtbot: QtBot,
-        has_content: bool,
+        mutate: Callable[[uuid.UUID, Note], None],
+        expected_enabled: bool,
+        expected_tooltip: Optional[str],
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             ah_note_type = import_ah_note_type(ah_did=ah_did)
+            anki_note = aqt.mw.col.new_note(ah_note_type)
 
             config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            # A brand-new note (AnkiHub note type, not yet on AnkiHub) with an
-            # empty first field has nothing to suggest, so the button is gated
-            # too — not just existing-note edits.
-            anki_note = aqt.mw.col.new_note(ah_note_type)
-            if has_content:
-                anki_note["Front"] = "content"
+            mutate(ah_did, anki_note)
 
             add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
@@ -876,73 +877,12 @@ class TestEditor:
                 qtbot=qtbot, addcards=add_cards_dialog, expected_text=AnkiHubCommands.NEW.value
             )
             self.assert_suggestion_button_enabled_status(
-                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_content
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=expected_enabled
             )
-            if not has_content:
-                # Empty first field is reported distinctly from "no changes".
+            if expected_tooltip is not None:
                 self.assert_suggestion_button_tooltip(
-                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=EMPTY_FIRST_FIELD_TOOLTIP
+                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=expected_tooltip
                 )
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_new_note_button_disabled_when_first_field_globally_protected(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note_type: ImportAHNoteType,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            ah_note_type = import_ah_note_type(ah_did=ah_did)
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            # A new note's deck is resolved from its note type (it has no AH-DB
-            # row). With the first field globally protected, the server can never
-            # accept the new note, so the button is disabled even with content —
-            # matching the dialog's gate.
-            anki_note = aqt.mw.col.new_note(ah_note_type)
-            anki_note["Front"] = "content"
-            config.set_globally_protected_fields(ah_did, {anki_note.mid: ["Front"]})
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_new_note_action_gate_blocks_empty_first_field(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note_type: ImportAHNoteType,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "is_logged_in", return_value=True)
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            ah_did = install_ah_deck()
-            ah_note_type = import_ah_note_type(ah_did=ah_did)
-            anki_note = aqt.mw.col.new_note(ah_note_type)  # empty first field
-
-            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
-            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            # The hotkey fires even when the button is disabled; an empty new note
-            # must be gated here, not fall through to add_current_note.
-            _on_suggestion_button_press(add_cards_dialog.editor)
-
-            tooltip_mock.assert_called_once_with(EMPTY_FIRST_FIELD_TOOLTIP)
-            assert not open_dialog_mock.called
 
             add_cards_dialog.editor.cleanup()
 
@@ -1038,66 +978,55 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
-    def test_suggestion_action_gate_blocks_when_no_changes(
+    @pytest.mark.parametrize(
+        "setup,expected_tooltip",
+        [
+            pytest.param(
+                _action_setup_unchanged_existing_note,
+                NO_CHANGES_TO_SUGGEST_TOOLTIP,
+                id="no_changes_existing_note",
+            ),
+            pytest.param(
+                _action_setup_deleted_existing_note,
+                NOTE_DELETED_TOOLTIP,
+                id="deleted_existing_note",
+            ),
+            pytest.param(
+                _action_setup_empty_new_note,
+                EMPTY_FIRST_FIELD_TOOLTIP,
+                id="empty_first_field_new_note",
+            ),
+        ],
+    )
+    def test_action_gate_blocks(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
         qtbot: QtBot,
+        setup: Callable[..., Note],
+        expected_tooltip: str,
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "is_logged_in", return_value=True)
             config.set_feature_flags({"auto_protect_fields_when_edited": True})
 
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+            anki_note = setup(install_ah_deck, import_ah_note, import_ah_note_type)
 
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
             tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
 
             add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
-            # Invoke the action directly to cover the keyboard-shortcut path, which
-            # fires even when the button is visually disabled.
+            # The hotkey fires even when the button is visually disabled; the
+            # action gate must short-circuit with the right tooltip and never
+            # fall through to the dialog (or, for new notes, to add_current_note).
             _on_suggestion_button_press(add_cards_dialog.editor)
 
-            tooltip_mock.assert_called_once_with(NO_CHANGES_TO_SUGGEST_TOOLTIP)
-            assert not open_dialog_mock.called
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_suggestion_action_gate_blocks_deleted_note(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "is_logged_in", return_value=True)
-
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
-                AnkiHubNote.ankihub_note_id == ah_note.ah_nid
-            ).execute()
-
-            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
-            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
-
-            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
-
-            # Keyboard shortcut fires even when the button is disabled; a note
-            # deleted on AnkiHub must not reach the dialog.
-            _on_suggestion_button_press(add_cards_dialog.editor)
-
-            tooltip_mock.assert_called_once_with(NOTE_DELETED_TOOLTIP)
+            tooltip_mock.assert_called_once_with(expected_tooltip)
             assert not open_dialog_mock.called
 
             add_cards_dialog.editor.cleanup()
