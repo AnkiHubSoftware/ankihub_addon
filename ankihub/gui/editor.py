@@ -36,6 +36,10 @@ SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
 VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
 VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
 
+# Live editors tracked so the field-typing and tag-update hooks (which pass only
+# a Note, not the Editor) can find the owning editor to refresh.
+_tracked_editors: List[Editor] = []
+
 
 def setup() -> None:
     _setup_additional_editor_buttons()
@@ -434,11 +438,6 @@ def _set_suggestion_button_label(editor: Editor, label: str) -> None:
 def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
     set_tooltip_script = f"document.getElementById('{SUGGESTION_BTN_ID}').title='{{}}';"
     editor.web.eval(set_tooltip_script.format(text))
-
-
-# Live editors tracked so the field-typing and tag-update hooks (which pass only
-# a Note, not the Editor) can find the owning editor to refresh.
-_tracked_editors: List[Editor] = []
 
 
 def _track_editor(editor: Editor) -> None:
