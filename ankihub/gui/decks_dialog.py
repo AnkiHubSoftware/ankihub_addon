@@ -281,9 +281,9 @@ class DeckManagementDialog(QDialog):
         # Initialize and setup the unsubscribe button
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         if theme_manager.night_mode:
-            self.unsubscribe_btn.setStyleSheet("color: #e29792")
+            self.unsubscribe_btn.setStyleSheet("color: #f5a19f")
         else:
-            self.unsubscribe_btn.setStyleSheet("color: #e2857f")
+            self.unsubscribe_btn.setStyleSheet("color: #f38987")
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
         # Add widgets to the action buttons layout
