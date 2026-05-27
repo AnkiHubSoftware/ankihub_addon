@@ -187,7 +187,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=lambda editor: editor.call_after_note_saved(
             functools.partial(_on_suggestion_button_press, editor), keepFocus=True
         ),
-        tip=f"Send your request to AnkiHub ({_suggestion_button_hotkey()})",
+        tip=_default_suggestion_button_tooltip(),
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
         keys=_suggestion_button_hotkey(),
@@ -238,8 +238,9 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         )
 
 
-def _default_suggestion_button_tooltip() -> str:
-    return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
+def _default_suggestion_button_tooltip(is_new_note: bool = False) -> str:
+    verb = "Suggest the note" if is_new_note else "Suggest a change"
+    return f"{verb} to AnkiHub ({_suggestion_button_hotkey()})"
 
 
 def _suggestion_button_hotkey():
@@ -386,7 +387,7 @@ def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
     return NO_CHANGES_TO_SUGGEST_TOOLTIP
 
 
-def _apply_suggestion_button_gate(editor: Editor, note: Note) -> None:
+def _apply_suggestion_button_gate(editor: Editor, note: Note, is_new_note: bool) -> None:
     """Enable or disable the suggestion button based on whether `note` has
     anything to suggest. Shared by the change-note and new-note branches;
     delegates the gating decision (and the feature-flag check) to
@@ -396,7 +397,7 @@ def _apply_suggestion_button_gate(editor: Editor, note: Note) -> None:
         _set_suggestion_button_tooltip(editor, gate_tooltip)
     else:
         _enable_buttons(editor, [SUGGESTION_BTN_ID])
-        _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip())
+        _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip(is_new_note))
 
 
 def _refresh_buttons(editor: Editor) -> None:
@@ -430,12 +431,12 @@ def _refresh_buttons(editor: Editor) -> None:
             _set_suggestion_button_tooltip(editor, NOTE_DELETED_TOOLTIP)
         else:
             _enable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-            _apply_suggestion_button_gate(editor, note)
+            _apply_suggestion_button_gate(editor, note, is_new_note=False)
     else:
         command = AnkiHubCommands.NEW.value
 
         _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-        _apply_suggestion_button_gate(editor, note)
+        _apply_suggestion_button_gate(editor, note, is_new_note=True)
 
     _set_suggestion_button_label(editor, command)
     editor.ankihub_command = command  # type: ignore
