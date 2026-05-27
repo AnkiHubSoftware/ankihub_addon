@@ -4555,6 +4555,39 @@ class TestDeckManagementDialog:
             # The single newly-added deck is auto-selected so its panel is surfaced.
             assert dialog._selected_ah_did() == new_deck.ah_did
 
+    def test_auto_refresh_selects_last_added_when_multiple_decks_added(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ):
+        """When the user subscribes to several decks on the web before returning,
+        auto-select the one that appears last in the server response — the closest
+        proxy we have for 'last added' since Deck carries no subscription timestamp.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(mocker)
+
+            existing_deck_name = "Existing Deck"
+            ah_did = install_ah_deck(ah_deck_name=existing_deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
+            existing_deck = DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=existing_deck_name)
+
+            mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[existing_deck])
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            assert dialog.decks_list.count() == 1
+
+            # Two new decks appear at once, with nothing selected.
+            new_deck_a = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck A")
+            new_deck_b = DeckFactory.create(ah_did=uuid.uuid4(), name="Newly Subscribed Deck B")
+            dialog._apply_fetched_subscriptions([existing_deck, new_deck_a, new_deck_b])
+
+            assert dialog.decks_list.count() == 3
+            # The last newly-added deck in the response is auto-selected.
+            assert dialog._selected_ah_did() == new_deck_b.ah_did
+
     def test_auto_refresh_keeps_existing_selection_when_deck_added(
         self,
         anki_session_with_addon_data: AnkiSession,

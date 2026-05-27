@@ -1037,12 +1037,16 @@ class DeckManagementDialog(QDialog):
         added_ids = new_ids - old_ids
 
         current = self._selected_ah_did()
-        if current is None and len(added_ids) == 1:
-            # Nothing selected and exactly one new subscription (the common "just
-            # subscribed on the web" case): select it so its panel — including
-            # "Sync to install" — is shown. If the user already has a deck selected
-            # we keep it, so a refresh can't retarget an in-progress workflow.
-            select_ah_did: Optional[UUID] = next(iter(added_ids))
+        if current is None and added_ids:
+            # Nothing selected and at least one new subscription (the common "just
+            # subscribed on the web" case): auto-select one so its panel — including
+            # "Sync to install" — is shown. When the user subscribed to several decks
+            # before returning, pick the one that appears last in the server response
+            # (we have no per-deck "subscribed_at" timestamp; this is the closest
+            # proxy for "last added" and matches the order rendered in the list).
+            # If the user already has a deck selected we keep it, so a refresh can't
+            # retarget an in-progress workflow.
+            select_ah_did: Optional[UUID] = next(deck.ah_did for deck in reversed(decks) if deck.ah_did in added_ids)
         else:
             select_ah_did = current if current in new_ids else None
 
