@@ -787,23 +787,20 @@ class TestEditor:
         [
             # Flag-on covers the full gate matrix; flag-off is the regression
             # row confirming the gate is a true no-op when the feature is off.
-            pytest.param(_no_mutation, True, False, NO_CHANGES_TO_SUGGEST_TOOLTIP, id="no_change_disabled"),
-            pytest.param(_set_front, True, True, None, id="field_edit_enabled"),
-            pytest.param(
-                _globally_protect_front_and_set,
-                True,
-                False,
-                NO_CHANGES_TO_SUGGEST_TOOLTIP,
-                id="globally_protected_only_edit_disabled",
-            ),
-            pytest.param(
-                _locally_protect_front_and_set,
-                True,
-                True,
-                None,
-                id="locally_protected_edit_enabled",
-            ),
-            pytest.param(_no_mutation, False, True, None, id="flag_off_no_change_enabled"),
+            # fmt: off
+            (_no_mutation, True, False, NO_CHANGES_TO_SUGGEST_TOOLTIP),
+            (_set_front, True, True, None),
+            (_globally_protect_front_and_set, True, False, NO_CHANGES_TO_SUGGEST_TOOLTIP),
+            (_locally_protect_front_and_set, True, True, None),
+            (_no_mutation, False, True, None),
+            # fmt: on
+        ],
+        ids=[
+            "no_change_disabled",
+            "field_edit_enabled",
+            "globally_protected_only_edit_disabled",
+            "locally_protected_edit_enabled",
+            "flag_off_no_change_enabled",
         ],
     )
     def test_visual_gate_on_existing_ah_note(
@@ -841,14 +838,16 @@ class TestEditor:
     @pytest.mark.parametrize(
         "mutate,expected_enabled,expected_tooltip",
         [
-            pytest.param(_no_mutation, False, EMPTY_FIRST_FIELD_TOOLTIP, id="empty_first_field_disabled"),
-            pytest.param(_set_front, True, None, id="first_field_filled_enabled"),
-            pytest.param(
-                _globally_protect_front_and_set,
-                False,
-                NO_CHANGES_TO_SUGGEST_TOOLTIP,
-                id="globally_protected_first_field_disabled",
-            ),
+            # fmt: off
+            (_no_mutation, False, EMPTY_FIRST_FIELD_TOOLTIP),
+            (_set_front, True, None),
+            (_globally_protect_front_and_set, False, NO_CHANGES_TO_SUGGEST_TOOLTIP),
+            # fmt: on
+        ],
+        ids=[
+            "empty_first_field_disabled",
+            "first_field_filled_enabled",
+            "globally_protected_first_field_disabled",
         ],
     )
     def test_visual_gate_on_new_ah_note(
@@ -981,21 +980,16 @@ class TestEditor:
     @pytest.mark.parametrize(
         "setup,expected_tooltip",
         [
-            pytest.param(
-                _action_setup_unchanged_existing_note,
-                NO_CHANGES_TO_SUGGEST_TOOLTIP,
-                id="no_changes_existing_note",
-            ),
-            pytest.param(
-                _action_setup_deleted_existing_note,
-                NOTE_DELETED_TOOLTIP,
-                id="deleted_existing_note",
-            ),
-            pytest.param(
-                _action_setup_empty_new_note,
-                EMPTY_FIRST_FIELD_TOOLTIP,
-                id="empty_first_field_new_note",
-            ),
+            # fmt: off
+            (_action_setup_unchanged_existing_note, NO_CHANGES_TO_SUGGEST_TOOLTIP),
+            (_action_setup_deleted_existing_note, NOTE_DELETED_TOOLTIP),
+            (_action_setup_empty_new_note, EMPTY_FIRST_FIELD_TOOLTIP),
+            # fmt: on
+        ],
+        ids=[
+            "no_changes_existing_note",
+            "deleted_existing_note",
+            "empty_first_field_new_note",
         ],
     )
     def test_action_gate_blocks(
