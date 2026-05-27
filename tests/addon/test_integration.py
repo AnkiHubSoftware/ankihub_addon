@@ -44,6 +44,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
     deck_options_did_load,
     editor_did_fire_typing_timer,
+    editor_did_update_tags,
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
@@ -883,6 +884,39 @@ class TestEditor:
             # without reloading the note.
             add_cards_dialog.editor.note["Front"] = "edited value"
             editor_did_fire_typing_timer(add_cards_dialog.editor.note)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_button_refreshes_live_on_tag_update(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # No changes yet: disabled.
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
+
+            # Add a tag and fire the tag-update hook; the button should enable live.
+            # Field typing timers don't fire for tag edits, so this hook is what
+            # keeps the button in sync with tag changes.
+            add_cards_dialog.editor.note.tags.append("a-new-tag")
+            editor_did_update_tags(add_cards_dialog.editor.note)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
 

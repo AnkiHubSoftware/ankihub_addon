@@ -50,7 +50,8 @@ def _setup_additional_editor_buttons():
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)
     gui_hooks.editor_did_load_note.append(_refresh_buttons)
     gui_hooks.editor_did_init.append(_track_editor)
-    gui_hooks.editor_did_fire_typing_timer.append(_on_editor_typing_timer)
+    gui_hooks.editor_did_fire_typing_timer.append(_refresh_buttons_for_edited_note)
+    gui_hooks.editor_did_update_tags.append(_refresh_buttons_for_edited_note)
     gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
@@ -439,8 +440,9 @@ def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
 
 editor: Editor
 
-# Live editors tracked so the typing-timer hook (which only receives a Note) can
-# locate the owning editor and refresh its button state as the user types.
+# Live editors tracked so the field-typing and tag-update hooks (which only
+# receive a Note) can locate the owning editor and refresh its button state as
+# the user edits.
 _tracked_editors: List[Editor] = []
 
 
@@ -448,7 +450,12 @@ def _track_editor(editor: Editor) -> None:
     _tracked_editors.append(editor)
 
 
-def _on_editor_typing_timer(note: Note) -> None:
+def _refresh_buttons_for_edited_note(note: Note) -> None:
+    """Refresh the owning editor's buttons after a field or tag edit.
+
+    Hook handler for editor_did_fire_typing_timer and editor_did_update_tags,
+    both of which pass only the edited Note.
+    """
     # Match by object identity, not note.id: unsaved Add-Cards notes all share
     # id 0, so an id comparison would refresh every open Add-Cards editor.
     for tracked in list(_tracked_editors):
