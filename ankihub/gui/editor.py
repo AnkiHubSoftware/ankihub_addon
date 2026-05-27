@@ -1,7 +1,8 @@
 """Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
 
 import functools
-from typing import Any, List, Tuple, cast
+import json
+from typing import Any, List, Optional, Tuple, cast
 
 from anki.models import NotetypeId
 from anki.notes import Note
@@ -16,7 +17,12 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
-from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG, any_suggestible_from_diffs, compute_note_diffs
+from ..main.suggestions import (
+    AUTO_PROTECT_FEATURE_FLAG,
+    _has_empty_first_field,
+    any_suggestible_from_diffs,
+    compute_note_diffs,
+)
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
@@ -31,6 +37,7 @@ from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 NO_CHANGES_TO_SUGGEST_TOOLTIP = "No changes to suggest"
+EMPTY_FIRST_FIELD_TOOLTIP = "The first field can't be empty"
 NOTE_DELETED_TOOLTIP = "This note has been deleted from AnkiHub. No new suggestions can be made."
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
 VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
@@ -142,8 +149,8 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             if cast(AnkiHubNote, ah_note).was_deleted():
                 tooltip(NOTE_DELETED_TOOLTIP)
                 return
-            if _should_block_for_no_changes(note):
-                tooltip(NO_CHANGES_TO_SUGGEST_TOOLTIP)
+            if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
+                tooltip(gate_tooltip)
                 return
 
     # The command is expected to have been set at this point already, either by
@@ -342,16 +349,19 @@ def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
             """
 
 
-def _should_block_for_no_changes(note: Note) -> bool:
-    """True when the 'No changes to suggest' gate should block suggesting `note`.
+def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
+    """The tooltip explaining why the Suggest button is gated for `note`, or
+    None when the note is suggestible (button stays enabled).
 
-    Behind AUTO_PROTECT_FEATURE_FLAG. Reuses the dialog's suggestibility check so
-    the editor button and the dialog's pre-open gate agree on what counts as a
-    suggestible change (field edit outside the globally-protected denylist, or a
-    tag change).
+    Behind AUTO_PROTECT_FEATURE_FLAG (returns None when off). Reuses the
+    dialog's suggestibility check so the editor button and the dialog's
+    pre-open gate agree. An empty first field is reported distinctly from
+    "no changes" — for a new note that's the only reason it can be gated.
     """
     if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
-        return False
+        return None
+    if _has_empty_first_field(note):
+        return EMPTY_FIRST_FIELD_TOOLTIP
     ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
     globally_protected = (
         {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
@@ -359,16 +369,18 @@ def _should_block_for_no_changes(note: Note) -> bool:
         else {}
     )
     diffs = compute_note_diffs([note])
-    return not any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected)
+    if any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected):
+        return None
+    return NO_CHANGES_TO_SUGGEST_TOOLTIP
 
 
 def _apply_suggestion_button_gate(editor: Editor, note: Note) -> None:
     """Enable or disable the suggestion button based on whether `note` has
     anything to suggest. Shared by the change-note and new-note branches; a
     no-op (button stays enabled) when the feature flag is off."""
-    if _should_block_for_no_changes(note):
+    if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
         _disable_buttons(editor, [SUGGESTION_BTN_ID])
-        _set_suggestion_button_tooltip(editor, NO_CHANGES_TO_SUGGEST_TOOLTIP)
+        _set_suggestion_button_tooltip(editor, gate_tooltip)
     else:
         _enable_buttons(editor, [SUGGESTION_BTN_ID])
         _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip())
@@ -434,13 +446,13 @@ def _set_enabled_states_of_buttons(editor: Editor, button_ids: list[str], enable
 
 
 def _set_suggestion_button_label(editor: Editor, label: str) -> None:
-    set_label_script = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
-    editor.web.eval(set_label_script.format(label))
+    # json.dumps so values with quotes/apostrophes can't break the JS string.
+    editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent={json.dumps(label)};")
 
 
 def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
-    set_tooltip_script = f"document.getElementById('{SUGGESTION_BTN_ID}').title='{{}}';"
-    editor.web.eval(set_tooltip_script.format(text))
+    # json.dumps so values with quotes/apostrophes can't break the JS string.
+    editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').title={json.dumps(text)};")
 
 
 def _track_editor(editor: Editor) -> None:

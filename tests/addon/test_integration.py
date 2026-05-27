@@ -154,6 +154,7 @@ from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_f
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import (
+    EMPTY_FIRST_FIELD_TOOLTIP,
     NO_CHANGES_TO_SUGGEST_TOOLTIP,
     NOTE_DELETED_TOOLTIP,
     SUGGESTION_BTN_ID,
@@ -891,6 +892,11 @@ class TestEditor:
             self.assert_suggestion_button_enabled_status(
                 qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_content
             )
+            if not has_content:
+                # Empty first field is reported distinctly from "no changes".
+                self.assert_suggestion_button_tooltip(
+                    qtbot=qtbot, addcards=add_cards_dialog, expected_tooltip=EMPTY_FIRST_FIELD_TOOLTIP
+                )
 
             add_cards_dialog.editor.cleanup()
 
