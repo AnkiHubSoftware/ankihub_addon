@@ -140,18 +140,17 @@ def _on_suggestion_button_press(editor: Editor) -> None:
         return
 
     # Covers the keyboard-shortcut path, which fires even when the button is
-    # visually disabled. New notes (no AH-DB row) are never gated here — they
-    # always carry content to suggest.
+    # visually disabled — including empty new notes, which must not fall through
+    # to add_current_note below.
     note = editor.note
-    if note is not None and note.id != 0:
-        ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
-        if ah_note is not None:
-            if cast(AnkiHubNote, ah_note).was_deleted():
-                tooltip(NOTE_DELETED_TOOLTIP)
-                return
-            if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
-                tooltip(gate_tooltip)
-                return
+    if note is not None and ankihub_db.is_ankihub_note_type(note.mid):
+        ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id) if note.id != 0 else None
+        if ah_note is not None and cast(AnkiHubNote, ah_note).was_deleted():
+            tooltip(NOTE_DELETED_TOOLTIP)
+            return
+        if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
+            tooltip(gate_tooltip)
+            return
 
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
@@ -362,7 +361,10 @@ def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
         return None
     if _has_empty_first_field(note):
         return EMPTY_FIRST_FIELD_TOOLTIP
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    # New notes have no AH-DB row, so fall back to the deck of their note type —
+    # otherwise the globally-protected map is empty and a globally-protected
+    # first field wouldn't gate the button (the dialog resolves it the same way).
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id) or ankihub_db.ankihub_did_for_note_type(NotetypeId(note.mid))
     globally_protected = (
         {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
         if ah_did
@@ -376,8 +378,9 @@ def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
 
 def _apply_suggestion_button_gate(editor: Editor, note: Note) -> None:
     """Enable or disable the suggestion button based on whether `note` has
-    anything to suggest. Shared by the change-note and new-note branches; a
-    no-op (button stays enabled) when the feature flag is off."""
+    anything to suggest. Shared by the change-note and new-note branches;
+    delegates the gating decision (and the feature-flag check) to
+    `_suggestion_gate_tooltip`."""
     if (gate_tooltip := _suggestion_gate_tooltip(note)) is not None:
         _disable_buttons(editor, [SUGGESTION_BTN_ID])
         _set_suggestion_button_tooltip(editor, gate_tooltip)
@@ -456,6 +459,9 @@ def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
 
 
 def _track_editor(editor: Editor) -> None:
+    # Sweep editors whose widget is gone so the list can't accumulate across a
+    # session (the edit hooks also prune, but only for editors that fire them).
+    _tracked_editors[:] = [e for e in _tracked_editors if not sip.isdeleted(e.widget)]
     _tracked_editors.append(editor)
 
 

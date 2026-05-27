@@ -900,6 +900,70 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
+    def test_new_note_button_disabled_when_first_field_globally_protected(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            # A new note's deck is resolved from its note type (it has no AH-DB
+            # row). With the first field globally protected, the server can never
+            # accept the new note, so the button is disabled even with content —
+            # matching the dialog's gate.
+            anki_note = aqt.mw.col.new_note(ah_note_type)
+            anki_note["Front"] = "content"
+            config.set_globally_protected_fields(ah_did, {anki_note.mid: ["Front"]})
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_new_note_action_gate_blocks_empty_first_field(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+            anki_note = aqt.mw.col.new_note(ah_note_type)  # empty first field
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            # The hotkey fires even when the button is disabled; an empty new note
+            # must be gated here, not fall through to add_current_note.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with(EMPTY_FIRST_FIELD_TOOLTIP)
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
     def test_suggestion_button_refreshes_live_on_typing_timer(
         self,
         anki_session_with_addon_data: AnkiSession,
