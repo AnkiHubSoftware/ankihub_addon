@@ -129,7 +129,7 @@ def open_suggestion_dialog_for_single_suggestion(
         note_diffs=diffs,
         ah_did=ah_did,
         preselected_change_type=preselected_change_type,
-        globally_protected_fields_by_mid=_globally_protected_fields_by_mid(ah_did),
+        globally_protected_fields_by_mid=globally_protected_fields_by_mid(ah_did),
         parent=parent,
     )
 
@@ -256,7 +256,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         return
 
     notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
-    globally_protected = _globally_protected_fields_by_mid(ah_did)
+    globally_protected = globally_protected_fields_by_mid(ah_did)
 
     diffs = compute_note_diffs(notes)
 
@@ -345,7 +345,7 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
     return ah_did
 
 
-def _globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
+def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
     """Coerce the cached globally-protected fields into the shape the widget expects."""
     return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
 

@@ -33,7 +33,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
-from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
+from .suggestion_dialog import globally_protected_fields_by_mid, open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 NO_CHANGES_TO_SUGGEST_TOOLTIP = "No changes to suggest"
@@ -378,11 +378,7 @@ def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
     # otherwise the globally-protected map is empty and a globally-protected
     # first field wouldn't gate the button (the dialog resolves it the same way).
     ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id) or ankihub_db.ankihub_did_for_note_type(NotetypeId(note.mid))
-    globally_protected = (
-        {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
-        if ah_did
-        else {}
-    )
+    globally_protected = globally_protected_fields_by_mid(ah_did) if ah_did else {}
     diffs = compute_note_diffs([note])
     if any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected):
         return None
