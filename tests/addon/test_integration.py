@@ -1097,31 +1097,35 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
+    @pytest.mark.parametrize("logged_in", [True, False])
     def test_suggestion_action_gate_no_op_for_non_ankihub_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         add_anki_note: AddAnkiNote,
         qtbot: QtBot,
+        logged_in: bool,
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "is_logged_in", return_value=True)
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
 
             anki_note = add_anki_note()  # non-AnkiHub note type
 
             open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
 
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             add_cards_dialog.editor.set_note(anki_note)
             self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
 
             # The button is visually disabled for non-AnkiHub notes; the hotkey
-            # still fires, but it must be a no-op (used to hit an assert in the
-            # dialog opener).
+            # still fires, but it must be a no-op — even when logged out, since
+            # there's no AnkiHub action to authenticate for.
             _on_suggestion_button_press(add_cards_dialog.editor)
 
             assert not open_dialog_mock.called
+            assert not login_mock.called
 
             add_cards_dialog.editor.cleanup()
 

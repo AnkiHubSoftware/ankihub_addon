@@ -135,15 +135,17 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     the hotkey is pressed.
     """
 
-    if not config.is_logged_in():
-        AnkiHubLogin.display_login()
-        return
-
     # The visual gate disables every button when the note isn't an AnkiHub
     # note type; the keyboard shortcut still fires, but there's nothing to do
-    # (and the dialog opener below would otherwise hit an assert).
+    # (and the dialog opener below would otherwise hit an assert). No-op
+    # before the login check so a logged-out user pressing the hotkey on a
+    # non-AnkiHub note doesn't get a misleading login prompt.
     note = editor.note
     if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
+        return
+
+    if not config.is_logged_in():
+        AnkiHubLogin.display_login()
         return
 
     # Cover the rest of the keyboard-shortcut path: it fires even when the
@@ -361,6 +363,12 @@ def _suggestion_gate_tooltip(note: Note) -> Optional[str]:
     dialog's suggestibility check so the editor button and the dialog's
     pre-open gate agree. An empty first field is reported distinctly from
     "no changes" — for a new note that's the only reason it can be gated.
+
+    Per NRT-508/751: change_type is treated as non-DELETE here, by design.
+    An unchanged existing AnkiHub note therefore gets the "no changes"
+    tooltip rather than enabling the button on the chance the user might
+    DELETE — DELETE-from-editor for unchanged notes is intentionally not
+    supported; the browser's "Suggest to delete" is the path for that.
     """
     if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
         return None
