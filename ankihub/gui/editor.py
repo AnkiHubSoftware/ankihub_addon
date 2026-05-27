@@ -3,7 +3,7 @@
 import functools
 from typing import Any, List, Tuple, cast
 
-from anki.models import NoteType, NotetypeId
+from anki.models import NotetypeId
 from anki.notes import Note
 from aqt import gui_hooks
 from aqt.addcards import AddCards
@@ -51,7 +51,6 @@ def _setup_additional_editor_buttons():
     gui_hooks.editor_did_init.append(_track_editor)
     gui_hooks.editor_did_fire_typing_timer.append(_refresh_buttons_for_edited_note)
     gui_hooks.editor_did_update_tags.append(_refresh_buttons_for_edited_note)
-    gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
 
@@ -225,26 +224,6 @@ def _default_suggestion_button_tooltip() -> str:
     return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
 
 
-def _should_block_for_no_changes(note: Note) -> bool:
-    """True when the 'No changes to suggest' gate should block suggesting `note`.
-
-    Behind AUTO_PROTECT_FEATURE_FLAG. Reuses the dialog's suggestibility check so
-    the editor button and the dialog's pre-open gate agree on what counts as a
-    suggestible change (field edit outside the globally-protected denylist, or a
-    tag change).
-    """
-    if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
-        return False
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
-    globally_protected = (
-        {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
-        if ah_did
-        else {}
-    )
-    diffs = compute_note_diffs([note])
-    return not any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected)
-
-
 def _suggestion_button_hotkey():
     return config.public_config["hotkey"]
 
@@ -359,6 +338,26 @@ def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
             """
 
 
+def _should_block_for_no_changes(note: Note) -> bool:
+    """True when the 'No changes to suggest' gate should block suggesting `note`.
+
+    Behind AUTO_PROTECT_FEATURE_FLAG. Reuses the dialog's suggestibility check so
+    the editor button and the dialog's pre-open gate agree on what counts as a
+    suggestible change (field edit outside the globally-protected denylist, or a
+    tag change).
+    """
+    if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
+        return False
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    globally_protected = (
+        {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
+        if ah_did
+        else {}
+    )
+    diffs = compute_note_diffs([note])
+    return not any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected)
+
+
 def _refresh_buttons(editor: Editor) -> None:
     """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
     Also changes the label of the suggestion button based on whether the note is already on AnkiHub.
@@ -437,9 +436,8 @@ def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
     editor.web.eval(set_tooltip_script.format(text))
 
 
-# Live editors tracked so hooks that don't hand us the Editor — the field-typing
-# and tag-update hooks (Note only) and the note-type-change hook (note types
-# only) — can still find the editor(s) to refresh.
+# Live editors tracked so the field-typing and tag-update hooks (which pass only
+# a Note, not the Editor) can find the owning editor to refresh.
 _tracked_editors: List[Editor] = []
 
 
@@ -447,31 +445,22 @@ def _track_editor(editor: Editor) -> None:
     _tracked_editors.append(editor)
 
 
-def _live_tracked_editors() -> List[Editor]:
-    """Tracked editors whose widget is still alive, pruning the rest in place."""
-    live = [e for e in _tracked_editors if not sip.isdeleted(e.widget)]
-    _tracked_editors[:] = live
-    return live
-
-
 def _refresh_buttons_for_edited_note(note: Note) -> None:
     """Refresh the owning editor's buttons after a field or tag edit.
 
     Hook handler for editor_did_fire_typing_timer and editor_did_update_tags,
-    both of which pass only the edited Note.
+    both of which pass only the edited Note. Note-type changes don't need a
+    handler here: they go through editor.loadNote, which fires
+    editor_did_load_note -> _refresh_buttons on the affected editor.
     """
     # Match by object identity, not note.id: unsaved Add-Cards notes all share
     # id 0, so an id comparison would refresh every open Add-Cards editor.
-    for tracked in _live_tracked_editors():
+    for tracked in list(_tracked_editors):
+        if sip.isdeleted(tracked.widget):
+            _tracked_editors.remove(tracked)
+            continue
         if tracked.note is note:
             _refresh_buttons(tracked)
-
-
-def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
-    # The hook gives us the note types, not the editor, so refresh every live
-    # editor. _refresh_buttons is idempotent UI-only work.
-    for tracked in _live_tracked_editors():
-        _refresh_buttons(tracked)
 
 
 def _setup_editor_did_load_js_message(editor: Editor) -> None:

@@ -39,7 +39,6 @@ from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.deckoptions import DeckOptionsDialog
 from aqt.gui_hooks import (
-    add_cards_did_change_note_type,
     browser_did_search,
     browser_will_show,
     browser_will_show_context_menu,
@@ -918,39 +917,6 @@ class TestEditor:
             # keeps the button in sync with tag changes.
             add_cards_dialog.editor.note.tags.append("a-new-tag")
             editor_did_update_tags(add_cards_dialog.editor.note)
-
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
-
-            add_cards_dialog.editor.cleanup()
-
-    def test_notetype_change_refreshes_button_via_registry(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-        install_ah_deck: InstallAHDeck,
-        import_ah_note: ImportAHNote,
-        qtbot: QtBot,
-    ):
-        editor.setup()
-        with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-            ah_note = import_ah_note(ah_did=ah_did)
-            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
-            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-            add_cards_dialog.editor.set_note(anki_note)
-            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
-
-            # No changes yet: disabled.
-            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False)
-
-            # The note-type-change hook passes no editor; the button must still
-            # refresh via the live-editor registry (replacing the old global).
-            add_cards_dialog.editor.note["Front"] = "edited value"
-            note_type = add_cards_dialog.editor.note.note_type()
-            add_cards_did_change_note_type(note_type, note_type)
 
             self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
 
