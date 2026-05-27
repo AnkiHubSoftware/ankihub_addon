@@ -857,6 +857,43 @@ class TestEditor:
 
             add_cards_dialog.editor.cleanup()
 
+    @pytest.mark.parametrize("has_content", [True, False])
+    def test_new_note_suggestion_button_gated_on_content(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+        has_content: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            # A brand-new note (AnkiHub note type, not yet on AnkiHub) with an
+            # empty first field has nothing to suggest, so the button is gated
+            # too — not just existing-note edits.
+            anki_note = aqt.mw.col.new_note(ah_note_type)
+            if has_content:
+                anki_note["Front"] = "content"
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_text=AnkiHubCommands.NEW.value
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=has_content
+            )
+
+            add_cards_dialog.editor.cleanup()
+
     def test_suggestion_button_refreshes_live_on_typing_timer(
         self,
         anki_session_with_addon_data: AnkiSession,

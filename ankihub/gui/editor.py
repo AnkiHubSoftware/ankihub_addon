@@ -362,6 +362,18 @@ def _should_block_for_no_changes(note: Note) -> bool:
     return not any_suggestible_from_diffs([note], diffs, change_type=None, globally_protected_by_mid=globally_protected)
 
 
+def _apply_suggestion_button_gate(editor: Editor, note: Note) -> None:
+    """Enable or disable the suggestion button based on whether `note` has
+    anything to suggest. Shared by the change-note and new-note branches; a
+    no-op (button stays enabled) when the feature flag is off."""
+    if _should_block_for_no_changes(note):
+        _disable_buttons(editor, [SUGGESTION_BTN_ID])
+        _set_suggestion_button_tooltip(editor, NO_CHANGES_TO_SUGGEST_TOOLTIP)
+    else:
+        _enable_buttons(editor, [SUGGESTION_BTN_ID])
+        _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip())
+
+
 def _refresh_buttons(editor: Editor) -> None:
     """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
     Also changes the label of the suggestion button based on whether the note is already on AnkiHub.
@@ -393,21 +405,12 @@ def _refresh_buttons(editor: Editor) -> None:
             _set_suggestion_button_tooltip(editor, NOTE_DELETED_TOOLTIP)
         else:
             _enable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-            if _should_block_for_no_changes(note):
-                _disable_buttons(editor, [SUGGESTION_BTN_ID])
-                _set_suggestion_button_tooltip(editor, NO_CHANGES_TO_SUGGEST_TOOLTIP)
-            else:
-                _enable_buttons(editor, [SUGGESTION_BTN_ID])
-                _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip())
+            _apply_suggestion_button_gate(editor, note)
     else:
         command = AnkiHubCommands.NEW.value
 
-        _enable_buttons(editor, [SUGGESTION_BTN_ID])
         _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-        _set_suggestion_button_tooltip(
-            editor,
-            _default_suggestion_button_tooltip(),
-        )
+        _apply_suggestion_button_gate(editor, note)
 
     _set_suggestion_button_label(editor, command)
     editor.ankihub_command = command  # type: ignore
