@@ -22,6 +22,7 @@ from ..main.suggestions import (
     _has_empty_first_field,
     any_suggestible_from_diffs,
     compute_note_diffs,
+    globally_protected_fields_by_mid,
 )
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
@@ -33,7 +34,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
-from .suggestion_dialog import globally_protected_fields_by_mid, open_suggestion_dialog_for_single_suggestion
+from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 NO_CHANGES_TO_SUGGEST_TOOLTIP = "No changes to suggest"

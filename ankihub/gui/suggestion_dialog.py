@@ -55,6 +55,7 @@ from ..main.suggestions import (
     any_suggestible_from_diffs,
     compute_note_diffs,
     get_anki_nid_to_ah_dids_dict,
+    globally_protected_fields_by_mid,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -343,11 +344,6 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
 
     ah_did = list(ah_dids)[0]
     return ah_did
-
-
-def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
-    """Coerce the cached globally-protected fields into the shape the widget expects."""
-    return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
 
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
