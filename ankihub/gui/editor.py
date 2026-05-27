@@ -152,7 +152,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     # Cover the rest of the keyboard-shortcut path: it fires even when the
     # button is visually disabled, including for empty new notes that must
     # not fall through to add_current_note below.
-    ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id) if note.id != 0 else None
+    ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
     if ah_note is not None and cast(AnkiHubNote, ah_note).was_deleted():
         tooltip(NOTE_DELETED_TOOLTIP)
         return
