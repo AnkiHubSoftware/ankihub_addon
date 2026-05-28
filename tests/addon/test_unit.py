@@ -3804,21 +3804,25 @@ class TestSetSubdeckDueDate:
         )
 
 
+@pytest.fixture
+def _reset_reminder_dialog_state():
+    # Real-dialog tests connect dialog.finished → QTimer.singleShot(0,
+    # _show_next_due_date_reminder_dialog). A late timer firing inside a
+    # @patch window otherwise records a call on the mocked dialog class with
+    # the real aqt.mw as parent. Clear state and drain pending callbacks
+    # before/after each test so stray timers hit the empty-queue early-return
+    # instead of acting on residue from another test.
+    _reminder_dialog_state.queue = []
+    _reminder_dialog_state.dialog = None
+    QApplication.processEvents()
+    yield
+    _reminder_dialog_state.queue = []
+    _reminder_dialog_state.dialog = None
+
+
+@pytest.mark.usefixtures("_reset_reminder_dialog_state")
 class TestShowNextDueDateReminderDialog:
     """Tests for _show_next_due_date_reminder_dialog function."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_reminder_dialog_state(self):
-        # Real-dialog tests connect dialog.finished → QTimer.singleShot(0,
-        # _show_next_due_date_reminder_dialog). A late timer firing inside this
-        # test's @patch window otherwise records a call on the mocked dialog
-        # class with the real aqt.mw as parent. Clear state and drain pending
-        # callbacks before the patches activate so any stray timer hits the
-        # empty-queue early-return.
-        _reminder_dialog_state.queue = []
-        _reminder_dialog_state.dialog = None
-        QApplication.processEvents()
-        yield
 
     @patch("ankihub.gui.subdeck_due_date_dialog.get_subdeck_log_context")
     @patch("ankihub.gui.subdeck_due_date_dialog.SubdeckDueDateReminderDialog")
@@ -3858,6 +3862,7 @@ class TestShowNextDueDateReminderDialog:
         assert _reminder_dialog_state.dialog is None
 
 
+@pytest.mark.usefixtures("_reset_reminder_dialog_state")
 class TestShowSubdeckDueDateReminders:
     """Tests for maybe_show_subdeck_due_date_reminders function."""
 
