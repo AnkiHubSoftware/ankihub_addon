@@ -4,14 +4,14 @@ import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
 from html import escape
 from pprint import pformat
-from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set, Union
+from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set
 
 import aqt
 from anki.models import NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import is_mac
 from aqt.qt import (
     QCheckBox,
     QComboBox,
@@ -22,13 +22,16 @@ from aqt.qt import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPalette,
     QPlainTextEdit,
+    QRect,
     QScrollArea,
     QSize,
     QSizePolicy,
     QSpacerItem,
     QStyle,
     QStyleOptionButton,
+    QStylePainter,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -946,58 +949,13 @@ class SourceWidget(QWidget):
             return None
 
 
-@lru_cache(maxsize=1)
-def _native_checkbox_text_offset() -> int:
-    """The x where a native QCheckBox draws its label text (indicator width +
-    style label-spacing + margins). Used to align a label-only checkbox row's
-    text with native QCheckBoxes elsewhere in the panel.
-
-    Cached: the value is constant per style/session, and a bulk suggestion can
-    build hundreds of tag rows.
+class _TagLabel:
+    """Tag-name rendering helpers shared by `_WrappingCheckBox`: elide long tags
+    to `…::leaf` (or `<head>…` for flat names) and inject zero-width spaces after
+    `::` and `_` so the text has break points inside identifier-style names.
     """
-    probe = QCheckBox("x")
-    probe.resize(probe.sizeHint())
-    opt = QStyleOptionButton()
-    opt.initFrom(probe)
-    opt.text = "x"
-    opt.rect = probe.rect()
-    return probe.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, probe).x()
-
-
-class _TagLabel(QLabel):
-    """A QLabel for tag-name display.
-
-    Centralizes tag rendering: elides long tags to `…::leaf` (or `<head>…` for
-    flat names), injects zero-width spaces after `::` and `_` so `wordWrap`
-    has break points inside identifier-style names, and sets a (rich-text)
-    tooltip with the full tag — only when actually elided. Emits `clicked`
-    on mouse press so a paired checkbox can toggle.
-    """
-
-    clicked = pyqtSignal()
 
     _MAX_LEN = 85
-
-    def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        display = self._elide(tag)
-        self.setText(self._inject_breakpoints(display))
-        self.setWordWrap(True)
-        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        # Wrapping a label inside a layout takes both: a horizontal policy that
-        # lets the layout pick the width (else sizeHint is the unwrapped single
-        # line) and `setHeightForWidth(True)` on the policy so the layout asks
-        # the label "how tall do you want to be at this width?" Without the
-        # latter, wordWrap=True wraps the *paint* but vertical sizing stays at
-        # a single line.
-        sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        sp.setHeightForWidth(True)
-        self.setSizePolicy(sp)
-        self.setMinimumWidth(1)
-        # Signal clickability on hover, matching the native checkbox labels.
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        if display != tag:
-            self.setToolTip(f"<p>{self._inject_breakpoints(escape(tag))}</p>")
 
     @classmethod
     def _elide(cls, tag: str) -> str:
@@ -1018,76 +976,10 @@ class _TagLabel(QLabel):
 
     @staticmethod
     def _inject_breakpoints(text: str) -> str:
-        """Insert zero-width spaces after `::` and `_` so QLabel.wordWrap has
-        valid break points inside identifier-style names (`a::b::c_d`).
+        """Insert zero-width spaces after `::` and `_` so word-wrap has valid
+        break points inside identifier-style names (`a::b::c_d`).
         """
         return text.replace("::", "::​").replace("_", "_​")
-
-    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt override
-        super().mousePressEvent(event)
-        self.clicked.emit()
-
-
-class _TagCheckBox(QWidget):
-    """A QCheckBox-like row pairing a checkbox indicator with a `_TagLabel`
-    whose tag name wraps to multiple lines.
-
-    QCheckBox draws its label inline as a single line; long tag names overflow
-    the section width and force a horizontal scrollbar. This widget keeps the
-    same `.isChecked() / .setChecked() / .toggled` API the rest of the code
-    expects but pairs the indicator with a wrappable `_TagLabel`.
-    """
-
-    toggled = pyqtSignal(bool)
-
-    def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(row)
-
-        self._checkbox = QCheckBox()
-        # Pad the (text-less) checkbox out to the exact x where a native QCheckBox
-        # draws its text, then drop the row spacing to zero — so the tag label
-        # lines up with the section title and field items (which are native
-        # QCheckBoxes) instead of sitting a few px further right.
-        self._content_offset = _native_checkbox_text_offset()
-        self._checkbox.setFixedWidth(self._content_offset)
-        row.setSpacing(0)
-        row.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
-
-        self._label = _TagLabel(tag)
-        qconnect(self._label.clicked, self._checkbox.toggle)
-        row.addWidget(self._label, 1)
-
-        qconnect(self._checkbox.toggled, self.toggled.emit)
-
-    # Propagate heightForWidth from the inner label up to this widget so the
-    # parent QVBoxLayout grows the row vertically when the label wraps.
-    def hasHeightForWidth(self) -> bool:  # noqa: N802
-        return True
-
-    def heightForWidth(self, width: int) -> int:  # noqa: N802
-        # The label starts at exactly `_content_offset` because the checkbox is
-        # `setFixedWidth(_content_offset)` with zero row spacing — keep those in
-        # sync if either changes.
-        label_width = max(1, width - self._content_offset)
-        label_height = self._label.heightForWidth(label_width)
-        # Don't drop below the bare checkbox height (single-line fallback).
-        return max(label_height, self._checkbox.sizeHint().height())
-
-    def sizeHint(self) -> QSize:  # noqa: N802
-        hint_w = self._checkbox.sizeHint().width()  # ignore label's natural width
-        hint_h = self._checkbox.sizeHint().height()
-        return QSize(hint_w, hint_h)
-
-    # QCheckBox-compatible surface used by `_GroupController` and the
-    # `IncludeInSuggestionWidget` accessors.
-    def isChecked(self) -> bool:  # noqa: N802 - Qt-style name
-        return self._checkbox.isChecked()
-
-    def setChecked(self, value: bool) -> None:  # noqa: N802
-        self._checkbox.setChecked(value)
 
 
 class _RowCheckBox(QCheckBox):
@@ -1096,11 +988,107 @@ class _RowCheckBox(QCheckBox):
     Qt's default `hitButton` only accepts clicks over the indicator + label,
     so a full-width checkbox shows the hover cursor across the whole row but
     only toggles on the text. Accepting the full rect makes the click area
-    match the cursor area (consistent with the wrapping tag rows).
+    match the cursor area.
     """
 
     def hitButton(self, pos) -> bool:  # noqa: N802 - Qt override
         return self.rect().contains(pos)
+
+
+class _WrappingCheckBox(_RowCheckBox):
+    """A full-row-clickable checkbox whose label wraps to multiple lines.
+
+    A plain QCheckBox draws its label on one line, so a long tag overflows the
+    panel. This paints the native indicator on the first text line and the
+    word-wrapped label beside it — giving the indicator/first-line alignment the
+    native style would for a single-line checkbox, on every platform, with no
+    separate label widget to misalign. The checkbox carries no native text; the
+    label is painted manually so wrapping (and `heightForWidth`) is under our
+    control.
+    """
+
+    # Native row height of a checkbox *with* text (an empty checkbox reserves
+    # no row padding). Probed once per class so bulk-suggestion dialogs don't
+    # build a throwaway QCheckBox per tag.
+    _native_row_height: Optional[int] = None
+
+    def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
+        super().__init__("", parent)
+        self._display = _TagLabel._elide(tag)
+        self._wrap_text = _TagLabel._inject_breakpoints(self._display)
+        if _WrappingCheckBox._native_row_height is None:
+            _WrappingCheckBox._native_row_height = QCheckBox("X").sizeHint().height()
+        # Style-and-font-determined and rect-independent in practice, so cache it
+        # rather than asking the style on every `heightForWidth` call (which the
+        # layout invokes many times during resize, per tag).
+        self._cached_content_x = self._compute_contents_x()
+        # Helps screen readers name the otherwise text-less checkbox.
+        self.setAccessibleName(tag)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Ignored width lets the layout pick the column width (so the text wraps
+        # instead of forcing the panel wide); heightForWidth supplies the wrapped
+        # height. Without setHeightForWidth the row would stay one line tall.
+        sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+        self.setMinimumWidth(1)
+        if self._display != tag:
+            self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(tag))}</p>")
+
+    def _compute_contents_x(self) -> int:
+        """x where the label text starts (indicator + style label spacing)."""
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        opt.rect = QRect(0, 0, 1000, max(self.fontMetrics().height(), 1))
+        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).x()
+
+    def _vertical_padding(self) -> int:
+        """Vertical space a native single-line checkbox reserves around its text
+        line. We add it so a wrapped row occupies the same box as a native
+        checkbox — keeping inter-row spacing consistent with the field rows.
+        """
+        assert self._native_row_height is not None  # set in __init__
+        return max(0, self._native_row_height - self.fontMetrics().height())
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802
+        fm = self.fontMetrics()
+        text_width = max(1, width - self._cached_content_x)
+        rect = fm.boundingRect(QRect(0, 0, text_width, 1_000_000), int(Qt.TextFlag.TextWordWrap), self._wrap_text)
+        return rect.height() + self._vertical_padding()
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        assert self._native_row_height is not None
+        return QSize(super().sizeHint().width(), self._native_row_height)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        assert self._native_row_height is not None
+        return QSize(1, self._native_row_height)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        painter = QStylePainter(self)
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        style = self.style()
+        top_pad = self._vertical_padding() // 2
+        line_height = self.fontMetrics().height()
+        # Draw the indicator centred on the first text line: hand the style a
+        # one-line-tall rect (offset by the top padding) so a multi-line row
+        # doesn't centre it in the middle.
+        line_opt = QStyleOptionButton(opt)
+        line_opt.rect = QRect(opt.rect.x(), opt.rect.y() + top_pad, opt.rect.width(), line_height)
+        ind_opt = QStyleOptionButton(opt)
+        ind_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, line_opt, self)
+        painter.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorCheckBox, ind_opt)
+        # Word-wrapped label, top-aligned in the contents rect (below the top pad).
+        contents = style.subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).adjusted(0, top_pad, 0, 0)
+        # Match the indicator's enabled state so the text greys with it.
+        color_group = QPalette.ColorGroup.Normal if self.isEnabled() else QPalette.ColorGroup.Disabled
+        painter.setPen(self.palette().color(color_group, QPalette.ColorRole.WindowText))
+        flags = int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop) | int(Qt.TextFlag.TextWordWrap)
+        painter.drawText(contents, flags, self._wrap_text)
 
 
 class _SelectAllCheckBox(_RowCheckBox):
@@ -1151,7 +1139,7 @@ class _SelectAllCheckBox(_RowCheckBox):
         self.setToolTip(self._full_text if text != self._full_text else "")
 
 
-_Toggleable = Union[QCheckBox, _TagCheckBox]
+_Toggleable = QCheckBox
 
 
 class _GroupController:
@@ -1327,8 +1315,8 @@ class IncludeInSuggestionWidget(QWidget):
         disabled (skipped by Select-all) — used to lock the first field for
         new-note suggestions.
         `item_widget` is a factory that builds the per-item checkbox from the
-        item name. Defaults to plain `QCheckBox`; `_add_tag_section` passes
-        `_TagCheckBox` so tag names wrap and self-tooltip when elided.
+        item name. Defaults to `_RowCheckBox`; `_add_tag_section` passes
+        `_WrappingCheckBox` so long tag names wrap and self-tooltip when elided.
         Returns `item -> checkbox` so the caller can wire up persistence.
         """
         if self._body_layout.count() > 0:
@@ -1336,6 +1324,8 @@ class IncludeInSuggestionWidget(QWidget):
             separator.setFixedHeight(1)
             separator.setStyleSheet(f"background-color: {_panel_line_color()}; border: none;")
             self._body_layout.addWidget(separator)
+            # Extra breathing room between the divider and the next section title.
+            self._body_layout.addSpacing(4)
 
         # Title sits on the select-all checkbox itself, so clicking the title
         # toggles the section and keeps the label aligned at the same x as the
@@ -1343,8 +1333,22 @@ class IncludeInSuggestionWidget(QWidget):
         # dynamically to fit the checkbox's actual width (tooltip shows the
         # full string when elided).
         select_all = _SelectAllCheckBox(title)
-        select_all.setStyleSheet("QCheckBox { color: palette(placeholder-text); font-weight: bold; }")
-        self._body_layout.addWidget(select_all)
+        # Bold + muted, set via font/palette rather than a stylesheet: a QSS rule
+        # switches the checkbox to box-model rendering and shifts its indicator,
+        # mis-aligning it with the native item checkboxes below.
+        title_font = select_all.font()
+        title_font.setBold(True)
+        select_all.setFont(title_font)
+        title_palette = select_all.palette()
+        title_palette.setColor(QPalette.ColorRole.WindowText, title_palette.color(QPalette.ColorRole.PlaceholderText))
+        select_all.setPalette(title_palette)
+        # Nest the title in its own layout so it gets the same horizontal offset
+        # the (nested) items layout adds — otherwise the section checkbox sits a
+        # couple px left of the item checkboxes on macOS.
+        header_layout = QVBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addWidget(select_all)
+        self._body_layout.addLayout(header_layout)
 
         controller = _GroupController(select_all, self._on_toggle)
         # Anchor the controller to a Qt-owned widget — without this Qt drops
@@ -1354,7 +1358,10 @@ class IncludeInSuggestionWidget(QWidget):
         # No indent — all checkboxes (section select-alls + items) align at the same x.
         items_layout = QVBoxLayout()
         items_layout.setContentsMargins(0, 0, 0, 0)
-        items_layout.setSpacing(2)
+        # Items sit tighter than the section-title gap so each section reads as a
+        # group. The right pixel value differs per platform because native
+        # checkbox rows are taller on macOS.
+        items_layout.setSpacing(10 if is_mac else 2)
         self._body_layout.addLayout(items_layout)
 
         result: Dict[str, QCheckBox] = {}
@@ -1368,7 +1375,7 @@ class IncludeInSuggestionWidget(QWidget):
                 cb.setChecked(initial_checked.get(item, True))
             controller.add_child(cb)
             # Full width for every row: `_RowCheckBox` accepts clicks across its
-            # whole width and `_TagCheckBox`'s label wraps + is fully clickable, so
+            # whole width and `_WrappingCheckBox` wraps + is fully clickable, so
             # the click area matches the hover cursor consistently.
             items_layout.addWidget(cb)
             result[item] = cb  # type: ignore[assignment]
@@ -1424,7 +1431,7 @@ class IncludeInSuggestionWidget(QWidget):
             title=title,
             items=tags,
             initial_checked={t: True for t in tags},
-            item_widget=_TagCheckBox,
+            item_widget=_WrappingCheckBox,
         )
 
     def _on_toggle(self) -> None:
