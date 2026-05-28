@@ -757,7 +757,8 @@ def prompt_for_tutorial(
                 **dialog_kwargs,
                 "on_main_button_click": f"pycmd('{START_TUTORIAL_PYCMD}')",
                 "on_secondary_button_click": f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
-                "on_close": f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
+                "on_close": f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
+                "on_text_button_click": f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
             }
             body = render_dialog(**kwargs)
             js = f"AnkiHub.showModal({json.dumps(body)})"
@@ -834,8 +835,9 @@ def prompt_for_onboarding_tutorial() -> None:
             title="📚 First time with Anki?",
             body="Find your way in the app with this <b>onboarding tour</b>.<br>"
             "You can revisit it anytime in AnkiHub's Help menu.",
-            secondary_button_label="Maybe later",
+            secondary_button_label="Not now",
             main_button_label="Take tour",
+            text_button_label="Don't show again",
         ),
         on_start=lambda: OnboardingTutorial().start(),
         on_dismiss=lambda: config.set_onboarding_tutorial_pending(False),
@@ -865,8 +867,9 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
             body="When installed, the AnKing Step Deck comes with all cards hidden (suspended). "
             "Take this tour to learn how to <b>select cards to study</b> and <b>set your daily limits</b>.<br><br>"
             "You can revisit this anytime in AnkiHub's Help menu.",
-            secondary_button_label="Skip for now",
+            secondary_button_label="Not now",
             main_button_label="Take tour",
+            text_button_label="Don't show again",
         ),
         on_start=lambda: StepDeckTutorial().start(),
         on_dismiss=lambda: config.set_step_deck_tutorial_pending(False),
