@@ -256,6 +256,18 @@ skip_test_fsrs_unsupported = pytest.mark.skipif(
 )
 
 
+def wait_for_js_truthy(qtbot: QtBot, web: AnkiWebView, js_expr: str) -> None:
+    """Poll the webview until `js_expr` evaluates truthy. Replaces fixed-wait + one-shot
+    DOM checks, which are unreliable when content is injected asynchronously (CI load)."""
+
+    def predicate() -> bool:
+        with qtbot.wait_callback() as callback:
+            web.evalWithCallback(js_expr, callback)
+        return bool(callback.args[0])
+
+    qtbot.wait_until(predicate)
+
+
 class InstallSampleAHDeck(Protocol):
     def __call__(self) -> Tuple[DeckId, uuid.UUID]: ...
 
@@ -7480,18 +7492,11 @@ class TestFlashCardSelector:
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
             overview_web: AnkiWebView = aqt.mw.overview.web
-
-            def button_exists() -> bool:
-                with qtbot.wait_callback() as callback:
-                    overview_web.evalWithCallback(
-                        f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
-                        callback,
-                    )
-                return bool(callback.args[0])
-
-            # The button is injected asynchronously after the overview re-renders for the
-            # subdeck; poll instead of asserting once after a fixed wait (flaky under CI load).
-            qtbot.wait_until(button_exists)
+            wait_for_js_truthy(
+                qtbot,
+                overview_web,
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+            )
 
     @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
