@@ -1215,12 +1215,21 @@ class _GroupController:
         # refresh_parent. After a user click, Qt advances the tri-state cycle
         # — interpret anything other than "now Checked" as "set all off".
         target = self._parent.checkState() == Qt.CheckState.Checked
-        self._suppress = True
-        for c in self._children:
-            if c.isEnabled():
-                c.setChecked(target)
-        self._suppress = False
-        self.refresh_parent()
+        # Batch the per-child repaints into a single update — without this,
+        # ticking a section with many children produces a visible cascade.
+        body = self._parent.parentWidget()
+        if body is not None:
+            body.setUpdatesEnabled(False)
+        try:
+            self._suppress = True
+            for c in self._children:
+                if c.isEnabled() and c.isChecked() != target:
+                    c.setChecked(target)
+            self._suppress = False
+            self.refresh_parent()
+        finally:
+            if body is not None:
+                body.setUpdatesEnabled(True)
         self._on_child_toggle()
 
     def _on_child_toggled(self, _checked: bool) -> None:
