@@ -989,10 +989,33 @@ class _RowCheckBox(QCheckBox):
     so a full-width checkbox shows the hover cursor across the whole row but
     only toggles on the text. Accepting the full rect makes the click area
     match the cursor area.
+
+    `paintEvent` is overridden to suppress the style's focus styling on the
+    label (which the user sees as "weird" after clicking) while keeping the
+    checkbox focus-navigable.
     """
 
     def hitButton(self, pos) -> bool:  # noqa: N802 - Qt override
         return self.rect().contains(pos)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        # Draw the indicator with the native state (so focus is visible on it)
+        # and the label with HasFocus stripped (so its text doesn't pick up the
+        # native focus styling, which reads as "weird" in this dialog).
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        painter = QStylePainter(self)
+        style = self.style()
+        ind_opt = QStyleOptionButton(opt)
+        ind_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, opt, self)
+        painter.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorCheckBox, ind_opt)
+        label_opt = QStyleOptionButton(opt)
+        label_opt.state &= ~QStyle.StateFlag.State_HasFocus
+        # Set the label rect explicitly to the contents area — without it,
+        # some styles (Fusion) draw the label from x=0 and it overlaps the
+        # indicator.
+        label_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self)
+        painter.drawControl(QStyle.ControlElement.CE_CheckBoxLabel, label_opt)
 
 
 class _WrappingCheckBox(_RowCheckBox):
