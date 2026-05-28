@@ -7479,15 +7479,19 @@ class TestFlashCardSelector:
 
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
-            qtbot.wait(500)
-
             overview_web: AnkiWebView = aqt.mw.overview.web
-            with qtbot.wait_callback() as callback:
-                overview_web.evalWithCallback(
-                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
-                    callback,
-                )
-            callback.assert_called_with(True)
+
+            def button_exists() -> bool:
+                with qtbot.wait_callback() as callback:
+                    overview_web.evalWithCallback(
+                        f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+                        callback,
+                    )
+                return bool(callback.args[0])
+
+            # The button is injected asynchronously after the overview re-renders for the
+            # subdeck; poll instead of asserting once after a fixed wait (flaky under CI load).
+            qtbot.wait_until(button_exists)
 
     @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
