@@ -4,6 +4,7 @@ import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 from html import escape
 from pprint import pformat
 from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set, Union
@@ -34,6 +35,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
+from aqt.theme import theme_manager
 from aqt.utils import show_info, showInfo, showText
 
 from .. import LOGGER
@@ -68,6 +70,19 @@ from .utils import (
     show_error_dialog,
     show_tooltip,
 )
+
+
+def _panel_background_color() -> str:
+    """Background fill for the dialog's grouped panels (Include-in-suggestion + Source)."""
+    return "#262626" if theme_manager.night_mode else "#ededed"
+
+
+def _panel_line_color() -> str:
+    """Subtle line color (section dividers, input borders) for the grouped panels.
+    Light uses the Figma value; dark uses a grey that reads against the dark fill
+    instead of the stark light line.
+    """
+    return "#4d4d4d" if theme_manager.night_mode else "#d1d5db"
 
 
 class SourceType(Enum):
@@ -504,6 +519,10 @@ class SuggestionDialog(QDialog):
         # right column's content (e.g. "Submit without review"), not at the
         # bottom of the dialog.
         outer_layout = QVBoxLayout()
+        # Uniform 16px gutter: dialog margins, the gap between the two columns,
+        # and the gap between the content and the button row all match.
+        outer_layout.setContentsMargins(16, 16, 16, 16)
+        outer_layout.setSpacing(16)
         self.setLayout(outer_layout)
 
         content_row = QHBoxLayout()
@@ -548,6 +567,14 @@ class SuggestionDialog(QDialog):
 
         self.source_widget = SourceWidget()
         self.source_widget_group_box = QGroupBox("Source (Required)")
+        self.source_widget_group_box.setObjectName("sourceGroupBox")
+        # Same neutral panel background as the Include-in-suggestion section.
+        self.source_widget_group_box.setStyleSheet(
+            f"#sourceGroupBox {{ background-color: {_panel_background_color()}; "
+            f"border: none; border-radius: 6px; margin-top: 8px; }} "
+            f"#sourceGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; "
+            f"left: 6px; padding: 0 3px; }}"
+        )
         right_layout.addWidget(self.source_widget_group_box)
         self.source_widget_group_box_layout = QVBoxLayout()
         self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
@@ -556,9 +583,8 @@ class SuggestionDialog(QDialog):
         qconnect(self.source_widget.validation_signal, self._validate)
         right_layout.addSpacing(10)
 
-        self._refresh_source_widget()
-
-        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes<br>to fields will not be applied.")
+        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes to fields will not be applied.")
+        self.hint_for_note_deletions.setWordWrap(True)
         self.hint_for_note_deletions.hide()
         right_layout.addWidget(self.hint_for_note_deletions)
         right_layout.addSpacing(10)
@@ -575,6 +601,10 @@ class SuggestionDialog(QDialog):
 
         qconnect(self.rationale_edit.textChanged, limit_length)
         qconnect(self.rationale_edit.textChanged, self._validate)
+
+        # Configure the source widget now that rationale_edit exists — populating
+        # the source-type dropdown re-validates, which reads rationale_edit.
+        self._refresh_source_widget()
 
         right_layout.addSpacing(10)
 
@@ -809,6 +839,31 @@ class SourceWidget(QWidget):
         qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
+        # "Other" needs free-text describing the source — a taller, top-aligned,
+        # line-wrapping box rather than the single-line input the other types use.
+        self.source_multiline_edit = QPlainTextEdit()
+        self.source_multiline_edit.setFixedHeight(60)
+        self.source_multiline_edit.hide()
+        qconnect(self.source_multiline_edit.textChanged, self._validate)
+        self.layout_.addWidget(self.source_multiline_edit)
+
+        # The inputs sit on the panel's neutral fill, which in dark mode is close
+        # to the native input background — a border keeps them legible. Re-assert
+        # background-color so the border stylesheet doesn't drop the themed fill.
+        border = _panel_line_color()
+        self.source_edit.setStyleSheet(
+            f"QLineEdit {{ border: 1px solid {border}; border-radius: 4px; "
+            f"padding: 2px 4px; background-color: palette(base); }}"
+        )
+        self.source_multiline_edit.setStyleSheet(
+            f"QPlainTextEdit {{ border: 1px solid {border}; border-radius: 4px; background-color: palette(base); }}"
+        )
+
+    def _source_text(self) -> str:
+        if self._source_type() == SourceType.OTHER:
+            return self.source_multiline_edit.toPlainText()
+        return self.source_edit.text()
+
     def setup_for_change_type(self, change_type: SuggestionType) -> None:
         """Sets up the source widget for the given change type. This method should be called initially
         after the source widget was created and whenever the change type changes."""
@@ -829,7 +884,7 @@ class SourceWidget(QWidget):
 
     def suggestion_source(self) -> SuggestionSource:
         source_type = self._source_type()
-        source = self.source_edit.text()
+        source = self._source_text()
 
         if source_type == SourceType.UWORLD:
             step = self.uworld_step_select.currentText()
@@ -847,8 +902,7 @@ class SourceWidget(QWidget):
         if self._source_type() in source_types_where_input_is_optional:
             return True
 
-        text = self.source_edit.text().strip()
-        return len(text) > 0
+        return len(self._source_text().strip()) > 0
 
     def _validate(self) -> None:
         self.validation_signal.emit(self.is_valid())
@@ -867,6 +921,9 @@ class SourceWidget(QWidget):
             self.uworld_step_select.hide()
             self.space_after_uworld_step_select.changeSize(0, 0)
             self.layout_.invalidate()
+        # Re-validate: switching to/from "Other" changes which input is read, so
+        # the OK-button gate must refresh even though no text changed.
+        self._validate()
 
     def _refresh_source_input_label(self) -> None:
         source_type = self._source_type()
@@ -874,14 +931,37 @@ class SourceWidget(QWidget):
         # so the inner field label stays bare to avoid showing "(Required)" twice.
         self.source_input_label.setText(source_type_to_source_label[source_type])
 
+        # "Other" uses the multi-line box; every other source type uses the single-line input.
         place_holder_text = source_type_to_source_place_holder_text.get(source_type, "")
-        self.source_edit.setPlaceholderText(place_holder_text)
+        uses_multiline = source_type == SourceType.OTHER
+        self.source_multiline_edit.setVisible(uses_multiline)
+        self.source_edit.setVisible(not uses_multiline)
+        active_input = self.source_multiline_edit if uses_multiline else self.source_edit
+        active_input.setPlaceholderText(place_holder_text)
 
     def _source_type(self) -> Optional[SourceType]:
         if self.source_type_select.currentText():
             return SourceType(self.source_type_select.currentText())
         else:
             return None
+
+
+@lru_cache(maxsize=1)
+def _native_checkbox_text_offset() -> int:
+    """The x where a native QCheckBox draws its label text (indicator width +
+    style label-spacing + margins). Used to align a label-only checkbox row's
+    text with native QCheckBoxes elsewhere in the panel.
+
+    Cached: the value is constant per style/session, and a bulk suggestion can
+    build hundreds of tag rows.
+    """
+    probe = QCheckBox("x")
+    probe.resize(probe.sizeHint())
+    opt = QStyleOptionButton()
+    opt.initFrom(probe)
+    opt.text = "x"
+    opt.rect = probe.rect()
+    return probe.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, probe).x()
 
 
 class _TagLabel(QLabel):
@@ -914,6 +994,8 @@ class _TagLabel(QLabel):
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
         self.setMinimumWidth(1)
+        # Signal clickability on hover, matching the native checkbox labels.
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         if display != tag:
             self.setToolTip(f"<p>{self._inject_breakpoints(escape(tag))}</p>")
 
@@ -962,10 +1044,16 @@ class _TagCheckBox(QWidget):
         super().__init__(parent)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(6)
         self.setLayout(row)
 
         self._checkbox = QCheckBox()
+        # Pad the (text-less) checkbox out to the exact x where a native QCheckBox
+        # draws its text, then drop the row spacing to zero — so the tag label
+        # lines up with the section title and field items (which are native
+        # QCheckBoxes) instead of sitting a few px further right.
+        self._content_offset = _native_checkbox_text_offset()
+        self._checkbox.setFixedWidth(self._content_offset)
+        row.setSpacing(0)
         row.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
 
         self._label = _TagLabel(tag)
@@ -980,9 +1068,10 @@ class _TagCheckBox(QWidget):
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802
-        indicator_w = self._checkbox.sizeHint().width()
-        spacing = self.layout().spacing() if self.layout() else 0
-        label_width = max(1, width - indicator_w - spacing)
+        # The label starts at exactly `_content_offset` because the checkbox is
+        # `setFixedWidth(_content_offset)` with zero row spacing — keep those in
+        # sync if either changes.
+        label_width = max(1, width - self._content_offset)
         label_height = self._label.heightForWidth(label_width)
         # Don't drop below the bare checkbox height (single-line fallback).
         return max(label_height, self._checkbox.sizeHint().height())
@@ -1001,7 +1090,20 @@ class _TagCheckBox(QWidget):
         self._checkbox.setChecked(value)
 
 
-class _SelectAllCheckBox(QCheckBox):
+class _RowCheckBox(QCheckBox):
+    """A QCheckBox whose entire (stretched) width is the click target.
+
+    Qt's default `hitButton` only accepts clicks over the indicator + label,
+    so a full-width checkbox shows the hover cursor across the whole row but
+    only toggles on the text. Accepting the full rect makes the click area
+    match the cursor area (consistent with the wrapping tag rows).
+    """
+
+    def hitButton(self, pos) -> bool:  # noqa: N802 - Qt override
+        return self.rect().contains(pos)
+
+
+class _SelectAllCheckBox(_RowCheckBox):
     """Displays PartiallyChecked programmatically, but user clicks only toggle
     Checked ↔ Unchecked — Qt's default Unchecked → PartiallyChecked cycle would
     block "select all" from an empty group.
@@ -1079,6 +1181,12 @@ class _GroupController:
         # parent tri-state or be touched by Select-all.
         togglable = [c for c in self._children if c.isEnabled()]
         if not togglable:
+            # Nothing for the (full-row clickable) Select-all to toggle; disable
+            # it and show it checked rather than letting it flip with no effect.
+            self._suppress = True
+            self._parent.setCheckState(Qt.CheckState.Checked)
+            self._suppress = False
+            self._parent.setEnabled(False)
             return
         selected = sum(1 for c in togglable if c.isChecked())
         self._suppress = True
@@ -1153,11 +1261,10 @@ class IncludeInSuggestionWidget(QWidget):
         self.setLayout(outer)
 
         frame = QFrame()
-        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setFrameShape(QFrame.Shape.NoFrame)
         frame.setObjectName("includeInSuggestionFrame")
         frame.setStyleSheet(
-            "#includeInSuggestionFrame { background-color: palette(alternate-base); "
-            "border: 1px solid palette(mid); border-radius: 6px; }"
+            f"#includeInSuggestionFrame {{ background-color: {_panel_background_color()}; border-radius: 6px; }}"
         )
         frame.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         outer.addWidget(frame)
@@ -1211,7 +1318,7 @@ class IncludeInSuggestionWidget(QWidget):
         items: List[str],
         initial_checked: Dict[str, bool],
         lock_first_field: Optional[str] = None,
-        item_widget: Callable[[str], "_Toggleable"] = QCheckBox,
+        item_widget: Callable[[str], "_Toggleable"] = _RowCheckBox,
     ) -> Dict[str, QCheckBox]:
         """Render one section: select-all checkbox (with the section title as
         its label) + one child checkbox per item, then a thin separator below.
@@ -1226,9 +1333,8 @@ class IncludeInSuggestionWidget(QWidget):
         """
         if self._body_layout.count() > 0:
             separator = QFrame()
-            separator.setFrameShape(QFrame.Shape.HLine)
-            separator.setFrameShadow(QFrame.Shadow.Plain)
-            separator.setStyleSheet("color: palette(mid);")
+            separator.setFixedHeight(1)
+            separator.setStyleSheet(f"background-color: {_panel_line_color()}; border: none;")
             self._body_layout.addWidget(separator)
 
         # Title sits on the select-all checkbox itself, so clicking the title
@@ -1261,6 +1367,9 @@ class IncludeInSuggestionWidget(QWidget):
             else:
                 cb.setChecked(initial_checked.get(item, True))
             controller.add_child(cb)
+            # Full width for every row: `_RowCheckBox` accepts clicks across its
+            # whole width and `_TagCheckBox`'s label wraps + is fully clickable, so
+            # the click area matches the hover cursor consistently.
             items_layout.addWidget(cb)
             result[item] = cb  # type: ignore[assignment]
         controller.refresh_parent()
