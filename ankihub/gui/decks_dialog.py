@@ -543,10 +543,13 @@ class DeckManagementDialog(QDialog):
             ),
         )
 
-        # Add checkbox and icon label to the result layout
+        # Add checkbox and icon label to the result layout. The trailing stretch keeps
+        # the icon next to the (multi-line) checkbox instead of being pushed to the far
+        # right of the wide panel, matching the other checkbox/icon rows.
         box = QHBoxLayout()
         box.addWidget(self.ankihub_deleted_notes_behavior_cb)
         box.addWidget(self.ankihub_deleted_notes_behavior_icon_label)
+        box.addStretch()
 
         return box
 
@@ -665,7 +668,6 @@ class DeckManagementDialog(QDialog):
         qconnect(self.update_templates_btn.clicked, self._on_update_templates_btn_clicked)
         self._update_templates_btn_state()
         box.addWidget(self.note_types_label)
-        box.addSpacing(8)
         # Group the buttons in their own layout with tight spacing so they sit close
         # together, independent of the parent layout's larger default item spacing.
         buttons_layout = QVBoxLayout()
