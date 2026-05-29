@@ -8,6 +8,7 @@ from uuid import UUID
 import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId, NotetypeNameId
+from aqt import props
 from aqt.qt import (
     QApplication,
     QBoxLayout,
@@ -21,6 +22,7 @@ from aqt.qt import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QPropertyAnimation,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -342,15 +344,31 @@ class DeckManagementDialog(QDialog):
 
         def on_done(future: Future) -> None:
             future.result()
-            self._refresh_box_bottom_right()
 
-        def install_deck_and_refresh_dialog() -> None:
-            sync_with_ankihub(on_done=on_done)
+        def install_deck() -> None:
+            # Fade this dialog out and close it, then run the install: the install triggers Anki's
+            # AnkiWeb sync, whose dialogs are attached to the main window. With this modal dialog in
+            # front, they'd be hidden behind it on macOS and deadlock. The import summary's "Go to
+            # Deck Management" button brings the user back once the deck is installed.
+            self.sync_to_install_btn.setEnabled(False)  # prevent a second trigger during the fade
+
+            def on_faded_out() -> None:
+                self.close()
+                self.setWindowOpacity(1.0)  # restore for next time the dialog is shown
+                self.sync_to_install_btn.setEnabled(True)
+                sync_with_ankihub(on_done=on_done)
+
+            animation = QPropertyAnimation(self, b"windowOpacity", self)
+            animation.setDuration(int(theme_manager.var(props.TRANSITION)))
+            animation.setStartValue(1.0)
+            animation.setEndValue(0.0)
+            qconnect(animation.finished, on_faded_out)
+            animation.start()
 
         self.sync_to_install_btn = QPushButton("🔃️ Sync to install")
         qconnect(
             self.sync_to_install_btn.clicked,
-            install_deck_and_refresh_dialog,
+            install_deck,
         )
 
         self.sync_to_install_btn_row = QHBoxLayout()
