@@ -175,7 +175,12 @@ from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
-from ankihub.gui.suggestion_dialog import SuggestionDialog
+from ankihub.gui.suggestion_dialog import (
+    IncludeInSuggestionWidget,
+    SuggestionDialog,
+    open_suggestion_dialog_for_bulk_suggestion,
+    open_suggestion_dialog_for_single_suggestion,
+)
 from ankihub.gui.utils import _Dialog, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
@@ -199,6 +204,10 @@ from ankihub.main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
+    BulkSuggestionFilters,
+    PerNoteFilters,
+    any_suggestible_from_diffs,
+    compute_note_diffs,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -888,6 +897,43 @@ def test_create_collaborative_deck_and_upload(
 
         # check that note mod value is in database
         assert AnkiHubNote.get(AnkiHubNote.anki_note_id == note.id).mod == note.mod
+
+
+def test_create_collaborative_deck_strips_personally_protected_fields(
+    anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+):
+    """Data-safety guard: the deck-creation upload must not ship the contents of personally-
+    protected fields (those carrying an `AnkiHub_Protect::Field` tag). This pins the
+    `to_note_data(include_protected_fields=False)` default that `create_ankihub_deck` relies on —
+    a future caller flipping that default would leak local annotations to other subscribers.
+    """
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        deck_name = "Protected Deck"
+        mw.col.decks.add_normal_deck_with_name(deck_name)
+        anki_did = mw.col.decks.id_for_name(deck_name)
+
+        note = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note["Front"] = "front"
+        note["Back"] = "secret local annotation"
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Back"]
+        mw.col.add_note(note, anki_did)
+
+        ah_did = next_deterministic_uuid()
+        ah_nid = next_deterministic_uuid()
+        upload_deck_mock = mocker.patch.object(AnkiHubClient, "upload_deck", return_value=ah_did)
+        mocker.patch("uuid.uuid4", return_value=ah_nid)
+
+        create_ankihub_deck(deck_name, private=False)
+
+        (uploaded,) = upload_deck_mock.call_args.kwargs["notes_data"]
+        field_names = [f.name for f in uploaded.fields]
+        assert "Back" not in field_names  # personally-protected field stripped before upload
+        assert "Front" in field_names  # unprotected field still shipped
+        assert uploaded.tags == []  # internal protect tag not shipped either
 
 
 def test_create_note_type(
@@ -1592,6 +1638,9 @@ def test_suggest_new_note(
 
         _, ah_did = install_sample_ah_deck()
         note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+        # The first field must be non-empty — server (and the local pre-submit
+        # gate in _new_note_suggestion) rejects new-note suggestions otherwise.
+        note["Front"] = "front_value"
 
         adapter = requests_mock.post(
             f"{config.api_url}/decks/{ah_did}/note-suggestion/",
@@ -1638,6 +1687,445 @@ def test_suggest_new_note(
         except AnkiHubHTTPError as e:
             exc = e
         assert exc is not None and exc.response.status_code == 403
+
+
+class TestFieldsToSuggestFilters:
+    """Covers the user-controlled filter introduced for the suggestion-dialog overhaul:
+    compute_note_diffs + the fields_to_include / tags_to_add / tags_to_remove allowlists.
+    """
+
+    def test_diff_edited_fields_includes_personally_protected_fields(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            # Personally protect the Front field and edit it. The previous _prepare_fields
+            # behavior would have stripped Front from the diff; the dialog needs to see it.
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::Front")
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            diffs = compute_note_diffs([note])
+            assert "Front" in diffs[note.id].edited_fields
+
+    def test_suggest_note_update_user_allowlists_strip_outside_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        """`suggest_note_update` honours per-field and per-tag user allowlists,
+        stripping anything outside the lists before the API call.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            note.tags = ["stays", "removed_a", "removed_b"]
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+            note.tags = ["stays", "added_a", "added_b"]
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=PerNoteFilters(
+                    fields_to_include=[field_names[0]],
+                    tags_to_add=["added_a"],
+                    tags_to_remove=["removed_a"],
+                ),
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            assert [f.name for f in sent.fields] == [field_names[0]]
+            assert sent.added_tags == ["added_a"]
+            assert sent.removed_tags == ["removed_a"]
+
+    def test_protected_fields_stripped_when_feature_flag_off(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+    ):
+        """With the feature flag off, the suggestion path keeps the legacy behavior:
+        fields carrying personal AnkiHub_Protect tags are stripped from the outgoing
+        suggestion. (When on, the dialog filters at the user's direction instead.)
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+            nid = aqt.mw.col.find_notes("")[0]
+            note = aqt.mw.col.get_note(nid)
+            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
+
+            field_names = list(note.keys())
+            note[field_names[0]] = "front_updated"
+            note[field_names[1]] = "back_updated"
+            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::{field_names[0]}")
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": False})
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            sent = create_mock.call_args.kwargs["change_note_suggestion"]
+            sent_field_names = [f.name for f in sent.fields]
+            # Protected field is stripped; the other change still goes out.
+            assert field_names[0] not in sent_field_names
+            assert field_names[1] in sent_field_names
+
+    def test_widget_populates_for_new_note_candidates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """New-note candidates (no AH DB row) populate the widget with all non-empty
+        fields and all current tags — parent spec edit 2026-05-18: the section
+        appears for every change type except DELETE, new-note included.
+
+        Also pins down that internal `AnkiHub_Protect::*` tags don't surface as
+        `+ tag` checkboxes (`_prepare_tags` strips them).
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = add_anki_note(note_type=note_type)
+            note["Front"] = "front_value"
+            # leave "Back" empty
+            note.tags = ["alpha", f"{TAG_FOR_PROTECTING_FIELDS}::Front", "beta"]
+            aqt.mw.col.update_note(note)
+
+            widget = IncludeInSuggestionWidget(notes=[note], note_diffs=compute_note_diffs([note]))
+
+            field_checkboxes = widget._field_checkboxes[NotetypeId(note.mid)]
+            assert "Front" in field_checkboxes
+            assert "Back" not in field_checkboxes  # empty field skipped
+            assert set(widget._added_tag_boxes.keys()) == {"alpha", "beta"}  # protect tag stripped
+            assert widget._removed_tag_boxes == {}  # no AH baseline → nothing to remove
+
+            # First field is server-required for new-note suggestions, so the widget locks
+            # its checkbox: checked + disabled + tooltip explaining why.
+            front_cb = field_checkboxes["Front"]
+            assert front_cb.isChecked()
+            assert not front_cb.isEnabled()
+            assert "first field is required" in front_cb.toolTip().lower()
+
+    def test_suggest_new_note_bulk_per_mid_filters(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        """Bulk new-note: per-mid allowlists from the dialog selection thread
+        through `_suggestions_for_notes` into each `_new_note_suggestion`.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = add_anki_note(note_type=note_type)
+            note["Front"] = "front_value"
+            note["Back"] = "back_value"
+            note.tags = ["alpha", "beta"]
+            aqt.mw.col.update_note(note)
+
+            mocker.patch("uuid.uuid4", return_value=next_deterministic_uuid())
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=BulkSuggestionFilters(
+                    fields_to_include_by_mid={NotetypeId(note.mid): ["Front"]},
+                    tags_to_add=["alpha"],
+                ),
+            )
+
+            sent = bulk_mock.call_args.kwargs["new_note_suggestions"][0]
+            assert [f.name for f in sent.fields] == ["Front"]
+            assert sent.tags == ["alpha"]
+
+    def test_bulk_new_note_skipped_when_mid_missing_from_allowlist(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        """When `fields_to_include_by_mid` is provided but doesn't cover a
+        note's mid (e.g., the widget rendered no section for it because every
+        edit was globally-protected), `for_mid` returns an empty allowlist
+        rather than 'no filter'. Result: no fields ship, the new-note
+        suggestion is dropped client-side.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = add_anki_note(note_type=note_type)
+            note["Front"] = "front_value"
+            note["Back"] = "back_value"
+            aqt.mw.col.update_note(note)
+
+            mocker.patch("uuid.uuid4", return_value=next_deterministic_uuid())
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=BulkSuggestionFilters(
+                    # Allowlist is provided but doesn't cover this mid → for_mid
+                    # returns an empty allowlist → no fields pass through.
+                    fields_to_include_by_mid={NotetypeId(99999): ["does-not-matter"]},
+                ),
+            )
+
+            # No suggestion submitted: the empty allowlist excludes every
+            # field, so _new_note_suggestion returns None.
+            bulk_mock.assert_not_called()
+
+    def test_dialog_filters_globally_protected_fields_from_config_cache(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+    ):
+        """End-to-end seam: `config.set_globally_protected_fields` →
+        `open_suggestion_dialog_for_single_suggestion` → `SuggestionDialog`
+        receives the `{NotetypeId: Set[str]}` kwarg the widget consumes.
+        Catches the helper's coercion AND the dialog's plumbing of the kwarg.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "front_edit"
+            note["Back"] = "back_edit"
+            aqt.mw.col.update_note(note)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            config.set_globally_protected_fields(ah_did, {mid: ["Front"]})
+
+            dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=None)
+
+            dialog_mock.assert_called_once()
+            kwargs = dialog_mock.call_args.kwargs
+            assert kwargs["globally_protected_fields_by_mid"] == {NotetypeId(mid): {"Front"}}
+
+    @pytest.mark.parametrize(
+        "preselected_change_type,expects_toast",
+        [
+            # Generic "Bulk suggest notes" over unchanged notes → empty-state toast.
+            (None, True),
+            # "Suggest to delete note" preselects DELETE → dialog opens (delete doesn't need changes).
+            (SuggestionType.DELETE, False),
+        ],
+    )
+    def test_bulk_suggest_empty_state_gate(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        preselected_change_type: Optional[SuggestionType],
+        expects_toast: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            toast_mock = mocker.patch("ankihub.gui.suggestion_dialog.show_tooltip")
+            dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
+
+            open_suggestion_dialog_for_bulk_suggestion(
+                anki_nids=[nid], parent=None, preselected_change_type=preselected_change_type
+            )
+
+            if expects_toast:
+                toast_mock.assert_called_once()
+                assert "no changes" in toast_mock.call_args[0][0].lower()
+                dialog_mock.assert_not_called()
+            else:
+                toast_mock.assert_not_called()
+                dialog_mock.assert_called_once()
+
+    def test_any_suggestible_from_diffs_by_change_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+    ):
+        """The bulk-gate helper must agree with the submit-path classification.
+
+        - DELETE only passes for existing-and-not-deleted AH notes.
+        - NEW_CONTENT / UPDATED_CONTENT (and None, since the browser's generic
+          "Bulk suggest notes" menu preselects None and is for changes) pass
+          for new-note candidates or notes with field/tag edits.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+            existing_nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            existing_unchanged = aqt.mw.col.get_note(existing_nid)
+            # A second AnkiHub note we'll then mark deleted-on-remote.
+            deleted_info = import_ah_note(ah_did=ah_did)
+            deleted_nid = ankihub_db.anki_nid_for_ankihub_nid(deleted_info.ah_nid)
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.ankihub_note_id == deleted_info.ah_nid
+            ).execute()
+            deleted_note = aqt.mw.col.get_note(deleted_nid)
+            # A note Anki knows about that has no AH DB row at all → new-note candidate.
+            new_note = add_anki_note(
+                note_type=aqt.mw.col.models.get(NotetypeId(mid)),
+            )
+
+            def is_suggestible(notes: List[Note], change_type: Optional[SuggestionType]) -> bool:
+                return any_suggestible_from_diffs(notes, compute_note_diffs(notes), change_type, {})
+
+            # DELETE: only the existing-and-not-deleted note qualifies.
+            assert is_suggestible([existing_unchanged], SuggestionType.DELETE)
+            assert not is_suggestible([deleted_note], SuggestionType.DELETE)
+            assert not is_suggestible([new_note], SuggestionType.DELETE)
+
+            # NEW_CONTENT on an unchanged existing note → no changes, no.
+            assert not is_suggestible([existing_unchanged], SuggestionType.NEW_CONTENT)
+            # NEW_CONTENT on a brand-new note → new-note candidate, yes.
+            assert is_suggestible([new_note], SuggestionType.NEW_CONTENT)
+
+            # None (the browser's generic "Bulk suggest notes" menu) behaves like
+            # NEW_CONTENT/UPDATED_CONTENT — gated on changes vs. local AH DB.
+            assert not is_suggestible([existing_unchanged], None)
+            assert is_suggestible([new_note], None)
+            assert not is_suggestible([deleted_note], None)
+
+            # New-note candidate whose only non-empty fields are all globally-protected,
+            # with no tags → not suggestible. (Otherwise the dialog would open with an
+            # empty "Include in suggestion" panel that the user can't submit from.)
+            new_note_protected = add_anki_note(note_type=aqt.mw.col.models.get(NotetypeId(mid)))
+            first_field_name = new_note_protected.note_type()["flds"][0]["name"]
+            assert not any_suggestible_from_diffs(
+                [new_note_protected],
+                compute_note_diffs([new_note_protected]),
+                SuggestionType.NEW_CONTENT,
+                {NotetypeId(mid): {first_field_name}},
+            )
+
+            # New-note candidate where the server-required first field is globally-protected
+            # but a second field has content → still not suggestible. The widget would render
+            # the second field as selectable but `_new_note_suggestion` rejects on the empty
+            # first field, so the submit silently drops.
+            new_note_first_protected = add_anki_note(note_type=aqt.mw.col.models.get(NotetypeId(mid)))
+            field_names = list(new_note_first_protected.keys())
+            new_note_first_protected[field_names[1]] = "back content"
+            aqt.mw.col.update_note(new_note_first_protected)
+            assert not any_suggestible_from_diffs(
+                [new_note_first_protected],
+                compute_note_diffs([new_note_first_protected]),
+                SuggestionType.NEW_CONTENT,
+                {NotetypeId(mid): {field_names[0]}},
+            )
+
+    def test_dialog_save_deselections_merges_with_prior(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """A field deselected in a prior session should stay deselected even when it's not
+        shown in the current widget (because the user hasn't edited it this time). Re-checking
+        a field explicitly clears its deselection. The dialog snapshots priors at construction
+        and merges them with the widget's current state on accept.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            mid = note_info.mid
+
+            # Prior session: user deselected "Back" for this mid AND deselected fields
+            # under an unrelated mid that isn't in today's batch. The unrelated mid's
+            # prior must survive untouched — `_save_deselections` only writes back mids
+            # whose fields the widget actually rendered.
+            other_mid = mid + 999_999
+            config.set_last_deselected_fields(ah_did, mid, ["Back"])
+            config.set_last_deselected_fields(ah_did, other_mid, ["Stale"])
+
+            # Current session: only "Front" is edited (Back isn't shown in the widget).
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+            note = aqt.mw.col.get_note(nid)
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            def build_dialog() -> SuggestionDialog:
+                return SuggestionDialog(
+                    is_new_note_suggestion=False,
+                    is_for_anking_deck=False,
+                    can_submit_without_review=False,
+                    added_new_media=False,
+                    callback=lambda _meta: None,
+                    notes=[note],
+                    note_diffs=compute_note_diffs([note]),
+                    ah_did=ah_did,
+                )
+
+            # Session 1: open dialog, deselect Front, save. Prior Back deselection must survive.
+            dialog = build_dialog()
+            assert "Back" not in dialog._fields_widget._field_checkboxes[NotetypeId(mid)]
+            dialog._fields_widget._field_checkboxes[NotetypeId(mid)]["Front"].setChecked(False)
+            dialog._save_deselections()
+            assert sorted(config.last_deselected_fields(ah_did, mid)) == ["Back", "Front"]
+
+            # Session 2: open a fresh dialog so the construction-time snapshot is `{"Back", "Front"}`.
+            # Re-check Front and save — Front's persisted deselection should clear; Back stays.
+            dialog = build_dialog()
+            dialog._fields_widget._field_checkboxes[NotetypeId(mid)]["Front"].setChecked(True)
+            dialog._save_deselections()
+            assert config.last_deselected_fields(ah_did, mid) == ["Back"]
+
+            # And `other_mid`'s prior is untouched throughout — neither session rendered fields
+            # under it, so `_save_deselections` never wrote it back.
+            assert config.last_deselected_fields(ah_did, other_mid) == ["Stale"]
 
 
 class TestSuggestNotesInBulk:
