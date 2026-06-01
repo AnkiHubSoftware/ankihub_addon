@@ -313,9 +313,9 @@ class AnkiHubNoteTypeSearchNode(CustomSearchNode):
 
         nids_with_ah_note_type = set(retain_nids_with_ah_note_type(nids))
         if self.value == "yes":
-            retained_nids = [nid for nid in nids if nid in nids_with_ah_note_type]
+            retained_nids = list(nids_with_ah_note_type)
         else:
-            retained_nids = [nid for nid in nids if nid not in nids_with_ah_note_type]
+            retained_nids = list(set(nids) - nids_with_ah_note_type)
 
         result = self._output_ids(retained_nids)
         return result

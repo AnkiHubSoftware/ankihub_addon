@@ -19,7 +19,7 @@ from anki.utils import checksum, ids2str
 from aqt.emptycards import EmptyCardsDialog
 
 from .. import LOGGER, settings
-from ..db import ankihub_db
+from ..db import DEFAULT_CHUNK_SIZE, ankihub_db, chunks
 from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
@@ -403,7 +403,13 @@ def retain_nids_with_ah_note_type(nids: Collection[NoteId]) -> Collection[NoteId
 
 
 def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeId]:
-    result = {id_: mid for id_, mid in aqt.mw.col.db.execute(f"select id, mid from notes where id in {ids2str(nids)}")}
+    # Query in chunks because this can be called with the whole collection (e.g. the
+    # "Not on AnkiHub" browser sidebar search), which would otherwise build one huge IN clause.
+    result: Dict[NoteId, NotetypeId] = {}
+    for chunk in chunks(list(nids), DEFAULT_CHUNK_SIZE):
+        result.update(
+            {id_: mid for id_, mid in aqt.mw.col.db.execute(f"select id, mid from notes where id in {ids2str(chunk)}")}
+        )
     return result
 
 
