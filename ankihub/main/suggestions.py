@@ -4,10 +4,12 @@ to the version stored in the AnkiHub database. Suggestions are sent to AnkiHub.
 when syncing with AnkiHub.)"""
 
 import copy
+import re
 import shutil
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from html import unescape
 from pathlib import Path
 from typing import (
     Any,
@@ -25,7 +27,7 @@ from typing import (
 
 import aqt
 from anki.models import NotetypeDict, NotetypeId
-from anki.notes import Note, NoteFieldsCheckResult, NoteId
+from anki.notes import Note, NoteId
 from anki.utils import ids2str
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -41,6 +43,7 @@ from ..ankihub_client import (
     get_media_names_from_suggestions,
 )
 from ..ankihub_client.ankihub_client import AnkiHubHTTPError
+from ..common_utils import AV_TAGS, HTML_MEDIA_TAGS
 from ..db import ankihub_db
 from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
@@ -65,6 +68,9 @@ ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR = "Note object does not exist"
 
 # string for errors when the first field of a note is empty
 ANKIHUB_EMPTY_FIRST_FIELD_ERROR = "The first field is required and cannot be empty"
+
+# Matches any HTML tag — used to strip markup when checking a field for visible text.
+HTML_TAG_REGEX = re.compile(r"<[^>]+>")
 
 
 class ChangeSuggestionResult(Enum):
@@ -208,10 +214,21 @@ def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[
 
 
 def has_empty_first_field(note: Note) -> bool:
-    """True when the note's first field is empty per Anki's own check, which
-    strips HTML/whitespace (so e.g. a "<br>"-only field counts as empty) —
-    matching what the Add screen and the server treat as an empty first field."""
-    return note.fields_check() == NoteFieldsCheckResult.EMPTY
+    """True when the note's first field has no visible content.
+
+    Strips HTML tags and entities, then checks for remaining text — so plain
+    whitespace and markup-only values (e.g. "<br>", "&nbsp;") count as empty,
+    while embedded media (images/audio) counts as content. This intentionally
+    approximates Anki's own `fields_check` rather than calling it, to avoid a
+    per-note backend round-trip (which also does a duplicate DB lookup); the
+    server still rejects a truly-empty first field as a backstop.
+    """
+    if not note.fields:
+        return True
+    field = note.fields[0]
+    if HTML_MEDIA_TAGS.search(field) or AV_TAGS.search(field):
+        return False
+    return not unescape(HTML_TAG_REGEX.sub("", field)).strip()
 
 
 def _is_suggestible_from_diff(
