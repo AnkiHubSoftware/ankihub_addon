@@ -1700,7 +1700,7 @@ class TestFieldsToSuggestFilters:
             aqt.mw.col.update_note(note)
 
             diffs = compute_note_diffs([note])
-            assert "Front" in diffs[note.id].edited_fields
+            assert "Front" in diffs[note.id].changed_field_names
 
     def test_suggest_note_update_user_allowlists_strip_outside_changes(
         self,
@@ -2146,8 +2146,8 @@ class TestSuggestNotesInBulk:
     ):
         """Two new notes of the same note type: "Back" is non-empty on the first, so the
         widget allowlists it for the mid (selections aggregate per note type). It must NOT
-        ship as an empty field on the second note where it's blank — `diff.local_note`
-        includes empty fields, so the builder has to drop them before the allowlist."""
+        ship as an empty field on the second note where it's blank — `changed_fields` for a
+        new note is its non-empty fields, so the empty "Back" never ships."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did)
@@ -2308,6 +2308,8 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                # Fields are moot here — the note is excluded for its empty first field.
+                filters=BulkSuggestionFilters(fields_to_include_by_mid={}),
             )
 
             # The note should not be sent to the API

@@ -121,6 +121,7 @@ def open_suggestion_dialog_for_single_suggestion(
         callback=lambda suggestion_meta: _on_suggestion_dialog_for_single_suggestion_closed(
             suggestion_meta=suggestion_meta,
             note=note,
+            note_diffs=diffs,
             ah_did=ah_did,
             parent=parent,
         ),
@@ -174,6 +175,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
 def _on_suggestion_dialog_for_single_suggestion_closed(
     suggestion_meta: SuggestionMetadata,
     note: Note,
+    note_diffs: Mapping[NoteId, NoteDiff],
     ah_did: uuid.UUID,
     parent: QWidget,
 ) -> None:
@@ -181,6 +183,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
         return
 
     per_note_filters = suggestion_meta.filters.for_mid(NotetypeId(note.mid))
+    diff = note_diffs[NoteId(note.id)]
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
@@ -192,6 +195,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 media_upload_cb=media_sync.start_media_upload,
                 auto_accept=suggestion_meta.auto_accept,
                 filters=per_note_filters,
+                diff=diff,
             )
         except AnkiHubHTTPError as e:
             _handle_suggestion_error(e, parent)
@@ -226,6 +230,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 media_upload_cb=media_sync.start_media_upload,
                 auto_accept=suggestion_meta.auto_accept,
                 filters=per_note_filters,
+                diff=diff,
             )
         except AnkiHubHTTPError as e:
             _handle_suggestion_error(e, parent)
@@ -1280,7 +1285,7 @@ class IncludeInSuggestionWidget(QWidget):
             note_type_name_by_mid.setdefault(mid, note.note_type()["name"])
             diff = self._note_diffs[NoteId(note.id)]
             globally_protected = self._globally_protected.get(mid, set())
-            fields = [f for f in diff.edited_fields if f not in globally_protected]
+            fields = [f for f in diff.changed_field_names if f not in globally_protected]
             # `dict.fromkeys(...)` dedupes across notes sharing this mid while preserving
             # first-seen field order so the widget renders fields in note-type definition order.
             fields_by_mid[mid] = list(dict.fromkeys((*fields_by_mid.get(mid, ()), *fields)))

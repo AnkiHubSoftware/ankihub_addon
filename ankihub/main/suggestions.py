@@ -95,13 +95,10 @@ class PerNoteFilters:
 @dataclass
 class BulkSuggestionFilters:
     """Same as `PerNoteFilters` but keyed by note type for the bulk-suggest
-    path — the dialog groups field selections by mid because the widget
-    has one section per note type. Tag filters apply across all notes.
-
-    `fields_to_include_by_mid` is required: the dialog's widget always renders
-    and produces a (possibly empty) per-mid selection, so there's no "no field
-    filter" state to represent. Pass `{}` for the field-less paths (DELETE, or
-    a dialog opened without notes).
+    path — the dialog groups field selections by mid because the widget has one
+    section per note type. Tag filters apply across all notes. A mid absent from
+    `fields_to_include_by_mid` ships none of its fields (see `for_mid`); the
+    dialog supplies the full per-mid selection.
     """
 
     fields_to_include_by_mid: Mapping[NotetypeId, Collection[str]]
@@ -132,26 +129,20 @@ class NoteDiff:
     is_deleted_on_remote: bool  # row exists AND is marked deleted
     local_note: NoteInfo  # local Anki note as NoteInfo (includes empty + protected fields)
     ah_note: Optional[NoteInfo]  # AH-stored version; None for new-note candidates and deleted notes
-    # The fields a suggestion would carry, ready to ship after allowlisting:
-    # change-note → fields whose value differs from AH; new-note → non-empty fields.
-    changed_fields: List[Field]
+    changed_fields: List[Field]  # fields a suggestion would carry, before the user's allowlist
     added_tags: List[str]
     removed_tags: List[str]
     added_new_media: bool
 
     @property
-    def edited_fields(self) -> List[str]:
+    def changed_field_names(self) -> List[str]:
         """Names of `changed_fields` — what the dialog offers and the suggestibility check reads."""
         return [f.name for f in self.changed_fields]
 
 
 def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
-    """Single-pass diff computation against the local AnkiHub DB.
-
-    Caches `note_type_dict` by mid for the batch and projects ah_nid from
-    the batched AH-DB rows, avoiding two per-note DB lookups inside
-    `to_note_data`.
-    """
+    """Compute a `NoteDiff` per note in one batched pass over the AnkiHub DB
+    (one membership query + one note-data query for the whole list)."""
     anki_nids = [note.id for note in notes]
     ah_db_rows: Dict[NoteId, AnkiHubNote] = {
         NoteId(row.anki_note_id): row
@@ -232,7 +223,7 @@ def _is_suggestible_from_diff(
         # globally protected, the suggestion can never succeed regardless of
         # what other fields or tags contribute — so the dialog shouldn't open.
         return False
-    if set(diff.edited_fields) - denied:
+    if set(diff.changed_field_names) - denied:
         return True
     return bool(diff.added_tags or diff.removed_tags)
 
@@ -266,6 +257,7 @@ def suggest_note_update(
     media_upload_cb: MediaUploadCallback,
     auto_accept: bool = False,
     filters: Optional[PerNoteFilters] = None,
+    diff: Optional[NoteDiff] = None,
 ) -> ChangeSuggestionResult:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
@@ -273,7 +265,8 @@ def suggest_note_update(
 
     `filters` carries the user's optional allowlists for fields and added/removed
     tags. `None` for any list means "no filter for that dimension"; the absent
-    `filters` arg is equivalent to no filters at all.
+    `filters` arg is equivalent to no filters at all. `diff` is the note's
+    precomputed `NoteDiff` (the dialog passes its open-time copy); computed when omitted.
     """
 
     # DELETE doesn't carry field content, so the empty-first-field requirement
@@ -281,7 +274,7 @@ def suggest_note_update(
     if _has_empty_first_field(note) and change_type != SuggestionType.DELETE:
         return ChangeSuggestionResult.EMPTY_FIRST_FIELD
 
-    suggestion = _change_note_suggestion(note, change_type, comment, filters=filters)
+    suggestion = _change_note_suggestion(note, change_type, comment, filters=filters, diff=diff)
     if suggestion is None:
         return ChangeSuggestionResult.NO_CHANGES
 
@@ -314,14 +307,16 @@ def suggest_new_note(
     media_upload_cb: MediaUploadCallback,
     auto_accept: bool = False,
     filters: Optional[PerNoteFilters] = None,
+    diff: Optional[NoteDiff] = None,
 ) -> bool:
     """Sends a NewNoteSuggestion to AnkiHub. Returns True on submit, False if
     the user-selected filters left nothing to submit.
 
     `filters.tags_to_remove` is ignored — new notes have no AH baseline to
-    remove tags from.
+    remove tags from. `diff` is the note's precomputed `NoteDiff` (the dialog
+    passes its open-time copy); computed when omitted.
     """
-    suggestion = _new_note_suggestion(note, ankihub_did, comment, filters=filters)
+    suggestion = _new_note_suggestion(note, ankihub_did, comment, filters=filters, diff=diff)
     if suggestion is None:
         return False
 
@@ -353,7 +348,7 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
     media_upload_cb: MediaUploadCallback,
-    filters: Optional[BulkSuggestionFilters] = None,
+    filters: BulkSuggestionFilters,
     note_diffs: Optional[Mapping[NoteId, NoteDiff]] = None,
 ) -> BulkNoteSuggestionsResult:
     """
@@ -454,7 +449,7 @@ def _suggestions_for_notes(
     change_type: SuggestionType,
     comment: str,
     note_diffs: Mapping[NoteId, NoteDiff],
-    filters: Optional[BulkSuggestionFilters] = None,
+    filters: BulkSuggestionFilters,
 ) -> Tuple[
     Sequence[NewNoteSuggestion],
     Sequence[ChangeNoteSuggestion],
@@ -496,7 +491,6 @@ def _suggestions_for_notes(
         else:
             notes_for_new_note_suggestions.append(note)
 
-    filters = filters or BulkSuggestionFilters(fields_to_include_by_mid={})
     # Cache per-mid projection across the two loops — same mid → same
     # PerNoteFilters, so we only need one dict allocation per distinct mid.
     per_mid_filters: Dict[NotetypeId, PerNoteFilters] = {}

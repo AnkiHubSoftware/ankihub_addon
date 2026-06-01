@@ -598,7 +598,7 @@ def bulk_filters_from_diffs(notes: Sequence[Note], note_diffs: Mapping[NoteId, N
     fields_by_mid: Dict[NotetypeId, List[str]] = {}
     for note in notes:
         selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
-        for name in note_diffs[note.id].edited_fields:
+        for name in note_diffs[note.id].changed_field_names:
             if name not in selected:
                 selected.append(name)
     return BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid)
