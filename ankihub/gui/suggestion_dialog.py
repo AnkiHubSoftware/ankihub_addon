@@ -62,6 +62,7 @@ from ..main.suggestions import (
     compute_note_diffs,
     get_anki_nid_to_ah_dids_dict,
     globally_protected_fields_by_mid,
+    has_empty_first_field,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -244,7 +245,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
             )
     else:
         # Check for empty first field before submitting new note suggestion
-        if not note.fields or not note.fields[0].strip():
+        if has_empty_first_field(note):
             show_tooltip("The first field is required.", parent=parent)
             return
 
