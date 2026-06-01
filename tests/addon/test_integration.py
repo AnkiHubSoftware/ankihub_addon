@@ -86,6 +86,7 @@ from ..fixtures import (
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     add_field_to_local_note_type,
+    bulk_filters_from_diffs,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
     make_review_histories,
@@ -2134,6 +2135,53 @@ class TestSuggestNotesInBulk:
             assert result.change_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 0
 
+    def test_bulk_new_notes_dont_ship_field_empty_on_that_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Two new notes of the same note type: "Back" is non-empty on the first, so the
+        widget allowlists it for the mid (selections aggregate per note type). It must NOT
+        ship as an empty field on the second note where it's blank — `diff.cur` includes
+        empty fields, so the builder has to drop them before the allowlist."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
+            note_with_back = add_anki_note(note_type=note_type)
+            note_with_back["Front"] = "front_1"
+            note_with_back["Back"] = "back_1"
+            note_without_back = add_anki_note(note_type=note_type)
+            note_without_back["Front"] = "front_2"
+            note_without_back["Back"] = ""
+            aqt.mw.col.update_note(note_with_back)
+            aqt.mw.col.update_note(note_without_back)
+
+            mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(2)])
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            # Per-mid allowlist contains both fields (the widget's aggregated selection).
+            suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note_with_back, note_without_back],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=BulkSuggestionFilters(
+                    fields_to_include_by_mid={NotetypeId(note_type["id"]): ["Front", "Back"]}
+                ),
+            )
+
+            sent_by_nid = {s.anki_nid: s for s in bulk_mock.call_args.kwargs["new_note_suggestions"]}
+            assert [f.name for f in sent_by_nid[note_with_back.id].fields] == ["Front", "Back"]
+            # The note with an empty Back ships only Front — no empty field.
+            assert [f.name for f in sent_by_nid[note_without_back.id].fields] == ["Front"]
+
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
         [
@@ -2302,12 +2350,6 @@ class TestSuggestNotesInBulk:
             # open-time diffs through to the submit path.
             notes = new_notes + changed_notes
             note_diffs = compute_note_diffs(notes)
-            fields_by_mid: Dict[NotetypeId, List[str]] = {}
-            for note in notes:
-                selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
-                for name in note_diffs[note.id].edited_fields:
-                    if name not in selected:
-                        selected.append(name)
 
             result = suggest_notes_in_bulk(
                 ankihub_did=ah_did,
@@ -2316,7 +2358,7 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
-                filters=BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid),
+                filters=bulk_filters_from_diffs(notes, note_diffs),
                 note_diffs=note_diffs,
             )
 

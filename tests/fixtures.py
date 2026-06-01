@@ -3,7 +3,7 @@ import os
 import random
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Type
+from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol, Sequence, Tuple, Type
 from unittest.mock import MagicMock, Mock
 
 import aqt
@@ -30,7 +30,7 @@ from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
-from ankihub.main.suggestions import BulkSuggestionFilters
+from ankihub.main.suggestions import BulkSuggestionFilters, NoteDiff
 from ankihub.main.utils import modified_note_type
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 from ankihub.user_state import _fetch_feature_flags_and_user_details
@@ -591,6 +591,19 @@ def mock_study_deck_dialog_with_cb(
     return mock_study_deck_dialog_inner
 
 
+def bulk_filters_from_diffs(notes: Sequence[Note], note_diffs: Mapping[NoteId, NoteDiff]) -> BulkSuggestionFilters:
+    """Mirror the suggestion dialog's default selection (every edited field checked) by
+    building the per-mid allowlist from the diffs — what the widget produces when the user
+    opens the dialog and submits without deselecting anything."""
+    fields_by_mid: Dict[NotetypeId, List[str]] = {}
+    for note in notes:
+        selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
+        for name in note_diffs[note.id].edited_fields:
+            if name not in selected:
+                selected.append(name)
+    return BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid)
+
+
 class MockSuggestionDialog(Protocol):
     def __call__(
         self,
@@ -618,21 +631,11 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
             if user_cancels:
                 suggestion_metadata = None
             else:
-                # Mirror the real dialog's default selection (every edited field
-                # checked) by building the per-mid allowlist from the diffs the
-                # dialog was handed.
-                notes = kwargs.get("notes", ())
-                note_diffs = kwargs.get("note_diffs") or {}
-                fields_by_mid: Dict[NotetypeId, List[str]] = {}
-                for note in notes:
-                    selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
-                    for name in note_diffs[note.id].edited_fields:
-                        if name not in selected:
-                            selected.append(name)
                 suggestion_metadata = SuggestionMetadata(
                     comment="test",
                     change_type=suggestion_type,
-                    filters=BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid),
+                    # Mirror the real dialog's default selection from the diffs it was handed.
+                    filters=bulk_filters_from_diffs(kwargs.get("notes", ()), kwargs.get("note_diffs") or {}),
                 )
             aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))
             return suggestion_dialog_mock

@@ -81,9 +81,11 @@ def _has_empty_first_field(note: Note) -> bool:
 @dataclass
 class PerNoteFilters:
     """Allowlists that select what content goes into one note's suggestion.
-    `None` for any list means "no filter for this dimension" (legacy
-    behavior: ship everything the diff detected). Globally-protected fields
-    are stripped *before* the dialog renders, so they never enter the
+    `None` for any list means "no filter for this dimension" — ship everything
+    the diff detected. The dialog-driven bulk path always projects a concrete
+    allowlist via `BulkSuggestionFilters.for_mid`; `None` is reached only by
+    callers that submit a note without an explicit selection. Globally-protected
+    fields are stripped *before* the dialog renders, so they never enter the
     allowlist — server-side enforcement is the only backstop at submit.
     """
 
@@ -109,9 +111,10 @@ class BulkSuggestionFilters:
     tags_to_remove: Optional[Collection[str]] = None
 
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
-        # A mid missing from the map means the widget rendered no field section
-        # for it (every edit was globally protected). Treat that as an empty
-        # allowlist so the diff can't ship fields the user never saw or selected.
+        # A mid missing from the map — the widget rendered no field section for it
+        # (every edit was globally protected), or this is a field-less submit (`{}`).
+        # Treat it as an empty allowlist so the diff can't ship fields the user
+        # never saw or selected.
         return PerNoteFilters(
             fields_to_include=self.fields_to_include_by_mid.get(mid, ()),
             tags_to_add=self.tags_to_add,
@@ -542,9 +545,10 @@ def _suggestions_for_notes(
 
 
 def _apply_field_allowlist(fields: List[Field], allowlist: Optional[Collection[str]]) -> List[Field]:
-    """Drop fields not in the user's allowlist. `allowlist=None` means "no user filter"
-    (legacy behavior — ships everything the diff detected). Globally-protected fields are
-    excluded by the dialog *before* the user picks; server-side enforcement is the backstop.
+    """Drop fields not in the user's allowlist. `allowlist=None` means "no user filter" —
+    ships everything the diff detected (only reached when a note is submitted without an
+    explicit selection). Globally-protected fields are excluded by the dialog *before* the
+    user picks; server-side enforcement is the backstop.
     """
     if allowlist is None:
         return fields
@@ -569,11 +573,15 @@ def _new_note_suggestion(
     # `tags_to_remove` on `filters` is ignored — new notes have no AH baseline
     # to remove tags from.
     filters = filters or PerNoteFilters()
-    # Reuse the open-time conversion when threaded from the bulk diff map. `cur`
-    # includes empty fields, but the user's allowlist (which the widget builds
-    # from non-empty fields only) drops them, so the shipped fields match.
+    # Reuse the open-time conversion when threaded from the bulk diff map.
     note_data = diff.cur if diff is not None else to_note_data(note, set_new_id=True, include_protected_fields=True)
-    fields = _apply_field_allowlist(list(note_data.fields), filters.fields_to_include)
+    # New-note suggestions never carry empty fields. The non-diff path already
+    # excludes them (include_empty_fields=False); `diff.cur` includes them, and a
+    # field empty on THIS note can still be allowlisted because the widget
+    # aggregates the per-mid selection across sibling notes — so drop empties
+    # before the allowlist to keep the shipped fields identical to the old path.
+    non_empty_fields = [f for f in note_data.fields if f.value]
+    fields = _apply_field_allowlist(non_empty_fields, filters.fields_to_include)
     tags = _apply_tag_allowlist(list(note_data.tags or []), filters.tags_to_add)
 
     # The server requires the first field; user-deselect or globally-protected
