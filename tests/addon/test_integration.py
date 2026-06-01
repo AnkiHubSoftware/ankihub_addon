@@ -150,7 +150,8 @@ from ankihub.gui.browser.custom_search_nodes import (
     AnkiHubNoteTypeSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
-from ankihub.gui.browser.sidebar_tooltip import RICH_TOOLTIP_ATTR, SidebarTooltipController
+from ankihub.gui.browser.rich_tooltip import RichTooltip
+from ankihub.gui.browser.sidebar_tooltip import RICH_TOOLTIP_ATTR
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
@@ -4788,9 +4789,9 @@ class TestBrowserTreeView:
             assert tooltip_html is not None
             assert "community.ankihub.net/t/how-to-suggest-a-new-note" in tooltip_html
 
-            # The interactive tooltip controller is installed (idempotently) on the sidebar.
-            controller = getattr(sidebar, "_ankihub_tooltip_controller", None)
-            assert isinstance(controller, SidebarTooltipController)
+            # The interactive tooltip is installed (idempotently) on the sidebar.
+            tooltip = getattr(sidebar, "_ankihub_tooltip", None)
+            assert isinstance(tooltip, RichTooltip)
 
     # without this mark the test sometime fails on clean-up
     @pytest.mark.qt_no_exception_capture
