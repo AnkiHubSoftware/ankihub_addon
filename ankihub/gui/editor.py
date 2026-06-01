@@ -126,11 +126,6 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     # dialog opener below would otherwise hit an assert). No-op before the login
     # check so a logged-out user pressing the hotkey on a non-AnkiHub note
     # doesn't get a misleading login prompt.
-    # The button is visually disabled when the note isn't an AnkiHub note type;
-    # the keyboard shortcut still fires, but there's nothing to do (and the
-    # dialog opener below would otherwise hit an assert). No-op before the login
-    # check so a logged-out user pressing the hotkey on a non-AnkiHub note
-    # doesn't get a misleading login prompt.
     note = editor.note
     if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
         return
