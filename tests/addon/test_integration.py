@@ -150,6 +150,7 @@ from ankihub.gui.browser.custom_search_nodes import (
     AnkiHubNoteTypeSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+from ankihub.gui.browser.sidebar_tooltip import RICH_TOOLTIP_ATTR, SidebarTooltipController
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
@@ -4659,6 +4660,52 @@ class TestCustomSearchNodes:
             ):
                 AnkiHubNoteTypeSearchNode(browser, "invalid").filter_ids(all_nids)
 
+    def test_not_on_ankihub_composed_search(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        # Mirrors the "Not on AnkiHub" sidebar entry, which ANDs ankihub_note_type:yes with
+        # ankihub_note:no. The result should be exactly the notes on a registered AnkiHub note
+        # type that aren't yet in the AnkiHub DB - i.e. the notes the user can suggest as new.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            ah_note_type = aqt.mw.col.models.get(ah_note.mid)
+
+            # New local note on the registered AnkiHub note type, not yet in the AnkiHub DB.
+            not_on_ankihub_note = add_anki_note(note_type=ah_note_type)
+            # Note on a non-AnkiHub note type - must be excluded (it can't be suggested).
+            add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            type_yes = AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_nids)
+            composed = AnkiHubNoteSearchNode(browser, "no").filter_ids(type_yes)
+            assert composed == [not_on_ankihub_note.id]
+
+    def test_AnkiHubNoteTypeSearchNode_cards_mode(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        # In cards mode the node receives/returns card ids, mapping through notes internally.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            add_anki_note()  # non-AnkiHub note type, excluded
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = False
+
+            all_cids = aqt.mw.col.find_cards("")
+            ah_cids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid = {ah_note.anki_nid}")
+            assert sorted(AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_cids)) == sorted(ah_cids)
+
 
 class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
@@ -4688,7 +4735,7 @@ class TestBrowserTreeView:
             ankihub_child_item_names = [item.name for item in ankihub_item.children]
             assert ankihub_child_item_names == [
                 "On AnkiHub",
-                "Not on AnkiHub",
+                "Not on AnkiHub ⓘ",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",
@@ -4713,6 +4760,37 @@ class TestBrowserTreeView:
             browser.table.select_all()
             nids = browser.table.get_selected_note_ids()
             assert len(nids) == 3
+
+    # without this mark the test sometime fails on clean-up
+    @pytest.mark.qt_no_exception_capture
+    def test_not_on_ankihub_item_has_interactive_tooltip(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        config.public_config["sync_on_startup"] = False
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+            install_sample_ah_deck()
+
+            browser: Browser = dialogs.open("Browser", mw)
+            qtbot.wait(500)
+            sidebar: SidebarTreeView = browser.sidebar
+            ankihub_item: SidebarItem = sidebar.model().root.children[0]
+
+            # The "Not on AnkiHub" item opts into the interactive (clickable-link) tooltip.
+            not_on_ankihub_item = ankihub_item.children[1]
+            assert not_on_ankihub_item.name == "Not on AnkiHub ⓘ"
+            tooltip_html = getattr(not_on_ankihub_item, RICH_TOOLTIP_ATTR, None)
+            assert tooltip_html is not None
+            assert "community.ankihub.net/t/how-to-suggest-a-new-note" in tooltip_html
+
+            # The interactive tooltip controller is installed (idempotently) on the sidebar.
+            controller = getattr(sidebar, "_ankihub_tooltip_controller", None)
+            assert isinstance(controller, SidebarTooltipController)
 
     # without this mark the test sometime fails on clean-up
     @pytest.mark.qt_no_exception_capture
@@ -4749,7 +4827,7 @@ class TestBrowserTreeView:
             item_names = [item.name for item in ankihub_item.children]
             assert item_names == [
                 "On AnkiHub",
-                "Not on AnkiHub",
+                "Not on AnkiHub ⓘ",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",

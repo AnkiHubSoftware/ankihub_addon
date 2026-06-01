@@ -94,6 +94,7 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+from .sidebar_tooltip import RICH_TOOLTIP_ATTR, setup_sidebar_rich_tooltip
 
 
 @dataclass
@@ -813,6 +814,7 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
 # sidebar
 def _setup_ankihub_sidebar_tree():
     browser_will_build_tree.append(_on_browser_will_build_tree)
+    browser_will_show.append(lambda browser: setup_sidebar_rich_tooltip(browser.sidebar))
 
 
 def _on_browser_will_build_tree(
@@ -921,7 +923,8 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
     )
 
     not_on_ankihub_item = result.add_simple(
-        name="Not on AnkiHub",
+        # Trailing info glyph signals that the item has an explanatory tooltip (shown on hover).
+        name="Not on AnkiHub ⓘ",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         # Gate on the note type being registered with an AnkiHub deck (the same check the
@@ -933,13 +936,15 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             SearchNode(parsable_text=f"{AnkiHubNoteSearchNode.parameter_name}:no"),
         ),
     )
-    # TODO Confirm copy against the Figma mockup (NRT-766) before release.
-    not_on_ankihub_item.tooltip = (
-        "These notes use an AnkiHub note type but aren't on AnkiHub yet — either you created "
-        "them and haven't suggested them to a deck yet, or you've suggested them as new notes "
-        "and they're still waiting to be accepted.<br><br>"
-        'To share new notes, <a href="https://community.ankihub.net/t/how-to-suggest-a-new-note/288684">'
-        "suggest them to a deck</a>."
+    # Interactive tooltip (clickable link) shown via setup_sidebar_rich_tooltip; opt in by
+    # setting RICH_TOOLTIP_ATTR on the item rather than the plain (non-clickable) item.tooltip.
+    setattr(
+        not_on_ankihub_item,
+        RICH_TOOLTIP_ATTR,
+        "These notes use an AnkiHub note type but haven't been added to AnkiHub yet, "
+        "either because they haven't been "
+        '<a href="https://community.ankihub.net/t/how-to-suggest-a-new-note/288684">suggested</a> '
+        "yet, or because a maintainer hasn't approved them yet.",
     )
 
     result.add_simple(
