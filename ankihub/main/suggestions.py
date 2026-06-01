@@ -207,6 +207,13 @@ def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
     return result
 
 
+def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
+    """Coerce the cached globally-protected fields into the typed shape that
+    `_is_suggestible_from_diff`, `any_suggestible_from_diffs`, and the dialog
+    widget consume."""
+    return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
+
+
 def _is_suggestible_from_diff(
     note: Note,
     diff: NoteDiff,
