@@ -2106,9 +2106,8 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
-                # Mirror the dialog: the widget offers the non-empty AH field "Front"
-                # (the local "New Field" and empty "Back" aren't offered).
-                filters=BulkSuggestionFilters(fields_to_include_by_mid={NotetypeId(new_note.mid): ["Front"]}),
+                # No filters → suggest everything the diff found. The empty "Back" and the
+                # local "New Field" aren't part of the diff, so only "Front" ships.
             )
 
             assert bulk_suggestions_method_mock.call_count == 1
@@ -2230,8 +2229,7 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
-                # The widget offers the edited "Front" field (local "New Field" isn't on AnkiHub).
-                filters=BulkSuggestionFilters(fields_to_include_by_mid={NotetypeId(ah_note.mid): ["Front"]}),
+                # No filters → suggest everything the diff found (local "New Field" isn't on AnkiHub).
             )
 
             if note_has_changes and not note_is_marked_as_deleted:
@@ -2308,8 +2306,6 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
-                # Fields are moot here — the note is excluded for its empty first field.
-                filters=BulkSuggestionFilters(fields_to_include_by_mid={}),
             )
 
             # The note should not be sent to the API

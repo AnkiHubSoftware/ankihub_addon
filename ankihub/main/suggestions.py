@@ -348,7 +348,7 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
     media_upload_cb: MediaUploadCallback,
-    filters: BulkSuggestionFilters,
+    filters: Optional[BulkSuggestionFilters] = None,
     note_diffs: Optional[Mapping[NoteId, NoteDiff]] = None,
 ) -> BulkNoteSuggestionsResult:
     """
@@ -360,8 +360,10 @@ def suggest_notes_in_bulk(
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date).
 
-    `note_diffs` is the precomputed `compute_note_diffs` map (the dialog passes its
-    open-time copy); computed here when not supplied.
+    `filters=None` means no filter — ship everything each note's diff detected
+    (the dialog always passes an explicit per-mid selection instead). `note_diffs`
+    is the precomputed `compute_note_diffs` map (the dialog passes its open-time
+    copy); computed here when not supplied.
     """
     if note_diffs is None:
         note_diffs = compute_note_diffs(notes)
@@ -449,7 +451,7 @@ def _suggestions_for_notes(
     change_type: SuggestionType,
     comment: str,
     note_diffs: Mapping[NoteId, NoteDiff],
-    filters: BulkSuggestionFilters,
+    filters: Optional[BulkSuggestionFilters] = None,
 ) -> Tuple[
     Sequence[NewNoteSuggestion],
     Sequence[ChangeNoteSuggestion],
@@ -496,6 +498,10 @@ def _suggestions_for_notes(
     per_mid_filters: Dict[NotetypeId, PerNoteFilters] = {}
 
     def _filters_for(note: Note) -> PerNoteFilters:
+        if filters is None:
+            # No filter — ship everything the diff detected (same as the
+            # single-note path's `filters=None`).
+            return PerNoteFilters()
         mid = NotetypeId(note.mid)
         if mid not in per_mid_filters:
             per_mid_filters[mid] = filters.for_mid(mid)
