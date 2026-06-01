@@ -16,6 +16,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
+from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
@@ -68,18 +69,13 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     """
     # Server-controlled rollout gate: the suggestion dialog needs to ship before
     # auto-protect is safe to enable (otherwise edits get silently stripped on suggest).
-    if not (config.get_feature_flags() or {}).get("auto_protect_fields_when_edited", False):
+    if not config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False):
         return changed
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
-    if not ah_did:
+    if not ah_did or not config.deck_config(ah_did).auto_protect_fields_when_edited:
         return changed
 
-    deck_config = config.deck_config(ah_did)
-    if not deck_config.auto_protect_fields_when_edited:
-        return changed
-
-    # If all fields are already covered by the "All" tag, no per-field tag is needed.
     if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
         return changed
 
@@ -87,8 +83,7 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     if field_name == ANKIHUB_NOTE_TYPE_FIELD_NAME:
         return changed
 
-    # Skip if globally protected for this deck (managed by deck owner, not locally)
-    if field_name in config.globally_protected_fields_for_note_type(ah_did, note.mid):
+    if field_name in config.globally_protected_fields(ah_did).get(note.mid, []):
         return changed
 
     ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
@@ -101,21 +96,23 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     if field_name.lower() not in ah_field_names_lower:
         return changed
 
-    # ah_note.fields omits empty fields, so treat a missing field name as empty
-    ah_field_value = (ah_note.fields or {}).get(field_name, "")
     protection_tag = protection_tag_for_field(field_name)
+    is_protected = is_tag_in_list(protection_tag, note.tags)
+    # ah_note.fields omits empty fields, so treat a missing field name as empty.
+    ah_field_value = (ah_note.fields or {}).get(field_name, "")
     should_be_protected = note[field_name] != ah_field_value
-    if should_be_protected and not is_tag_in_list(protection_tag, note.tags):
-        # Field differs from AnkiHub version — add protection if not already present
+    if is_protected == should_be_protected:
+        return changed
+
+    if should_be_protected:
         note.tags.append(protection_tag)
-        update_notes_with_named_undo(f"AnkiHub | Auto-protect {field_name}", note)
-        return True
-    if not should_be_protected and is_tag_in_list(protection_tag, note.tags):
-        # Field matches AnkiHub version — remove protection tag if present
-        note.tags = [t for t in note.tags if t.lower() != protection_tag.lower()]
-        update_notes_with_named_undo(f"AnkiHub | Auto-unprotect {field_name}", note)
-        return True
-    return changed
+        verb = "protect"
+    else:
+        protection_tag_lower = protection_tag.lower()
+        note.tags = [t for t in note.tags if t.lower() != protection_tag_lower]
+        verb = "unprotect"
+    update_notes_with_named_undo(f"AnkiHub | Auto-{verb} {field_name}", note)
+    return True
 
 
 def _on_suggestion_button_press(editor: Editor) -> None:
