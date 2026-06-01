@@ -145,7 +145,11 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
-from ankihub.gui.browser.custom_search_nodes import AnkiHubNoteSearchNode, UpdatedSinceLastReviewSearchNode
+from ankihub.gui.browser.custom_search_nodes import (
+    AnkiHubNoteSearchNode,
+    AnkiHubNoteTypeSearchNode,
+    UpdatedSinceLastReviewSearchNode,
+)
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
@@ -4604,6 +4608,57 @@ class TestCustomSearchNodes:
             ):
                 AnkiHubNoteSearchNode(browser, "invalid").filter_ids(all_nids)
 
+    def test_AnkiHubNoteTypeSearchNode_yes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            # A note on a non-AnkiHub note type should be excluded.
+            add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_nids) == [ah_note.anki_nid]
+
+    def test_AnkiHubNoteTypeSearchNode_no(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            import_ah_note()
+            note = add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteTypeSearchNode(browser, "no").filter_ids(all_nids) == [note.id]
+
+    def test_AnkiHubNoteTypeSearchNode_invalid_value(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            with pytest.raises(
+                ValueError,
+                match=rf"Invalid value for {AnkiHubNoteTypeSearchNode.parameter_name}.+",
+            ):
+                AnkiHubNoteTypeSearchNode(browser, "invalid").filter_ids(all_nids)
+
 
 class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
@@ -4632,8 +4687,8 @@ class TestBrowserTreeView:
             # assert that all children of the ankihub_item exist
             ankihub_child_item_names = [item.name for item in ankihub_item.children]
             assert ankihub_child_item_names == [
-                "With AnkiHub ID",
-                "ID Pending",
+                "On AnkiHub",
+                "Not on AnkiHub",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",
@@ -4693,8 +4748,8 @@ class TestBrowserTreeView:
             # assert that all children of the ankihub_item exist
             item_names = [item.name for item in ankihub_item.children]
             assert item_names == [
-                "With AnkiHub ID",
-                "ID Pending",
+                "On AnkiHub",
+                "Not on AnkiHub",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",

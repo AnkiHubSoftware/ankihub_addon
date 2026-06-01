@@ -86,6 +86,7 @@ from .custom_columns import (
 )
 from .custom_search_nodes import (
     AnkiHubNoteSearchNode,
+    AnkiHubNoteTypeSearchNode,
     CustomSearchNode,
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -439,8 +440,9 @@ def _on_bulk_notes_suggest_action(
     if not filtered_nids:
         showInfo(
             "The selected notes need to have an AnkiHub note type.<br><br>"
-            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
-            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            "You can use <b>AnkiHub -> On AnkiHub</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> Not on AnkiHub</b> (for suggesting new notes) in the left sidebar "
+            "to find notes to suggest.",
             parent=browser,
         )
         return
@@ -449,8 +451,9 @@ def _on_bulk_notes_suggest_action(
         showInfo(
             f"{len(nids) - len(filtered_nids)} of the {len(nids)} selected notes don't have an AnkiHub note type "
             "and will be ignored.<br><br>"
-            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
-            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            "You can use <b>AnkiHub -> On AnkiHub</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> Not on AnkiHub</b> (for suggesting new notes) in the left sidebar "
+            "to find notes to suggest.",
             parent=browser,
         )
 
@@ -911,20 +914,32 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
     result.on_expanded = _set_ah_tree_expanded_in_ui_config
 
     result.add_simple(
-        name="With AnkiHub ID",
+        name="On AnkiHub",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:_*"),
     )
 
-    result.add_simple(
-        name="ID Pending",
+    not_on_ankihub_item = result.add_simple(
+        name="Not on AnkiHub",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
+        # Gate on the note type being registered with an AnkiHub deck (the same check the
+        # suggestion entrypoints use), not on the `ankihub_id` field-name search. This keeps
+        # out notes whose note type merely happens to carry an `ankihub_id` field (e.g. cloned
+        # or import-collision note type variants), which can't actually be suggested.
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:"),
+            SearchNode(parsable_text=f"{AnkiHubNoteTypeSearchNode.parameter_name}:yes"),
             SearchNode(parsable_text=f"{AnkiHubNoteSearchNode.parameter_name}:no"),
         ),
+    )
+    # TODO Confirm copy against the Figma mockup (NRT-766) before release.
+    not_on_ankihub_item.tooltip = (
+        "These notes use an AnkiHub note type but aren't on AnkiHub yet — either you created "
+        "them and haven't suggested them to a deck yet, or you've suggested them as new notes "
+        "and they're still waiting to be accepted.<br><br>"
+        'To share new notes, <a href="https://community.ankihub.net/t/how-to-suggest-a-new-note/288684">'
+        "suggest them to a deck</a>."
     )
 
     result.add_simple(
