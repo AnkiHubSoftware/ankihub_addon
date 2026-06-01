@@ -14,6 +14,7 @@ from aqt.progress import ProgressDialog
 from aqt.qt import (
     QAbstractAnimation,
     QApplication,
+    QColor,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -22,6 +23,8 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QPainter,
+    QPixmap,
     QPropertyAnimation,
     QPushButton,
     QScrollArea,
@@ -654,6 +657,20 @@ def warning_icon() -> QIcon:
 def warning_triangle_icon() -> QIcon:
     """Flat, muted-gray warning triangle (vs the OS-styled yellow `warning_icon`)."""
     return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))
+
+
+def tinted_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
+    """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
+    and antialiased edges stay intact). Used to theme flat single-color icons."""
+    out = QPixmap(pixmap.size())
+    out.setDevicePixelRatio(pixmap.devicePixelRatio())
+    out.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(out)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(out.rect(), color)
+    painter.end()
+    return out
 
 
 def question_icon() -> QIcon:

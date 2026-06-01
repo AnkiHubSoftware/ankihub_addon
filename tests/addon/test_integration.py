@@ -216,6 +216,7 @@ from ankihub.main.suggestions import (
     PerNoteFilters,
     any_suggestible_from_diffs,
     compute_note_diffs,
+    has_empty_first_field,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -2507,6 +2508,26 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 1
             assert ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(result.errors_by_nid[note.id])
+
+    def test_has_empty_first_field_treats_html_only_as_empty(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """has_empty_first_field uses Anki's fields_check, so an HTML-only first
+        field (no visible content) counts as empty — a plain `.strip()` would miss it."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note = add_anki_note(note_type=import_ah_note_type(ah_did=ah_did))
+
+            note["Front"] = ""
+            assert has_empty_first_field(note)
+            note["Front"] = "<br>"
+            assert has_empty_first_field(note)
+            note["Front"] = "real content"
+            assert not has_empty_first_field(note)
 
     def test_suggestion_for_multiple_notes(
         self,

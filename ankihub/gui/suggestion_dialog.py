@@ -14,7 +14,6 @@ from anki.notes import Note, NoteId
 from anki.utils import is_mac
 from aqt.qt import (
     QCheckBox,
-    QColor,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -24,9 +23,7 @@ from aqt.qt import (
     QLabel,
     QLayout,
     QLineEdit,
-    QPainter,
     QPalette,
-    QPixmap,
     QPlainTextEdit,
     QRect,
     QScrollArea,
@@ -77,6 +74,7 @@ from .utils import (
     active_window_or_mw,
     show_error_dialog,
     show_tooltip,
+    tinted_pixmap,
     warning_triangle_icon,
 )
 
@@ -1256,20 +1254,6 @@ class _GroupController:
 _FIRST_FIELD_LOCK_TOOLTIP = "The first field is required for new-note suggestions."
 
 
-def _tint_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
-    """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
-    and antialiased edges stay intact). Used to theme the flat warning icon."""
-    out = QPixmap(pixmap.size())
-    out.setDevicePixelRatio(pixmap.devicePixelRatio())
-    out.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(out)
-    painter.drawPixmap(0, 0, pixmap)
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-    painter.fillRect(out.rect(), color)
-    painter.end()
-    return out
-
-
 class IncludeInSuggestionWidget(QWidget):
     """Selector for which edited fields and tag changes to include in the
     outgoing suggestion. Shown for change-note and new-note flows; hidden
@@ -1511,7 +1495,7 @@ class IncludeInSuggestionWidget(QWidget):
         muted = self.palette().color(QPalette.ColorRole.PlaceholderText)
 
         icon_label = QLabel()
-        icon_label.setPixmap(_tint_pixmap(warning_triangle_icon().pixmap(QSize(32, 32)), muted))
+        icon_label.setPixmap(tinted_pixmap(warning_triangle_icon().pixmap(QSize(32, 32)), muted))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
 

@@ -17,7 +17,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
-from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
+from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG, has_empty_first_field
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
@@ -153,10 +153,10 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     # and then open the suggestion dialog.
     if editor.note.id == 0:
         # add_current_note() only fires add_cards_did_add_note on a *successful*
-        # add. An empty first field makes the add fail silently, which would
-        # leave on_did_add_note registered and later fire it for an unrelated
-        # note — so bail before registering when the note can't be added.
-        if not editor.note.fields or not editor.note.fields[0].strip():
+        # add. An empty first field makes the add fail, which would leave
+        # on_did_add_note registered and later fire it for an unrelated note —
+        # so bail before registering when the note can't be added.
+        if has_empty_first_field(editor.note):
             tooltip("The first field is empty.")
             return
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)

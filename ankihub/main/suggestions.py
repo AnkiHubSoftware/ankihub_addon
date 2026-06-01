@@ -25,7 +25,7 @@ from typing import (
 
 import aqt
 from anki.models import NotetypeDict, NotetypeId
-from anki.notes import Note, NoteId
+from anki.notes import Note, NoteFieldsCheckResult, NoteId
 from anki.utils import ids2str
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -78,11 +78,11 @@ class MediaUploadCallback(Protocol):
     def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None: ...
 
 
-def _has_empty_first_field(note: Note) -> bool:
-    """Returns True if the first field of the note is empty or whitespace-only."""
-    if not note.fields:
-        return True
-    return not note.fields[0].strip()
+def has_empty_first_field(note: Note) -> bool:
+    """True when the note's first field is empty per Anki's own check, which
+    strips HTML/whitespace (so e.g. a "<br>"-only field counts as empty) —
+    matching what the Add screen and the server treat as an empty first field."""
+    return note.fields_check() == NoteFieldsCheckResult.EMPTY
 
 
 @dataclass
@@ -226,7 +226,7 @@ def _is_suggestible_from_diff(
         return diff.exists_in_ah_db
     # The submit path drops these as EMPTY_FIRST_FIELD for non-DELETE
     # change types; mirror that so we don't accept a note we'll just reject.
-    if _has_empty_first_field(note):
+    if has_empty_first_field(note):
         return False
     denied = set(globally_protected_by_mid.get(NotetypeId(note.mid), ()))
     if not diff.exists_in_ah_db and note.note_type()["flds"][0]["name"] in denied:
@@ -280,7 +280,7 @@ def suggest_note_update(
 
     # DELETE doesn't carry field content, so the empty-first-field requirement
     # doesn't apply — users should be able to delete malformed notes.
-    if _has_empty_first_field(note) and change_type != SuggestionType.DELETE:
+    if has_empty_first_field(note) and change_type != SuggestionType.DELETE:
         return ChangeSuggestionResult.EMPTY_FIRST_FIELD
 
     suggestion = _change_note_suggestion(note, change_type, comment, filters=filters)
@@ -485,7 +485,7 @@ def _suggestions_for_notes(
     nids_with_empty_first_field: List[NoteId] = []
     for note in notes:
         # DELETE doesn't carry field content; allow notes with an empty first field through.
-        if _has_empty_first_field(note) and change_type != SuggestionType.DELETE:
+        if has_empty_first_field(note) and change_type != SuggestionType.DELETE:
             nids_with_empty_first_field.append(note.id)
             continue
 
