@@ -1218,6 +1218,12 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
 
+            # Edit the note so it's suggestible — otherwise the dialog's empty-state
+            # gate short-circuits before any suggestion is created.
+            note = aqt.mw.col.get_note(nids[0])
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
+
             suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(user_cancels=user_cancels)
 
             open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)

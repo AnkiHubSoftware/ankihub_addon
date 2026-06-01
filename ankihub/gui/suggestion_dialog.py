@@ -47,7 +47,6 @@ from ..main.suggestions import (
     ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
-    AUTO_PROTECT_FEATURE_FLAG,
     BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
     ChangeSuggestionResult,
@@ -90,7 +89,7 @@ class SuggestionMetadata:
     auto_accept: bool = False
     change_type: Optional[SuggestionType] = None
     source: Optional[SuggestionSource] = None
-    filters: BulkSuggestionFilters = field(default_factory=BulkSuggestionFilters)
+    filters: BulkSuggestionFilters = field(default_factory=lambda: BulkSuggestionFilters(fields_to_include_by_mid={}))
 
 
 def open_suggestion_dialog_for_single_suggestion(
@@ -260,9 +259,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 
     diffs = compute_note_diffs(notes)
 
-    if config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False) and not any_suggestible_from_diffs(
-        notes, diffs, preselected_change_type, globally_protected
-    ):
+    if not any_suggestible_from_diffs(notes, diffs, preselected_change_type, globally_protected):
         show_tooltip("No changes to suggest. Try syncing with AnkiHub first.", parent=parent)
         return
 
@@ -274,6 +271,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         callback=lambda suggestion_meta: _on_suggestion_dialog_for_bulk_suggestion_closed(
             suggestion_meta=suggestion_meta,
             notes=notes,
+            note_diffs=diffs,
             ah_did=ah_did,
             parent=parent,
         ),
@@ -289,6 +287,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 def _on_suggestion_dialog_for_bulk_suggestion_closed(
     suggestion_meta: SuggestionMetadata,
     notes: List[Note],
+    note_diffs: Mapping[NoteId, NoteDiff],
     ah_did: uuid.UUID,
     parent: QWidget,
 ) -> None:
@@ -310,6 +309,7 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_upload_cb,
             filters=suggestion_meta.filters,
+            note_diffs=note_diffs,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
@@ -510,11 +510,7 @@ class SuggestionDialog(QDialog):
         content_row.setSpacing(16)
         outer_layout.addLayout(content_row, 1)
 
-        if (
-            config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
-            and self._notes
-            and self._ah_did is not None
-        ):
+        if self._notes and self._ah_did is not None:
             assert self._note_diffs is not None  # paired with `_notes`; see __init__
             self._fields_widget = IncludeInSuggestionWidget(
                 notes=self._notes,
@@ -637,7 +633,11 @@ class SuggestionDialog(QDialog):
         return self._fields_widget is not None and self._fields_widget.isVisible()
 
     def suggestion_meta(self) -> Optional[SuggestionMetadata]:
-        filters = self._fields_widget.suggestion_filters() if self._fields_widget_active() else BulkSuggestionFilters()
+        filters = (
+            self._fields_widget.suggestion_filters()
+            if self._fields_widget_active()
+            else BulkSuggestionFilters(fields_to_include_by_mid={})
+        )
         return SuggestionMetadata(
             change_type=self._change_type(),
             comment=self._comment(),

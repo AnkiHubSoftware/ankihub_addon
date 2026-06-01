@@ -44,16 +44,9 @@ from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
-from ..settings import config
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 from .utils import get_anki_nid_to_mid_dict, is_tag_in_list, md5_file_hash
-
-# The Fields-to-Suggest selector and the auto-protect-on-edit hook share this
-# flag — auto-protect's silent tagging only makes sense if the dialog surfaces
-# those tags back to the user.
-AUTO_PROTECT_FEATURE_FLAG = "auto_protect_fields_when_edited"
-
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -104,21 +97,23 @@ class BulkSuggestionFilters:
     """Same as `PerNoteFilters` but keyed by note type for the bulk-suggest
     path — the dialog groups field selections by mid because the widget
     has one section per note type. Tag filters apply across all notes.
+
+    `fields_to_include_by_mid` is required: the dialog's widget always renders
+    and produces a (possibly empty) per-mid selection, so there's no "no field
+    filter" state to represent. Pass `{}` for the field-less paths (DELETE, or
+    a dialog opened without notes).
     """
 
-    fields_to_include_by_mid: Optional[Mapping[NotetypeId, Collection[str]]] = None
+    fields_to_include_by_mid: Mapping[NotetypeId, Collection[str]]
     tags_to_add: Optional[Collection[str]] = None
     tags_to_remove: Optional[Collection[str]] = None
 
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
-        # `fields_to_include_by_mid` non-None but missing this mid means the
-        # widget rendered no field section for it (every edit was globally
-        # protected). Treat that as an empty allowlist — NOT "no filter" —
-        # so the diff can't ship fields the user never saw or selected.
+        # A mid missing from the map means the widget rendered no field section
+        # for it (every edit was globally protected). Treat that as an empty
+        # allowlist so the diff can't ship fields the user never saw or selected.
         return PerNoteFilters(
-            fields_to_include=(
-                self.fields_to_include_by_mid.get(mid, ()) if self.fields_to_include_by_mid is not None else None
-            ),
+            fields_to_include=self.fields_to_include_by_mid.get(mid, ()),
             tags_to_add=self.tags_to_add,
             tags_to_remove=self.tags_to_remove,
         )
@@ -134,6 +129,7 @@ class NoteDiff:
 
     exists_in_ah_db: bool  # AH DB has a row for this note (deleted or not)
     is_deleted_on_remote: bool  # row exists AND is marked deleted
+    cur: NoteInfo  # the Anki note converted to a NoteInfo (include_empty_fields + protected)
     ah_note: Optional[NoteInfo]  # AH-stored version; None for new-note candidates and deleted notes
     # For change-note: field names whose value differs from AH.
     # For new-note: all non-empty field names.
@@ -197,6 +193,7 @@ def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
         result[nid] = NoteDiff(
             exists_in_ah_db=ah_db_row is not None,
             is_deleted_on_remote=is_deleted_on_remote,
+            cur=cur,
             ah_note=ah_note,
             edited_fields=edited_fields,
             added_tags=added_tags,
@@ -349,6 +346,7 @@ def suggest_notes_in_bulk(
     comment: str,
     media_upload_cb: MediaUploadCallback,
     filters: Optional[BulkSuggestionFilters] = None,
+    note_diffs: Optional[Mapping[NoteId, NoteDiff]] = None,
 ) -> BulkNoteSuggestionsResult:
     """
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
@@ -358,14 +356,21 @@ def suggest_notes_in_bulk(
     database. To create suggestions for notes that differ from the
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date).
+
+    `note_diffs` is the open-time `compute_note_diffs` map; the suggestion dialog
+    threads it through so the submit path reuses the conversions instead of
+    re-deriving them. Recomputed here if not supplied (standalone callers/tests).
     """
+    if note_diffs is None:
+        note_diffs = compute_note_diffs(notes)
+
     (
         new_note_suggestions,
         change_note_suggestions,
         nids_without_changes,
         nids_deleted_on_remote,
         nids_with_empty_first_field,
-    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment, filters=filters)
+    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment, note_diffs, filters=filters)
 
     new_note_suggestions = cast(
         Sequence[NewNoteSuggestion],
@@ -441,6 +446,7 @@ def _suggestions_for_notes(
     ankihub_did: uuid.UUID,
     change_type: SuggestionType,
     comment: str,
+    note_diffs: Mapping[NoteId, NoteDiff],
     filters: Optional[BulkSuggestionFilters] = None,
 ) -> Tuple[
     Sequence[NewNoteSuggestion],
@@ -464,14 +470,6 @@ def _suggestions_for_notes(
     - nids_deleted_on_remote
     - nids_with_empty_first_field
     """
-    anki_nids = [note.id for note in notes]
-
-    ah_db_notes = execute_list_query_in_chunks(
-        lambda anki_nids: AnkiHubNote.filter(anki_note_id__in=anki_nids),
-        ids=anki_nids,
-    )
-    ah_db_note_by_anki_nid = {NoteId(ah_db_note.anki_note_id): ah_db_note for ah_db_note in ah_db_notes}
-
     notes_for_new_note_suggestions = []
     notes_for_change_note_suggestions = []
     nids_deleted_on_remote = []
@@ -482,16 +480,18 @@ def _suggestions_for_notes(
             nids_with_empty_first_field.append(note.id)
             continue
 
-        if ah_db_note := ah_db_note_by_anki_nid.get(note.id):
-            ah_db_note = cast(AnkiHubNote, ah_db_note)
-            if ah_db_note.was_deleted():
+        # Reuse the AH-DB membership the diff already resolved instead of
+        # re-running the `AnkiHubNote.filter(anki_note_id__in=...)` batch query.
+        diff = note_diffs[NoteId(note.id)]
+        if diff.exists_in_ah_db:
+            if diff.is_deleted_on_remote:
                 nids_deleted_on_remote.append(note.id)
             else:
                 notes_for_change_note_suggestions.append(note)
         else:
             notes_for_new_note_suggestions.append(note)
 
-    filters = filters or BulkSuggestionFilters()
+    filters = filters or BulkSuggestionFilters(fields_to_include_by_mid={})
     # Cache per-mid projection across the two loops — same mid → same
     # PerNoteFilters, so we only need one dict allocation per distinct mid.
     per_mid_filters: Dict[NotetypeId, PerNoteFilters] = {}
@@ -511,6 +511,7 @@ def _suggestions_for_notes(
             change_type=change_type,
             comment=comment,
             filters=_filters_for(note),
+            diff=note_diffs[NoteId(note.id)],
         )
         if change_suggestion is not None:
             change_note_suggestions.append(change_suggestion)
@@ -524,6 +525,7 @@ def _suggestions_for_notes(
             ah_did=ankihub_did,
             comment=comment,
             filters=_filters_for(note),
+            diff=note_diffs[NoteId(note.id)],
         )
         if new_suggestion is not None:
             new_note_suggestions.append(new_suggestion)
@@ -562,13 +564,15 @@ def _new_note_suggestion(
     ah_did: uuid.UUID,
     comment: str,
     filters: Optional[PerNoteFilters] = None,
+    diff: Optional[NoteDiff] = None,
 ) -> Optional[NewNoteSuggestion]:
     # `tags_to_remove` on `filters` is ignored — new notes have no AH baseline
     # to remove tags from.
     filters = filters or PerNoteFilters()
-    note_data = to_note_data(
-        note, set_new_id=True, include_protected_fields=config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
-    )
+    # Reuse the open-time conversion when threaded from the bulk diff map. `cur`
+    # includes empty fields, but the user's allowlist (which the widget builds
+    # from non-empty fields only) drops them, so the shipped fields match.
+    note_data = diff.cur if diff is not None else to_note_data(note, set_new_id=True, include_protected_fields=True)
     fields = _apply_field_allowlist(list(note_data.fields), filters.fields_to_include)
     tags = _apply_tag_allowlist(list(note_data.tags or []), filters.tags_to_add)
 
@@ -584,7 +588,10 @@ def _new_note_suggestion(
 
     return NewNoteSuggestion(
         ah_did=ah_did,
-        ah_nid=note_data.ah_nid,
+        # New notes have no AnkiHub id yet; mint one. (`diff.cur.ah_nid` is None
+        # for new-note candidates, and the non-diff path's `set_new_id` already
+        # generated one — normalize both here.)
+        ah_nid=note_data.ah_nid if note_data.ah_nid is not None else uuid.uuid4(),
         anki_nid=note.id,
         fields=fields,
         tags=tags,
@@ -600,12 +607,13 @@ def _change_note_suggestion(
     change_type: SuggestionType,
     comment: str,
     filters: Optional[PerNoteFilters] = None,
+    diff: Optional[NoteDiff] = None,
 ) -> Optional[ChangeNoteSuggestion]:
     filters = filters or PerNoteFilters()
-    note_from_anki_db = to_note_data(
-        note,
-        include_empty_fields=True,
-        include_protected_fields=config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False),
+    # Reuse the open-time conversions when threaded from the bulk diff map;
+    # `cur` is built with the same include_empty_fields + include_protected_fields.
+    note_from_anki_db = (
+        diff.cur if diff is not None else to_note_data(note, include_empty_fields=True, include_protected_fields=True)
     )
     assert isinstance(note_from_anki_db, NoteInfo)
     assert note_from_anki_db.ah_nid is not None
@@ -616,7 +624,8 @@ def _change_note_suggestion(
     fields_that_changed: List[Field] = []
 
     if change_type != SuggestionType.DELETE:
-        note_from_ah_db = ankihub_db.note_data(note.id)
+        note_from_ah_db = diff.ah_note if diff is not None else ankihub_db.note_data(note.id)
+        assert note_from_ah_db is not None
 
         added_tags, removed_tags = _added_and_removed_tags(
             prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags

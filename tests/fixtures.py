@@ -30,6 +30,7 @@ from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
+from ankihub.main.suggestions import BulkSuggestionFilters
 from ankihub.main.utils import modified_note_type
 from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 from ankihub.user_state import _fetch_feature_flags_and_user_details
@@ -617,9 +618,21 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
             if user_cancels:
                 suggestion_metadata = None
             else:
+                # Mirror the real dialog's default selection (every edited field
+                # checked) by building the per-mid allowlist from the diffs the
+                # dialog was handed.
+                notes = kwargs.get("notes", ())
+                note_diffs = kwargs.get("note_diffs") or {}
+                fields_by_mid: Dict[NotetypeId, List[str]] = {}
+                for note in notes:
+                    selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
+                    for name in note_diffs[note.id].edited_fields:
+                        if name not in selected:
+                            selected.append(name)
                 suggestion_metadata = SuggestionMetadata(
                     comment="test",
                     change_type=suggestion_type,
+                    filters=BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid),
                 )
             aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))
             return suggestion_dialog_mock
