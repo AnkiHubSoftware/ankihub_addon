@@ -2146,8 +2146,8 @@ class TestSuggestNotesInBulk:
     ):
         """Two new notes of the same note type: "Back" is non-empty on the first, so the
         widget allowlists it for the mid (selections aggregate per note type). It must NOT
-        ship as an empty field on the second note where it's blank — `diff.cur` includes
-        empty fields, so the builder has to drop them before the allowlist."""
+        ship as an empty field on the second note where it's blank — `diff.local_note`
+        includes empty fields, so the builder has to drop them before the allowlist."""
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did)
