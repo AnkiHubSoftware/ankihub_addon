@@ -78,13 +78,6 @@ class MediaUploadCallback(Protocol):
     def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None: ...
 
 
-def has_empty_first_field(note: Note) -> bool:
-    """True when the note's first field is empty per Anki's own check, which
-    strips HTML/whitespace (so e.g. a "<br>"-only field counts as empty) —
-    matching what the Add screen and the server treat as an empty first field."""
-    return note.fields_check() == NoteFieldsCheckResult.EMPTY
-
-
 @dataclass
 class PerNoteFilters:
     """Allowlists that select what content goes into one note's suggestion.
@@ -212,6 +205,13 @@ def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[
     `_is_suggestible_from_diff`, `any_suggestible_from_diffs`, and the dialog
     widget consume."""
     return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
+
+
+def has_empty_first_field(note: Note) -> bool:
+    """True when the note's first field is empty per Anki's own check, which
+    strips HTML/whitespace (so e.g. a "<br>"-only field counts as empty) —
+    matching what the Add screen and the server treat as an empty first field."""
+    return note.fields_check() == NoteFieldsCheckResult.EMPTY
 
 
 def _is_suggestible_from_diff(
