@@ -4672,7 +4672,7 @@ class TestCustomSearchNodes:
         # type that aren't yet in the AnkiHub DB - i.e. the notes the user can suggest as new.
         with anki_session_with_addon_data.profile_loaded():
             ah_note = import_ah_note()
-            ah_note_type = aqt.mw.col.models.get(ah_note.mid)
+            ah_note_type = aqt.mw.col.models.get(NotetypeId(ah_note.mid))
 
             # New local note on the registered AnkiHub note type, not yet in the AnkiHub DB.
             not_on_ankihub_note = add_anki_note(note_type=ah_note_type)

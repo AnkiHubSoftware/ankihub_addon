@@ -15,6 +15,7 @@ because a non-activating popup window doesn't reliably receive mouse-move events
 over a non-key window. The link is still styled and clickable.)
 """
 
+import re
 from typing import Optional, Tuple
 
 from anki.utils import is_mac
@@ -31,8 +32,8 @@ from aqt.qt import (
     QObject,
     QPainter,
     QPaintEvent,
-    QPen,
     QPoint,
+    QRectF,
     QStyle,
     Qt,
     QTimer,
@@ -84,29 +85,44 @@ class _RichTooltipPopup(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.addWidget(self._label)
 
-        # Match Anki's native tooltip colors (see stylesheets.py: QToolTip uses FG / CANVAS).
-        # The border is drawn in paintEvent (not here) so it stays a single device pixel.
-        self.setStyleSheet(
-            f"#ankihubRichTooltip {{ background-color: {theme_manager.var(colors.CANVAS)}; }}"
-            f" QLabel {{ color: {theme_manager.var(colors.FG)}; background: transparent; }}"
-        )
+        # Only the label text color is set via QSS. The background is painted in paintEvent
+        # (not via QSS) because QSS background-color isn't reliably applied to a top-level
+        # window - relying on it let the system palette (dark desktop) show through in light mode.
+        self._apply_label_color()
+
+    def _apply_label_color(self) -> None:
+        self._label.setStyleSheet(f"QLabel {{ color: {theme_manager.var(colors.FG)}; background: transparent; }}")
 
     def set_html(self, html: str) -> None:
+        self._apply_label_color()
+        # Force the link color inline. The default <a> color (palette Link role) renders too
+        # light on light themes and too dark on dark; a widget stylesheet can't target links and
+        # would override a palette change anyway. An inline style on the anchor is always honored.
+        link_color = theme_manager.var(colors.FG_LINK)
+        html = re.sub(r"<a (?![^>]*\bstyle=)", f'<a style="color: {link_color};" ', html)
         self._label.setText(html)
         self.adjustSize()
 
     def paintEvent(self, event: Optional[QPaintEvent]) -> None:
-        super().paintEvent(event)
-        # Draw a square 1-device-pixel border like a native QToolTip. A cosmetic pen (width 0)
-        # stays 1px regardless of display scaling, unlike a QSS "1px" (= 1 logical pixel).
-        # macOS native tooltips use a muted gray border (FG_FAINT); other platforms (Fusion /
-        # Windows styles) draw the frame in the text color (FG).
+        # Fill the background and draw the border ourselves. Match Anki's native tooltip colors
+        # (see stylesheets.py: QToolTip uses FG / CANVAS); colors are resolved here so a
+        # mid-session theme switch is picked up.
         painter = QPainter(self)
-        pen = QPen(theme_manager.qcolor(colors.FG_FAINT if is_mac else colors.FG))
-        pen.setCosmetic(True)
-        pen.setWidth(0)
-        painter.setPen(pen)
-        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        rect = self.rect()
+        painter.fillRect(rect, theme_manager.qcolor(colors.CANVAS))
+        # Border drawn as four filled edges (not a pen + drawRect, whose centered stroke makes the
+        # right/bottom edges look thicker than the half-clipped left/top edges). macOS native
+        # tooltips have a thin (1-device-pixel) muted-gray (FG_FAINT) border; other platforms
+        # (Fusion / Windows) use a 1-logical-pixel border in the text color (FG). Thickness is in
+        # logical px, so on macOS it's divided by the device pixel ratio to stay 1 physical pixel.
+        border_color = theme_manager.qcolor(colors.FG_FAINT if is_mac else colors.FG)
+        dpr = self.devicePixelRatioF() or 1.0
+        t = (1.0 / dpr) if is_mac else 1.0
+        w, h = rect.width(), rect.height()
+        painter.fillRect(QRectF(0, 0, w, t), border_color)  # top
+        painter.fillRect(QRectF(0, h - t, w, t), border_color)  # bottom
+        painter.fillRect(QRectF(0, 0, t, h), border_color)  # left
+        painter.fillRect(QRectF(w - t, 0, t, h), border_color)  # right
         painter.end()
 
 
