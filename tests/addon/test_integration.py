@@ -265,6 +265,18 @@ skip_test_fsrs_unsupported = pytest.mark.skipif(
 )
 
 
+def wait_for_js_truthy(qtbot: QtBot, web: AnkiWebView, js_expr: str) -> None:
+    """Poll the webview until `js_expr` evaluates truthy. Replaces fixed-wait + one-shot
+    DOM checks, which are unreliable when content is injected asynchronously (CI load)."""
+
+    def predicate() -> bool:
+        with qtbot.wait_callback() as callback:
+            web.evalWithCallback(js_expr, callback)
+        return bool(callback.args[0])
+
+    qtbot.wait_until(predicate)
+
+
 class InstallSampleAHDeck(Protocol):
     def __call__(self) -> Tuple[DeckId, uuid.UUID]: ...
 
@@ -7967,15 +7979,12 @@ class TestFlashCardSelector:
 
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
-            qtbot.wait(500)
-
             overview_web: AnkiWebView = aqt.mw.overview.web
-            with qtbot.wait_callback() as callback:
-                overview_web.evalWithCallback(
-                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
-                    callback,
-                )
-            callback.assert_called_with(True)
+            wait_for_js_truthy(
+                qtbot,
+                overview_web,
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+            )
 
     @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
