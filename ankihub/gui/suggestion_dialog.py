@@ -14,6 +14,7 @@ from anki.notes import Note, NoteId
 from anki.utils import is_mac
 from aqt.qt import (
     QCheckBox,
+    QColor,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -23,7 +24,9 @@ from aqt.qt import (
     QLabel,
     QLayout,
     QLineEdit,
+    QPainter,
     QPalette,
+    QPixmap,
     QPlainTextEdit,
     QRect,
     QScrollArea,
@@ -74,7 +77,7 @@ from .utils import (
     active_window_or_mw,
     show_error_dialog,
     show_tooltip,
-    warning_icon,
+    warning_triangle_icon,
 )
 
 
@@ -1253,6 +1256,20 @@ _EMPTY_STATE_TITLE = "No changes detected"
 _EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
 
 
+def _tint_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
+    """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
+    and antialiased edges stay intact). Used to theme the flat warning icon."""
+    out = QPixmap(pixmap.size())
+    out.setDevicePixelRatio(pixmap.devicePixelRatio())
+    out.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(out)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(out.rect(), color)
+    painter.end()
+    return out
+
+
 class IncludeInSuggestionWidget(QWidget):
     """Selector for which edited fields and tag changes to include in the
     outgoing suggestion. Shown for change-note and new-note flows; hidden
@@ -1493,8 +1510,14 @@ class IncludeInSuggestionWidget(QWidget):
         layout.setSpacing(6)
         container.setLayout(layout)
 
+        # Icon and hint share the subtitle's muted, theme-adaptive color. The
+        # triangle is recolored to that palette role; the exclamation is a
+        # transparent cutout in the SVG, so it shows the panel background through
+        # in either theme.
+        muted = self.palette().color(QPalette.ColorRole.PlaceholderText)
+
         icon_label = QLabel()
-        icon_label.setPixmap(warning_icon().pixmap(QSize(32, 32)))
+        icon_label.setPixmap(_tint_pixmap(warning_triangle_icon().pixmap(QSize(32, 32)), muted))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
 
