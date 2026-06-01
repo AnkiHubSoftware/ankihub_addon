@@ -182,8 +182,8 @@ from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
 from ankihub.gui.suggestion_dialog import (
-    _EMPTY_STATE_TITLE,
-    _SUBTITLE_EMPTY,
+    EMPTY_STATE_SUBTITLE,
+    EMPTY_STATE_TITLE,
     IncludeInSuggestionWidget,
     SuggestionDialog,
     open_suggestion_dialog_for_bulk_suggestion,
@@ -1999,10 +1999,10 @@ class TestFieldsToSuggestFilters:
             assert widget._added_tag_boxes == {}
             assert widget._removed_tag_boxes == {}
             assert not widget.has_any_selection()
-            assert widget._subtitle.text() == _SUBTITLE_EMPTY
+            assert widget._subtitle.text() == EMPTY_STATE_SUBTITLE
             assert widget._counter_label.text() == "0/0"
             label_texts = [label.text() for label in widget.findChildren(QLabel)]
-            assert _EMPTY_STATE_TITLE in label_texts
+            assert EMPTY_STATE_TITLE in label_texts
             # The empty state renders in the frame, not the (hidden) scroll area —
             # a word-wrapped label in a resizable scroll area squashes when short.
             assert widget._scroll.isHidden()

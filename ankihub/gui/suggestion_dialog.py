@@ -80,6 +80,13 @@ from .utils import (
     warning_triangle_icon,
 )
 
+# "Include in suggestion" panel copy. The subtitle switches to the EMPTY variant
+# (plus the warning) when the note has no edited fields and no tag changes.
+INCLUDE_SUBTITLE = "Select which fields you want to submit changes for"
+EMPTY_STATE_SUBTITLE = "Edit a note field to create a change suggestion"
+EMPTY_STATE_TITLE = "No changes detected"
+EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
+
 
 def _panel_background_color() -> str:
     """Background fill for the dialog's grouped panels (Include-in-suggestion + Source)."""
@@ -1248,13 +1255,6 @@ class _GroupController:
 
 _FIRST_FIELD_LOCK_TOOLTIP = "The first field is required for new-note suggestions."
 
-# Subtitle under the "Include in suggestion" title. Switches to the empty-state
-# variant when the note has nothing to suggest (no edited fields, no tag changes).
-_SUBTITLE_DEFAULT = "Select which fields you want to submit changes for"
-_SUBTITLE_EMPTY = "Edit a note field to create a change suggestion"
-_EMPTY_STATE_TITLE = "No changes detected"
-_EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
-
 
 def _tint_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
     """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
@@ -1334,7 +1334,7 @@ class IncludeInSuggestionWidget(QWidget):
         title_row.addWidget(self._counter_label)
         frame_layout.addLayout(title_row)
 
-        self._subtitle = QLabel(_SUBTITLE_DEFAULT)
+        self._subtitle = QLabel(INCLUDE_SUBTITLE)
         self._subtitle.setStyleSheet("color: palette(placeholder-text);")
         self._subtitle.setWordWrap(True)
         frame_layout.addWidget(self._subtitle)
@@ -1488,16 +1488,10 @@ class IncludeInSuggestionWidget(QWidget):
         self._body_layout.addStretch()
 
         if not (self._field_checkboxes or self._added_tag_boxes or self._removed_tag_boxes):
-            # Nothing to suggest: show an empty state instead of an empty panel.
-            # The dialog still opens (the user can pick Delete on change type),
-            # but the OK button stays disabled until there's a selection.
-            #
-            # The empty state lives in the frame (not the scroll area): the
-            # scroll area is for the checkbox list, and a word-wrapped label
-            # inside a `widgetResizable` QScrollArea squashes/overlaps when the
-            # panel is short. Hiding the scroll and centering the empty state in
-            # the frame keeps it readable at any dialog size.
-            self._subtitle.setText(_SUBTITLE_EMPTY)
+            # Nothing to suggest -> empty state in the frame, not the scroll area:
+            # a word-wrapped label in a widgetResizable QScrollArea squashes when
+            # the panel is short.
+            self._subtitle.setText(EMPTY_STATE_SUBTITLE)
             self._scroll.hide()
             self._frame_layout.addStretch()
             self._frame_layout.addWidget(self._build_empty_state())
@@ -1521,12 +1515,12 @@ class IncludeInSuggestionWidget(QWidget):
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
 
-        title = QLabel(_EMPTY_STATE_TITLE)
+        title = QLabel(EMPTY_STATE_TITLE)
         title.setStyleSheet("font-weight: bold;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        hint = QLabel(_EMPTY_STATE_HINT)
+        hint = QLabel(EMPTY_STATE_HINT)
         hint.setStyleSheet("color: palette(placeholder-text);")
         hint.setWordWrap(True)
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
