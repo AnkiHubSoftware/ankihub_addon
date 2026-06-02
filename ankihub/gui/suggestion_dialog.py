@@ -579,9 +579,11 @@ class SuggestionDialog(QDialog):
         self.source_widget_group_box = QGroupBox("Source (Required)")
         self.source_widget_group_box.setObjectName("sourceGroupBox")
         # Same neutral panel background as the Include-in-suggestion section.
+        # font-weight on the element (not ::title) overrides Anki's bold-title
+        # default, so "Source" stays regular like in Figma.
         self.source_widget_group_box.setStyleSheet(
             f"#sourceGroupBox {{ background-color: {_panel_background_color()}; "
-            f"border: none; border-radius: 6px; margin-top: 8px; }} "
+            f"border: none; border-radius: 6px; margin-top: 8px; font-weight: normal; }} "
             f"#sourceGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; "
             f"left: 6px; padding: 0 3px; }}"
         )
