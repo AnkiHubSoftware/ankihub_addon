@@ -61,7 +61,7 @@ class AnkiHubIdColumn(CustomColumn):
             if note["ankihub_id"]:
                 return note["ankihub_id"]
             else:
-                return "ID Pending"
+                return "Not on AnkiHub"
         else:
             return "Not AnkiHub Note Type"
 
