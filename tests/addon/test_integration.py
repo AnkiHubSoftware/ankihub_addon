@@ -206,6 +206,7 @@ from ankihub.main.note_type_management import add_note_type, add_note_type_field
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ankihub.main.suggestions import (
+    ANKIHUB_DUPLICATE_ANKI_ID_ERROR,
     ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
@@ -2203,6 +2204,58 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 1
             assert result.change_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 0
+
+    @pytest.mark.parametrize("conflict_is_deleted", [False, True])
+    def test_new_note_already_in_deck_is_surfaced_for_resubmit(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        conflict_is_deleted: bool,
+    ):
+        """A new-note suggestion rejected with the duplicate-anki_id error becomes a
+        resubmittable "already in this deck" entry; a soft-deleted conflict
+        is routed to the deleted-on-AnkiHub category instead."""
+        conflicting_ah_nid = next_deterministic_uuid()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_note = add_anki_note(note_type=note_type)
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "create_suggestions_in_bulk",
+                return_value={
+                    new_note.id: {
+                        "non_field_errors": [ANKIHUB_DUPLICATE_ANKI_ID_ERROR],
+                        "conflicting_ankihub_id": [str(conflicting_ah_nid)],
+                        "conflicting_note_deleted": ["True" if conflict_is_deleted else "False"],
+                    }
+                },
+            )
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[new_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            if conflict_is_deleted:
+                assert result.already_in_deck_by_nid == {}
+                assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(result.errors_by_nid[new_note.id])
+            else:
+                assert set(result.already_in_deck_by_nid) == {new_note.id}
+                conflict = result.already_in_deck_by_nid[new_note.id]
+                assert conflict.conflicting_ah_nid == conflicting_ah_nid
+                assert conflict.new_note_suggestion.anki_nid == new_note.id
+                # the error stays in errors_by_nid so it counts as failed
+                assert new_note.id in result.errors_by_nid
 
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",

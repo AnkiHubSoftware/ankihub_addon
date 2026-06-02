@@ -8,7 +8,6 @@ import uuid
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
-from textwrap import dedent
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import MagicMock, Mock, patch
 
@@ -118,6 +117,7 @@ from ankihub.gui.operations.utils import future_with_exception, future_with_resu
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.subdeck_due_date_dialog import _reminder_dialog_state
 from ankihub.gui.suggestion_dialog import (
+    BulkSuggestionSummaryDialog,
     SourceType,
     SuggestionDialog,
     SuggestionMetadata,
@@ -1261,102 +1261,44 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 
 
 class TestOnSuggestNotesInBulkDone:
-    def test_correct_message_is_shown(
+    def test_opens_bulk_summary_dialog(
         self,
         mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
-        nid_1 = NoteId(1)
-        nid_2 = NoteId(2)
-        nid_3 = NoteId(3)
-        nid_4 = NoteId(4)
+        dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.BulkSuggestionSummaryDialog")
+        ah_did = next_deterministic_uuid()
+        result = suggestions.BulkNoteSuggestionsResult(
+            errors_by_nid={NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR]},
+            change_note_suggestions_count=2,
+            new_note_suggestions_count=0,
+        )
         _on_suggest_notes_in_bulk_done(
-            future=future_with_result(
-                suggestions.BulkNoteSuggestionsResult(
-                    errors_by_nid={
-                        nid_1: ["some error"],
-                        nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
-                        nid_3: ["Note object does not exist"],
-                        nid_4: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
-                    },
-                    change_note_suggestions_count=10,
-                    new_note_suggestions_count=20,
-                )
-            ),
+            future=future_with_result(result),
             parent=aqt.mw,
+            ah_did=ah_did,
+            change_type=SuggestionType.UPDATED_CONTENT,
+            auto_accept=False,
         )
 
-        _, kwargs = showText_mock.call_args
-        assert (
-            kwargs.get("txt")
-            == dedent(
-                """
-                Submitted 10 change note suggestion(s).
-                Submitted 20 new note suggestion(s).
+        dialog_mock.assert_called_once()
+        _, kwargs = dialog_mock.call_args
+        assert kwargs["result"] is result
+        assert kwargs["ah_did"] == ah_did
 
-                Failed to submit suggestions for 4 note(s).
-                All notes with failed suggestions:
-                1, 2, 3, 4
-
-                Notes without changes (1):
-                2
-
-                Notes that don't exist on AnkiHub (1):
-                3
-
-                Notes with the first field empty (1):
-                4
-                """
-            ).strip()
-        )
-
-    def test_empty_categories_are_not_shown(
-        self,
-        mocker: MockerFixture,
-    ):
-        """Test that only non-empty categories are shown in the message."""
-        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
-        nid_1 = NoteId(1)
-        _on_suggest_notes_in_bulk_done(
-            future=future_with_result(
-                suggestions.BulkNoteSuggestionsResult(
-                    errors_by_nid={
-                        nid_1: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
-                    },
-                    change_note_suggestions_count=5,
-                    new_note_suggestions_count=3,
-                )
-            ),
-            parent=aqt.mw,
-        )
-
-        _, kwargs = showText_mock.call_args
-        # Only the "empty first field" category should be shown, not the others
-        assert (
-            kwargs.get("txt")
-            == dedent(
-                """
-                Submitted 5 change note suggestion(s).
-                Submitted 3 new note suggestion(s).
-
-                Failed to submit suggestions for 1 note(s).
-                All notes with failed suggestions:
-                1
-
-                Notes with the first field empty (1):
-                1
-                """
-            ).strip()
-        )
-
-    def test_with_exception_in_future(self):
+    def test_with_exception_in_future(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
         with pytest.raises(Exception):
             _on_suggest_notes_in_bulk_done(
                 future=future_with_exception(Exception("test")),
                 parent=aqt.mw,
+                ah_did=next_deterministic_uuid(),
+                change_type=SuggestionType.UPDATED_CONTENT,
+                auto_accept=False,
             )
 
-    def test_with_http_403_exception_in_future(self, mocker: MockerFixture):
+    def test_with_http_403_exception_in_future(
+        self, mocker: MockerFixture, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
         response = Response()
         response.status_code = 403
         response.json = lambda: {"detail": "test"}  # type: ignore
@@ -1369,9 +1311,288 @@ class TestOnSuggestNotesInBulkDone:
         _on_suggest_notes_in_bulk_done(
             future=future_with_exception(exception),
             parent=aqt.mw,
+            ah_did=next_deterministic_uuid(),
+            change_type=SuggestionType.UPDATED_CONTENT,
+            auto_accept=False,
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
+
+
+def _duplicate_anki_id_error(conflicting_ah_nid: uuid.UUID, deleted: bool = False) -> dict:
+    """The list-wrapped/stringified shape the backend returns (DRF normalization)."""
+    return {
+        "non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR],
+        "conflicting_ankihub_id": [str(conflicting_ah_nid)],
+        "conflicting_note_deleted": ["True" if deleted else "False"],
+    }
+
+
+class TestParseDuplicateAnkiIdError:
+    def test_parses_list_wrapped_stringified_payload(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
+        ah_nid = next_deterministic_uuid()
+        parsed = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid))
+        assert parsed == (ah_nid, False)
+
+    def test_deleted_flag_compares_against_literal_true(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
+        ah_nid = next_deterministic_uuid()
+        _, deleted = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid, deleted=True))
+        assert deleted is True
+        # "False" is a truthy string; must not be read as deleted.
+        _, deleted = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid, deleted=False))
+        assert deleted is False
+
+    def test_returns_none_for_unrelated_error(self):
+        assert suggestions.parse_duplicate_anki_id_error({"non_field_errors": ["something else"]}) is None
+        assert suggestions.parse_duplicate_anki_id_error([suggestions.ANKIHUB_NO_CHANGE_ERROR]) is None
+
+    def test_missing_conflicting_id_yields_none_id(self):
+        # Older server: duplicate message without the conflicting id.
+        parsed = suggestions.parse_duplicate_anki_id_error(
+            {"non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR]}
+        )
+        assert parsed == (None, False)
+
+
+class TestNewNoteToChangeSuggestionConverter:
+    def test_reuses_fields_and_tags_and_keys_by_conflicting_id(self, next_deterministic_uuid):
+        from ankihub.ankihub_client import Field, NewNoteSuggestion
+
+        ah_did = next_deterministic_uuid()
+        conflicting_ah_nid = next_deterministic_uuid()
+        new_note_suggestion = NewNoteSuggestion(
+            ah_nid=next_deterministic_uuid(),
+            anki_nid=123,
+            fields=[Field(name="Front", value="a"), Field(name="Back", value="b")],
+            comment="c",
+            ah_did=ah_did,
+            note_type_name="Basic",
+            anki_note_type_id=1,
+            tags=["t1", "t2"],
+            guid="g",
+        )
+
+        change = suggestions._new_note_to_change_suggestion(
+            new_note_suggestion, conflicting_ah_nid, SuggestionType.UPDATED_CONTENT
+        )
+
+        assert change.ah_nid == conflicting_ah_nid
+        assert change.anki_nid == 123
+        assert change.fields == new_note_suggestion.fields
+        assert change.added_tags == ["t1", "t2"]
+        assert change.removed_tags == []
+        assert change.change_type == SuggestionType.UPDATED_CONTENT
+
+
+def _make_already_in_deck_conflict(anki_nid: int, conflicting_ah_nid, next_deterministic_uuid):
+    from ankihub.ankihub_client import Field, NewNoteSuggestion
+
+    new_note_suggestion = NewNoteSuggestion(
+        ah_nid=next_deterministic_uuid(),
+        anki_nid=anki_nid,
+        fields=[Field(name="Front", value="x")],
+        comment="",
+        ah_did=next_deterministic_uuid(),
+        note_type_name="Basic",
+        anki_note_type_id=1,
+        tags=[],
+        guid="g",
+    )
+    return suggestions.AlreadyInDeckConflict(
+        new_note_suggestion=new_note_suggestion, conflicting_ah_nid=conflicting_ah_nid
+    )
+
+
+class TestBulkSuggestionSummaryDialog:
+    def _dialog(self, next_deterministic_uuid, errors_by_nid, already_in_deck_by_nid=None, change_count=1):
+        result = suggestions.BulkNoteSuggestionsResult(
+            errors_by_nid=errors_by_nid,
+            change_note_suggestions_count=change_count,
+            new_note_suggestions_count=0,
+            already_in_deck_by_nid=already_in_deck_by_nid or {},
+        )
+        return BulkSuggestionSummaryDialog(
+            result=result,
+            ah_did=next_deterministic_uuid(),
+            change_type=SuggestionType.UPDATED_CONTENT,
+            auto_accept=False,
+            parent=aqt.mw,
+        )
+
+    def test_categorizes_errors_excluding_already_in_deck(self, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={
+                NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                NoteId(2): [suggestions.ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR],
+                NoteId(3): [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
+                NoteId(4): ["something unexpected"],
+                NoteId(5): _duplicate_anki_id_error(conflicting),
+            },
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        cats = dialog._categorize()
+        assert cats["notes_without_changes"] == [NoteId(1)]
+        assert cats["notes_dont_exist"] == [NoteId(2)]
+        assert cats["empty_first_field"] == [NoteId(3)]
+        assert cats["other_errors"] == [NoteId(4)]  # NoteId(5) is in the action box, not Other errors
+        assert dialog._can_close() is False  # action required
+
+    def test_no_action_required_allows_close(self, next_deterministic_uuid):
+        dialog = self._dialog(next_deterministic_uuid, errors_by_nid={NoteId(1): ["x"]})
+        assert dialog._can_close() is True
+
+    def test_ignore_enables_close(self, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        assert dialog._can_close() is False
+        dialog._on_ignore()
+        assert dialog._action_state == "ignored"
+        assert dialog._can_close() is True
+        assert dialog._already_in_deck  # still rendered, just resolved
+
+    def _patch_resubmit(self, mocker, errors_returned):
+        mocker.patch(
+            "ankihub.gui.suggestion_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            return_value=errors_returned,
+        )
+        mocker.patch.object(
+            aqt.mw.taskman,
+            "with_progress",
+            side_effect=lambda task, on_done, parent: on_done(future_with_result(task())),
+        )
+
+    def test_resubmit_success_moves_to_submitted(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+            change_count=1,
+        )
+        self._patch_resubmit(mocker, errors_returned={})
+        dialog._on_resubmit()
+
+        assert dialog._change_submitted == 2
+        assert NoteId(5) not in dialog._errors_by_nid
+        assert dialog._already_in_deck == {}
+        assert dialog._action_state == "resolved"
+        assert dialog._can_close() is True
+        assert "change_submitted" in dialog._updated_keys
+
+    def test_resubmit_partial_failure_recategorizes(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+            change_count=1,
+        )
+        self._patch_resubmit(mocker, errors_returned={NoteId(5): [suggestions.ANKIHUB_NO_CHANGE_ERROR]})
+        dialog._on_resubmit()
+
+        assert dialog._change_submitted == 1  # nothing succeeded
+        assert NoteId(5) in dialog._errors_by_nid
+        assert dialog._categorize()["notes_without_changes"] == [NoteId(5)]
+        assert "notes_without_changes" in dialog._updated_keys
+        assert dialog._can_close() is True
+
+    def test_hard_resubmit_failure_does_not_trap_user(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        mocker.patch("ankihub.gui.suggestion_dialog.show_error_dialog")
+        mocker.patch(
+            "ankihub.gui.suggestion_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            side_effect=Exception("network down"),
+        )
+
+        def run_failing(task, on_done, parent):
+            try:
+                on_done(future_with_result(task()))
+            except Exception as exc:
+                on_done(future_with_exception(exc))
+
+        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=run_failing)
+        dialog._on_resubmit()
+        assert dialog._can_close() is True  # Close re-enabled after a hard failure
+
+
+class TestMaybeHandleNoteAlreadyExists:
+    def _http_error(self, payload, status=400):
+        response = Response()
+        response.status_code = status
+        response.url = "https://app.ankihub.net/api/notes/.../suggestion/"
+        response.json = lambda: payload  # type: ignore
+        return AnkiHubHTTPError(response)
+
+    def test_resubmittable_conflict_shows_dialog(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        show_mock = mocker.patch("ankihub.gui.suggestion_dialog._show_note_already_exists_dialog")
+        ah_nid = next_deterministic_uuid()
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error(_duplicate_anki_id_error(ah_nid)),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is True
+        show_mock.assert_called_once()
+
+    def test_deleted_conflict_shows_deleted_dialog(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        show_error = mocker.patch("ankihub.gui.suggestion_dialog.show_error_dialog")
+        show_dialog = mocker.patch("ankihub.gui.suggestion_dialog._show_note_already_exists_dialog")
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error(_duplicate_anki_id_error(next_deterministic_uuid(), deleted=True)),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is True
+        show_error.assert_called_once()
+        show_dialog.assert_not_called()
+
+    def test_non_duplicate_error_is_not_handled(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error({"non_field_errors": ["unrelated"]}),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is False
+
+    def test_missing_conflicting_id_falls_back(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error({"non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR]}),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is False
 
 
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:

@@ -24,6 +24,7 @@ from aqt.qt import (
     QLineEdit,
     QPalette,
     QPlainTextEdit,
+    QPushButton,
     QRect,
     QScrollArea,
     QSize,
@@ -39,7 +40,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import show_info, showInfo, showText
+from aqt.utils import openLink, show_info, showInfo
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -53,6 +54,7 @@ from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     AUTO_PROTECT_FEATURE_FLAG,
+    AlreadyInDeckConflict,
     BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
     ChangeSuggestionResult,
@@ -60,6 +62,9 @@ from ..main.suggestions import (
     any_suggestible_from_diffs,
     compute_note_diffs,
     get_anki_nid_to_ah_dids_dict,
+    parse_duplicate_anki_id_error,
+    resubmit_new_note_as_change_suggestion,
+    resubmit_new_notes_as_change_suggestions_in_bulk,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -150,6 +155,130 @@ def open_suggestion_dialog_for_single_suggestion(
         globally_protected_fields_by_mid=_globally_protected_fields_by_mid(ah_did),
         parent=parent,
     )
+
+
+class NoteAlreadyExistsDialog(QDialog):
+    """Shown when a single new-note suggestion is rejected because the note already
+    exists in the deck on AnkiHub. Offers to resubmit the edits as a change
+    suggestion. Non-blocking; `on_send` runs when the user chooses to resubmit and
+    the dialog closes."""
+
+    def __init__(self, on_send: Callable[[], None], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._on_send = on_send
+        self.setWindowTitle("Note already exists in this deck")
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(16)
+
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        icon = QLabel()
+        icon.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation).pixmap(QSize(36, 36)))
+        icon.setAlignment(Qt.AlignmentFlag.AlignTop)
+        body.addWidget(icon)
+        message = QLabel(
+            "This note already exists in the AnkiHub deck. Send your edits as a change "
+            "suggestion instead, they'll go through the normal review process."
+        )
+        message.setWordWrap(True)
+        message.setMinimumWidth(320)
+        body.addWidget(message, 1)
+        layout.addLayout(body)
+
+        button_box = QDialogButtonBox()
+        cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        send_button = button_box.addButton("Send as change suggestion", QDialogButtonBox.ButtonRole.AcceptRole)
+        send_button.setDefault(True)
+        qconnect(cancel_button.clicked, self.reject)
+        qconnect(send_button.clicked, self._handle_send)
+        layout.addWidget(button_box)
+
+    def _handle_send(self) -> None:
+        # Close first, then kick off the resubmit; the result surfaces as a toast or
+        # an error dialog (the ticket: "the dialog closes on success").
+        self.accept()
+        self._on_send()
+
+
+def _show_note_already_exists_dialog(
+    note: Note,
+    ah_did: uuid.UUID,
+    conflicting_ah_nid: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> None:
+    LOGGER.info("error_dialog_shown", note_id=note.id, ah_did=str(ah_did))
+    # New-note flows carry no change type; resubmit as an "Updated content" change.
+    change_type = SuggestionType.UPDATED_CONTENT
+    per_note_filters = suggestion_meta.filters.for_mid(NotetypeId(note.mid))
+
+    def on_send() -> None:
+        LOGGER.info("resubmit_clicked", note_id=note.id, ah_did=str(ah_did))
+
+        def task() -> ChangeSuggestionResult:
+            return resubmit_new_note_as_change_suggestion(
+                note=note,
+                ah_did=ah_did,
+                conflicting_ah_nid=conflicting_ah_nid,
+                change_type=change_type,
+                comment=_comment_with_source(suggestion_meta),
+                auto_accept=suggestion_meta.auto_accept,
+                filters=per_note_filters,
+            )
+
+        def on_done(future: Future) -> None:
+            try:
+                result = future.result()
+            except AnkiHubHTTPError as e:
+                _handle_suggestion_error(e, parent)
+                return
+            if result == ChangeSuggestionResult.SUCCESS:
+                show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+            elif result == ChangeSuggestionResult.NO_CHANGES:
+                show_tooltip("No changes to suggest.", parent=parent)
+            elif result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+                show_error_dialog(
+                    "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                    title="Note has been deleted from AnkiHub.",
+                    parent=parent,
+                )
+
+        aqt.mw.taskman.with_progress(task=task, on_done=on_done, parent=parent)
+
+    NoteAlreadyExistsDialog(on_send=on_send, parent=parent).show()
+
+
+def _maybe_handle_note_already_exists(
+    e: AnkiHubHTTPError,
+    note: Note,
+    ah_did: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> bool:
+    """If the new-note submit was rejected because the note already exists in the deck,
+    handle it and return True. Returns False to let the generic error
+    handler run (not this error, or the server didn't include the conflicting id)."""
+    if e.response.status_code != 400:
+        return False
+    parsed = parse_duplicate_anki_id_error(e.response.json())
+    if parsed is None:
+        return False
+    conflicting_ah_nid, is_deleted = parsed
+    if is_deleted:
+        show_error_dialog(
+            "This note has been deleted from AnkiHub. No new suggestions can be made.",
+            title="Note has been deleted from AnkiHub.",
+            parent=parent,
+        )
+        return True
+    if conflicting_ah_nid is None:
+        # Older server without the conflicting id — fall back to generic handling.
+        return False
+    _show_note_already_exists_dialog(note, ah_did, conflicting_ah_nid, suggestion_meta, parent)
+    return True
 
 
 def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
@@ -247,6 +376,10 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 filters=per_note_filters,
             )
         except AnkiHubHTTPError as e:
+            if _maybe_handle_note_already_exists(
+                e=e, note=note, ah_did=ah_did, suggestion_meta=suggestion_meta, parent=parent
+            ):
+                return
             _handle_suggestion_error(e, parent)
             return
         if submitted:
@@ -329,7 +462,13 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             media_upload_cb=media_upload_cb,
             filters=suggestion_meta.filters,
         ),
-        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(
+            future,
+            parent,
+            ah_did=ah_did,
+            change_type=suggestion_meta.change_type,
+            auto_accept=suggestion_meta.auto_accept,
+        ),
         parent=parent,
     )
 
@@ -376,7 +515,354 @@ def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     return result
 
 
-def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
+SUPPORT_FORUM_URL = "https://community.ankihub.net/c/support"
+_MUTED_TEXT_COLOR = "#9aa0a6"
+
+# (key, label, error substring). "other_errors" is the catch-all and is not listed here.
+_BULK_ERROR_CATEGORIES = [
+    ("notes_without_changes", "Notes without changes", ANKIHUB_NO_CHANGE_ERROR),
+    ("notes_dont_exist", "Notes that don't exist on AnkiHub", ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR),
+    ("empty_first_field", "Notes with the first field empty", ANKIHUB_EMPTY_FIRST_FIELD_ERROR),
+]
+
+
+def _summary_color(positive: bool) -> str:
+    if positive:
+        return "#66bb6a" if theme_manager.night_mode else "#2e7d32"
+    return "#ef5350" if theme_manager.night_mode else "#c62828"
+
+
+def _summary_link_color() -> str:
+    return "#5b9bd5" if theme_manager.night_mode else "#1565c0"
+
+
+def _updated_badge_colors() -> "tuple":
+    return ("#23492c", "#9be8ab") if theme_manager.night_mode else ("#d8f5dd", "#1b7a2f")
+
+
+class BulkSuggestionSummaryDialog(QDialog):
+    """Summary shown after every bulk suggestion submit. Replaces the old plain-text
+    `showText` summary: categorizes results and offers an interactive "Notes already
+    in this deck" action that resubmits as change suggestions."""
+
+    def __init__(
+        self,
+        result: BulkNoteSuggestionsResult,
+        ah_did: uuid.UUID,
+        change_type: SuggestionType,
+        auto_accept: bool,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("AnkiHub | Bulk Suggestion Summary")
+        self.setMinimumWidth(500)
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+
+        self._errors_by_nid: Dict[NoteId, object] = dict(result.errors_by_nid)
+        self._already_in_deck: Dict[NoteId, AlreadyInDeckConflict] = dict(result.already_in_deck_by_nid)
+        self._change_submitted = result.change_note_suggestions_count
+        self._new_submitted = result.new_note_suggestions_count
+        self._ah_did = ah_did
+        self._change_type = change_type or SuggestionType.UPDATED_CONTENT
+        self._auto_accept = auto_accept
+        self._action_state = "default"  # default | loading | ignored | resolved
+        self._hard_error = False  # a failed resubmit attempt; keeps Close reachable
+        self._updated_keys: Set[str] = set()  # "change_submitted" + category keys to badge
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(16, 16, 16, 12)
+        outer.setSpacing(12)
+
+        # Content (summary + action box) is rebuilt on each state change. The category
+        # count is bounded (<= 5) and id lists are truncated, so the dialog stays a
+        # sensible size without a scroll area — and the action box + Close are always
+        # visible rather than scrolling off.
+        self._content_layout = QVBoxLayout()
+        self._content_layout.setContentsMargins(0, 0, 0, 0)
+        self._content_layout.setSpacing(12)
+        outer.addLayout(self._content_layout, 1)
+
+        footer = QHBoxLayout()
+        footer.addStretch(1)
+        self._close_button = QPushButton("Close")
+        qconnect(self._close_button.clicked, self.accept)
+        footer.addWidget(self._close_button)
+        outer.addLayout(footer)
+
+        if self._already_in_deck:
+            LOGGER.info("bulk_error_category_shown", ah_did=str(self._ah_did), count=len(self._already_in_deck))
+
+        self._render()
+
+    # --- state ------------------------------------------------------------
+    def _can_close(self) -> bool:
+        if self._action_state == "loading":
+            return False
+        if self._hard_error or self._action_state in ("ignored", "resolved"):
+            return True
+        return not self._already_in_deck
+
+    def _categorize(self) -> Dict[str, List[NoteId]]:
+        already = set(self._already_in_deck.keys())
+        cats: Dict[str, List[NoteId]] = {key: [] for key, _, _ in _BULK_ERROR_CATEGORIES}
+        cats["other_errors"] = []
+        for nid, errors in self._errors_by_nid.items():
+            if nid in already:
+                continue
+            error_text = str(errors)
+            for key, _, substring in _BULK_ERROR_CATEGORIES:
+                if substring in error_text:
+                    cats[key].append(nid)
+                    break
+            else:
+                cats["other_errors"].append(nid)
+        return cats
+
+    # --- rendering --------------------------------------------------------
+    _NID_DISPLAY_CAP = 25
+
+    @classmethod
+    def _format_nids(cls, nids: List[NoteId]) -> str:
+        shown = ", ".join(str(nid) for nid in nids[: cls._NID_DISPLAY_CAP])
+        extra = len(nids) - cls._NID_DISPLAY_CAP
+        if extra > 0:
+            shown += f", … and {extra} more"
+        return shown
+
+    @classmethod
+    def _clear_layout(cls, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            elif item.layout() is not None:
+                cls._clear_layout(item.layout())
+
+    def _render(self) -> None:
+        self._clear_layout(self._content_layout)
+        self._content_layout.addWidget(self._build_summary_card())
+        if self._already_in_deck:
+            heading = QLabel("Action required")
+            heading.setStyleSheet("font-weight:700;")
+            self._content_layout.addWidget(heading)
+            self._content_layout.addWidget(self._build_action_card())
+        self._content_layout.addStretch(1)
+        self._close_button.setEnabled(self._can_close())
+        self.adjustSize()
+
+    def _new_card(self, object_name: str):
+        card = QFrame()
+        card.setObjectName(object_name)
+        border = _panel_line_color()
+        background = "#2b2b2b" if theme_manager.night_mode else "white"
+        card.setStyleSheet(
+            f"QFrame#{object_name}{{border:1px solid {border}; border-radius:8px; background:{background};}}"
+        )
+        vbox = QVBoxLayout(card)
+        vbox.setContentsMargins(16, 14, 16, 14)
+        vbox.setSpacing(10)
+        return card, vbox
+
+    def _divider(self) -> QFrame:
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        color = _panel_line_color()
+        line.setStyleSheet(f"color:{color}; background:{color}; max-height:1px; border:none;")
+        return line
+
+    def _badge(self) -> QLabel:
+        background, foreground = _updated_badge_colors()
+        badge = QLabel("Updated")
+        badge.setStyleSheet(f"background:{background}; color:{foreground}; border-radius:9px; padding:2px 9px;")
+        return badge
+
+    def _summary_line(self, number: int, label: str, color: Optional[str], badge: bool = False) -> QWidget:
+        widget = QWidget()
+        widget.setStyleSheet("background:transparent;")
+        row = QHBoxLayout(widget)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        if color:
+            text = f'<span style="color:{color};"><b>{number}</b> {escape(label)}</span>'
+        else:
+            text = f"<b>{number}</b> {escape(label)}"
+        line = QLabel(text)
+        line.setTextFormat(Qt.TextFormat.RichText)
+        row.addWidget(line)
+        if badge:
+            row.addWidget(self._badge())
+        row.addStretch(1)
+        return widget
+
+    def _category_block(self, key: str, label: str, nids: List[NoteId], with_support: bool = False) -> QWidget:
+        widget = QWidget()
+        widget.setStyleSheet("background:transparent;")
+        vbox = QVBoxLayout(widget)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(4)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+        title = QLabel(f"({len(nids)}) {label}")
+        title.setStyleSheet("font-weight:600;")
+        title_row.addWidget(title)
+        if key in self._updated_keys:
+            title_row.addWidget(self._badge())
+        title_row.addStretch(1)
+        vbox.addLayout(title_row)
+
+        ids = QLabel(self._format_nids(nids))
+        ids.setWordWrap(True)
+        vbox.addWidget(ids)
+
+        if with_support:
+            link = QLabel(
+                f'Please <a href="{SUPPORT_FORUM_URL}" style="color:{_summary_link_color()};">contact support.</a>'
+            )
+            link.setTextFormat(Qt.TextFormat.RichText)
+            qconnect(link.linkActivated, lambda *_: openLink(SUPPORT_FORUM_URL))
+            vbox.addWidget(link)
+        return widget
+
+    def _build_summary_card(self) -> QFrame:
+        card, vbox = self._new_card("summaryCard")
+        vbox.addWidget(
+            self._summary_line(
+                self._change_submitted,
+                "change note suggestion(s) submitted.",
+                _summary_color(True),
+                badge="change_submitted" in self._updated_keys,
+            )
+        )
+        vbox.addWidget(self._summary_line(self._new_submitted, "new note suggestion(s) submitted.", None))
+        vbox.addWidget(self._summary_line(len(self._errors_by_nid), "failed to submit.", _summary_color(False)))
+
+        cats = self._categorize()
+        for key, label, _ in _BULK_ERROR_CATEGORIES:
+            if cats[key]:
+                vbox.addWidget(self._divider())
+                vbox.addWidget(self._category_block(key, label, cats[key]))
+        if cats["other_errors"]:
+            vbox.addWidget(self._divider())
+            vbox.addWidget(
+                self._category_block("other_errors", "Other errors", cats["other_errors"], with_support=True)
+            )
+        return card
+
+    def _build_action_card(self) -> QFrame:
+        card, vbox = self._new_card("actionCard")
+        nids = list(self._already_in_deck.keys())
+
+        title = QLabel(f"({len(nids)}) Notes already in this deck")
+        title.setStyleSheet("font-weight:600;")
+        vbox.addWidget(title)
+
+        ids = QLabel(self._format_nids(nids))
+        ids.setWordWrap(True)
+        vbox.addWidget(ids)
+
+        description = QLabel(
+            "These notes already exist in this deck on AnkiHub. Resubmit to push your "
+            "edits through as change suggestions."
+        )
+        description.setWordWrap(True)
+        vbox.addWidget(description)
+
+        if self._action_state == "ignored":
+            ignored = QLabel("Ignored — no action taken.")
+            ignored.setStyleSheet(f"color:{_MUTED_TEXT_COLOR}; font-style:italic;")
+            vbox.addWidget(ignored)
+            return card
+
+        button_row = QHBoxLayout()
+        button_row.setContentsMargins(0, 6, 0, 0)
+        loading = self._action_state == "loading"
+
+        ignore_button = QPushButton("Ignore")
+        ignore_button.setEnabled(not loading)
+        qconnect(ignore_button.clicked, self._on_ignore)
+        button_row.addWidget(ignore_button)
+
+        if loading:
+            submitting = QPushButton("Submitting…")
+            submitting.setEnabled(False)
+            button_row.addWidget(submitting)
+        else:
+            resubmit = QPushButton(f"({len(nids)}) Resubmit as change suggestions")
+            qconnect(resubmit.clicked, self._on_resubmit)
+            button_row.addWidget(resubmit)
+        button_row.addStretch(1)
+        vbox.addLayout(button_row)
+        return card
+
+    # --- actions ----------------------------------------------------------
+    def _on_ignore(self) -> None:
+        self._action_state = "ignored"
+        self._render()
+
+    def _on_resubmit(self) -> None:
+        LOGGER.info("bulk_resubmit_clicked", ah_did=str(self._ah_did), count=len(self._already_in_deck))
+        conflicts = dict(self._already_in_deck)
+        self._action_state = "loading"
+        self._render()
+
+        def task() -> Dict[NoteId, object]:
+            return resubmit_new_notes_as_change_suggestions_in_bulk(conflicts, self._change_type, self._auto_accept)
+
+        def on_done(future: Future) -> None:
+            try:
+                errors_by_nid = future.result()
+            except Exception as e:  # hard failure (network etc.) — never trap the user
+                self._hard_error = True
+                self._action_state = "default"
+                self._render()
+                show_error_dialog(
+                    "Couldn't resubmit the suggestions. Please try again.",
+                    title="Error resubmitting suggestions :(",
+                    parent=self,
+                )
+                LOGGER.warning("Bulk resubmit failed.", exc_info=e)
+                return
+            self._apply_resubmit_result(conflicts, errors_by_nid)
+
+        aqt.mw.taskman.with_progress(task=task, on_done=on_done, parent=self)
+
+    def _apply_resubmit_result(
+        self,
+        conflicts: Mapping[NoteId, AlreadyInDeckConflict],
+        errors_by_nid: Mapping[NoteId, object],
+    ) -> None:
+        succeeded = [nid for nid in conflicts if nid not in errors_by_nid]
+        failed = {nid: errors_by_nid[nid] for nid in conflicts if nid in errors_by_nid}
+
+        for nid in succeeded:
+            self._errors_by_nid.pop(nid, None)
+        if succeeded:
+            self._change_submitted += len(succeeded)
+            self._updated_keys.add("change_submitted")
+
+        for nid, error in failed.items():
+            self._errors_by_nid[nid] = error
+
+        self._already_in_deck = {}
+        self._action_state = "resolved"
+
+        # Badge the error categories the re-failed notes landed in.
+        for key, nids in self._categorize().items():
+            if any(nid in failed for nid in nids):
+                self._updated_keys.add(key)
+
+        self._render()
+
+
+def _on_suggest_notes_in_bulk_done(
+    future: Future,
+    parent: QWidget,
+    ah_did: uuid.UUID,
+    change_type: Optional[SuggestionType],
+    auto_accept: bool,
+) -> None:
     try:
         suggestions_result: BulkNoteSuggestionsResult = future.result()
     except AnkiHubHTTPError as e:
@@ -397,54 +883,13 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
         errors_by_nid=suggestions_result.errors_by_nid,
     )
 
-    msg_about_created_suggestions = (
-        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n"
-    )
-
-    notes_without_changes = [
-        note for note, errors in suggestions_result.errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)
-    ]
-    notes_that_dont_exist_on_ankihub = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(errors)
-    ]
-    notes_with_empty_first_field = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(errors)
-    ]
-
-    if suggestions_result.errors_by_nid:
-        category_messages = []
-        if notes_without_changes:
-            category_messages.append(
-                f"Notes without changes ({len(notes_without_changes)}):\n"
-                f"{', '.join(str(nid) for nid in notes_without_changes)}"
-            )
-        if notes_that_dont_exist_on_ankihub:
-            category_messages.append(
-                f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
-                f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
-            )
-        if notes_with_empty_first_field:
-            category_messages.append(
-                f"Notes with the first field empty ({len(notes_with_empty_first_field)}):\n"
-                f"{', '.join(str(nid) for nid in notes_with_empty_first_field)}"
-            )
-
-        msg_about_failed_suggestions = (
-            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
-            "All notes with failed suggestions:\n"
-            f"{', '.join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n"
-            + "\n\n".join(category_messages)
-        )
-    else:
-        msg_about_failed_suggestions = ""
-
-    msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
+    BulkSuggestionSummaryDialog(
+        result=suggestions_result,
+        ah_did=ah_did,
+        change_type=change_type or SuggestionType.UPDATED_CONTENT,
+        auto_accept=auto_accept,
+        parent=parent,
+    ).show()
 
 
 class SuggestionDialog(QDialog):

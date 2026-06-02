@@ -6,7 +6,7 @@ when syncing with AnkiHub.)"""
 import copy
 import shutil
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import (
@@ -65,6 +65,45 @@ ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR = "Note object does not exist"
 
 # string for errors when the first field of a note is empty
 ANKIHUB_EMPTY_FIRST_FIELD_ERROR = "The first field is required and cannot be empty"
+
+# string contained in the error returned when a *new note* suggestion is rejected
+# because the deck already contains a note with the same anki_id. The note exists on
+# AnkiHub but the local AnkiHub DB doesn't know it yet (pre-sync), so the add-on
+# submitted a new-note suggestion instead of a change suggestion.
+ANKIHUB_DUPLICATE_ANKI_ID_ERROR = "A deck can't contain multiple notes with the same anki_id."
+
+
+def _first_if_list(value: Any) -> Any:
+    """The backend wraps ValidationError detail values in single-element lists
+    (DRF normalization). Unwrap those, tolerating already-scalar values."""
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
+def parse_duplicate_anki_id_error(errors: Any) -> Optional[Tuple[Optional[uuid.UUID], bool]]:
+    """If `errors` is the duplicate-anki_id error, return
+    ``(conflicting_ah_nid_or_None, is_deleted)``; otherwise return ``None``.
+
+    `errors` may be the server's ``validation_errors`` dict, a plain error string
+    (local categories), or a dict without the conflicting fields. The conflicting
+    fields arrive list-wrapped and stringified, so ``conflicting_note_deleted`` is
+    compared against the literal ``"True"`` rather than truthiness.
+    """
+    if ANKIHUB_DUPLICATE_ANKI_ID_ERROR not in str(errors):
+        return None
+
+    conflicting_ah_nid: Optional[uuid.UUID] = None
+    is_deleted = False
+    if isinstance(errors, dict):
+        raw_id = _first_if_list(errors.get("conflicting_ankihub_id"))
+        if raw_id:
+            try:
+                conflicting_ah_nid = uuid.UUID(str(raw_id))
+            except (ValueError, TypeError):
+                conflicting_ah_nid = None
+        is_deleted = str(_first_if_list(errors.get("conflicting_note_deleted"))) == "True"
+    return conflicting_ah_nid, is_deleted
 
 
 class ChangeSuggestionResult(Enum):
@@ -335,10 +374,25 @@ def suggest_new_note(
 
 
 @dataclass
+class AlreadyInDeckConflict:
+    """A new-note suggestion rejected because the note already exists in the deck
+    on AnkiHub (non-deleted). Carries everything needed to resubmit it as a change
+    suggestion without a remote fetch: the original (already media-renamed) new-note
+    suggestion plus the existing note's ankihub id."""
+
+    new_note_suggestion: NewNoteSuggestion
+    conflicting_ah_nid: uuid.UUID
+
+
+@dataclass
 class BulkNoteSuggestionsResult:
     errors_by_nid: Dict[NoteId, List[str]]
-    new_note_suggestions_count: int
-    change_note_suggestions_count: int
+    # nids rejected with the duplicate-anki_id error that can be resubmitted as
+    # change suggestions ("Notes already in this deck"). Soft-deleted conflicts are
+    # routed to the deleted-on-AnkiHub category instead and are not included here.
+    already_in_deck_by_nid: Dict[NoteId, AlreadyInDeckConflict] = field(default_factory=dict)
+    new_note_suggestions_count: int = 0
+    change_note_suggestions_count: int = 0
 
 
 def suggest_notes_in_bulk(
@@ -405,12 +459,111 @@ def suggest_notes_in_bulk(
         **errors_by_nid_from_local,
     }
 
+    # Pull out new-note suggestions rejected because the note already exists in the
+    # deck on AnkiHub. Non-deleted conflicts become resubmittable "already in this
+    # deck" entries; soft-deleted conflicts are re-pointed to the deleted-on-AnkiHub
+    # category (a change suggestion would 404 against a tombstoned note).
+    new_note_suggestion_by_nid = {NoteId(ns.anki_nid): ns for ns in new_note_suggestions}
+    already_in_deck_by_nid: Dict[NoteId, AlreadyInDeckConflict] = {}
+    for nid, errors in list(errors_by_nid.items()):
+        parsed = parse_duplicate_anki_id_error(errors)
+        if parsed is None:
+            continue
+        conflicting_ah_nid, is_deleted = parsed
+        if is_deleted:
+            errors_by_nid[nid] = ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR
+            continue
+        new_note_suggestion = new_note_suggestion_by_nid.get(nid)
+        if conflicting_ah_nid is not None and new_note_suggestion is not None:
+            already_in_deck_by_nid[nid] = AlreadyInDeckConflict(
+                new_note_suggestion=new_note_suggestion,
+                conflicting_ah_nid=conflicting_ah_nid,
+            )
+        # Missing conflicting id (e.g. older server) → leave the error in place so it
+        # surfaces under "Other errors"; no resubmit affordance is offered.
+
     result = BulkNoteSuggestionsResult(
         errors_by_nid=errors_by_nid,
         change_note_suggestions_count=len([x for x in change_note_suggestions if x.anki_nid not in errors_by_nid]),
         new_note_suggestions_count=len([x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]),
+        already_in_deck_by_nid=already_in_deck_by_nid,
     )
     return result
+
+
+def _new_note_to_change_suggestion(
+    new_note_suggestion: NewNoteSuggestion,
+    conflicting_ah_nid: uuid.UUID,
+    change_type: SuggestionType,
+) -> ChangeNoteSuggestion:
+    """Convert a new-note suggestion that was rejected as a duplicate into a change
+    suggestion for the existing note (`conflicting_ah_nid`). The user's selected
+    fields/tags are reused as-is; the server diffs them against its copy of the note.
+    No remote fetch or local AnkiHub-DB write is needed."""
+    return ChangeNoteSuggestion(
+        ah_nid=conflicting_ah_nid,
+        anki_nid=new_note_suggestion.anki_nid,
+        fields=new_note_suggestion.fields,
+        comment=new_note_suggestion.comment,
+        added_tags=list(new_note_suggestion.tags or []),
+        removed_tags=[],
+        change_type=change_type,
+    )
+
+
+def resubmit_new_note_as_change_suggestion(
+    note: Note,
+    ah_did: uuid.UUID,
+    conflicting_ah_nid: uuid.UUID,
+    change_type: SuggestionType,
+    comment: str,
+    auto_accept: bool = False,
+    filters: Optional[PerNoteFilters] = None,
+) -> ChangeSuggestionResult:
+    """Resubmit a single note (whose new-note suggestion hit the duplicate-anki_id
+    error) as a change suggestion for the existing note. Media was already renamed and
+    uploaded by the failed new-note submit, so it is not re-uploaded here."""
+    new_note_suggestion = _new_note_suggestion(note, ah_did, comment, filters=filters)
+    if new_note_suggestion is None:
+        return ChangeSuggestionResult.NO_CHANGES
+
+    change_note_suggestion = _new_note_to_change_suggestion(new_note_suggestion, conflicting_ah_nid, change_type)
+    client = AnkiHubClient()
+    try:
+        client.create_change_note_suggestion(
+            change_note_suggestion=change_note_suggestion,
+            auto_accept=auto_accept,
+        )
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 404:
+            return ChangeSuggestionResult.ANKIHUB_NOT_FOUND
+        raise e
+
+    return ChangeSuggestionResult.SUCCESS
+
+
+def resubmit_new_notes_as_change_suggestions_in_bulk(
+    conflicts: Mapping[NoteId, AlreadyInDeckConflict],
+    change_type: SuggestionType,
+    auto_accept: bool = False,
+) -> Dict[NoteId, Any]:
+    """Resubmit the "already in this deck" notes as change suggestions in a single
+    bulk call. Returns the per-nid validation errors for the ones that failed again
+    (a nid absent from the result succeeded). Media was already uploaded by the
+    original new-note submit, so it is not re-uploaded here."""
+    if not conflicts:
+        return {}
+
+    change_note_suggestions = [
+        _new_note_to_change_suggestion(c.new_note_suggestion, c.conflicting_ah_nid, change_type)
+        for c in conflicts.values()
+    ]
+    client = AnkiHubClient()
+    errors_by_nid_int = client.create_suggestions_in_bulk(
+        change_note_suggestions=change_note_suggestions,
+        auto_accept=auto_accept,
+    )
+    return {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
 
 
 def get_anki_nid_to_ah_dids_dict(
