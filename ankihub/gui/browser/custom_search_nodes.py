@@ -14,6 +14,7 @@ from aqt.browser import Browser, ItemId
 from ...ankihub_client import suggestion_type_from_str
 from ...db import NOTE_NOT_DELETED_CONDITION, execute_list_query_in_chunks, flat
 from ...db.models import AnkiHubNote
+from ...main.utils import retain_nids_with_ah_note_type
 
 
 class CustomSearchNode(ABC):
@@ -29,6 +30,7 @@ class CustomSearchNode(ABC):
             NewNoteSearchNode,
             UpdatedSinceLastReviewSearchNode,
             AnkiHubNoteSearchNode,
+            AnkiHubNoteTypeSearchNode,
         )
         for custom_search_node_type in custom_search_node_types:
             if custom_search_node_type.parameter_name == parameter_name:
@@ -287,6 +289,33 @@ class AnkiHubNoteSearchNode(CustomSearchNode):
             retained_nids = list(nids_in_ah_db)
         else:
             retained_nids = list(set(nids) - set(nids_in_ah_db))
+
+        result = self._output_ids(retained_nids)
+        return result
+
+
+class AnkiHubNoteTypeSearchNode(CustomSearchNode):
+    """Search parameter to filter notes based on whether their note type is registered
+    with an AnkiHub deck (i.e. is an AnkiHub note type). This is the same check the
+    suggestion entrypoints gate on, so it matches exactly the notes that can be suggested."""
+
+    parameter_name = "ankihub_note_type"
+
+    def __init__(self, browser: Browser, value: str):
+        self.browser = browser
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        if self.value not in ("yes", "no"):
+            raise ValueError(f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'.")
+
+        nids = self._note_ids(ids)
+
+        nids_with_ah_note_type = set(retain_nids_with_ah_note_type(nids))
+        if self.value == "yes":
+            retained_nids = list(nids_with_ah_note_type)
+        else:
+            retained_nids = list(set(nids) - nids_with_ah_note_type)
 
         result = self._output_ids(retained_nids)
         return result
