@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, Qt, QUrl, QWidget
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWidget
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -157,7 +157,13 @@ from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_di
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
+from ankihub.gui.editor import (
+    NOTE_DELETED_TOOLTIP,
+    SUGGESTION_BTN_ID,
+    _default_suggestion_button_tooltip,
+    _on_field_unfocus_auto_protect,
+    _on_suggestion_button_press,
+)
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
@@ -182,6 +188,8 @@ from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
 from ankihub.gui.suggestion_dialog import (
+    EMPTY_STATE_SUBTITLE,
+    EMPTY_STATE_TITLE,
     IncludeInSuggestionWidget,
     SuggestionDialog,
     open_suggestion_dialog_for_bulk_suggestion,
@@ -214,6 +222,7 @@ from ankihub.main.suggestions import (
     PerNoteFilters,
     any_suggestible_from_diffs,
     compute_note_diffs,
+    has_empty_first_field,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -744,6 +753,132 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_button_enabled_for_existing_note_without_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            anki_note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
+
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # No edits, but the button stays enabled — clicking opens the dialog,
+            # which renders an empty state and lets the user pick Delete. The
+            # no-changes gating lives in the dialog, not on the editor button.
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+            # Enabled-state tooltip uses the change-note wording (vs the new-note variant).
+            self.assert_suggestion_button_tooltip(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_tooltip=_default_suggestion_button_tooltip(is_new_note=False),
+            )
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_action_gate_blocks_deleted_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.ankihub_note_id == ah_note.ah_nid
+            ).execute()
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # The button is visually disabled for deleted notes; the hotkey still
+            # fires, so it must short-circuit with the deleted-note tooltip and
+            # never open the dialog.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with(NOTE_DELETED_TOOLTIP)
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_new_note_with_empty_first_field_does_not_register_add_callback(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+            anki_note = aqt.mw.col.new_note(ah_note_type)  # empty first field
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+            assert add_cards_dialog.editor.note.id == 0  # sanity: unsaved new note
+
+            # Pressing Suggest on a new note with an empty first field must bail
+            # before add_current_note — otherwise the add fails silently and the
+            # add_cards_did_add_note callback leaks onto an unrelated later note.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with("The first field is empty.")
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("logged_in", [True, False])
+    def test_suggestion_action_gate_no_op_for_non_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+
+            anki_note = add_anki_note()  # non-AnkiHub note type
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # The button is visually disabled for non-AnkiHub notes; the hotkey
+            # still fires, but it must be a no-op — even when logged out, since
+            # there's no AnkiHub action to authenticate for.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            assert not open_dialog_mock.called
+            assert not login_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
     def test_with_note_deleted_on_ankihub(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -794,6 +929,13 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def _open_addcards(self, anki_note: Note, qtbot: QtBot, mocker: MockerFixture) -> AddCards:
+        """Open AddCards with `anki_note`, then wait for the first button refresh."""
+        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+        add_cards_dialog.editor.set_note(anki_note)
+        self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+        return add_cards_dialog
+
     def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
         qtbot.wait_until(lambda: refresh_buttons_spy.called)
@@ -813,6 +955,14 @@ class TestEditor:
                 callback,
             )
         callback.assert_called_with(not expected_enabled)
+
+    def assert_suggestion_button_tooltip(self, qtbot: QtBot, addcards: AddCards, expected_tooltip: str) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}').title",
+                callback,
+            )
+        callback.assert_called_with(expected_tooltip)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
         addcards.editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').click()")
@@ -1848,6 +1998,34 @@ class TestFieldsToSuggestFilters:
             assert not front_cb.isEnabled()
             assert "first field is required" in front_cb.toolTip().lower()
 
+    def test_widget_shows_empty_state_when_no_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """An existing AnkiHub note with no edits and no tag changes renders the
+        empty state: no field/tag checkboxes, the subtitle switches to the
+        empty-state copy, the warning message shows, the counter reads 0/0, and
+        there's nothing selected (so the dialog's OK button stays disabled)."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
+
+            widget = IncludeInSuggestionWidget(notes=[note], note_diffs=compute_note_diffs([note]))
+
+            assert widget._field_checkboxes == {}
+            assert widget._added_tag_boxes == {}
+            assert widget._removed_tag_boxes == {}
+            assert not widget.has_any_selection()
+            assert widget._subtitle.text() == EMPTY_STATE_SUBTITLE
+            assert widget._counter_label.text() == "0/0"
+            label_texts = [label.text() for label in widget.findChildren(QLabel)]
+            assert EMPTY_STATE_TITLE in label_texts
+            # The empty state renders in the frame, not the (hidden) scroll area —
+            # a word-wrapped label in a resizable scroll area squashes when short.
+            assert widget._scroll.isHidden()
+
     def test_suggest_new_note_bulk_per_mid_filters(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2336,6 +2514,27 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 1
             assert ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(result.errors_by_nid[note.id])
+
+    def test_has_empty_first_field(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Markup-only/whitespace first fields count as empty (a plain `.strip()`
+        would miss "<br>"/"&nbsp;"); text or embedded media counts as content."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note = add_anki_note(note_type=import_ah_note_type(ah_did=ah_did))
+
+            for empty_value in ("", "   ", "<br>", "<div></div>", "&nbsp;"):
+                note["Front"] = empty_value
+                assert has_empty_first_field(note), f"expected empty: {empty_value!r}"
+
+            for content_value in ("real content", "x", '<img src="x.jpg">', "[sound:a.mp3]"):
+                note["Front"] = content_value
+                assert not has_empty_first_field(note), f"expected non-empty: {content_value!r}"
 
     def test_suggestion_for_multiple_notes(
         self,
