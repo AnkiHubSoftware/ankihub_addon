@@ -567,7 +567,7 @@ class SuggestionDialog(QDialog):
         self.change_type_select = QComboBox()
         if not self._is_new_note_suggestion:
             self.change_type_select.addItems([x.value[1] for x in SuggestionType])
-            right_layout.addWidget(QLabel("Change Type"))
+            right_layout.addWidget(QLabel("<b>Change Type</b>"))
             right_layout.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
@@ -605,7 +605,7 @@ class SuggestionDialog(QDialog):
         right_layout.addWidget(self.hint_for_note_deletions)
         right_layout.addSpacing(10)
 
-        right_layout.addWidget(QLabel("Rationale for Change (Required)"))
+        right_layout.addWidget(QLabel("<b>Rationale for Change (Required)</b>"))
 
         self.rationale_edit = QPlainTextEdit()
         self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
