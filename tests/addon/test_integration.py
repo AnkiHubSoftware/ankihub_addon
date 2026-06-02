@@ -86,6 +86,7 @@ from ..fixtures import (
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     add_field_to_local_note_type,
+    bulk_filters_from_diffs,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
     make_review_histories,
@@ -1006,12 +1007,11 @@ def auto_protect_note(
     install_ah_deck: InstallAHDeck,
     import_ah_note: ImportAHNote,
 ):
-    """Yields (ah_did, note) with the auto-protect feature flag and the per-deck
-    setting both on. Use within the yielded `profile_loaded` context."""
+    """Yields (ah_did, note) with the auto-protect per-deck setting on. Use
+    within the yielded `profile_loaded` context."""
     with anki_session_with_addon_data.profile_loaded():
         ah_did = install_ah_deck()
         note_info = import_ah_note(ah_did=ah_did)
-        config.set_feature_flags({"auto_protect_fields_when_edited": True})
         config.set_auto_protect_fields_when_edited(ah_did, True)
         nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
         yield ah_did, aqt.mw.col.get_note(nid)
@@ -1083,7 +1083,6 @@ class TestAutoProtectFieldsWhenEdited:
         add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             note = add_anki_note()
             note["Front"] = "edited value"
 
@@ -1106,16 +1105,6 @@ class TestAutoProtectFieldsWhenEdited:
         ankihub_id_idx = note.keys().index("ankihub_id")
         note["ankihub_id"] = "edited value"
         result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
-        assert result is False
-        assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
-
-    def test_hook_is_no_op_when_feature_flag_disabled(self, auto_protect_note):
-        # Per-deck setting is on (from fixture), but the server-side rollout flag is off.
-        _, note = auto_protect_note
-        config.set_feature_flags({"auto_protect_fields_when_edited": False})
-        note["Front"] = "edited value"
-
-        result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
         assert result is False
         assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
@@ -1172,7 +1161,6 @@ class TestAutoProtectFieldsWhenEdited:
                 ),
             )
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1730,7 +1718,7 @@ class TestFieldsToSuggestFilters:
             aqt.mw.col.update_note(note)
 
             diffs = compute_note_diffs([note])
-            assert "Front" in diffs[note.id].edited_fields
+            assert "Front" in diffs[note.id].changed_field_names
 
     def test_suggest_note_update_user_allowlists_strip_outside_changes(
         self,
@@ -1771,44 +1759,6 @@ class TestFieldsToSuggestFilters:
             assert [f.name for f in sent.fields] == [field_names[0]]
             assert sent.added_tags == ["added_a"]
             assert sent.removed_tags == ["removed_a"]
-
-    def test_protected_fields_stripped_when_feature_flag_off(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
-        mocker: MockerFixture,
-    ):
-        """With the feature flag off, the suggestion path keeps the legacy behavior:
-        fields carrying personal AnkiHub_Protect tags are stripped from the outgoing
-        suggestion. (When on, the dialog filters at the user's direction instead.)
-        """
-        with anki_session_with_addon_data.profile_loaded():
-            _, ah_did = install_sample_ah_deck()
-            nid = aqt.mw.col.find_notes("")[0]
-            note = aqt.mw.col.get_note(nid)
-            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
-
-            field_names = list(note.keys())
-            note[field_names[0]] = "front_updated"
-            note[field_names[1]] = "back_updated"
-            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::{field_names[0]}")
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": False})
-
-            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
-
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-                media_upload_cb=mocker.stub(),
-            )
-
-            sent = create_mock.call_args.kwargs["change_note_suggestion"]
-            sent_field_names = [f.name for f in sent.fields]
-            # Protected field is stripped; the other change still goes out.
-            assert field_names[0] not in sent_field_names
-            assert field_names[1] in sent_field_names
 
     def test_widget_populates_for_new_note_candidates(
         self,
@@ -1956,7 +1906,6 @@ class TestFieldsToSuggestFilters:
             note["Back"] = "back_edit"
             aqt.mw.col.update_note(note)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_globally_protected_fields(ah_did, {mid: ["Front"]})
 
             dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
@@ -1989,7 +1938,6 @@ class TestFieldsToSuggestFilters:
             note_info = import_ah_note(ah_did=ah_did)
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             toast_mock = mocker.patch("ankihub.gui.suggestion_dialog.show_tooltip")
             dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
 
@@ -2113,8 +2061,6 @@ class TestFieldsToSuggestFilters:
             note["Front"] = "edited"
             aqt.mw.col.update_note(note)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
             def build_dialog() -> SuggestionDialog:
                 return SuggestionDialog(
                     is_new_note_suggestion=False,
@@ -2178,6 +2124,8 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                # No filters → suggest everything the diff found. The empty "Back" and the
+                # local "New Field" aren't part of the diff, so only "Front" ships.
             )
 
             assert bulk_suggestions_method_mock.call_count == 1
@@ -2203,6 +2151,53 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 1
             assert result.change_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 0
+
+    def test_bulk_new_notes_dont_ship_field_empty_on_that_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Two new notes of the same note type: "Back" is non-empty on the first, so the
+        widget allowlists it for the mid (selections aggregate per note type). It must NOT
+        ship as an empty field on the second note where it's blank — `changed_fields` for a
+        new note is its non-empty fields, so the empty "Back" never ships."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
+            note_with_back = add_anki_note(note_type=note_type)
+            note_with_back["Front"] = "front_1"
+            note_with_back["Back"] = "back_1"
+            note_without_back = add_anki_note(note_type=note_type)
+            note_without_back["Front"] = "front_2"
+            note_without_back["Back"] = ""
+            aqt.mw.col.update_note(note_with_back)
+            aqt.mw.col.update_note(note_without_back)
+
+            mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(2)])
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            # Per-mid allowlist contains both fields (the widget's aggregated selection).
+            suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note_with_back, note_without_back],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=BulkSuggestionFilters(
+                    fields_to_include_by_mid={NotetypeId(note_type["id"]): ["Front", "Back"]}
+                ),
+            )
+
+            sent_by_nid = {s.anki_nid: s for s in bulk_mock.call_args.kwargs["new_note_suggestions"]}
+            assert [f.name for f in sent_by_nid[note_with_back.id].fields] == ["Front", "Back"]
+            # The note with an empty Back ships only Front — no empty field.
+            assert [f.name for f in sent_by_nid[note_without_back.id].fields] == ["Front"]
 
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
@@ -2252,6 +2247,7 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                # No filters → suggest everything the diff found (local "New Field" isn't on AnkiHub).
             )
 
             if note_has_changes and not note_is_marked_as_deleted:
@@ -2366,13 +2362,20 @@ class TestSuggestNotesInBulk:
                 note["Front"] = "new front"
                 note.flush()
 
+            # Mirror the dialog: select every edited field per mid, and thread the
+            # open-time diffs through to the submit path.
+            notes = new_notes + changed_notes
+            note_diffs = compute_note_diffs(notes)
+
             result = suggest_notes_in_bulk(
                 ankihub_did=ah_did,
-                notes=new_notes + changed_notes,
+                notes=notes,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                filters=bulk_filters_from_diffs(notes, note_diffs),
+                note_diffs=note_diffs,
             )
 
             assert bulk_suggestions_method_mock.call_count == 1
