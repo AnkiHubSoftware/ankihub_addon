@@ -91,6 +91,7 @@ class ReviewerSidebar:
         self.on_auth_failure_hook: Callable = None
         self.last_accessed_url: Optional[str] = None
         self.needs_to_accept_terms = False
+        self._focus_content_webview_on_page_load = False
 
         self._setup_ui()
 
@@ -177,16 +178,22 @@ class ReviewerSidebar:
 
         self._update_header_webview()
 
-    def show_chatbot(self, ah_nid: Optional[uuid.UUID]) -> None:
+    def show_chatbot(self, ah_nid: Optional[uuid.UUID], focus: bool = False) -> None:
         self.page_type = SidebarPageType.CHATBOT
         self.resources = []
+
+        # Only focus the chatbot when explicitly requested (e.g. when the user opens it),
+        # not when it's refreshed on card change, so that the reviewer keeps keyboard focus
+        # (and shortcuts like the answer keys keep working) while reviewing with the sidebar open.
+        self._focus_content_webview_on_page_load = focus
 
         # The web app handles the case when ah_nid is None and shows the "note not found" screen.
         url = f"{config.app_url}/ai/chatbot/{ah_nid}/?is_on_anki=true"
         self.set_content_url(url)
 
         self._update_header_webview()
-        self.content_webview.setFocus()
+        if focus:
+            self.content_webview.setFocus()
 
     def _update_header_button_state(self):
         if not self.resources:
@@ -287,7 +294,8 @@ class ReviewerSidebar:
             return
 
         if ok:
-            if self.page_type == SidebarPageType.CHATBOT:
+            if self._focus_content_webview_on_page_load:
+                self._focus_content_webview_on_page_load = False
                 self.content_webview.setFocus()
             return
 
@@ -470,9 +478,9 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         _show_chatbot_for_current_card(card)
 
 
-def _show_chatbot_for_current_card(card: Card) -> None:
+def _show_chatbot_for_current_card(card: Card, focus: bool = False) -> None:
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    reviewer_sidebar.show_chatbot(ah_nid)
+    reviewer_sidebar.show_chatbot(ah_nid, focus=focus)
 
 
 def _remove_anking_button(_: Card) -> None:
@@ -614,7 +622,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if button_name == "chatbot":
             if is_active:
                 if reviewer_sidebar.open_sidebar():
-                    _show_chatbot_for_current_card(context.card)
+                    _show_chatbot_for_current_card(context.card, focus=True)
             else:
                 reviewer_sidebar.close_sidebar()
         else:
