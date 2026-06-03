@@ -93,6 +93,11 @@ from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.gui import menu
+from ankihub.gui.bulk_suggestion_summary_dialog import (
+    BulkSuggestionSummaryDialog,
+    _ActionState,
+    _on_suggest_notes_in_bulk_done,
+)
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -117,14 +122,11 @@ from ankihub.gui.operations.utils import future_with_exception, future_with_resu
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.subdeck_due_date_dialog import _reminder_dialog_state
 from ankihub.gui.suggestion_dialog import (
-    BulkSuggestionSummaryDialog,
     SourceType,
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
-    _ActionState,
     _GroupController,
-    _on_suggest_notes_in_bulk_done,
     _SelectAllCheckBox,
     _TagLabel,
     get_anki_nid_to_ah_dids_dict,
@@ -1267,7 +1269,7 @@ class TestOnSuggestNotesInBulkDone:
         mocker: MockerFixture,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.BulkSuggestionSummaryDialog")
+        dialog_mock = mocker.patch("ankihub.gui.bulk_suggestion_summary_dialog.BulkSuggestionSummaryDialog")
         ah_did = next_deterministic_uuid()
         result = suggestions.BulkNoteSuggestionsResult(
             errors_by_nid={NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR]},
@@ -1278,7 +1280,6 @@ class TestOnSuggestNotesInBulkDone:
             future=future_with_result(result),
             parent=aqt.mw,
             ah_did=ah_did,
-            change_type=SuggestionType.UPDATED_CONTENT,
             auto_accept=False,
         )
 
@@ -1293,7 +1294,6 @@ class TestOnSuggestNotesInBulkDone:
                 future=future_with_exception(Exception("test")),
                 parent=aqt.mw,
                 ah_did=next_deterministic_uuid(),
-                change_type=SuggestionType.UPDATED_CONTENT,
                 auto_accept=False,
             )
 
@@ -1306,14 +1306,13 @@ class TestOnSuggestNotesInBulkDone:
         exception = AnkiHubHTTPError(response)
 
         show_error_dialog_mock = mocker.patch(
-            "ankihub.gui.suggestion_dialog.show_error_dialog",
+            "ankihub.gui.bulk_suggestion_summary_dialog.show_error_dialog",
         )
 
         _on_suggest_notes_in_bulk_done(
             future=future_with_exception(exception),
             parent=aqt.mw,
             ah_did=next_deterministic_uuid(),
-            change_type=SuggestionType.UPDATED_CONTENT,
             auto_accept=False,
         )
         _, kwargs = show_error_dialog_mock.call_args
@@ -1415,7 +1414,6 @@ class TestBulkSuggestionSummaryDialog:
         return BulkSuggestionSummaryDialog(
             result=result,
             ah_did=next_deterministic_uuid(),
-            change_type=SuggestionType.UPDATED_CONTENT,
             auto_accept=False,
             parent=aqt.mw,
         )
@@ -1477,7 +1475,7 @@ class TestBulkSuggestionSummaryDialog:
 
     def _patch_resubmit(self, mocker, errors_returned):
         mocker.patch(
-            "ankihub.gui.suggestion_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            "ankihub.gui.bulk_suggestion_summary_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
             return_value=errors_returned,
         )
         mocker.patch.object(
@@ -1531,9 +1529,9 @@ class TestBulkSuggestionSummaryDialog:
             errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
             already_in_deck_by_nid={NoteId(5): conflict},
         )
-        mocker.patch("ankihub.gui.suggestion_dialog.show_error_dialog")
+        mocker.patch("ankihub.gui.bulk_suggestion_summary_dialog.show_error_dialog")
         mocker.patch(
-            "ankihub.gui.suggestion_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            "ankihub.gui.bulk_suggestion_summary_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
             side_effect=Exception("network down"),
         )
 
