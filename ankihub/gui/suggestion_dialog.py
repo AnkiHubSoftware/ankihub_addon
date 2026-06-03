@@ -21,6 +21,7 @@ from aqt.qt import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QPalette,
     QPlainTextEdit,
@@ -62,6 +63,8 @@ from ..main.suggestions import (
     any_suggestible_from_diffs,
     compute_note_diffs,
     get_anki_nid_to_ah_dids_dict,
+    globally_protected_fields_by_mid,
+    has_empty_first_field,
     parse_duplicate_anki_id_error,
     resubmit_new_note_as_change_suggestion,
     resubmit_new_notes_as_change_suggestions_in_bulk,
@@ -78,7 +81,16 @@ from .utils import (
     clear_layout,
     show_error_dialog,
     show_tooltip,
+    tinted_pixmap,
+    warning_triangle_icon,
 )
+
+# "Include in suggestion" panel copy. The subtitle switches to the EMPTY variant
+# (plus the warning) when the note has no edited fields and no tag changes.
+INCLUDE_SUBTITLE = "Select which fields you want to submit changes for"
+EMPTY_STATE_SUBTITLE = "Edit a note field to create a change suggestion"
+EMPTY_STATE_TITLE = "No changes detected"
+EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
 
 
 def _panel_background_color() -> str:
@@ -153,7 +165,7 @@ def open_suggestion_dialog_for_single_suggestion(
         note_diffs=diffs,
         ah_did=ah_did,
         preselected_change_type=preselected_change_type,
-        globally_protected_fields_by_mid=_globally_protected_fields_by_mid(ah_did),
+        globally_protected_fields_by_mid=globally_protected_fields_by_mid(ah_did),
         parent=parent,
     )
 
@@ -363,7 +375,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
             )
     else:
         # Check for empty first field before submitting new note suggestion
-        if not note.fields or not note.fields[0].strip():
+        if has_empty_first_field(note):
             show_tooltip("The first field is required.", parent=parent)
             return
 
@@ -408,7 +420,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         return
 
     notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
-    globally_protected = _globally_protected_fields_by_mid(ah_did)
+    globally_protected = globally_protected_fields_by_mid(ah_did)
 
     diffs = compute_note_diffs(notes)
 
@@ -501,11 +513,6 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
 
     ah_did = list(ah_dids)[0]
     return ah_did
-
-
-def _globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
-    """Coerce the cached globally-protected fields into the shape the widget expects."""
-    return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
 
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
@@ -1018,7 +1025,7 @@ class SuggestionDialog(QDialog):
         self.change_type_select = QComboBox()
         if not self._is_new_note_suggestion:
             self.change_type_select.addItems([x.value[1] for x in SuggestionType])
-            right_layout.addWidget(QLabel("Change Type"))
+            right_layout.addWidget(QLabel("<b>Change Type</b>"))
             right_layout.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
@@ -1030,14 +1037,22 @@ class SuggestionDialog(QDialog):
         self.source_widget_group_box = QGroupBox("Source (Required)")
         self.source_widget_group_box.setObjectName("sourceGroupBox")
         # Same neutral panel background as the Include-in-suggestion section.
+        # font-weight on the element (not ::title) overrides Anki's bold-title
+        # default, so "Source" stays regular like in Figma.
         self.source_widget_group_box.setStyleSheet(
             f"#sourceGroupBox {{ background-color: {_panel_background_color()}; "
-            f"border: none; border-radius: 6px; margin-top: 8px; }} "
+            f"border: none; border-radius: 6px; margin-top: 8px; font-weight: normal; }} "
             f"#sourceGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; "
             f"left: 6px; padding: 0 3px; }}"
         )
+        # Pin the source box to its natural height so it never shrinks below its
+        # (fixed-height) contents — otherwise the combo and link/details fields
+        # overlap when the dialog is short. The rationale editor below absorbs
+        # the column's vertical flex instead.
+        self.source_widget_group_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         right_layout.addWidget(self.source_widget_group_box)
         self.source_widget_group_box_layout = QVBoxLayout()
+        self.source_widget_group_box_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
 
         self.source_widget_group_box_layout.addWidget(self.source_widget)
@@ -1050,7 +1065,7 @@ class SuggestionDialog(QDialog):
         right_layout.addWidget(self.hint_for_note_deletions)
         right_layout.addSpacing(10)
 
-        right_layout.addWidget(QLabel("Rationale for Change (Required)"))
+        right_layout.addWidget(QLabel("<b>Rationale for Change (Required)</b>"))
 
         self.rationale_edit = QPlainTextEdit()
         self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
@@ -1764,10 +1779,10 @@ class IncludeInSuggestionWidget(QWidget):
         title_row.addWidget(self._counter_label)
         frame_layout.addLayout(title_row)
 
-        subtitle = QLabel("Select which fields you want to submit changes for")
-        subtitle.setStyleSheet("color: palette(placeholder-text);")
-        subtitle.setWordWrap(True)
-        frame_layout.addWidget(subtitle)
+        self._subtitle = QLabel(INCLUDE_SUBTITLE)
+        self._subtitle.setStyleSheet("color: palette(placeholder-text);")
+        self._subtitle.setWordWrap(True)
+        frame_layout.addWidget(self._subtitle)
         frame_layout.addSpacing(6)
 
         self._scroll = QScrollArea()
@@ -1787,6 +1802,7 @@ class IncludeInSuggestionWidget(QWidget):
         self._scroll.setWidget(body)
         frame_layout.addWidget(self._scroll)
 
+        self._frame_layout = frame_layout
         self._populate(initial_deselected_by_mid)
         self._refresh_counter()
 
@@ -1916,6 +1932,47 @@ class IncludeInSuggestionWidget(QWidget):
 
         self._body_layout.addStretch()
 
+        if not (self._field_checkboxes or self._added_tag_boxes or self._removed_tag_boxes):
+            # Nothing to suggest -> empty state in the frame, not the scroll area:
+            # a word-wrapped label in a widgetResizable QScrollArea squashes when
+            # the panel is short.
+            self._subtitle.setText(EMPTY_STATE_SUBTITLE)
+            self._scroll.hide()
+            self._frame_layout.addStretch()
+            self._frame_layout.addWidget(self._build_empty_state())
+            self._frame_layout.addStretch()
+
+    def _build_empty_state(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        container.setLayout(layout)
+
+        # Icon and hint share the subtitle's muted, theme-adaptive color. The
+        # triangle is recolored to that palette role; the exclamation is a
+        # transparent cutout in the SVG, so it shows the panel background through
+        # in either theme.
+        muted = self.palette().color(QPalette.ColorRole.PlaceholderText)
+
+        icon_label = QLabel()
+        icon_label.setPixmap(tinted_pixmap(warning_triangle_icon().pixmap(QSize(32, 32)), muted))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(icon_label)
+
+        title = QLabel(EMPTY_STATE_TITLE)
+        title.setStyleSheet("font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        hint = QLabel(EMPTY_STATE_HINT)
+        hint.setStyleSheet("color: palette(placeholder-text);")
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
+
+        return container
+
     def _add_tag_section(self, title: str, tags: List[str]) -> Dict[str, QCheckBox]:
         return self._add_section(
             title=title,
@@ -1940,7 +1997,7 @@ class IncludeInSuggestionWidget(QWidget):
         boxes = self._all_checkboxes()
         total = len(boxes)
         selected = sum(1 for cb in boxes if cb.isChecked())
-        self._counter_label.setText(f"{selected}/{total}" if total else "")
+        self._counter_label.setText(f"{selected}/{total}")
 
     def has_any_selection(self) -> bool:
         return any(cb.isChecked() for cb in self._all_checkboxes())

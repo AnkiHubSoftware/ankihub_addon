@@ -1,9 +1,10 @@
 """Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
 
 import functools
+import json
 from typing import Any, List, Tuple, cast
 
-from anki.models import NoteType, NotetypeId
+from anki.models import NotetypeId
 from anki.notes import Note
 from aqt import gui_hooks
 from aqt.addcards import AddCards
@@ -16,7 +17,7 @@ from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..main.note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, protection_tag_for_field
-from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
+from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG, has_empty_first_field
 from ..main.utils import is_tag_in_list, update_notes_with_named_undo
 from ..settings import (
     ANKI_INT_VERSION,
@@ -30,6 +31,7 @@ from ..settings import (
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
+NOTE_DELETED_TOOLTIP = "This note has been deleted from AnkiHub. No new suggestions can be made."
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
 VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
 VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
@@ -42,12 +44,10 @@ def setup() -> None:
 
 
 def _setup_additional_editor_buttons():
-    gui_hooks.add_cards_did_init.append(_on_add_cards_init)
     gui_hooks.editor_did_init_buttons.append(_setup_editor_buttons)
     gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)
     gui_hooks.editor_did_load_note.append(_refresh_buttons)
-    gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
 
@@ -121,6 +121,22 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     the hotkey is pressed.
     """
 
+    # The button is visually disabled when the note isn't an AnkiHub note type;
+    # the keyboard shortcut still fires, but there's nothing to do (and the
+    # dialog opener below would otherwise hit an assert). No-op before the login
+    # check so a logged-out user pressing the hotkey on a non-AnkiHub note
+    # doesn't get a misleading login prompt.
+    note = editor.note
+    if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
+        return
+
+    # A note deleted on AnkiHub can't take new suggestions; gate before the login
+    # check too, so a logged-out user isn't asked to log in for a dead action.
+    ah_note = AnkiHubNote.get_or_none(anki_note_id=note.id)
+    if ah_note is not None and cast(AnkiHubNote, ah_note).was_deleted():
+        tooltip(NOTE_DELETED_TOOLTIP)
+        return
+
     if not config.is_logged_in():
         AnkiHubLogin.display_login()
         return
@@ -136,6 +152,13 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     # We call add_current_note() to add the note to the database,
     # and then open the suggestion dialog.
     if editor.note.id == 0:
+        # add_current_note() only fires add_cards_did_add_note on a *successful*
+        # add. An empty first field makes the add fail, which would leave
+        # on_did_add_note registered and later fire it for an unrelated note —
+        # so bail before registering when the note can't be added.
+        if has_empty_first_field(editor.note):
+            tooltip("The first field is empty.")
+            return
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
@@ -152,7 +175,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=lambda editor: editor.call_after_note_saved(
             functools.partial(_on_suggestion_button_press, editor), keepFocus=True
         ),
-        tip=f"Send your request to AnkiHub ({_suggestion_button_hotkey()})",
+        tip=_default_suggestion_button_tooltip(),
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
         keys=_suggestion_button_hotkey(),
@@ -203,8 +226,9 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         )
 
 
-def _default_suggestion_button_tooltip() -> str:
-    return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
+def _default_suggestion_button_tooltip(is_new_note: bool = False) -> str:
+    verb = "Suggest the note" if is_new_note else "Suggest a change"
+    return f"{verb} to AnkiHub ({_suggestion_button_hotkey()})"
 
 
 def _suggestion_button_hotkey():
@@ -349,25 +373,19 @@ def _refresh_buttons(editor: Editor) -> None:
         if ah_note.was_deleted():
             _enable_buttons(editor, [VIEW_NOTE_HISTORY_BTN_ID])
             _disable_buttons(editor, [SUGGESTION_BTN_ID, VIEW_NOTE_BTN_ID])
-            _set_suggestion_button_tooltip(
-                editor,
-                "This note has been deleted from AnkiHub. No new suggestions can be made.",
-            )
+            _set_suggestion_button_tooltip(editor, NOTE_DELETED_TOOLTIP)
         else:
+            # The button stays enabled even with no changes — clicking opens the
+            # suggestion dialog, which renders an empty state and lets the user
+            # pick DELETE. The gating lives in the dialog, not here.
             _enable_buttons(editor, all_button_ids)
-            _set_suggestion_button_tooltip(
-                editor,
-                _default_suggestion_button_tooltip(),
-            )
+            _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip(is_new_note=False))
     else:
         command = AnkiHubCommands.NEW.value
 
         _enable_buttons(editor, [SUGGESTION_BTN_ID])
         _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
-        _set_suggestion_button_tooltip(
-            editor,
-            _default_suggestion_button_tooltip(),
-        )
+        _set_suggestion_button_tooltip(editor, _default_suggestion_button_tooltip(is_new_note=True))
 
     _set_suggestion_button_label(editor, command)
     editor.ankihub_command = command  # type: ignore
@@ -391,26 +409,13 @@ def _set_enabled_states_of_buttons(editor: Editor, button_ids: list[str], enable
 
 
 def _set_suggestion_button_label(editor: Editor, label: str) -> None:
-    set_label_script = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
-    editor.web.eval(set_label_script.format(label))
+    # json.dumps so values with quotes/apostrophes can't break the JS string.
+    editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent={json.dumps(label)};")
 
 
 def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
-    set_tooltip_script = f"document.getElementById('{SUGGESTION_BTN_ID}').title='{{}}';"
-    editor.web.eval(set_tooltip_script.format(text))
-
-
-editor: Editor
-
-
-def _on_add_cards_init(add_cards: AddCards) -> None:
-    global editor
-    editor = add_cards.editor
-
-
-def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
-    global editor
-    _refresh_buttons(editor)
+    # json.dumps so values with quotes/apostrophes can't break the JS string.
+    editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').title={json.dumps(text)};")
 
 
 def _setup_editor_did_load_js_message(editor: Editor) -> None:

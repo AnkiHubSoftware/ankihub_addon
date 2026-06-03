@@ -4,10 +4,12 @@ to the version stored in the AnkiHub database. Suggestions are sent to AnkiHub.
 when syncing with AnkiHub.)"""
 
 import copy
+import re
 import shutil
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from html import unescape
 from pathlib import Path
 from typing import (
     Any,
@@ -41,6 +43,7 @@ from ..ankihub_client import (
     get_media_names_from_suggestions,
 )
 from ..ankihub_client.ankihub_client import AnkiHubHTTPError
+from ..common_utils import AV_TAGS, HTML_MEDIA_TAGS
 from ..db import ankihub_db
 from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
@@ -71,6 +74,9 @@ ANKIHUB_EMPTY_FIRST_FIELD_ERROR = "The first field is required and cannot be emp
 # AnkiHub but the local AnkiHub DB doesn't know it yet (pre-sync), so the add-on
 # submitted a new-note suggestion instead of a change suggestion.
 ANKIHUB_DUPLICATE_ANKI_ID_ERROR = "A deck can't contain multiple notes with the same anki_id."
+
+# Matches any HTML tag — used to strip markup when checking a field for visible text.
+HTML_TAG_REGEX = re.compile(r"<[^>]+>")
 
 
 def _first_if_list(value: Any) -> Any:
@@ -115,13 +121,6 @@ class ChangeSuggestionResult(Enum):
 
 class MediaUploadCallback(Protocol):
     def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None: ...
-
-
-def _has_empty_first_field(note: Note) -> bool:
-    """Returns True if the first field of the note is empty or whitespace-only."""
-    if not note.fields:
-        return True
-    return not note.fields[0].strip()
 
 
 @dataclass
@@ -246,6 +245,31 @@ def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
     return result
 
 
+def globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
+    """Coerce the cached globally-protected fields into the typed shape that
+    `_is_suggestible_from_diff`, `any_suggestible_from_diffs`, and the dialog
+    widget consume."""
+    return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
+
+
+def has_empty_first_field(note: Note) -> bool:
+    """True when the note's first field has no visible content.
+
+    Strips HTML tags and entities, then checks for remaining text — so plain
+    whitespace and markup-only values (e.g. "<br>", "&nbsp;") count as empty,
+    while embedded media (images/audio) counts as content. This intentionally
+    approximates Anki's own `fields_check` rather than calling it, to avoid a
+    per-note backend round-trip (which also does a duplicate DB lookup); the
+    server still rejects a truly-empty first field as a backstop.
+    """
+    if not note.fields:
+        return True
+    field = note.fields[0]
+    if HTML_MEDIA_TAGS.search(field) or AV_TAGS.search(field):
+        return False
+    return not unescape(HTML_TAG_REGEX.sub("", field)).strip()
+
+
 def _is_suggestible_from_diff(
     note: Note,
     diff: NoteDiff,
@@ -258,7 +282,7 @@ def _is_suggestible_from_diff(
         return diff.exists_in_ah_db
     # The submit path drops these as EMPTY_FIRST_FIELD for non-DELETE
     # change types; mirror that so we don't accept a note we'll just reject.
-    if _has_empty_first_field(note):
+    if has_empty_first_field(note):
         return False
     denied = set(globally_protected_by_mid.get(NotetypeId(note.mid), ()))
     if not diff.exists_in_ah_db and note.note_type()["flds"][0]["name"] in denied:
@@ -312,7 +336,7 @@ def suggest_note_update(
 
     # DELETE doesn't carry field content, so the empty-first-field requirement
     # doesn't apply — users should be able to delete malformed notes.
-    if _has_empty_first_field(note) and change_type != SuggestionType.DELETE:
+    if has_empty_first_field(note) and change_type != SuggestionType.DELETE:
         return ChangeSuggestionResult.EMPTY_FIRST_FIELD
 
     suggestion = _change_note_suggestion(note, change_type, comment, filters=filters)
@@ -631,7 +655,7 @@ def _suggestions_for_notes(
     nids_with_empty_first_field: List[NoteId] = []
     for note in notes:
         # DELETE doesn't carry field content; allow notes with an empty first field through.
-        if _has_empty_first_field(note) and change_type != SuggestionType.DELETE:
+        if has_empty_first_field(note) and change_type != SuggestionType.DELETE:
             nids_with_empty_first_field.append(note.id)
             continue
 
