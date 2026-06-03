@@ -182,9 +182,8 @@ class ReviewerSidebar:
         self.page_type = SidebarPageType.CHATBOT
         self.resources = []
 
-        # Only focus the chatbot when explicitly requested (e.g. when the user opens it),
-        # not when it's refreshed on card change, so that the reviewer keeps keyboard focus
-        # (and shortcuts like the answer keys keep working) while reviewing with the sidebar open.
+        # Only focus the chatbot when explicitly requested (e.g. when the user opens it), not on
+        # card change, so that the reviewer keeps keyboard focus (and shortcuts) while reviewing.
         self._focus_content_webview_on_page_load = focus
 
         # The web app handles the case when ah_nid is None and shows the "note not found" screen.
@@ -289,13 +288,17 @@ class ReviewerSidebar:
         self.content_webview.eval(f"localStorage.setItem('theme', '{anki_theme()}');")
 
     def _on_content_page_loaded(self, ok: bool) -> None:
+        # Consume the one-shot focus request on every load, so that a stale request can't
+        # focus the webview on a later, unrelated page load.
+        focus_requested = self._focus_content_webview_on_page_load
+        self._focus_content_webview_on_page_load = False
+
         if url_login() in self.content_webview.url().toString():
             self._handle_auth_failure()
             return
 
         if ok:
-            if self._focus_content_webview_on_page_load:
-                self._focus_content_webview_on_page_load = False
+            if focus_requested and self.is_sidebar_open():
                 self.content_webview.setFocus()
             return
 
