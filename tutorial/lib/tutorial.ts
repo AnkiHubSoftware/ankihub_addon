@@ -147,7 +147,11 @@ export class TutorialEffect {
         }
         if (arrowElement) {
             this.arrowElement = arrowElement;
-            this.getStepElement().appendChild(this.arrowElement);
+            const stepEl = this.getStepElement();
+            // Insert before dialog content so the arrow does not paint on top of body text
+            // when the rotated tip overlaps the panel (appendChild stacks it above siblings).
+            stepEl.insertBefore(this.arrowElement, stepEl.firstElementChild);
+            this.arrowElement.style.pointerEvents = "none";
         }
         let backdropElement: HTMLElement | null = null;
         if (this.options.backdrop instanceof HTMLElement) {
@@ -264,7 +268,11 @@ export class TutorialEffect {
             return;
         }
         const arrowLength = this.arrowElement?.offsetWidth ?? 0;
-        const floatingOffset = Math.sqrt(2 * arrowLength ** 2) / 2;
+        // Half diagonal of the square arrow; small extra gap keeps the rotated diamond off text.
+        const floatingOffset =
+            arrowLength > 0
+                ? Math.sqrt(2 * arrowLength ** 2) / 2 + arrowLength * 0.2
+                : 0;
 
         let middleware = [autoPlacement()];
         if (this.arrowElement) {
