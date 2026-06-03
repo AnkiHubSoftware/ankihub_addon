@@ -38,7 +38,7 @@ dev = [
 bundle = [
   "sentry_sdk==1.6.0",
   "tenacity==8.2.2",
-  "structlog==24.1.0",
+  "structlog==25.5.0",
   "peewee==3.18.2",
   "mashumaro",
   # We cannot use more recent versions because we still need to support Python 3.9
