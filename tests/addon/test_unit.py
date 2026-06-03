@@ -122,6 +122,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
+    _ActionState,
     _GroupController,
     _on_suggest_notes_in_bulk_done,
     _SelectAllCheckBox,
@@ -1454,9 +1455,25 @@ class TestBulkSuggestionSummaryDialog:
         )
         assert dialog._can_close() is False
         dialog._on_ignore()
-        assert dialog._action_state == "ignored"
+        assert dialog._action_state == _ActionState.IGNORED
         assert dialog._can_close() is True
         assert dialog._already_in_deck  # still rendered, just resolved
+
+    def test_window_close_is_gated_until_action_resolved(self, mocker, next_deterministic_uuid):
+        # X / Escape route through reject(); it must be a no-op while an action is required.
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        super_reject = mocker.patch("aqt.qt.QDialog.reject")
+        dialog.reject()
+        super_reject.assert_not_called()  # blocked while action required
+        dialog._on_ignore()
+        dialog.reject()
+        super_reject.assert_called_once()  # allowed once resolved
 
     def _patch_resubmit(self, mocker, errors_returned):
         mocker.patch(
@@ -1484,7 +1501,7 @@ class TestBulkSuggestionSummaryDialog:
         assert dialog._change_submitted == 2
         assert NoteId(5) not in dialog._errors_by_nid
         assert dialog._already_in_deck == {}
-        assert dialog._action_state == "resolved"
+        assert dialog._action_state == _ActionState.RESOLVED
         assert dialog._can_close() is True
         assert "change_submitted" in dialog._updated_keys
 

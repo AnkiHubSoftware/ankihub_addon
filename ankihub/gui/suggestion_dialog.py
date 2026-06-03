@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from html import escape
 from pprint import pformat
-from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki.models import NotetypeId
@@ -75,6 +75,7 @@ from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
+    clear_layout,
     show_error_dialog,
     show_tooltip,
 )
@@ -536,8 +537,18 @@ def _summary_link_color() -> str:
     return "#5b9bd5" if theme_manager.night_mode else "#1565c0"
 
 
-def _updated_badge_colors() -> "tuple":
+def _updated_badge_colors() -> Tuple[str, str]:
     return ("#23492c", "#9be8ab") if theme_manager.night_mode else ("#d8f5dd", "#1b7a2f")
+
+
+class _ActionState(Enum):
+    """State of the 'Notes already in this deck' action box."""
+
+    DEFAULT = "default"
+    LOADING = "loading"  # resubmit in flight
+    IGNORED = "ignored"  # user chose to ignore
+    RESOLVED = "resolved"  # resubmit finished (fully or partially)
+    FAILED = "failed"  # resubmit hit a hard error; user may retry and can close
 
 
 class BulkSuggestionSummaryDialog(QDialog):
@@ -565,8 +576,7 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._ah_did = ah_did
         self._change_type = change_type or SuggestionType.UPDATED_CONTENT
         self._auto_accept = auto_accept
-        self._action_state = "default"  # default | loading | ignored | resolved
-        self._hard_error = False  # a failed resubmit attempt; keeps Close reachable
+        self._action_state = _ActionState.DEFAULT
         self._updated_keys: Set[str] = set()  # "change_submitted" + category keys to badge
 
         outer = QVBoxLayout(self)
@@ -596,11 +606,23 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     # --- state ------------------------------------------------------------
     def _can_close(self) -> bool:
-        if self._action_state == "loading":
+        if self._action_state == _ActionState.LOADING:
             return False
-        if self._hard_error or self._action_state in ("ignored", "resolved"):
+        if self._action_state in (_ActionState.IGNORED, _ActionState.RESOLVED, _ActionState.FAILED):
             return True
         return not self._already_in_deck
+
+    # Gate the window-X / Escape close (which call reject()), not just the Close
+    # button, so an unresolved action or an in-flight resubmit can't be dismissed.
+    def reject(self) -> None:
+        if self._can_close():
+            super().reject()
+
+    def closeEvent(self, event) -> None:
+        if self._can_close():
+            super().closeEvent(event)
+        else:
+            event.ignore()
 
     def _categorize(self) -> Dict[str, List[NoteId]]:
         already = set(self._already_in_deck.keys())
@@ -629,18 +651,8 @@ class BulkSuggestionSummaryDialog(QDialog):
             shown += f", … and {extra} more"
         return shown
 
-    @classmethod
-    def _clear_layout(cls, layout) -> None:
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            elif item.layout() is not None:
-                cls._clear_layout(item.layout())
-
     def _render(self) -> None:
-        self._clear_layout(self._content_layout)
+        clear_layout(self._content_layout)
         self._content_layout.addWidget(self._build_summary_card())
         if self._already_in_deck:
             heading = QLabel("Action required")
@@ -651,7 +663,7 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._close_button.setEnabled(self._can_close())
         self.adjustSize()
 
-    def _new_card(self, object_name: str):
+    def _new_card(self, object_name: str) -> Tuple[QFrame, QVBoxLayout]:
         card = QFrame()
         card.setObjectName(object_name)
         border = _panel_line_color()
@@ -769,7 +781,7 @@ class BulkSuggestionSummaryDialog(QDialog):
         description.setWordWrap(True)
         vbox.addWidget(description)
 
-        if self._action_state == "ignored":
+        if self._action_state == _ActionState.IGNORED:
             ignored = QLabel("Ignored — no action taken.")
             ignored.setStyleSheet(f"color:{_MUTED_TEXT_COLOR}; font-style:italic;")
             vbox.addWidget(ignored)
@@ -777,7 +789,7 @@ class BulkSuggestionSummaryDialog(QDialog):
 
         button_row = QHBoxLayout()
         button_row.setContentsMargins(0, 6, 0, 0)
-        loading = self._action_state == "loading"
+        loading = self._action_state == _ActionState.LOADING
 
         ignore_button = QPushButton("Ignore")
         ignore_button.setEnabled(not loading)
@@ -798,13 +810,13 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     # --- actions ----------------------------------------------------------
     def _on_ignore(self) -> None:
-        self._action_state = "ignored"
+        self._action_state = _ActionState.IGNORED
         self._render()
 
     def _on_resubmit(self) -> None:
         LOGGER.info("bulk_resubmit_clicked", ah_did=str(self._ah_did), count=len(self._already_in_deck))
         conflicts = dict(self._already_in_deck)
-        self._action_state = "loading"
+        self._action_state = _ActionState.LOADING
         self._render()
 
         def task() -> Dict[NoteId, object]:
@@ -814,8 +826,9 @@ class BulkSuggestionSummaryDialog(QDialog):
             try:
                 errors_by_nid = future.result()
             except Exception as e:  # hard failure (network etc.) — never trap the user
-                self._hard_error = True
-                self._action_state = "default"
+                # FAILED keeps the action buttons (so the user can retry) but also
+                # lets Close work, so a failed resubmit can't trap them.
+                self._action_state = _ActionState.FAILED
                 self._render()
                 show_error_dialog(
                     "Couldn't resubmit the suggestions. Please try again.",
@@ -846,7 +859,7 @@ class BulkSuggestionSummaryDialog(QDialog):
             self._errors_by_nid[nid] = error
 
         self._already_in_deck = {}
-        self._action_state = "resolved"
+        self._action_state = _ActionState.RESOLVED
 
         # Badge the error categories the re-failed notes landed in.
         for key, nids in self._categorize().items():
