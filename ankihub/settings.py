@@ -33,6 +33,7 @@ from anki.utils import is_win, point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
+from product_metrics_client import DEFAULT_PRODUCT_METRICS_URL, STAGING_PRODUCT_METRICS_URL
 from structlog.processors import CallsiteParameter
 from structlog.typing import Processor
 
@@ -252,6 +253,7 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
+            self.product_metrics_url = STAGING_PRODUCT_METRICS_URL
             self.anking_deck_id = uuid.UUID(
                 self.public_config.get("staging_anking_deck_id") or "dfe7f548-f66e-4277-932b-c7a63db3223a"
             )
@@ -260,6 +262,7 @@ class _Config:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
+            self.product_metrics_url = DEFAULT_PRODUCT_METRICS_URL
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -271,6 +274,9 @@ class _Config:
             override_url = override_url.rstrip("/")
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
+
+        if product_metrics_url := os.getenv("PRODUCT_METRICS_URL"):
+            self.product_metrics_url = product_metrics_url
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
@@ -549,6 +555,18 @@ class _Config:
 
     def user_id(self) -> Optional[int]:
         return self._private_config.user_details.get("id")
+
+    def plan(self) -> Optional[str]:
+        return self._private_config.user_details.get("plan")
+
+    def is_staff(self) -> bool:
+        return bool(self._private_config.user_details.get("is_staff"))
+
+    def is_admin(self) -> bool:
+        return bool(self._private_config.user_details.get("is_admin"))
+
+    def is_beta_tester(self) -> bool:
+        return bool(self._private_config.user_details.get("beta_tester"))
 
     def last_deck_sync(self) -> Optional[str]:
         return self._private_config.user_details.get("last_deck_sync")

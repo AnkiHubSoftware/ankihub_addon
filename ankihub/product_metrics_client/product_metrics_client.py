@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import socket
 import time
 from typing import Any, Dict, Iterator, Optional, Sequence, Tuple, cast
@@ -80,10 +79,10 @@ class ProductMetricsClient:
 
     def __init__(
         self,
-        url: Optional[str] = None,
+        url: str,
         session: Optional[Session] = None,
     ) -> None:
-        self.url = url or os.getenv("PRODUCT_METRICS_URL") or DEFAULT_PRODUCT_METRICS_URL
+        self.url = url
         self._session = session
 
     def track(
