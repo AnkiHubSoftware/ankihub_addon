@@ -33,7 +33,6 @@ from anki.utils import is_win, point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
-from product_metrics_client import DEFAULT_PRODUCT_METRICS_URL, STAGING_PRODUCT_METRICS_URL
 from structlog.processors import CallsiteParameter
 from structlog.typing import Processor
 
@@ -51,6 +50,7 @@ from .ankihub_client import (
 from .ankihub_client.models import Deck, UserDeckRelation
 from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
+from .product_metrics_client import DEFAULT_PRODUCT_METRICS_URL, STAGING_PRODUCT_METRICS_URL
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
