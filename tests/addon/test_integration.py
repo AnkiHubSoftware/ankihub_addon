@@ -2346,10 +2346,12 @@ class TestFieldsToSuggestFilters:
         clipping (no painted line is wider than the content rect).
         """
 
-        def painted_extents(cb) -> tuple[float, float, int]:
-            """(painted text height, widest painted line, content width), measured
-            through the same `_lay_out`/`_content_width` that `paintEvent` draws
-            with — so this asserts the real paint output fits, not a re-implementation.
+        def painted_extents(cb) -> tuple[float, float, int, int]:
+            """(painted text height, widest painted line, content width, text top
+            offset), measured through the same `_lay_out`/`_content_width` that
+            `paintEvent` draws with — so this asserts the real paint output fits,
+            not a re-implementation. (Kept untyped so the `_WrappingCheckBox`-only
+            internals aren't accessed through the dict's `QCheckBox` type.)
             """
             content_w = cb._content_width(cb.width())
             layout = cb._lay_out(max(1, content_w))
@@ -2357,7 +2359,9 @@ class TestFieldsToSuggestFilters:
                 (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
                 default=0.0,
             )
-            return layout.boundingRect().height(), widest, content_w
+            # paintEvent draws the text below this top padding.
+            top_offset = cb._vertical_padding() // 2
+            return layout.boundingRect().height(), widest, content_w, top_offset
 
         deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
         long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
@@ -2403,10 +2407,9 @@ class TestFieldsToSuggestFilters:
                     # Wait for the layout to apply the new row heights, rather than racing a timer.
                     qtbot.waitUntil(lambda: all(cb.height() == cb.heightForWidth(cb.width()) for cb in boxes.values()))
                     for tag, cb in boxes.items():
-                        painted_h, widest_line, content_w = painted_extents(cb)
-                        # paintEvent draws the text below this top padding, so it must fit below it too.
-                        top_offset = cb._vertical_padding() // 2
-                        # +0.5 absorbs the float boundingRect height vs. integer row height.
+                        painted_h, widest_line, content_w, top_offset = painted_extents(cb)
+                        # +0.5 absorbs the float boundingRect height vs. integer row height;
+                        # top_offset is where paintEvent starts drawing the text.
                         assert cb.height() + 0.5 >= top_offset + painted_h, (
                             f"vertical clip for {tag!r} at dialog width {width}: row height "
                             f"{cb.height()} < text top {top_offset} + painted height {painted_h:.0f}"
