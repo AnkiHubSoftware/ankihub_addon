@@ -126,6 +126,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     _SelectAllCheckBox,
     _TagLabel,
+    _WrappingCheckBox,
     get_anki_nid_to_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
@@ -580,6 +581,61 @@ def test_tag_label_elide():
     assert leaf_result.startswith("…::")
     assert leaf_result.endswith("…")
     assert len(leaf_result) <= 85
+
+
+def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):
+    """Regression (NRT-790): the last line of a long tag checkbox got clipped.
+
+    `heightForWidth` must reserve enough height for what `paintEvent` actually
+    draws. The bug cached the style's content-rect width at `__init__` — before
+    the widget was polished, where it is ~6px wider than the polished value — so
+    `heightForWidth` measured wrapping against too-wide a column, under-counted
+    lines, and clipped the last one. The widget must be SHOWN (polished) for that
+    discrepancy to surface, so this test shows it before measuring.
+
+    Covers a deep hierarchical tag (breaks at `::`) and a long unbreakable leaf
+    (must wrap mid-token rather than overflow), for both vertical clipping (row
+    height covers the painted text) and horizontal clipping (no line is wider
+    than the content rect), across boundary widths and font sizes.
+    """
+
+    def painted_extents(cb: _WrappingCheckBox) -> tuple[float, float, int, int]:
+        """(painted height, widest line, content width, text top offset), via the
+        same `_build_text_layout`/`_content_width` that `paintEvent` draws with."""
+        content_w = cb._content_width(cb.width())
+        layout = cb._build_text_layout(max(1, content_w))  # returns a laid-out QTextLayout
+        widest = max(
+            (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
+            default=0.0,
+        )
+        return layout.boundingRect().height(), widest, content_w, cb._vertical_padding() // 2
+
+    deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
+    long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
+    for tag in (deep_tag, long_leaf_tag):
+        cb = _WrappingCheckBox(tag)
+        qtbot.addWidget(cb)
+        cb.show()  # polish the widget so the content-rect metrics are the real ones
+        qtbot.waitExposed(cb)
+        for point_size in (None, 13, 16, 20):
+            if point_size is not None:
+                font = cb.font()
+                font.setPointSize(point_size)
+                cb.setFont(font)
+                cb.ensurePolished()
+            for width in range(150, 540, 2):
+                cb.resize(width, cb.heightForWidth(width))
+                painted_h, widest_line, content_w, top_offset = painted_extents(cb)
+                # +0.5 absorbs the float boundingRect height vs. integer row height;
+                # top_offset is where paintEvent starts drawing the text.
+                assert cb.height() + 0.5 >= top_offset + painted_h, (
+                    f"vertical clip: tag={tag!r} pt={point_size} width={width}: row height "
+                    f"{cb.height()} < text top {top_offset} + painted height {painted_h:.0f}"
+                )
+                assert widest_line <= content_w + 1, (
+                    f"horizontal clip: tag={tag!r} pt={point_size} width={width}: "
+                    f"line width {widest_line:.0f} > content width {content_w}"
+                )
 
 
 def test_remove_note_type_name_modifications():
