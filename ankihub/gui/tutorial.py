@@ -48,6 +48,11 @@ from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
 from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.reset_local_changes import reset_local_changes_to_notes
+from ..product_metrics_client import (
+    ProductMetricsClient,
+    ProductMetricsHTTPError,
+    ProductMetricsRequestException,
+)
 from ..settings import config
 from .flashcard_selector_dialog import (
     show_flashcard_selector,
@@ -384,6 +389,7 @@ def ensure_tutorial_active(func: Callable[..., None]) -> Callable[..., None]:
 class Tutorial:
     def __init__(self) -> None:
         self.current_step = 1
+        self.product_metrics = ProductMetricsClient(url=config.product_metrics_url)
 
     @classmethod
     def is_active(cls) -> bool:
@@ -520,9 +526,40 @@ class Tutorial:
         for context in contexts:
             inject_tutorial_assets(context, on_script_loaded)
 
+    def _track_tutorial_started(self, event_name: str) -> None:
+        user_id = str(config.user_id())
+        plan = config.plan()
+        is_staff = config.is_staff()
+        is_admin = config.is_admin()
+        is_beta_tester = config.is_beta_tester()
+        tutorial_name = type(self).__name__
+
+        def send_event() -> None:
+            try:
+                self.product_metrics.track(
+                    distinct_id=user_id,
+                    event_name=event_name,
+                    properties={
+                        "tutorial": tutorial_name,
+                        "user": user_id,
+                        "plan": plan,
+                        "is_staff_or_admin": is_staff or is_admin,
+                        "beta_tester": is_beta_tester,
+                    },
+                )
+            except (ProductMetricsHTTPError, ProductMetricsRequestException) as exc:
+                LOGGER.warning(
+                    "failed_to_track_tutorial_started",
+                    tutorial=tutorial_name,
+                    exception=str(exc),
+                )
+
+        aqt.mw.taskman.run_in_background(send_event)
+
     def start(self) -> None:
         global active_tutorial
         active_tutorial = self
+        self._track_tutorial_started(event_name="tutorial_shown")
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
