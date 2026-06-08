@@ -252,7 +252,7 @@ def _schedule_post_sync_tasks() -> None:
 
 
 def _show_onboarding_prompt_if_first_sync() -> None:
-    if config.last_deck_sync() is None:
+    if config.onboarding_tutorial_show_on_sync() and config.last_deck_sync() is None:
         from ..tutorial import prompt_for_onboarding_tutorial
 
         prompt_for_onboarding_tutorial()
