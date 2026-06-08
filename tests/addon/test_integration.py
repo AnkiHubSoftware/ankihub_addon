@@ -2348,13 +2348,13 @@ class TestFieldsToSuggestFilters:
 
         def painted_extents(cb) -> tuple[float, float, int, int]:
             """(painted text height, widest painted line, content width, text top
-            offset), measured through the same `_lay_out`/`_content_width` that
+            offset), measured through the same `_build_text_layout`/`_content_width` that
             `paintEvent` draws with — so this asserts the real paint output fits,
             not a re-implementation. (Kept untyped so the `_WrappingCheckBox`-only
             internals aren't accessed through the dict's `QCheckBox` type.)
             """
             content_w = cb._content_width(cb.width())
-            layout = cb._lay_out(max(1, content_w))
+            layout = cb._build_text_layout(max(1, content_w))
             widest = max(
                 (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
                 default=0.0,

@@ -1095,7 +1095,7 @@ class _WrappingCheckBox(_RowCheckBox):
         assert self._native_row_height is not None  # set in __init__
         return max(0, self._native_row_height - self.fontMetrics().height())
 
-    def _lay_out(self, text_width: int) -> QTextLayout:
+    def _build_text_layout(self, text_width: int) -> QTextLayout:
         """Wrap the label into `text_width` px with the same QTextLayout engine
         `paintEvent` draws with, so `heightForWidth` reserves exactly the number
         of lines that get painted. (`QFontMetrics.boundingRect` is a separate
@@ -1122,7 +1122,7 @@ class _WrappingCheckBox(_RowCheckBox):
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802
-        layout = self._lay_out(max(1, self._content_width(width)))
+        layout = self._build_text_layout(max(1, self._content_width(width)))
         return math.ceil(layout.boundingRect().height()) + self._vertical_padding()
 
     def sizeHint(self) -> QSize:  # noqa: N802
@@ -1155,7 +1155,7 @@ class _WrappingCheckBox(_RowCheckBox):
         painter.setPen(self.palette().color(color_group, QPalette.ColorRole.WindowText))
         # Draw via the same QTextLayout `heightForWidth` measured with, so the
         # painted line count matches the reserved height exactly (no clipped line).
-        self._lay_out(contents.width()).draw(painter, QPointF(contents.x(), contents.y()))
+        self._build_text_layout(contents.width()).draw(painter, QPointF(contents.x(), contents.y()))
 
 
 class _SelectAllCheckBox(_RowCheckBox):
