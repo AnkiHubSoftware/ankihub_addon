@@ -1,5 +1,6 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
 
+import math
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
@@ -25,6 +26,7 @@ from aqt.qt import (
     QLineEdit,
     QPalette,
     QPlainTextEdit,
+    QPointF,
     QRect,
     QScrollArea,
     QSize,
@@ -34,6 +36,8 @@ from aqt.qt import (
     QStyleOptionButton,
     QStylePainter,
     Qt,
+    QTextLayout,
+    QTextOption,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
@@ -1056,10 +1060,6 @@ class _WrappingCheckBox(_RowCheckBox):
         self._wrap_text = _TagLabel._inject_breakpoints(self._display)
         if _WrappingCheckBox._native_row_height is None:
             _WrappingCheckBox._native_row_height = QCheckBox("X").sizeHint().height()
-        # Style-and-font-determined and rect-independent in practice, so cache it
-        # rather than asking the style on every `heightForWidth` call (which the
-        # layout invokes many times during resize, per tag).
-        self._cached_content_x = self._compute_contents_x()
         # Helps screen readers name the otherwise text-less checkbox.
         self.setAccessibleName(tag)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1073,12 +1073,19 @@ class _WrappingCheckBox(_RowCheckBox):
         if self._display != tag:
             self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(tag))}</p>")
 
-    def _compute_contents_x(self) -> int:
-        """x where the label text starts (indicator + style label spacing)."""
+    def _content_width(self, width: int) -> int:
+        """Width available for the label inside a checkbox of the given overall
+        width, derived the same way `paintEvent` computes its draw rect (the
+        style's `SE_CheckBoxContents` sub-element). Computed fresh per call rather
+        than cached: the style metrics aren't reliable until the widget is
+        polished, and a value cached in `__init__` is too narrow on the left and
+        too wide overall, which made `heightForWidth` under-count wrapped lines
+        and clip the last one. The style call is cheap.
+        """
         opt = QStyleOptionButton()
         self.initStyleOption(opt)
-        opt.rect = QRect(0, 0, 1000, max(self.fontMetrics().height(), 1))
-        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).x()
+        opt.rect = QRect(0, 0, width, max(self.fontMetrics().height(), 1))
+        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).width()
 
     def _vertical_padding(self) -> int:
         """Vertical space a native single-line checkbox reserves around its text
@@ -1088,14 +1095,35 @@ class _WrappingCheckBox(_RowCheckBox):
         assert self._native_row_height is not None  # set in __init__
         return max(0, self._native_row_height - self.fontMetrics().height())
 
+    def _lay_out(self, text_width: int) -> QTextLayout:
+        """Wrap the label into `text_width` px with the same QTextLayout engine
+        `paintEvent` draws with, so `heightForWidth` reserves exactly the number
+        of lines that get painted. (`QFontMetrics.boundingRect` is a separate
+        code path that disagrees by a line at wrap boundaries — especially with
+        wrap-anywhere — which is what clipped the last tag segment.)
+        """
+        opt = QTextOption()
+        opt.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        layout = QTextLayout(self._wrap_text, self.font())
+        layout.setTextOption(opt)
+        layout.beginLayout()
+        y = 0.0
+        while True:
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(max(1, text_width))
+            line.setPosition(QPointF(0, y))
+            y += line.height()
+        layout.endLayout()
+        return layout
+
     def hasHeightForWidth(self) -> bool:  # noqa: N802
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802
-        fm = self.fontMetrics()
-        text_width = max(1, width - self._cached_content_x)
-        rect = fm.boundingRect(QRect(0, 0, text_width, 1_000_000), int(Qt.TextFlag.TextWordWrap), self._wrap_text)
-        return rect.height() + self._vertical_padding()
+        layout = self._lay_out(max(1, self._content_width(width)))
+        return math.ceil(layout.boundingRect().height()) + self._vertical_padding()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         assert self._native_row_height is not None
@@ -1125,8 +1153,9 @@ class _WrappingCheckBox(_RowCheckBox):
         # Match the indicator's enabled state so the text greys with it.
         color_group = QPalette.ColorGroup.Normal if self.isEnabled() else QPalette.ColorGroup.Disabled
         painter.setPen(self.palette().color(color_group, QPalette.ColorRole.WindowText))
-        flags = int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop) | int(Qt.TextFlag.TextWordWrap)
-        painter.drawText(contents, flags, self._wrap_text)
+        # Draw via the same QTextLayout `heightForWidth` measured with, so the
+        # painted line count matches the reserved height exactly (no clipped line).
+        self._lay_out(contents.width()).draw(painter, QPointF(contents.x(), contents.y()))
 
 
 class _SelectAllCheckBox(_RowCheckBox):

@@ -2323,6 +2323,105 @@ class TestFieldsToSuggestFilters:
             # under it, so `_save_deselections` never wrote it back.
             assert config.last_deselected_fields(ah_did, other_mid) == ["Stale"]
 
+    def test_long_tag_checkbox_is_not_clipped(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        """Regression: long tag checkboxes had their last line clipped in the
+        suggestion dialog.
+
+        A deep tag like ``A::B::C::Leaf`` lost its bottom segment vertically:
+        `_WrappingCheckBox.heightForWidth` measured wrapping against a wider text
+        width than `paintEvent` drew into (style metrics cached before the widget
+        was polished), so it reserved one line too few. An elided tag whose leaf
+        has no break points overflowed horizontally. This only reproduces inside
+        the real dialog, whose stylesheet pads the checkbox content rect, with a
+        larger UI font and the narrow left column.
+
+        Checks both a deep hierarchical tag and a long unbreakable leaf, for both
+        vertical clipping (row height covers the painted text) and horizontal
+        clipping (no painted line is wider than the content rect).
+        """
+        from aqt.qt import QPointF, QStyle, QStyleOptionButton, QTextLayout, QTextOption
+
+        from ankihub.gui.suggestion_dialog import SuggestionDialog
+
+        def painted_extents(cb) -> tuple[float, float, int]:
+            """(painted text height, widest painted line, content rect width)."""
+            sopt = QStyleOptionButton()
+            cb.initStyleOption(sopt)
+            content_w = cb.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, sopt, cb).width()
+            opt = QTextOption()
+            opt.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+            layout = QTextLayout(cb._wrap_text, cb.font())
+            layout.setTextOption(opt)
+            layout.beginLayout()
+            y = 0.0
+            widest = 0.0
+            while True:
+                line = layout.createLine()
+                if not line.isValid():
+                    break
+                line.setLineWidth(max(1, content_w))
+                line.setPosition(QPointF(0, y))
+                y += line.height()
+                widest = max(widest, line.naturalTextWidth())
+            layout.endLayout()
+            return layout.boundingRect().height(), widest, content_w
+
+        deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
+        long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
+        with anki_session_with_addon_data.profile_loaded():
+            # A larger UI font, set before the dialog is built, like real Anki.
+            app_font = aqt.mw.app.font()
+            app_font.setPointSize(16)
+            aqt.mw.app.setFont(app_font)
+            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did, note_data=NoteInfoFactory.create(tags=[deep_tag]))
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            # Remove the deep tag (-> "Removed Tags") and add the long leaf (-> "Added Tags").
+            note.tags = [long_leaf_tag]
+            aqt.mw.col.update_note(note)
+
+            dialog = SuggestionDialog(
+                is_new_note_suggestion=False,
+                is_for_anking_deck=False,
+                can_submit_without_review=False,
+                added_new_media=False,
+                callback=lambda _meta: None,
+                notes=[note],
+                note_diffs=compute_note_diffs([note]),
+                ah_did=ah_did,
+            )
+            qtbot.addWidget(dialog)
+            dialog.show()
+            qtbot.waitExposed(dialog)
+            boxes = {
+                **dialog._fields_widget._added_tag_boxes,
+                **dialog._fields_widget._removed_tag_boxes,
+            }
+            assert len(boxes) == 2
+
+            # Widths that span the boundaries where a tag rewraps to one more line.
+            for width in range(640, 1000, 20):
+                dialog.resize(width, 600)
+                qtbot.wait(10)
+                for tag, cb in boxes.items():
+                    painted_h, widest_line, content_w = painted_extents(cb)
+                    assert cb.height() + 0.5 >= painted_h, (
+                        f"vertical clip for {tag!r} at dialog width {width}: "
+                        f"row height {cb.height()} < painted text height {painted_h:.0f}"
+                    )
+                    assert widest_line <= content_w + 1, (
+                        f"horizontal clip for {tag!r} at dialog width {width}: "
+                        f"line width {widest_line:.0f} > content width {content_w}"
+                    )
+
 
 class TestSuggestNotesInBulk:
     def test_new_note_suggestion(
