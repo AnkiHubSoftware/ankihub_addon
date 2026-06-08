@@ -2345,82 +2345,78 @@ class TestFieldsToSuggestFilters:
         vertical clipping (row height covers the painted text) and horizontal
         clipping (no painted line is wider than the content rect).
         """
-        from aqt.qt import QPointF, QStyle, QStyleOptionButton, QTextLayout, QTextOption
-
-        from ankihub.gui.suggestion_dialog import SuggestionDialog
 
         def painted_extents(cb) -> tuple[float, float, int]:
-            """(painted text height, widest painted line, content rect width)."""
-            sopt = QStyleOptionButton()
-            cb.initStyleOption(sopt)
-            content_w = cb.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, sopt, cb).width()
-            opt = QTextOption()
-            opt.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
-            layout = QTextLayout(cb._wrap_text, cb.font())
-            layout.setTextOption(opt)
-            layout.beginLayout()
-            y = 0.0
-            widest = 0.0
-            while True:
-                line = layout.createLine()
-                if not line.isValid():
-                    break
-                line.setLineWidth(max(1, content_w))
-                line.setPosition(QPointF(0, y))
-                y += line.height()
-                widest = max(widest, line.naturalTextWidth())
-            layout.endLayout()
+            """(painted text height, widest painted line, content width), measured
+            through the same `_lay_out`/`_content_width` that `paintEvent` draws
+            with — so this asserts the real paint output fits, not a re-implementation.
+            """
+            content_w = cb._content_width(cb.width())
+            layout = cb._lay_out(max(1, content_w))
+            widest = max(
+                (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
+                default=0.0,
+            )
             return layout.boundingRect().height(), widest, content_w
 
         deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
         long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
         with anki_session_with_addon_data.profile_loaded():
             # A larger UI font, set before the dialog is built, like real Anki.
-            app_font = aqt.mw.app.font()
-            app_font.setPointSize(16)
-            aqt.mw.app.setFont(app_font)
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
+            # Restored in `finally` so it doesn't leak into other tests in this process.
+            original_font = aqt.mw.app.font()
+            larger_font = aqt.mw.app.font()
+            larger_font.setPointSize(16)
+            aqt.mw.app.setFont(larger_font)
+            try:
+                config.set_feature_flags({"auto_protect_fields_when_edited": True})
 
-            ah_did = install_ah_deck()
-            note_info = import_ah_note(ah_did=ah_did, note_data=NoteInfoFactory.create(tags=[deep_tag]))
-            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
-            # Remove the deep tag (-> "Removed Tags") and add the long leaf (-> "Added Tags").
-            note.tags = [long_leaf_tag]
-            aqt.mw.col.update_note(note)
+                ah_did = install_ah_deck()
+                note_info = import_ah_note(ah_did=ah_did, note_data=NoteInfoFactory.create(tags=[deep_tag]))
+                note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+                # Remove the deep tag (-> "Removed Tags") and add the long leaf (-> "Added Tags").
+                note.tags = [long_leaf_tag]
+                aqt.mw.col.update_note(note)
 
-            dialog = SuggestionDialog(
-                is_new_note_suggestion=False,
-                is_for_anking_deck=False,
-                can_submit_without_review=False,
-                added_new_media=False,
-                callback=lambda _meta: None,
-                notes=[note],
-                note_diffs=compute_note_diffs([note]),
-                ah_did=ah_did,
-            )
-            qtbot.addWidget(dialog)
-            dialog.show()
-            qtbot.waitExposed(dialog)
-            boxes = {
-                **dialog._fields_widget._added_tag_boxes,
-                **dialog._fields_widget._removed_tag_boxes,
-            }
-            assert len(boxes) == 2
+                dialog = SuggestionDialog(
+                    is_new_note_suggestion=False,
+                    is_for_anking_deck=False,
+                    can_submit_without_review=False,
+                    added_new_media=False,
+                    callback=lambda _meta: None,
+                    notes=[note],
+                    note_diffs=compute_note_diffs([note]),
+                    ah_did=ah_did,
+                )
+                qtbot.addWidget(dialog)
+                dialog.show()
+                qtbot.waitExposed(dialog)
+                boxes = {
+                    **dialog._fields_widget._added_tag_boxes,
+                    **dialog._fields_widget._removed_tag_boxes,
+                }
+                assert len(boxes) == 2
 
-            # Widths that span the boundaries where a tag rewraps to one more line.
-            for width in range(640, 1000, 20):
-                dialog.resize(width, 600)
-                qtbot.wait(10)
-                for tag, cb in boxes.items():
-                    painted_h, widest_line, content_w = painted_extents(cb)
-                    assert cb.height() + 0.5 >= painted_h, (
-                        f"vertical clip for {tag!r} at dialog width {width}: "
-                        f"row height {cb.height()} < painted text height {painted_h:.0f}"
-                    )
-                    assert widest_line <= content_w + 1, (
-                        f"horizontal clip for {tag!r} at dialog width {width}: "
-                        f"line width {widest_line:.0f} > content width {content_w}"
-                    )
+                # Widths that span the boundaries where a tag rewraps to one more line.
+                for width in range(640, 1000, 20):
+                    dialog.resize(width, 600)
+                    # Wait for the layout to apply the new row heights, rather than racing a timer.
+                    qtbot.waitUntil(lambda: all(cb.height() == cb.heightForWidth(cb.width()) for cb in boxes.values()))
+                    for tag, cb in boxes.items():
+                        painted_h, widest_line, content_w = painted_extents(cb)
+                        # paintEvent draws the text below this top padding, so it must fit below it too.
+                        top_offset = cb._vertical_padding() // 2
+                        # +0.5 absorbs the float boundingRect height vs. integer row height.
+                        assert cb.height() + 0.5 >= top_offset + painted_h, (
+                            f"vertical clip for {tag!r} at dialog width {width}: row height "
+                            f"{cb.height()} < text top {top_offset} + painted height {painted_h:.0f}"
+                        )
+                        assert widest_line <= content_w + 1, (
+                            f"horizontal clip for {tag!r} at dialog width {width}: "
+                            f"line width {widest_line:.0f} > content width {content_w}"
+                        )
+            finally:
+                aqt.mw.app.setFont(original_font)
 
 
 class TestSuggestNotesInBulk:
