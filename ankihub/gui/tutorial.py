@@ -97,6 +97,7 @@ def render_tour_step(
     total_steps: int,
     back_label: str = "Back",
     on_back: Optional[str] = None,
+    on_continue_later: Optional[str] = None,
     next_label: str = "Next",
     on_next: Optional[str] = None,
     on_close: Optional[str] = None,
@@ -111,6 +112,7 @@ def render_tour_step(
             "total_steps": total_steps,
             "back_label": back_label,
             "on_back": on_back,
+            "on_continue_later": on_continue_later,
             "next_label": next_label,
             "on_next": on_next,
             "on_close": on_close,
@@ -425,6 +427,7 @@ class Tutorial:
             back_label=step.back_label,
             on_back=f"pycmd('{PREV_STEP_PYCMD}')",
             on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            on_continue_later=f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
             next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=step.apply_backdrop,
@@ -575,6 +578,14 @@ class Tutorial:
         global active_tutorial
         active_tutorial = None
 
+    def _skip_tutorial(self) -> None:
+        # It copies the end() method because it can be called from the Tutorial children
+        self._cleanup_step(all_webviews=True)
+        gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
+        global active_tutorial
+        active_tutorial = None
+
     def _on_webview_did_receive_js_message(
         self, handled: tuple[bool, Any], message: str, context: Any
     ) -> tuple[bool, Any]:
@@ -636,6 +647,9 @@ class Tutorial:
             return True, None
         elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
+            return True, None
+        elif message == SKIP_TUTORIAL_PYCMD:
+            self._skip_tutorial()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
             step = self.steps[self.current_step - 1]
