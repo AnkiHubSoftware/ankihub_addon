@@ -556,9 +556,10 @@ class SuggestionDialog(QDialog):
                 globally_protected_fields_by_mid=self._globally_protected_by_mid,
             )
             self._fields_widget.setMinimumWidth(220)
-            # Cap the left column so pathologically long section titles can't
-            # push the dialog wide; the section-title checkbox elides instead.
-            self._fields_widget.setMaximumWidth(360)
+            # No maximum width: the 2:3 stretch factors keep both columns
+            # growing proportionally when the dialog is resized. Long content
+            # can't push the dialog wide — section titles and tag rows elide
+            # (Ignored size policy), and the rest sits inside a scroll area.
             content_row.addWidget(self._fields_widget, 2)
             qconnect(self._fields_widget.selection_changed, self._validate)
 
