@@ -45,7 +45,6 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
-from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.reset_local_changes import reset_local_changes_to_notes
 from ..product_metrics_client import (
@@ -990,8 +989,25 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         cur_new = int(new_sub.get("perDay", 0))
         cur_rev = int(rev_sub.get("perDay", 0))
         extra = max(len(cids), 30)
-        new_sub["perDay"] = cur_new + extra
-        rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
+
+        deck = aqt.mw.col.decks.get(anki_did, default=None)
+        new_today = 0
+        rev_today = 0
+        if isinstance(deck, dict):
+            try:
+                new_today = int(deck.get("newToday", [0, 0])[1])
+            except Exception:
+                new_today = 0
+            try:
+                rev_today = int(deck.get("revToday", [0, 0])[1])
+            except Exception:
+                rev_today = 0
+
+        target_new_per_day = max(cur_new, new_today + extra)
+        new_sub["perDay"] = target_new_per_day
+
+        target_rev_per_day = max(cur_rev, rev_today + extra, target_new_per_day * 10)
+        rev_sub["perDay"] = target_rev_per_day
         aqt.mw.col.decks.update_config(deck_config)
 
     def _has_cards_to_review(self) -> bool:
