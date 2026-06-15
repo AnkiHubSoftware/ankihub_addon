@@ -278,13 +278,16 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
         raise e
 
     if e.response.status_code == 400:
-        if non_field_errors := e.response.json().get("non_field_errors", None):
+        non_field_errors = e.response.json().get("non_field_errors") or []
+        if non_field_errors:
             error_message = "\n".join(non_field_errors)
         else:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        all_no_changes_errors = all(ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors)
+        all_no_changes_errors = bool(non_field_errors) and all(
+            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
+        )
         if all_no_changes_errors:
             # The dialog OK button is gated on at least one field/tag change being
             # selected, so this branch should be unreachable in normal use. If it

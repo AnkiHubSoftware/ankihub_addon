@@ -1613,6 +1613,15 @@ class TestMaybeHandleNoteAlreadyExists:
         )
         assert handled is False
 
+    def test_handle_suggestion_error_survives_400_without_non_field_errors(self, mocker):
+        # A 400 whose body has no "non_field_errors" must degrade to showInfo, not raise.
+        from ankihub.gui.suggestion_dialog import _handle_suggestion_error
+
+        mocker.patch("ankihub.gui.suggestion_dialog.report_exception_and_upload_logs")
+        show_info_mock = mocker.patch("ankihub.gui.suggestion_dialog.showInfo")
+        _handle_suggestion_error(self._http_error({"detail": "boom"}), parent=aqt.mw)
+        show_info_mock.assert_called_once()
+
 
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:
     def test_ankihub_nids_to_anki_ids(

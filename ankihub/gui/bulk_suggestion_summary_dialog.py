@@ -11,6 +11,7 @@ from typing import Dict, List, Mapping, Optional, Tuple
 import aqt
 from anki.notes import NoteId
 from aqt.qt import (
+    QCloseEvent,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -157,7 +158,7 @@ class BulkSuggestionSummaryDialog(QDialog):
         if self._can_close():
             super().reject()
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         if self._can_close():
             super().closeEvent(event)
         else:
