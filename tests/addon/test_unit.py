@@ -1432,11 +1432,15 @@ class TestBulkSuggestionSummaryDialog:
             },
             already_in_deck_by_nid={NoteId(5): conflict},
         )
-        cats = dialog._categorize()
-        assert cats["notes_without_changes"] == [NoteId(1)]
-        assert cats["notes_dont_exist"] == [NoteId(2)]
+        cats = dialog._issue_categories()
+        # No-change notes are surfaced as "skipped" in the Summary, not as an issue.
+        assert dialog._skipped_nids() == [NoteId(1)]
+        assert "notes_without_changes" not in cats
+        assert cats["notes_deleted"] == [NoteId(2)]
         assert cats["empty_first_field"] == [NoteId(3)]
         assert cats["other_errors"] == [NoteId(4)]  # NoteId(5) is in the action box, not Other errors
+        # "failed to submit" excludes the skipped (no-change) note: 2,3,4,5 = 4.
+        assert dialog._failed_count() == 4
         assert dialog._can_close() is False  # action required
 
     def test_no_action_required_allows_close(self, next_deterministic_uuid):
@@ -1512,13 +1516,13 @@ class TestBulkSuggestionSummaryDialog:
             already_in_deck_by_nid={NoteId(5): conflict},
             change_count=1,
         )
-        self._patch_resubmit(mocker, errors_returned={NoteId(5): [suggestions.ANKIHUB_NO_CHANGE_ERROR]})
+        self._patch_resubmit(mocker, errors_returned={NoteId(5): [suggestions.ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR]})
         dialog._on_resubmit()
 
         assert dialog._change_submitted == 1  # nothing succeeded
         assert NoteId(5) in dialog._errors_by_nid
-        assert dialog._categorize()["notes_without_changes"] == [NoteId(5)]
-        assert "notes_without_changes" in dialog._updated_keys
+        assert dialog._issue_categories()["notes_deleted"] == [NoteId(5)]
+        assert "notes_deleted" in dialog._updated_keys
         assert dialog._can_close() is True
 
     def test_hard_resubmit_failure_does_not_trap_user(self, mocker, next_deterministic_uuid):

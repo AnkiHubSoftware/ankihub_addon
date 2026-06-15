@@ -6,7 +6,7 @@ import uuid
 from concurrent.futures import Future
 from enum import Enum
 from html import escape
-from typing import Dict, List, Mapping, Optional, Set, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple
 
 import aqt
 from anki.notes import NoteId
@@ -34,31 +34,52 @@ from ..main.suggestions import (
     BulkNoteSuggestionsResult,
     resubmit_new_notes_as_change_suggestions_in_bulk,
 )
-from .utils import clear_layout, panel_line_color, show_error_dialog
+from .utils import clear_layout, show_error_dialog, show_tooltip
 
 SUPPORT_FORUM_URL = "https://community.ankihub.net/c/support"
+DELETED_NOTES_DOCS_URL = "https://community.ankihub.net/t/deleting-notes/170582"
 MUTED_TEXT_COLOR = "#9aa0a6"
 
-# (key, label, error substring). "other_errors" is the catch-all and is not listed here.
-BULK_ERROR_CATEGORIES = [
-    ("notes_without_changes", "Notes without changes", ANKIHUB_NO_CHANGE_ERROR),
-    ("notes_dont_exist", "Notes that don't exist on AnkiHub", ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR),
-    ("empty_first_field", "Notes with the first field empty", ANKIHUB_EMPTY_FIRST_FIELD_ERROR),
+# Issue categories shown under "Submission issues", in display order:
+# (key, label, error substring, guidance HTML).
+# "No changes" is surfaced separately as a skipped-count line in the Summary, and
+# "other_errors" is the catch-all appended after these.
+BULK_ISSUE_CATEGORIES = [
+    (
+        "notes_deleted",
+        "Notes deleted on AnkiHub",
+        ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
+        "These notes are no longer linked to AnkiHub. Keep as personal notes or "
+        f'remove from your collection. <a href="{DELETED_NOTES_DOCS_URL}">Learn more</a>.',
+    ),
+    (
+        "empty_first_field",
+        "First field empty",
+        ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
+        "Fill in the first field and try again.",
+    ),
 ]
+OTHER_ERRORS_GUIDANCE = f'Try again or <a href="{SUPPORT_FORUM_URL}">Contact support</a> if the issue persists.'
 
 
 def _summary_color(positive: bool) -> str:
     if positive:
-        return "#66bb6a" if theme_manager.night_mode else "#2e7d32"
-    return "#ef5350" if theme_manager.night_mode else "#c62828"
-
-
-def _summary_link_color() -> str:
-    return "#5b9bd5" if theme_manager.night_mode else "#1565c0"
+        return "#5fb16a" if theme_manager.night_mode else "#3b7c44"
+    return "#e2685a" if theme_manager.night_mode else "#cc4131"
 
 
 def _updated_badge_colors() -> Tuple[str, str]:
-    return ("#23492c", "#9be8ab") if theme_manager.night_mode else ("#d8f5dd", "#1b7a2f")
+    # (background, foreground)
+    return ("#0c3a1f", "#7fd39b") if theme_manager.night_mode else ("#dcfce7", "#066934")
+
+
+def _action_band_bg() -> str:
+    # A touch lighter than the dark window bg (raised-panel feel) / the Figma gray on light.
+    return "#383838" if theme_manager.night_mode else "#e7e7e7"
+
+
+def _divider_color() -> str:
+    return "#4d4d4d" if theme_manager.night_mode else "#d0d4da"
 
 
 class _ActionState(Enum):
@@ -73,8 +94,9 @@ class _ActionState(Enum):
 
 class BulkSuggestionSummaryDialog(QDialog):
     """Summary shown after every bulk suggestion submit. Replaces the old plain-text
-    `showText` summary: categorizes results and offers an interactive "Notes already
-    in this deck" action that resubmits as change suggestions."""
+    `showText` summary: a Summary section, categorized submission issues, and an
+    interactive "Notes already in this deck" action that resubmits as change
+    suggestions."""
 
     def __init__(
         self,
@@ -85,7 +107,7 @@ class BulkSuggestionSummaryDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("AnkiHub | Bulk Suggestion Summary")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(520)
         self.setWindowModality(Qt.WindowModality.WindowModal)
 
         self._errors_by_nid: Dict[NoteId, object] = dict(result.errors_by_nid)
@@ -95,19 +117,18 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._ah_did = ah_did
         self._auto_accept = auto_accept
         self._action_state = _ActionState.DEFAULT
-        self._updated_keys: Set[str] = set()  # "change_submitted" + category keys to badge
+        # Summary/category keys to flag with an "Updated" badge after a resubmit.
+        self._updated_keys: set = set()
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 16, 16, 12)
+        outer.setContentsMargins(30, 18, 30, 14)
         outer.setSpacing(12)
 
-        # Content (summary + action box) is rebuilt on each state change. The category
-        # count is bounded (<= 5) and id lists are truncated, so the dialog stays a
-        # sensible size without a scroll area — and the action box + Close are always
-        # visible rather than scrolling off.
+        # Rebuilt on each state change. Category count is bounded and IDs live behind
+        # "Copy note IDs" buttons, so the dialog stays a sensible size without a scroll.
         self._content_layout = QVBoxLayout()
         self._content_layout.setContentsMargins(0, 0, 0, 0)
-        self._content_layout.setSpacing(12)
+        self._content_layout.setSpacing(14)
         outer.addLayout(self._content_layout, 1)
 
         footer = QHBoxLayout()
@@ -142,15 +163,27 @@ class BulkSuggestionSummaryDialog(QDialog):
         else:
             event.ignore()
 
-    def _categorize(self) -> Dict[str, List[NoteId]]:
+    def _skipped_nids(self) -> List[NoteId]:
+        # Notes that had nothing to submit — surfaced as "skipped" in the Summary, not
+        # as a failure.
+        return [nid for nid, errors in self._errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)]
+
+    def _failed_count(self) -> int:
+        return len(self._errors_by_nid) - len(self._skipped_nids())
+
+    def _issue_categories(self) -> Dict[str, List[NoteId]]:
+        """Failed nids grouped for the 'Submission issues' section. Excludes the
+        skipped (no-change) notes and the resubmittable 'already in this deck' notes."""
         already = set(self._already_in_deck.keys())
-        cats: Dict[str, List[NoteId]] = {key: [] for key, _, _ in BULK_ERROR_CATEGORIES}
+        cats: Dict[str, List[NoteId]] = {key: [] for key, *_ in BULK_ISSUE_CATEGORIES}
         cats["other_errors"] = []
         for nid, errors in self._errors_by_nid.items():
             if nid in already:
                 continue
             error_text = str(errors)
-            for key, _, substring in BULK_ERROR_CATEGORIES:
+            if ANKIHUB_NO_CHANGE_ERROR in error_text:
+                continue  # surfaced as "skipped" in the Summary
+            for key, _, substring, _ in BULK_ISSUE_CATEGORIES:
                 if substring in error_text:
                     cats[key].append(nid)
                     break
@@ -159,45 +192,41 @@ class BulkSuggestionSummaryDialog(QDialog):
         return cats
 
     # --- rendering --------------------------------------------------------
-    _NID_DISPLAY_CAP = 25
-
-    @classmethod
-    def _format_nids(cls, nids: List[NoteId]) -> str:
-        shown = ", ".join(str(nid) for nid in nids[: cls._NID_DISPLAY_CAP])
-        extra = len(nids) - cls._NID_DISPLAY_CAP
-        if extra > 0:
-            shown += f", … and {extra} more"
-        return shown
-
     def _render(self) -> None:
         clear_layout(self._content_layout)
-        self._content_layout.addWidget(self._build_summary_card())
+        self._content_layout.addWidget(self._build_summary())
+
+        issue_blocks = self._issue_blocks()
+        if issue_blocks:
+            self._content_layout.addWidget(self._divider())
+            self._content_layout.addWidget(self._section_header("Submission issues"))
+            for key, label, guidance, nids in issue_blocks:
+                self._content_layout.addWidget(self._issue_block(key, label, guidance, nids))
+
         if self._already_in_deck:
-            heading = QLabel("Action required")
-            heading.setStyleSheet("font-weight:700;")
-            self._content_layout.addWidget(heading)
-            self._content_layout.addWidget(self._build_action_card())
-        self._content_layout.addStretch(1)
+            self._content_layout.addWidget(self._section_header("Action required", size=13))
+            self._content_layout.addWidget(self._build_action_band())
+
         self._close_button.setEnabled(self._can_close())
         self.adjustSize()
 
-    def _new_card(self, object_name: str) -> Tuple[QFrame, QVBoxLayout]:
-        card = QFrame()
-        card.setObjectName(object_name)
-        border = panel_line_color()
-        background = "#2b2b2b" if theme_manager.night_mode else "white"
-        card.setStyleSheet(
-            f"QFrame#{object_name}{{border:1px solid {border}; border-radius:8px; background:{background};}}"
-        )
-        vbox = QVBoxLayout(card)
-        vbox.setContentsMargins(16, 14, 16, 14)
-        vbox.setSpacing(10)
-        return card, vbox
+    def _issue_blocks(self) -> List[Tuple[str, str, str, List[NoteId]]]:
+        cats = self._issue_categories()
+        blocks = [(key, label, guidance, cats[key]) for key, label, _, guidance in BULK_ISSUE_CATEGORIES if cats[key]]
+        if cats["other_errors"]:
+            blocks.append(("other_errors", "Other errors", OTHER_ERRORS_GUIDANCE, cats["other_errors"]))
+        return blocks
+
+    def _section_header(self, text: str, size: int = 16) -> QLabel:
+        # Hierarchy: Summary (20) > Submission issues (16) > Action required (13).
+        label = QLabel(text)
+        label.setStyleSheet(f"font-weight:700; font-size:{size}px;")
+        return label
 
     def _divider(self) -> QFrame:
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        color = panel_line_color()
+        color = _divider_color()
         line.setStyleSheet(f"color:{color}; background:{color}; max-height:1px; border:none;")
         return line
 
@@ -207,25 +236,90 @@ class BulkSuggestionSummaryDialog(QDialog):
         badge.setStyleSheet(f"background:{background}; color:{foreground}; border-radius:9px; padding:2px 9px;")
         return badge
 
-    def _summary_line(self, number: int, label: str, color: Optional[str], badge: bool = False) -> QWidget:
+    def _copy_nids_button(self, nids: List[NoteId]) -> QPushButton:
+        button = QPushButton("Copy note IDs")
+        qconnect(button.clicked, lambda: self._copy_nids(nids))
+        return button
+
+    def _copy_nids(self, nids: List[NoteId]) -> None:
+        search = "nid:" + ",".join(str(nid) for nid in nids)
+        aqt.mw.app.clipboard().setText(search)
+        show_tooltip("Copied a note search to the clipboard — paste it into the Browse window.", parent=self)
+
+    def _guidance_label(self, html: str) -> QLabel:
+        label = QLabel(html)
+        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setWordWrap(True)
+        qconnect(label.linkActivated, openLink)
+        return label
+
+    def _bullet(self, number: int, label: str, color: Optional[str], updated_key: Optional[str] = None) -> QWidget:
         widget = QWidget()
         widget.setStyleSheet("background:transparent;")
         row = QHBoxLayout(widget)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
+        text = f"•&nbsp;&nbsp;<b>{number}</b> {escape(label)}"
         if color:
-            text = f'<span style="color:{color};"><b>{number}</b> {escape(label)}</span>'
-        else:
-            text = f"<b>{number}</b> {escape(label)}"
+            text = f'<span style="color:{color};">{text}</span>'
         line = QLabel(text)
         line.setTextFormat(Qt.TextFormat.RichText)
         row.addWidget(line)
-        if badge:
+        if updated_key and updated_key in self._updated_keys:
             row.addWidget(self._badge())
         row.addStretch(1)
         return widget
 
-    def _category_block(self, key: str, label: str, nids: List[NoteId], with_support: bool = False) -> QWidget:
+    def _build_summary(self) -> QWidget:
+        container = QWidget()
+        container.setStyleSheet("background:transparent;")
+        vbox = QVBoxLayout(container)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(8)
+
+        vbox.addWidget(self._section_header("Summary", size=20))
+        vbox.addWidget(
+            self._bullet(
+                self._change_submitted,
+                "change note suggestion(s) submitted.",
+                _summary_color(True),
+                updated_key="change_submitted",
+            )
+        )
+        vbox.addWidget(self._bullet(self._new_submitted, "new note suggestion(s) submitted.", None))
+
+        skipped = self._skipped_nids()
+        if skipped:
+            vbox.addWidget(self._skipped_row(skipped))
+
+        vbox.addWidget(self._bullet(self._failed_count(), "failed to submit.", _summary_color(False)))
+        return container
+
+    def _skipped_row(self, nids: List[NoteId]) -> QWidget:
+        widget = QWidget()
+        widget.setStyleSheet("background:transparent;")
+        row = QHBoxLayout(widget)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        left = QVBoxLayout()
+        left.setContentsMargins(0, 0, 0, 0)
+        left.setSpacing(2)
+        bullet = QLabel(f"•&nbsp;&nbsp;<b>{len(nids)}</b> notes skipped")
+        bullet.setTextFormat(Qt.TextFormat.RichText)
+        left.addWidget(bullet)
+        sub = QLabel("No changes were detected.")
+        sub.setStyleSheet("margin-left:18px;")
+        left.addWidget(sub)
+        row.addLayout(left)
+
+        if "skipped" in self._updated_keys:
+            row.addWidget(self._badge())
+        row.addStretch(1)
+        row.addWidget(self._copy_nids_button(nids), alignment=Qt.AlignmentFlag.AlignTop)
+        return widget
+
+    def _issue_block(self, key: str, label: str, guidance_html: str, nids: List[NoteId]) -> QWidget:
         widget = QWidget()
         widget.setStyleSheet("background:transparent;")
         vbox = QVBoxLayout(widget)
@@ -240,61 +334,34 @@ class BulkSuggestionSummaryDialog(QDialog):
         if key in self._updated_keys:
             title_row.addWidget(self._badge())
         title_row.addStretch(1)
+        title_row.addWidget(self._copy_nids_button(nids))
         vbox.addLayout(title_row)
 
-        ids = QLabel(self._format_nids(nids))
-        ids.setWordWrap(True)
-        vbox.addWidget(ids)
-
-        if with_support:
-            link = QLabel(
-                f'Please <a href="{SUPPORT_FORUM_URL}" style="color:{_summary_link_color()};">contact support.</a>'
-            )
-            link.setTextFormat(Qt.TextFormat.RichText)
-            qconnect(link.linkActivated, lambda *_: openLink(SUPPORT_FORUM_URL))
-            vbox.addWidget(link)
+        vbox.addWidget(self._guidance_label(guidance_html))
         return widget
 
-    def _build_summary_card(self) -> QFrame:
-        card, vbox = self._new_card("summaryCard")
-        vbox.addWidget(
-            self._summary_line(
-                self._change_submitted,
-                "change note suggestion(s) submitted.",
-                _summary_color(True),
-                badge="change_submitted" in self._updated_keys,
-            )
-        )
-        vbox.addWidget(self._summary_line(self._new_submitted, "new note suggestion(s) submitted.", None))
-        vbox.addWidget(self._summary_line(len(self._errors_by_nid), "failed to submit.", _summary_color(False)))
-
-        cats = self._categorize()
-        for key, label, _ in BULK_ERROR_CATEGORIES:
-            if cats[key]:
-                vbox.addWidget(self._divider())
-                vbox.addWidget(self._category_block(key, label, cats[key]))
-        if cats["other_errors"]:
-            vbox.addWidget(self._divider())
-            vbox.addWidget(
-                self._category_block("other_errors", "Other errors", cats["other_errors"], with_support=True)
-            )
-        return card
-
-    def _build_action_card(self) -> QFrame:
-        card, vbox = self._new_card("actionCard")
+    def _build_action_band(self) -> QFrame:
+        frame = QFrame()
+        frame.setFrameShape(QFrame.Shape.NoFrame)
+        frame.setObjectName("actionBand")
+        frame.setStyleSheet(f"#actionBand {{ background-color: {_action_band_bg()}; border-radius: 8px; }}")
+        vbox = QVBoxLayout(frame)
+        vbox.setContentsMargins(14, 12, 14, 12)
+        vbox.setSpacing(8)
         nids = list(self._already_in_deck.keys())
 
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
         title = QLabel(f"({len(nids)}) Notes already in this deck")
         title.setStyleSheet("font-weight:600;")
-        vbox.addWidget(title)
-
-        ids = QLabel(self._format_nids(nids))
-        ids.setWordWrap(True)
-        vbox.addWidget(ids)
+        title_row.addWidget(title)
+        title_row.addStretch(1)
+        title_row.addWidget(self._copy_nids_button(nids))
+        vbox.addLayout(title_row)
 
         description = QLabel(
-            "These notes already exist in this deck on AnkiHub. Resubmit to push your "
-            "edits through as change suggestions."
+            "These notes already exist in this deck on AnkiHub, so you can't submit them as "
+            "New Note Suggestions. Resubmit to push your edits through as Change Suggestions."
         )
         description.setWordWrap(True)
         vbox.addWidget(description)
@@ -303,10 +370,10 @@ class BulkSuggestionSummaryDialog(QDialog):
             ignored = QLabel("Ignored — no action taken.")
             ignored.setStyleSheet(f"color:{MUTED_TEXT_COLOR}; font-style:italic;")
             vbox.addWidget(ignored)
-            return card
+            return frame
 
         button_row = QHBoxLayout()
-        button_row.setContentsMargins(0, 6, 0, 0)
+        button_row.setContentsMargins(0, 4, 0, 0)
         loading = self._action_state == _ActionState.LOADING
 
         ignore_button = QPushButton("Ignore")
@@ -320,11 +387,12 @@ class BulkSuggestionSummaryDialog(QDialog):
             button_row.addWidget(submitting)
         else:
             resubmit = QPushButton(f"({len(nids)}) Resubmit as change suggestions")
+            resubmit.setDefault(True)
             qconnect(resubmit.clicked, self._on_resubmit)
             button_row.addWidget(resubmit)
         button_row.addStretch(1)
         vbox.addLayout(button_row)
-        return card
+        return frame
 
     # --- actions ----------------------------------------------------------
     def _on_ignore(self) -> None:
@@ -379,16 +447,21 @@ class BulkSuggestionSummaryDialog(QDialog):
 
         for nid, error in failed.items():
             self._errors_by_nid[nid] = error
+            self._updated_keys.add(self._category_key_for(str(error)))
 
         self._already_in_deck = {}
         self._action_state = _ActionState.RESOLVED
-
-        # Badge the error categories the re-failed notes landed in.
-        for key, nids in self._categorize().items():
-            if any(nid in failed for nid in nids):
-                self._updated_keys.add(key)
-
         self._render()
+
+    @staticmethod
+    def _category_key_for(error_text: str) -> str:
+        """Which summary/category key a re-failed note now lands in (for the badge)."""
+        if ANKIHUB_NO_CHANGE_ERROR in error_text:
+            return "skipped"
+        for key, _, substring, _ in BULK_ISSUE_CATEGORIES:
+            if substring in error_text:
+                return key
+        return "other_errors"
 
 
 def _on_suggest_notes_in_bulk_done(
