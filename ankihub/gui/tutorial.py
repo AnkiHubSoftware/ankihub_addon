@@ -575,6 +575,8 @@ class Tutorial:
         self.show_current()
 
     def end(self) -> None:
+        if self.current_step < len(self.steps):
+            self._track_tutorial(event_name="tour_abandoned")
         self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
