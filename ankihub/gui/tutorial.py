@@ -562,10 +562,11 @@ class Tutorial:
 
         aqt.mw.taskman.run_in_background(send_event)
 
-    def start(self) -> None:
+    def start(self, *, reopen: bool = False) -> None:
         global active_tutorial
         active_tutorial = self
-        self._track_tutorial(event_name="tutorial_start")
+        event_name = "tour_reopen" if reopen else "tutorial_start"
+        self._track_tutorial(event_name=event_name)
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
@@ -925,8 +926,8 @@ class DeckBrowserOverviewBackdropMixin:
 
 class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
-        return super().start()
+    def start(self, *, reopen: bool = False) -> None:
+        return super().start(reopen=reopen)
 
     def end(self) -> None:
         config.set_onboarding_tutorial_pending(False)
@@ -1127,11 +1128,11 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
+    def start(self, *, reopen: bool = False) -> None:
         self._unhook_browser = self.hook_browser_startup(self._on_browser_startup)
         base_start = super().start
         set_current_deck(parent=aqt.mw, deck_id=self._anking_deck_config.anki_id).success(
-            lambda _: base_start()
+            lambda _: base_start(reopen=reopen)
         ).run_in_background()
 
     def end(self) -> None:

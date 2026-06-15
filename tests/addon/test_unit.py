@@ -2299,6 +2299,33 @@ class TestTutorialProductMetrics:
 
         mock_client.track.assert_not_called()
 
+    def test_start_tracks_tour_reopen_from_help_menu(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "show_current")
+
+        Tutorial().start(reopen=True)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_reopen",
+            properties={
+                "tutorial": "Tutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
 
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
