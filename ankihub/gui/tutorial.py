@@ -489,8 +489,6 @@ class Tutorial:
         return (step.tooltip_context, step.target_context, *backdrop_contexts)
 
     def show_current(self) -> None:
-        if self.current_step == len(self.steps):
-            self._track_tutorial(event_name="tour_completed")
         step = self.steps[self.current_step - 1]
         if isinstance(step, QtTutorialStep):
             target = step.qt_target() if callable(step.qt_target) else step.qt_target
@@ -714,6 +712,7 @@ class Tutorial:
     @ensure_tutorial_active
     def next(self) -> None:
         if self.current_step >= len(self.steps):
+            self._track_tutorial(event_name="tour_completed")
             self.end()
             return
         self._cleanup_step()

@@ -2201,7 +2201,7 @@ class TestTutorialProductMetrics:
             },
         )
 
-    def test_show_current_tracks_tour_completed_on_final_step(self, mocker: MockerFixture) -> None:
+    def test_next_tracks_tour_completed_on_final_step(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import Tutorial, TutorialStep
 
         class TwoStepTutorial(Tutorial):
@@ -2219,12 +2219,14 @@ class TestTutorialProductMetrics:
         mocker.patch.object(config, "is_admin", return_value=False)
         mocker.patch.object(config, "is_beta_tester", return_value=False)
         mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
-        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
-        mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+        mocker.patch.object(Tutorial, "end")
 
         tutorial = TwoStepTutorial()
         tutorial.current_step = 2
-        tutorial.show_current()
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", tutorial)
+        tutorial.next()
 
         mock_client.track.assert_called_once_with(
             distinct_id="42",
