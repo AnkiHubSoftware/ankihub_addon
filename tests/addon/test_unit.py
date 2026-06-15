@@ -583,6 +583,72 @@ def test_tag_label_elide():
     assert len(leaf_result) <= 85
 
 
+def test_tag_label_elision_candidates():
+    candidates = _TagLabel._elision_candidates
+
+    # Within-budget tags: a single candidate, themselves (shown in full).
+    assert candidates("Pathology") == ["Pathology"]
+    assert candidates("Hierarchy::A::B") == ["Hierarchy::A::B"]
+
+    # Long flat tag: a single `…`-truncated candidate within the budget.
+    flat = candidates("x" * 120)
+    assert len(flat) == 1
+    assert flat[0].endswith("…") and len(flat[0]) <= _TagLabel._MAX_LEN
+
+    # Long hierarchical tag: `…::`-suffixes, longest → shortest, all within budget,
+    # the floor being `…::leaf`. The widest is the longest suffix that still fits.
+    long_hierarchical = (
+        "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
+    )
+    cands = candidates(long_hierarchical)
+    assert len(cands) >= 2
+    assert all(c.startswith("…::") for c in cands)
+    assert all(len(c) <= _TagLabel._MAX_LEN for c in cands)
+    assert cands[-1] == "…::VariableRatio"
+    # Strictly shrinking, and each is a `::`-suffix of the original tag.
+    assert [len(c) for c in cands] == sorted((len(c) for c in cands), reverse=True)
+    for c in cands:
+        assert long_hierarchical.endswith(c[len("…::") :])
+    # The original (>85) tag is never itself a candidate — always elided.
+    assert long_hierarchical not in cands
+
+    # Giant single leaf: still non-empty, truncated within budget.
+    giant = candidates("Hierarchy::" + "y" * 120)
+    assert len(giant) == 1
+    assert giant[0].startswith("…::") and giant[0].endswith("…")
+    assert len(giant[0]) <= _TagLabel._MAX_LEN
+
+
+def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
+    """NRT-790 follow-up: an elided hierarchical tag (>85 chars) should reveal
+    more leading segments as the dialog widens, instead of always collapsing to
+    `…::leaf`. Width-driven, capped at the 85-char budget, floor `…::leaf`."""
+    tag = "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()  # polish so the content-rect metrics are real
+    qtbot.waitExposed(cb)
+
+    def displayed_at(width: int) -> str:
+        cb.resize(width, cb.heightForWidth(width))
+        cb._layout_for_width(cb._content_width(cb.width()))
+        assert cb._layout_cache is not None
+        return cb._layout_cache[1]
+
+    narrow = displayed_at(150)
+    wide = displayed_at(1000)
+
+    # Both elided forms keep the leaf; the wider one reveals strictly more.
+    assert narrow.startswith("…::") and wide.startswith("…::")
+    assert narrow.endswith("VariableRatio") and wide.endswith("VariableRatio")
+    assert len(wide) > len(narrow)
+    assert len(wide) <= _TagLabel._MAX_LEN
+    # The wider suffix contains the narrower one's tail (it's a longer suffix).
+    assert wide[len("…::") :].endswith(narrow[len("…::") :])
+    # The full tag is offered as a tooltip while elided.
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+
 def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):
     """Regression (NRT-790): the last line of a long tag checkbox got clipped.
 
@@ -601,9 +667,9 @@ def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):
 
     def painted_extents(cb: _WrappingCheckBox) -> tuple[float, float, int, int]:
         """(painted height, widest line, content width, text top offset), via the
-        same `_build_text_layout`/`_content_width` that `paintEvent` draws with."""
+        same `_layout_for_width`/`_content_width` that `paintEvent` draws with."""
         content_w = cb._content_width(cb.width())
-        layout = cb._build_text_layout(max(1, content_w))  # returns a laid-out QTextLayout
+        layout = cb._layout_for_width(content_w)  # returns a laid-out QTextLayout
         widest = max(
             (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
             default=0.0,
