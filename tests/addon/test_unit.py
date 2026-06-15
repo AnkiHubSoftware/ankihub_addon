@@ -126,6 +126,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     _SelectAllCheckBox,
     _TagLabel,
+    _WrappingCheckBox,
     get_anki_nid_to_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
@@ -555,31 +556,159 @@ def test_prepared_field_html():
     assert _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">') == '<img src="foo.jpg">'
 
 
-def test_tag_label_elide():
-    elide = _TagLabel._elide
+def test_tag_label_elision_candidates():
+    candidates = _TagLabel._elision_candidates
 
-    # Short tag → as-is.
-    assert elide("Pathology") == "Pathology"
-    assert elide("Hierarchy::A::B") == "Hierarchy::A::B"
+    # Flat tag (no `::`): a single candidate, itself. The widget truncates to
+    # fit the line budget if needed; the candidate list isn't length-bounded.
+    assert candidates("Pathology") == ["Pathology"]
+    assert candidates("x" * 120) == ["x" * 120]
 
-    # Long hierarchical tag → `…::leaf`.
+    # Hierarchical tag: the full tag, then `…::`-suffixes, longest → shortest,
+    # dropping one leading segment at a time down to `…::leaf`.
+    assert candidates("Hierarchy::A::B") == ["Hierarchy::A::B", "…::A::B", "…::B"]
+
     long_hierarchical = (
-        "AnkiHub::Internal::AnKing::Pharmacology::Antiarrhythmics::Class_III::Amiodarone::Cardiovascular::Specifics"
+        "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
     )
-    assert elide(long_hierarchical) == "…::Specifics"
+    cands = candidates(long_hierarchical)
+    # Full tag is the longest candidate; the rest are `…::`-suffixes ending in the leaf.
+    assert cands[0] == long_hierarchical
+    assert all(c.startswith("…::") for c in cands[1:])
+    assert cands[-1] == "…::VariableRatio"
+    # Strictly shrinking, and each is a `::`-suffix of the original tag.
+    assert [len(c) for c in cands] == sorted((len(c) for c in cands), reverse=True)
+    for c in cands:
+        assert long_hierarchical.endswith(c.removeprefix("…::"))
 
-    # Long flat tag (no `::`) → plain ellipsis at the end.
-    long_flat = "x" * 120
-    flat_result = elide(long_flat)
-    assert flat_result.endswith("…")
-    assert len(flat_result) <= 85
 
-    # Long hierarchical tag whose leaf alone exceeds the budget → leaf truncated too.
-    bulky_leaf = "y" * 120
-    leaf_result = elide(f"Hierarchy::{bulky_leaf}")
-    assert leaf_result.startswith("…::")
-    assert leaf_result.endswith("…")
-    assert len(leaf_result) <= 85
+def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
+    """NRT-790 follow-up: a long hierarchical tag reveals more leading segments
+    as the dialog widens — elided to a `…::`-suffix when space is tight, and
+    shown in full once a wide enough window fits it within the line budget."""
+    tag = "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()  # polish so the content-rect metrics are real
+    qtbot.waitExposed(cb)
+
+    def displayed_at(width: int) -> str:
+        cb.resize(width, cb.heightForWidth(width))
+        cb._layout_for_width(cb._content_width(cb.width()))
+        assert cb._layout_cache is not None
+        return cb._layout_cache.text
+
+    # Tight space: elided to a `…::`-suffix ending in the leaf, with a tooltip
+    # offering the full tag. (Checked before widening, which clears the tooltip.)
+    narrow = displayed_at(150)
+    assert narrow.startswith("…::") and narrow.endswith("VariableRatio")
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+    # Widening reveals strictly more; each wider form is a longer suffix.
+    medium = displayed_at(700)
+    assert len(medium) > len(narrow)
+    assert medium.removeprefix("…::").endswith(narrow.removeprefix("…::"))
+
+    # A wide enough window reveals the whole tag — no `…::` left — and clears the tooltip.
+    very_wide = displayed_at(2400)
+    assert very_wide == tag
+    assert cb.toolTip() == ""
+
+
+def test_wrapping_checkbox_truncates_giant_single_segment(qtbot: QtBot):
+    """A single segment too long to fit the line budget at the current width is
+    truncated with a trailing `…`, so a pathological tag can't balloon the row
+    past `_TagLabel._MAX_LINES` lines."""
+    tag = "Hierarchy::" + ("Supercalifragilistic" * 8)  # 160-char unbreakable leaf
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+    cb.resize(200, cb.heightForWidth(200))
+
+    layout = cb._layout_for_width(cb._content_width(cb.width()))
+    assert layout.lineCount() <= _TagLabel._MAX_LINES
+    assert cb._layout_cache is not None
+    assert cb._layout_cache.text.endswith("…")
+
+
+def test_wrapping_checkbox_tooltip_tracks_font_change(qtbot: QtBot):
+    """NRT-790 review follow-up: a font change can elide a previously-full tag
+    without a resize. The tooltip (offering the full tag) must update on the
+    font change, not stay stale until the next resize."""
+    tag = "#AK_Step2::Clinical::Medicine::Gastroenterology::Pancreatitis"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+
+    # Wide + default font: the whole tag fits, so it's shown in full, no tooltip.
+    cb.resize(700, cb.heightForWidth(700))
+    assert cb._layout_cache is not None and cb._layout_cache.text == tag
+    assert cb.toolTip() == ""
+
+    # A much larger font no longer fits the tag in the line budget at the same
+    # width, so it elides — without any resize. The tooltip must now appear.
+    font = cb.font()
+    font.setPointSize(48)
+    cb.setFont(font)
+    assert cb._layout_cache is not None and cb._layout_cache.text != tag  # now elided
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+
+def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):
+    """Regression (NRT-790): the last line of a long tag checkbox got clipped.
+
+    `heightForWidth` must reserve enough height for what `paintEvent` actually
+    draws. The bug cached the style's content-rect width at `__init__` — before
+    the widget was polished, where it is ~6px wider than the polished value — so
+    `heightForWidth` measured wrapping against too-wide a column, under-counted
+    lines, and clipped the last one. The widget must be SHOWN (polished) for that
+    discrepancy to surface, so this test shows it before measuring.
+
+    Covers a deep hierarchical tag (breaks at `::`) and a long unbreakable leaf
+    (must wrap mid-token rather than overflow), for both vertical clipping (row
+    height covers the painted text) and horizontal clipping (no line is wider
+    than the content rect), across boundary widths and font sizes.
+    """
+
+    def painted_extents(cb: _WrappingCheckBox) -> tuple[float, float, int, int]:
+        """(painted height, widest line, content width, text top offset), via the
+        same `_layout_for_width`/`_content_width` that `paintEvent` draws with."""
+        content_w = cb._content_width(cb.width())
+        layout = cb._layout_for_width(content_w)  # returns a laid-out QTextLayout
+        widest = max(
+            (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
+            default=0.0,
+        )
+        return layout.boundingRect().height(), widest, content_w, cb._vertical_padding() // 2
+
+    deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
+    long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
+    for tag in (deep_tag, long_leaf_tag):
+        cb = _WrappingCheckBox(tag)
+        qtbot.addWidget(cb)
+        cb.show()  # polish the widget so the content-rect metrics are the real ones
+        qtbot.waitExposed(cb)
+        for point_size in (None, 13, 16, 20):
+            if point_size is not None:
+                font = cb.font()
+                font.setPointSize(point_size)
+                cb.setFont(font)
+                cb.ensurePolished()
+            for width in range(150, 540, 2):
+                cb.resize(width, cb.heightForWidth(width))
+                painted_h, widest_line, content_w, top_offset = painted_extents(cb)
+                # +0.5 absorbs the float boundingRect height vs. integer row height;
+                # top_offset is where paintEvent starts drawing the text.
+                assert cb.height() + 0.5 >= top_offset + painted_h, (
+                    f"vertical clip: tag={tag!r} pt={point_size} width={width}: row height "
+                    f"{cb.height()} < text top {top_offset} + painted height {painted_h:.0f}"
+                )
+                assert widest_line <= content_w + 1, (
+                    f"horizontal clip: tag={tag!r} pt={point_size} width={width}: "
+                    f"line width {widest_line:.0f} > content width {content_w}"
+                )
 
 
 def test_remove_note_type_name_modifications():

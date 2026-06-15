@@ -1,12 +1,13 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
 
+import math
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import Enum
 from html import escape
 from pprint import pformat
-from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Callable, Collection, Dict, List, Mapping, NamedTuple, Optional, Sequence, Set
 
 import aqt
 from anki.models import NotetypeId
@@ -17,6 +18,7 @@ from aqt.qt import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QEvent,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -25,6 +27,7 @@ from aqt.qt import (
     QLineEdit,
     QPalette,
     QPlainTextEdit,
+    QPointF,
     QRect,
     QScrollArea,
     QSize,
@@ -34,6 +37,8 @@ from aqt.qt import (
     QStyleOptionButton,
     QStylePainter,
     Qt,
+    QTextLayout,
+    QTextOption,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
@@ -552,9 +557,10 @@ class SuggestionDialog(QDialog):
                 globally_protected_fields_by_mid=self._globally_protected_by_mid,
             )
             self._fields_widget.setMinimumWidth(220)
-            # Cap the left column so pathologically long section titles can't
-            # push the dialog wide; the section-title checkbox elides instead.
-            self._fields_widget.setMaximumWidth(360)
+            # No maximum width: the 2:3 stretch factors keep both columns
+            # growing proportionally when the dialog is resized. Long content
+            # can't push the dialog wide — section titles and tag rows elide
+            # (Ignored size policy), and the rest sits inside a scroll area.
             content_row.addWidget(self._fields_widget, 2)
             qconnect(self._fields_widget.selection_changed, self._validate)
 
@@ -965,29 +971,34 @@ class SourceWidget(QWidget):
 
 
 class _TagLabel:
-    """Tag-name rendering helpers shared by `_WrappingCheckBox`: elide long tags
-    to `…::leaf` (or `<head>…` for flat names) and inject zero-width spaces after
-    `::` and `_` so the text has break points inside identifier-style names.
+    """Tag-name rendering helpers shared by `_WrappingCheckBox`: produce the
+    display candidates for a tag (full name, then progressively shorter `…::`
+    suffixes) and inject zero-width spaces after `::` and `_` so the text has
+    break points inside identifier-style names.
     """
 
-    _MAX_LEN = 85
+    # How many wrapped lines a tag may occupy before it is elided. This is the
+    # only bound on what a tag shows: the widget renders the longest candidate
+    # that fits this many lines at the current width, so a wider dialog reveals
+    # more — eventually the whole tag — and a narrow one collapses to `…::leaf`.
+    # (Supersedes the old fixed 85-char ceiling: the bound is now space, not a
+    # hardcoded length, per QA feedback on NRT-790 / the NRT-508 spec.)
+    _MAX_LINES = 3
 
     @classmethod
-    def _elide(cls, tag: str) -> str:
-        """Tags shorter than the budget render as-is. Longer hierarchical tags
-        collapse to `…::leaf` (the trailing `::`-segment with an ellipsis
-        prefix). The leaf itself is truncated if it would still exceed the
-        budget. Long flat tags get a plain `…` truncation.
+    def _elision_candidates(cls, tag: str) -> List[str]:
+        """Display candidates for `tag`, longest first: the full tag, then
+        trailing-segment suffixes prefixed with `…::`, dropping one leading
+        segment at a time (`a::b::c::leaf` → [`a::b::c::leaf`, `…::b::c::leaf`,
+        `…::c::leaf`, `…::leaf`]). A flat tag (no `::`) yields just itself.
+        `_WrappingCheckBox` renders the longest candidate that fits `_MAX_LINES`
+        lines at the current width, truncating the last one if even it overflows
+        — so the list need not be length-bounded here.
         """
-        if len(tag) <= cls._MAX_LEN:
-            return tag
-        if "::" in tag:
-            leaf = tag.rsplit("::", 1)[-1]
-            leaf_budget = cls._MAX_LEN - 3  # account for "…::" prefix
-            if len(leaf) > leaf_budget:
-                leaf = f"{leaf[: leaf_budget - 1]}…"
-            return f"…::{leaf}"
-        return f"{tag[: cls._MAX_LEN - 1]}…"
+        if "::" not in tag:
+            return [tag]
+        segments = tag.split("::")
+        return [tag] + ["…::" + "::".join(segments[start:]) for start in range(1, len(segments))]
 
     @staticmethod
     def _inject_breakpoints(text: str) -> str:
@@ -1033,6 +1044,15 @@ class _RowCheckBox(QCheckBox):
         painter.drawControl(QStyle.ControlElement.CE_CheckBoxLabel, label_opt)
 
 
+class _TagLayout(NamedTuple):
+    """`_WrappingCheckBox`'s per-width memo: the chosen display `text` and its
+    laid-out `layout`, valid for one `content_width`."""
+
+    content_width: int
+    text: str
+    layout: QTextLayout
+
+
 class _WrappingCheckBox(_RowCheckBox):
     """A full-row-clickable checkbox whose label wraps to multiple lines.
 
@@ -1052,14 +1072,18 @@ class _WrappingCheckBox(_RowCheckBox):
 
     def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
         super().__init__("", parent)
-        self._display = _TagLabel._elide(tag)
-        self._wrap_text = _TagLabel._inject_breakpoints(self._display)
+        self._tag = tag
+        # Display candidates, longest → shortest: the full tag, then `…::`
+        # suffixes. `_layout_for_width` renders the longest that fits the current
+        # width, so a wide dialog shows the whole tag and a narrow one elides. A
+        # flat tag (no `::`) has a single candidate (itself).
+        self._candidates = _TagLabel._elision_candidates(tag)
+        # Memoizes the chosen text + layout for one content width so the
+        # back-to-back heightForWidth + paintEvent at the same width don't
+        # rebuild, and the candidate search runs once per resize step.
+        self._layout_cache: Optional[_TagLayout] = None
         if _WrappingCheckBox._native_row_height is None:
             _WrappingCheckBox._native_row_height = QCheckBox("X").sizeHint().height()
-        # Style-and-font-determined and rect-independent in practice, so cache it
-        # rather than asking the style on every `heightForWidth` call (which the
-        # layout invokes many times during resize, per tag).
-        self._cached_content_x = self._compute_contents_x()
         # Helps screen readers name the otherwise text-less checkbox.
         self.setAccessibleName(tag)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1070,15 +1094,21 @@ class _WrappingCheckBox(_RowCheckBox):
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
         self.setMinimumWidth(1)
-        if self._display != tag:
-            self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(tag))}</p>")
+        self._refresh_tooltip()
 
-    def _compute_contents_x(self) -> int:
-        """x where the label text starts (indicator + style label spacing)."""
+    def _content_width(self, width: int) -> int:
+        """Width available for the label inside a checkbox of the given overall
+        width, derived the same way `paintEvent` computes its draw rect (the
+        style's `SE_CheckBoxContents` sub-element). Computed fresh per call rather
+        than cached: the style metrics aren't reliable until the widget is
+        polished, and a value cached in `__init__` is too narrow on the left and
+        too wide overall, which made `heightForWidth` under-count wrapped lines
+        and clip the last one. The style call is cheap.
+        """
         opt = QStyleOptionButton()
         self.initStyleOption(opt)
-        opt.rect = QRect(0, 0, 1000, max(self.fontMetrics().height(), 1))
-        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).x()
+        opt.rect = QRect(0, 0, width, max(self.fontMetrics().height(), 1))
+        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).width()
 
     def _vertical_padding(self) -> int:
         """Vertical space a native single-line checkbox reserves around its text
@@ -1088,14 +1118,102 @@ class _WrappingCheckBox(_RowCheckBox):
         assert self._native_row_height is not None  # set in __init__
         return max(0, self._native_row_height - self.fontMetrics().height())
 
+    def _build_text_layout(self, wrap_text: str, text_width: int) -> QTextLayout:
+        """Wrap `wrap_text` into `text_width` px with the same QTextLayout engine
+        `paintEvent` draws with, so `heightForWidth` reserves exactly the number
+        of lines that get painted. (`QFontMetrics.boundingRect` is a separate
+        code path that disagrees by a line at wrap boundaries — especially with
+        wrap-anywhere — which is what clipped the last tag segment.)
+        """
+        opt = QTextOption()
+        opt.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        layout = QTextLayout(wrap_text, self.font())
+        layout.setTextOption(opt)
+        layout.beginLayout()
+        y = 0.0
+        while True:
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(max(1, text_width))
+            line.setPosition(QPointF(0, y))
+            y += line.height()
+        layout.endLayout()
+        return layout
+
+    def _layout_for_width(self, content_width: int) -> QTextLayout:
+        """Choose the display text for `content_width` and lay it out. Renders the
+        longest candidate whose wrapped text fits within `_TagLabel._MAX_LINES`
+        lines — so a wide enough dialog shows the full tag and a narrow one
+        collapses to a `…::`-suffix. If even the narrowest candidate (`…::leaf`)
+        overflows the budget, its text is truncated to fit. Memoized per content
+        width so the paired heightForWidth + paintEvent at one width build once.
+        """
+        text_width = max(1, content_width)
+        if self._layout_cache is not None and self._layout_cache.content_width == text_width:
+            return self._layout_cache.layout
+        for candidate in self._candidates:  # longest → shortest; last is the floor
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(candidate), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                chosen_text, chosen_layout = candidate, layout
+                break
+        else:
+            # Even `…::leaf` needs more than the budget — truncate it to fit.
+            chosen_text = self._truncate_to_fit(self._candidates[-1], text_width)
+            chosen_layout = self._build_text_layout(_TagLabel._inject_breakpoints(chosen_text), text_width)
+        self._layout_cache = _TagLayout(text_width, chosen_text, chosen_layout)
+        return chosen_layout
+
+    def _truncate_to_fit(self, text: str, text_width: int) -> str:
+        """Longest prefix of `text` that, with a trailing `…`, wraps within
+        `_TagLabel._MAX_LINES` lines at `text_width`. Only reached for a single
+        segment too long to fit the line budget at the current width; keeps a
+        pathological tag from ballooning the row to many lines."""
+        # Largest prefix length that fits; the `+ 1` rounds `mid` up so the
+        # `lo = mid` branch makes progress when `hi == lo + 1` (no infinite loop).
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(f"{text[:mid]}…"), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                lo = mid
+            else:
+                hi = mid - 1
+        return f"{text[:lo]}…"
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().resizeEvent(event)
+        # The chosen suffix can change with width; keep the tooltip in sync so it
+        # appears only while text is actually hidden.
+        self._refresh_tooltip()
+
+    def changeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        # A font change re-wraps the text, so the chosen candidate (and thus
+        # whether the text is elided) can change with no resize: drop the
+        # width-keyed memo and refresh the tooltip to match. The `hasattr` guard
+        # covers a FontChange arriving mid-construction, before the subclass
+        # attributes exist. (Style metrics in `_content_width` are recomputed
+        # per call, so a style change needs no handling here.)
+        if event.type() == QEvent.Type.FontChange and hasattr(self, "_candidates"):
+            self._layout_cache = None
+            self._refresh_tooltip()
+        super().changeEvent(event)
+
+    def _refresh_tooltip(self) -> None:
+        """Show the full tag as a tooltip only while the rendered text is elided."""
+        self._layout_for_width(self._content_width(self.width()))
+        displayed = self._layout_cache.text if self._layout_cache is not None else self._tag
+        if displayed != self._tag:
+            self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(self._tag))}</p>")
+        else:
+            self.setToolTip("")
+
     def hasHeightForWidth(self) -> bool:  # noqa: N802
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802
-        fm = self.fontMetrics()
-        text_width = max(1, width - self._cached_content_x)
-        rect = fm.boundingRect(QRect(0, 0, text_width, 1_000_000), int(Qt.TextFlag.TextWordWrap), self._wrap_text)
-        return rect.height() + self._vertical_padding()
+        layout = self._layout_for_width(self._content_width(width))
+        return math.ceil(layout.boundingRect().height()) + self._vertical_padding()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         assert self._native_row_height is not None
@@ -1125,8 +1243,9 @@ class _WrappingCheckBox(_RowCheckBox):
         # Match the indicator's enabled state so the text greys with it.
         color_group = QPalette.ColorGroup.Normal if self.isEnabled() else QPalette.ColorGroup.Disabled
         painter.setPen(self.palette().color(color_group, QPalette.ColorRole.WindowText))
-        flags = int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop) | int(Qt.TextFlag.TextWordWrap)
-        painter.drawText(contents, flags, self._wrap_text)
+        # Draw via the same QTextLayout `heightForWidth` measured with, so the
+        # painted line count matches the reserved height exactly (no clipped line).
+        self._layout_for_width(contents.width()).draw(painter, QPointF(contents.x(), contents.y()))
 
 
 class _SelectAllCheckBox(_RowCheckBox):
