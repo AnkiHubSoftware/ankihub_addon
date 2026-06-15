@@ -596,7 +596,7 @@ def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
         cb.resize(width, cb.heightForWidth(width))
         cb._layout_for_width(cb._content_width(cb.width()))
         assert cb._layout_cache is not None
-        return cb._layout_cache[1]
+        return cb._layout_cache.text
 
     # Tight space: elided to a `…::`-suffix ending in the leaf, with a tooltip
     # offering the full tag. (Checked before widening, which clears the tooltip.)
@@ -629,7 +629,31 @@ def test_wrapping_checkbox_truncates_giant_single_segment(qtbot: QtBot):
     layout = cb._layout_for_width(cb._content_width(cb.width()))
     assert layout.lineCount() <= _TagLabel._MAX_LINES
     assert cb._layout_cache is not None
-    assert cb._layout_cache[1].endswith("…")
+    assert cb._layout_cache.text.endswith("…")
+
+
+def test_wrapping_checkbox_tooltip_tracks_font_change(qtbot: QtBot):
+    """NRT-790 review follow-up: a font change can elide a previously-full tag
+    without a resize. The tooltip (offering the full tag) must update on the
+    font change, not stay stale until the next resize."""
+    tag = "#AK_Step2::Clinical::Medicine::Gastroenterology::Pancreatitis"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+
+    # Wide + default font: the whole tag fits, so it's shown in full, no tooltip.
+    cb.resize(700, cb.heightForWidth(700))
+    assert cb._layout_cache is not None and cb._layout_cache.text == tag
+    assert cb.toolTip() == ""
+
+    # A much larger font no longer fits the tag in the line budget at the same
+    # width, so it elides — without any resize. The tooltip must now appear.
+    font = cb.font()
+    font.setPointSize(48)
+    cb.setFont(font)
+    assert cb._layout_cache is not None and cb._layout_cache.text != tag  # now elided
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
 
 
 def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):

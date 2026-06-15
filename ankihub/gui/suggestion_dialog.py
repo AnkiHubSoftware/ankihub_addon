@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from html import escape
 from pprint import pformat
-from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Callable, Collection, Dict, List, Mapping, NamedTuple, Optional, Sequence, Set
 
 import aqt
 from anki.models import NotetypeId
@@ -1044,6 +1044,15 @@ class _RowCheckBox(QCheckBox):
         painter.drawControl(QStyle.ControlElement.CE_CheckBoxLabel, label_opt)
 
 
+class _TagLayout(NamedTuple):
+    """`_WrappingCheckBox`'s per-width memo: the chosen display `text` and its
+    laid-out `layout`, valid for one `content_width`."""
+
+    content_width: int
+    text: str
+    layout: QTextLayout
+
+
 class _WrappingCheckBox(_RowCheckBox):
     """A full-row-clickable checkbox whose label wraps to multiple lines.
 
@@ -1069,10 +1078,10 @@ class _WrappingCheckBox(_RowCheckBox):
         # width, so a wide dialog shows the whole tag and a narrow one elides. A
         # flat tag (no `::`) has a single candidate (itself).
         self._candidates = _TagLabel._elision_candidates(tag)
-        # Memoizes the chosen (text, layout) for one content width so the
+        # Memoizes the chosen text + layout for one content width so the
         # back-to-back heightForWidth + paintEvent at the same width don't
         # rebuild, and the candidate search runs once per resize step.
-        self._layout_cache: Optional[Tuple[int, str, QTextLayout]] = None
+        self._layout_cache: Optional[_TagLayout] = None
         if _WrappingCheckBox._native_row_height is None:
             _WrappingCheckBox._native_row_height = QCheckBox("X").sizeHint().height()
         # Helps screen readers name the otherwise text-less checkbox.
@@ -1141,8 +1150,8 @@ class _WrappingCheckBox(_RowCheckBox):
         width so the paired heightForWidth + paintEvent at one width build once.
         """
         text_width = max(1, content_width)
-        if self._layout_cache is not None and self._layout_cache[0] == text_width:
-            return self._layout_cache[2]
+        if self._layout_cache is not None and self._layout_cache.content_width == text_width:
+            return self._layout_cache.layout
         for candidate in self._candidates:  # longest → shortest; last is the floor
             layout = self._build_text_layout(_TagLabel._inject_breakpoints(candidate), text_width)
             if layout.lineCount() <= _TagLabel._MAX_LINES:
@@ -1152,7 +1161,7 @@ class _WrappingCheckBox(_RowCheckBox):
             # Even `…::leaf` needs more than the budget — truncate it to fit.
             chosen_text = self._truncate_to_fit(self._candidates[-1], text_width)
             chosen_layout = self._build_text_layout(_TagLabel._inject_breakpoints(chosen_text), text_width)
-        self._layout_cache = (text_width, chosen_text, chosen_layout)
+        self._layout_cache = _TagLayout(text_width, chosen_text, chosen_layout)
         return chosen_layout
 
     def _truncate_to_fit(self, text: str, text_width: int) -> str:
@@ -1160,6 +1169,8 @@ class _WrappingCheckBox(_RowCheckBox):
         `_TagLabel._MAX_LINES` lines at `text_width`. Only reached for a single
         segment too long to fit the line budget at the current width; keeps a
         pathological tag from ballooning the row to many lines."""
+        # Largest prefix length that fits; the `+ 1` rounds `mid` up so the
+        # `lo = mid` branch makes progress when `hi == lo + 1` (no infinite loop).
         lo, hi = 0, len(text)
         while lo < hi:
             mid = (lo + hi + 1) // 2
@@ -1177,17 +1188,21 @@ class _WrappingCheckBox(_RowCheckBox):
         self._refresh_tooltip()
 
     def changeEvent(self, event) -> None:  # noqa: N802 - Qt override
-        # A font change re-wraps the text, so the width-keyed layout memo is
-        # stale; drop it (the style metrics in `_content_width` are recomputed
-        # per call, so a style change needs no special handling here).
-        if event.type() == QEvent.Type.FontChange:
+        # A font change re-wraps the text, so the chosen candidate (and thus
+        # whether the text is elided) can change with no resize: drop the
+        # width-keyed memo and refresh the tooltip to match. The `hasattr` guard
+        # covers a FontChange arriving mid-construction, before the subclass
+        # attributes exist. (Style metrics in `_content_width` are recomputed
+        # per call, so a style change needs no handling here.)
+        if event.type() == QEvent.Type.FontChange and hasattr(self, "_candidates"):
             self._layout_cache = None
+            self._refresh_tooltip()
         super().changeEvent(event)
 
     def _refresh_tooltip(self) -> None:
         """Show the full tag as a tooltip only while the rendered text is elided."""
         self._layout_for_width(self._content_width(self.width()))
-        displayed = self._layout_cache[1] if self._layout_cache is not None else self._tag
+        displayed = self._layout_cache.text if self._layout_cache is not None else self._tag
         if displayed != self._tag:
             self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(self._tag))}</p>")
         else:
