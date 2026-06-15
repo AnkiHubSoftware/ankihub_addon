@@ -556,73 +556,36 @@ def test_prepared_field_html():
     assert _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">') == '<img src="foo.jpg">'
 
 
-def test_tag_label_elide():
-    elide = _TagLabel._elide
-
-    # Short tag → as-is.
-    assert elide("Pathology") == "Pathology"
-    assert elide("Hierarchy::A::B") == "Hierarchy::A::B"
-
-    # Long hierarchical tag → `…::leaf`.
-    long_hierarchical = (
-        "AnkiHub::Internal::AnKing::Pharmacology::Antiarrhythmics::Class_III::Amiodarone::Cardiovascular::Specifics"
-    )
-    assert elide(long_hierarchical) == "…::Specifics"
-
-    # Long flat tag (no `::`) → plain ellipsis at the end.
-    long_flat = "x" * 120
-    flat_result = elide(long_flat)
-    assert flat_result.endswith("…")
-    assert len(flat_result) <= 85
-
-    # Long hierarchical tag whose leaf alone exceeds the budget → leaf truncated too.
-    bulky_leaf = "y" * 120
-    leaf_result = elide(f"Hierarchy::{bulky_leaf}")
-    assert leaf_result.startswith("…::")
-    assert leaf_result.endswith("…")
-    assert len(leaf_result) <= 85
-
-
 def test_tag_label_elision_candidates():
     candidates = _TagLabel._elision_candidates
 
-    # Within-budget tags: a single candidate, themselves (shown in full).
+    # Flat tag (no `::`): a single candidate, itself. The widget truncates to
+    # fit the line budget if needed; the candidate list isn't length-bounded.
     assert candidates("Pathology") == ["Pathology"]
-    assert candidates("Hierarchy::A::B") == ["Hierarchy::A::B"]
+    assert candidates("x" * 120) == ["x" * 120]
 
-    # Long flat tag: a single `…`-truncated candidate within the budget.
-    flat = candidates("x" * 120)
-    assert len(flat) == 1
-    assert flat[0].endswith("…") and len(flat[0]) <= _TagLabel._MAX_LEN
+    # Hierarchical tag: the full tag, then `…::`-suffixes, longest → shortest,
+    # dropping one leading segment at a time down to `…::leaf`.
+    assert candidates("Hierarchy::A::B") == ["Hierarchy::A::B", "…::A::B", "…::B"]
 
-    # Long hierarchical tag: `…::`-suffixes, longest → shortest, all within budget,
-    # the floor being `…::leaf`. The widest is the longest suffix that still fits.
     long_hierarchical = (
         "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
     )
     cands = candidates(long_hierarchical)
-    assert len(cands) >= 2
-    assert all(c.startswith("…::") for c in cands)
-    assert all(len(c) <= _TagLabel._MAX_LEN for c in cands)
+    # Full tag is the longest candidate; the rest are `…::`-suffixes ending in the leaf.
+    assert cands[0] == long_hierarchical
+    assert all(c.startswith("…::") for c in cands[1:])
     assert cands[-1] == "…::VariableRatio"
     # Strictly shrinking, and each is a `::`-suffix of the original tag.
     assert [len(c) for c in cands] == sorted((len(c) for c in cands), reverse=True)
     for c in cands:
-        assert long_hierarchical.endswith(c[len("…::") :])
-    # The original (>85) tag is never itself a candidate — always elided.
-    assert long_hierarchical not in cands
-
-    # Giant single leaf: still non-empty, truncated within budget.
-    giant = candidates("Hierarchy::" + "y" * 120)
-    assert len(giant) == 1
-    assert giant[0].startswith("…::") and giant[0].endswith("…")
-    assert len(giant[0]) <= _TagLabel._MAX_LEN
+        assert long_hierarchical.endswith(c.removeprefix("…::"))
 
 
 def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
-    """NRT-790 follow-up: an elided hierarchical tag (>85 chars) should reveal
-    more leading segments as the dialog widens, instead of always collapsing to
-    `…::leaf`. Width-driven, capped at the 85-char budget, floor `…::leaf`."""
+    """NRT-790 follow-up: a long hierarchical tag reveals more leading segments
+    as the dialog widens — elided to a `…::`-suffix when space is tight, and
+    shown in full once a wide enough window fits it within the line budget."""
     tag = "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
     cb = _WrappingCheckBox(tag)
     qtbot.addWidget(cb)
@@ -635,18 +598,38 @@ def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
         assert cb._layout_cache is not None
         return cb._layout_cache[1]
 
+    # Tight space: elided to a `…::`-suffix ending in the leaf, with a tooltip
+    # offering the full tag. (Checked before widening, which clears the tooltip.)
     narrow = displayed_at(150)
-    wide = displayed_at(1000)
-
-    # Both elided forms keep the leaf; the wider one reveals strictly more.
-    assert narrow.startswith("…::") and wide.startswith("…::")
-    assert narrow.endswith("VariableRatio") and wide.endswith("VariableRatio")
-    assert len(wide) > len(narrow)
-    assert len(wide) <= _TagLabel._MAX_LEN
-    # The wider suffix contains the narrower one's tail (it's a longer suffix).
-    assert wide[len("…::") :].endswith(narrow[len("…::") :])
-    # The full tag is offered as a tooltip while elided.
+    assert narrow.startswith("…::") and narrow.endswith("VariableRatio")
     assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+    # Widening reveals strictly more; each wider form is a longer suffix.
+    medium = displayed_at(700)
+    assert len(medium) > len(narrow)
+    assert medium.removeprefix("…::").endswith(narrow.removeprefix("…::"))
+
+    # A wide enough window reveals the whole tag — no `…::` left — and clears the tooltip.
+    very_wide = displayed_at(2400)
+    assert very_wide == tag
+    assert cb.toolTip() == ""
+
+
+def test_wrapping_checkbox_truncates_giant_single_segment(qtbot: QtBot):
+    """A single segment too long to fit the line budget at the current width is
+    truncated with a trailing `…`, so a pathological tag can't balloon the row
+    past `_TagLabel._MAX_LINES` lines."""
+    tag = "Hierarchy::" + ("Supercalifragilistic" * 8)  # 160-char unbreakable leaf
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+    cb.resize(200, cb.heightForWidth(200))
+
+    layout = cb._layout_for_width(cb._content_width(cb.width()))
+    assert layout.lineCount() <= _TagLabel._MAX_LINES
+    assert cb._layout_cache is not None
+    assert cb._layout_cache[1].endswith("…")
 
 
 def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):

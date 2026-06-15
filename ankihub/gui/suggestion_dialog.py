@@ -971,62 +971,34 @@ class SourceWidget(QWidget):
 
 
 class _TagLabel:
-    """Tag-name rendering helpers shared by `_WrappingCheckBox`: elide long tags
-    to `…::leaf` (or `<head>…` for flat names) and inject zero-width spaces after
-    `::` and `_` so the text has break points inside identifier-style names.
+    """Tag-name rendering helpers shared by `_WrappingCheckBox`: produce the
+    display candidates for a tag (full name, then progressively shorter `…::`
+    suffixes) and inject zero-width spaces after `::` and `_` so the text has
+    break points inside identifier-style names.
     """
 
-    # Absolute display ceiling (chars), per the NRT-508 design spec: a tag never
-    # renders more than this, even at a very wide window.
-    _MAX_LEN = 85
-    # When a hierarchical tag exceeds `_MAX_LEN` and must be elided to a
-    # `…::`-suffix, how many wrapped lines that suffix may occupy. The widget
-    # shows the longest suffix that fits this budget at the current width, so a
-    # wider dialog reveals more leading segments (`…::leaf` →
-    # `…::Schedules::leaf` → …). Tags within `_MAX_LEN` are shown in full and
-    # wrap freely, unaffected by this budget.
+    # How many wrapped lines a tag may occupy before it is elided. This is the
+    # only bound on what a tag shows: the widget renders the longest candidate
+    # that fits this many lines at the current width, so a wider dialog reveals
+    # more — eventually the whole tag — and a narrow one collapses to `…::leaf`.
+    # (Supersedes the old fixed 85-char ceiling: the bound is now space, not a
+    # hardcoded length, per QA feedback on NRT-790 / the NRT-508 spec.)
     _MAX_LINES = 2
 
     @classmethod
     def _elision_candidates(cls, tag: str) -> List[str]:
-        """Display candidates for `tag`, longest first, each within `_MAX_LEN`.
-
-        A tag within the budget yields a single candidate: itself (shown in
-        full, unchanged). A longer flat tag (no `::`) yields a single `…`-
-        truncated candidate. A longer hierarchical tag yields progressively
-        shorter trailing-segment suffixes, each prefixed with `…::`
-        (`a::b::c::leaf` → [`…::b::c::leaf`, `…::c::leaf`, `…::leaf`]); suffixes
-        over the budget are dropped so even the widest stays within `_MAX_LEN`.
-        If the leaf alone exceeds the budget it is `…`-truncated, so the list is
-        never empty. `_WrappingCheckBox` picks the longest candidate that fits
-        the available width (see `_MAX_LINES`).
+        """Display candidates for `tag`, longest first: the full tag, then
+        trailing-segment suffixes prefixed with `…::`, dropping one leading
+        segment at a time (`a::b::c::leaf` → [`a::b::c::leaf`, `…::b::c::leaf`,
+        `…::c::leaf`, `…::leaf`]). A flat tag (no `::`) yields just itself.
+        `_WrappingCheckBox` renders the longest candidate that fits `_MAX_LINES`
+        lines at the current width, truncating the last one if even it overflows
+        — so the list need not be length-bounded here.
         """
-        if len(tag) <= cls._MAX_LEN:
-            return [tag]
         if "::" not in tag:
-            return [f"{tag[: cls._MAX_LEN - 1]}…"]
+            return [tag]
         segments = tag.split("::")
-        # Drop one leading segment at a time; keep suffixes within the budget.
-        candidates = [
-            suffix
-            for start in range(1, len(segments))
-            if len(suffix := "…::" + "::".join(segments[start:])) <= cls._MAX_LEN
-        ]
-        if not candidates:
-            # Even `…::leaf` overflows: truncate the leaf ("…::" + leaf + "…").
-            leaf = segments[-1]
-            candidates.append(f"…::{leaf[: cls._MAX_LEN - 4]}…")
-        return candidates
-
-    @classmethod
-    def _elide(cls, tag: str) -> str:
-        """The narrowest display form: tags within the budget render as-is,
-        longer hierarchical tags collapse to `…::leaf` (leaf truncated if
-        needed), long flat tags get a plain `…` truncation. This is the floor
-        `_WrappingCheckBox` falls back to at the narrowest widths; wider widths
-        reveal more via `_elision_candidates`.
-        """
-        return cls._elision_candidates(tag)[-1]
+        return [tag] + ["…::" + "::".join(segments[start:]) for start in range(1, len(segments))]
 
     @staticmethod
     def _inject_breakpoints(text: str) -> str:
@@ -1092,10 +1064,10 @@ class _WrappingCheckBox(_RowCheckBox):
     def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
         super().__init__("", parent)
         self._tag = tag
-        # Display candidates, longest → shortest. For a long hierarchical tag
-        # these are `…::`-suffixes of increasing length; `_layout_for_width`
-        # picks the longest that fits the current width, so a wider dialog
-        # reveals more. A within-budget tag has a single candidate (itself).
+        # Display candidates, longest → shortest: the full tag, then `…::`
+        # suffixes. `_layout_for_width` renders the longest that fits the current
+        # width, so a wide dialog shows the whole tag and a narrow one elides. A
+        # flat tag (no `::`) has a single candidate (itself).
         self._candidates = _TagLabel._elision_candidates(tag)
         # Memoizes the chosen (text, layout) for one content width so the
         # back-to-back heightForWidth + paintEvent at the same width don't
@@ -1161,26 +1133,42 @@ class _WrappingCheckBox(_RowCheckBox):
         return layout
 
     def _layout_for_width(self, content_width: int) -> QTextLayout:
-        """Choose the display text for `content_width` and lay it out. Picks the
+        """Choose the display text for `content_width` and lay it out. Renders the
         longest candidate whose wrapped text fits within `_TagLabel._MAX_LINES`
-        lines, falling back to the narrowest (`…::leaf`) when even that overflows
-        — so wider widths reveal more leading segments. Within-budget tags have a
-        single candidate and are unaffected. Memoized per content width so the
-        paired heightForWidth + paintEvent at one width build the layout once.
+        lines — so a wide enough dialog shows the full tag and a narrow one
+        collapses to a `…::`-suffix. If even the narrowest candidate (`…::leaf`)
+        overflows the budget, its text is truncated to fit. Memoized per content
+        width so the paired heightForWidth + paintEvent at one width build once.
         """
         text_width = max(1, content_width)
         if self._layout_cache is not None and self._layout_cache[0] == text_width:
             return self._layout_cache[2]
-        chosen_text = self._candidates[-1]
-        chosen_layout: Optional[QTextLayout] = None
         for candidate in self._candidates:  # longest → shortest; last is the floor
-            chosen_text = candidate
-            chosen_layout = self._build_text_layout(_TagLabel._inject_breakpoints(candidate), text_width)
-            if chosen_layout.lineCount() <= _TagLabel._MAX_LINES:
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(candidate), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                chosen_text, chosen_layout = candidate, layout
                 break
-        assert chosen_layout is not None  # `_elision_candidates` is never empty
+        else:
+            # Even `…::leaf` needs more than the budget — truncate it to fit.
+            chosen_text = self._truncate_to_fit(self._candidates[-1], text_width)
+            chosen_layout = self._build_text_layout(_TagLabel._inject_breakpoints(chosen_text), text_width)
         self._layout_cache = (text_width, chosen_text, chosen_layout)
         return chosen_layout
+
+    def _truncate_to_fit(self, text: str, text_width: int) -> str:
+        """Longest prefix of `text` that, with a trailing `…`, wraps within
+        `_TagLabel._MAX_LINES` lines at `text_width`. Only reached for a single
+        segment too long to fit the line budget at the current width; keeps a
+        pathological tag from ballooning the row to many lines."""
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(f"{text[:mid]}…"), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                lo = mid
+            else:
+                hi = mid - 1
+        return f"{text[:lo]}…"
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt override
         super().resizeEvent(event)
