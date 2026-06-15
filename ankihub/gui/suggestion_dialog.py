@@ -162,7 +162,9 @@ class NoteAlreadyExistsDialog(QDialog):
         super().__init__(parent)
         self._on_send = on_send
         self.setWindowTitle("Note already exists in this deck")
-        self.setWindowModality(Qt.WindowModality.WindowModal)
+        # Application-modal (not window-modal) so macOS shows it as a normal centered
+        # dialog rather than a sheet sliding out of the parent window's title bar.
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
@@ -205,7 +207,7 @@ def _show_note_already_exists_dialog(
     suggestion_meta: "SuggestionMetadata",
     parent: QWidget,
 ) -> None:
-    LOGGER.info("error_dialog_shown", note_id=note.id, ah_did=str(ah_did))
+    LOGGER.info("duplicate_note_error_dialog_shown", note_id=note.id, ah_did=str(ah_did))
 
     def resubmit() -> ChangeSuggestionResult:
         # New-note flows carry no change type; resubmit as an "Updated content" change.
@@ -237,7 +239,7 @@ def _show_note_already_exists_dialog(
             )
 
     def on_send() -> None:
-        LOGGER.info("resubmit_clicked", note_id=note.id, ah_did=str(ah_did))
+        LOGGER.info("duplicate_note_resubmitted_as_update_suggestion", note_id=note.id, ah_did=str(ah_did))
         aqt.mw.taskman.with_progress(task=resubmit, on_done=on_resubmit_done, parent=parent)
 
     NoteAlreadyExistsDialog(on_send=on_send, parent=parent).show()

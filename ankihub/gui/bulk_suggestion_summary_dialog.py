@@ -18,6 +18,7 @@ from aqt.qt import (
     QLabel,
     QPushButton,
     Qt,
+    QTimer,
     QVBoxLayout,
     QWidget,
     qconnect,
@@ -99,6 +100,9 @@ class BulkSuggestionSummaryDialog(QDialog):
     interactive "Notes already in this deck" action that resubmits as change
     suggestions."""
 
+    _SIDE_MARGIN = 28  # horizontal inset for every section except the full-bleed band
+    _SECTION_GAP = 20  # default vertical gap between sections
+
     def __init__(
         self,
         result: BulkNoteSuggestionsResult,
@@ -108,8 +112,10 @@ class BulkSuggestionSummaryDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("AnkiHub | Bulk Suggestion Summary")
-        self.setMinimumWidth(520)
-        self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setMinimumWidth(440)
+        # Application-modal (not window-modal) so macOS shows it as a normal centered
+        # dialog rather than a sheet sliding out of the parent window's title bar.
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         self._errors_by_nid: Dict[NoteId, object] = dict(result.errors_by_nid)
         self._already_in_deck: Dict[NoteId, AlreadyInDeckConflict] = dict(result.already_in_deck_by_nid)
@@ -121,18 +127,24 @@ class BulkSuggestionSummaryDialog(QDialog):
         # Summary/category keys to flag with an "Updated" badge after a resubmit.
         self._updated_keys: set = set()
 
+        # Side margins are 0 so the "action required" band can span the full dialog
+        # width; every other section is wrapped in a SIDE_MARGIN inset via `_inset`.
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(30, 18, 30, 14)
-        outer.setSpacing(12)
+        outer.setContentsMargins(0, 16, 0, 14)
+        # Gap between the content (its last section is the action band) and the footer.
+        outer.setSpacing(16)
 
         # Rebuilt on each state change. Category count is bounded and IDs live behind
         # "Copy note IDs" buttons, so the dialog stays a sensible size without a scroll.
         self._content_layout = QVBoxLayout()
         self._content_layout.setContentsMargins(0, 0, 0, 0)
-        self._content_layout.setSpacing(14)
+        # Spacing is added explicitly per-gap in `_render` (Qt layouts only support a
+        # single uniform spacing, but a couple of gaps need bespoke values).
+        self._content_layout.setSpacing(0)
         outer.addLayout(self._content_layout, 1)
 
         footer = QHBoxLayout()
+        footer.setContentsMargins(self._SIDE_MARGIN, 0, self._SIDE_MARGIN, 0)
         footer.addStretch(1)
         self._close_button = QPushButton("Close")
         qconnect(self._close_button.clicked, self.accept)
@@ -140,7 +152,11 @@ class BulkSuggestionSummaryDialog(QDialog):
         outer.addLayout(footer)
 
         if self._already_in_deck:
-            LOGGER.info("bulk_error_category_shown", ah_did=str(self._ah_did), count=len(self._already_in_deck))
+            LOGGER.info(
+                "bulk_duplicate_note_error_dialog_shown",
+                ah_did=str(self._ah_did),
+                count=len(self._already_in_deck),
+            )
 
         self._render()
 
@@ -193,22 +209,45 @@ class BulkSuggestionSummaryDialog(QDialog):
         return cats
 
     # --- rendering --------------------------------------------------------
+    def _inset(self, widget: QWidget) -> QWidget:
+        """Wrap a widget in a SIDE_MARGIN horizontal inset, so sections line up while
+        the full-bleed action band (added un-inset) spans the whole dialog width."""
+        container = QWidget()
+        container.setStyleSheet(".QWidget { background: transparent; }")
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(self._SIDE_MARGIN, 0, self._SIDE_MARGIN, 0)
+        layout.addWidget(widget)
+        return container
+
     def _render(self) -> None:
         clear_layout(self._content_layout)
-        self._content_layout.addWidget(self._build_summary())
+        self._content_layout.addWidget(self._inset(self._build_summary()))
 
         issue_blocks = self._issue_blocks()
         if issue_blocks:
-            self._content_layout.addWidget(self._divider())
-            self._content_layout.addWidget(self._section_header("Submission issues"))
+            self._content_layout.addSpacing(self._SECTION_GAP)
+            self._content_layout.addWidget(self._inset(self._divider()))
+            self._content_layout.addSpacing(self._SECTION_GAP)
+            self._content_layout.addWidget(self._inset(self._section_header("Submission issues")))
             for key, label, guidance, nids in issue_blocks:
-                self._content_layout.addWidget(self._issue_block(key, label, guidance, nids))
+                self._content_layout.addSpacing(self._SECTION_GAP)
+                self._content_layout.addWidget(self._inset(self._issue_block(key, label, guidance, nids)))
 
         if self._already_in_deck:
-            self._content_layout.addWidget(self._section_header("Action required", size=13))
-            self._content_layout.addWidget(self._build_action_band())
+            self._content_layout.addSpacing(self._SECTION_GAP)
+            self._content_layout.addWidget(self._inset(self._section_header("Action required", size=14)))
+            self._content_layout.addSpacing(8)  # "Action required" → band
+            self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
         self._close_button.setEnabled(self._can_close())
+        # Resize on the next event-loop tick: computing the fit synchronously here
+        # (right after rebuilding the layout) can under-size the dialog because the
+        # freshly-created widgets haven't reported their final size hints yet, which
+        # squashes multi-line rows. Deferring lets the layout settle first.
+        QTimer.singleShot(0, self._fit_to_content)
+
+    def _fit_to_content(self) -> None:
+        self._content_layout.activate()
         self.adjustSize()
 
     def _issue_blocks(self) -> List[Tuple[str, str, str, List[NoteId]]]:
@@ -219,7 +258,8 @@ class BulkSuggestionSummaryDialog(QDialog):
         return blocks
 
     def _section_header(self, text: str, size: int = 16) -> QLabel:
-        # Hierarchy: Summary (20) > Submission issues (16) > Action required (13).
+        # Hierarchy: Summary (18) > Submission issues (16) > Action required, issue
+        # category titles, and the action-band title (all 14), all weight 700.
         label = QLabel(text)
         label.setStyleSheet(f"font-weight:700; font-size:{size}px;")
         return label
@@ -234,7 +274,10 @@ class BulkSuggestionSummaryDialog(QDialog):
     def _badge(self) -> QLabel:
         background, foreground = _updated_badge_colors()
         badge = QLabel("Updated")
-        badge.setStyleSheet(f"background:{background}; color:{foreground}; border-radius:9px; padding:2px 9px;")
+        badge.setStyleSheet(
+            f"background:{background}; color:{foreground}; border-radius:9px; "
+            "padding:2px 9px; font-weight:400; font-size:12px;"
+        )
         return badge
 
     def _copy_nids_button(self, nids: List[NoteId]) -> QPushButton:
@@ -245,7 +288,7 @@ class BulkSuggestionSummaryDialog(QDialog):
     def _copy_nids(self, nids: List[NoteId]) -> None:
         search = "nid:" + ",".join(str(nid) for nid in nids)
         aqt.mw.app.clipboard().setText(search)
-        show_tooltip("Copied a note search to the clipboard — paste it into the Browse window.", parent=self)
+        show_tooltip("Copied note IDs", parent=self)
 
     def _guidance_label(self, html: str) -> QLabel:
         label = QLabel(html)
@@ -256,7 +299,7 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     def _bullet(self, number: int, label: str, color: Optional[str], updated_key: Optional[str] = None) -> QWidget:
         widget = QWidget()
-        widget.setStyleSheet("background:transparent;")
+        widget.setStyleSheet(".QWidget { background: transparent; }")
         row = QHBoxLayout(widget)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
@@ -273,12 +316,12 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     def _build_summary(self) -> QWidget:
         container = QWidget()
-        container.setStyleSheet("background:transparent;")
+        container.setStyleSheet(".QWidget { background: transparent; }")
         vbox = QVBoxLayout(container)
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(8)
 
-        vbox.addWidget(self._section_header("Summary", size=20))
+        vbox.addWidget(self._section_header("Summary", size=18))
         vbox.addWidget(
             self._bullet(
                 self._change_submitted,
@@ -298,7 +341,7 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     def _skipped_row(self, nids: List[NoteId]) -> QWidget:
         widget = QWidget()
-        widget.setStyleSheet("background:transparent;")
+        widget.setStyleSheet(".QWidget { background: transparent; }")
         row = QHBoxLayout(widget)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
@@ -315,22 +358,23 @@ class BulkSuggestionSummaryDialog(QDialog):
         row.addLayout(left)
 
         if "skipped" in self._updated_keys:
-            row.addWidget(self._badge())
+            # AlignTop so the badge stays pill-height (lines up with the count) instead
+            # of stretching to fill the two-line row.
+            row.addWidget(self._badge(), alignment=Qt.AlignmentFlag.AlignTop)
         row.addStretch(1)
         row.addWidget(self._copy_nids_button(nids), alignment=Qt.AlignmentFlag.AlignTop)
         return widget
 
     def _issue_block(self, key: str, label: str, guidance_html: str, nids: List[NoteId]) -> QWidget:
         widget = QWidget()
-        widget.setStyleSheet("background:transparent;")
+        widget.setStyleSheet(".QWidget { background: transparent; }")
         vbox = QVBoxLayout(widget)
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(4)
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
-        title = QLabel(f"({len(nids)}) {label}")
-        title.setStyleSheet("font-weight:600;")
+        title = self._section_header(f"({len(nids)}) {label}", size=14)
         title_row.addWidget(title)
         if key in self._updated_keys:
             title_row.addWidget(self._badge())
@@ -345,16 +389,16 @@ class BulkSuggestionSummaryDialog(QDialog):
         frame = QFrame()
         frame.setFrameShape(QFrame.Shape.NoFrame)
         frame.setObjectName("actionBand")
-        frame.setStyleSheet(f"#actionBand {{ background-color: {_action_band_bg()}; border-radius: 8px; }}")
+        # Full-bleed: spans the dialog width, so no border-radius (square edges meet the sides).
+        frame.setStyleSheet(f"#actionBand {{ background-color: {_action_band_bg()}; }}")
         vbox = QVBoxLayout(frame)
-        vbox.setContentsMargins(14, 12, 14, 12)
+        vbox.setContentsMargins(self._SIDE_MARGIN, 12, self._SIDE_MARGIN, 12)
         vbox.setSpacing(8)
         nids = list(self._already_in_deck.keys())
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
-        title = QLabel(f"({len(nids)}) Notes already in this deck")
-        title.setStyleSheet("font-weight:600;")
+        title = self._section_header(f"({len(nids)}) Notes already in this deck", size=14)
         title_row.addWidget(title)
         title_row.addStretch(1)
         title_row.addWidget(self._copy_nids_button(nids))
@@ -401,7 +445,11 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._render()
 
     def _on_resubmit(self) -> None:
-        LOGGER.info("bulk_resubmit_clicked", ah_did=str(self._ah_did), count=len(self._already_in_deck))
+        LOGGER.info(
+            "bulk_duplicate_note_resubmitted_as_update_suggestion",
+            ah_did=str(self._ah_did),
+            count=len(self._already_in_deck),
+        )
         conflicts = dict(self._already_in_deck)
         self._action_state = _ActionState.LOADING
         self._render()
