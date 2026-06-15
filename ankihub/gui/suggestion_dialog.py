@@ -983,7 +983,7 @@ class _TagLabel:
     # more — eventually the whole tag — and a narrow one collapses to `…::leaf`.
     # (Supersedes the old fixed 85-char ceiling: the bound is now space, not a
     # hardcoded length, per QA feedback on NRT-790 / the NRT-508 spec.)
-    _MAX_LINES = 2
+    _MAX_LINES = 3
 
     @classmethod
     def _elision_candidates(cls, tag: str) -> List[str]:
