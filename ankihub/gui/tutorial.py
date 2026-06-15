@@ -489,6 +489,8 @@ class Tutorial:
         return (step.tooltip_context, step.target_context, *backdrop_contexts)
 
     def show_current(self) -> None:
+        if self.current_step == len(self.steps):
+            self._track_tutorial(event_name="tour_completed")
         step = self.steps[self.current_step - 1]
         if isinstance(step, QtTutorialStep):
             target = step.qt_target() if callable(step.qt_target) else step.qt_target
@@ -582,6 +584,7 @@ class Tutorial:
         active_tutorial = None
 
     def _skip_tutorial(self) -> None:
+        self._track_tutorial(event_name="tour_postponed")
         # It copies the end() method because it can be called from the Tutorial children
         self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
@@ -764,6 +767,7 @@ def prompt_for_tutorial(
     on_start: Callable[[], None],
     on_dismiss: Callable[[], None],
     on_skip: Optional[Callable[[], None]] = None,
+    tutorial_class: type[Tutorial] = Tutorial,
 ) -> None:
     if active_tutorial:
         return
@@ -793,6 +797,7 @@ def prompt_for_tutorial(
             on_dismiss()
             return True, None
         if message == SKIP_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_postponed")
             clean_up_webviews()
             if on_skip:
                 on_skip()
@@ -858,6 +863,7 @@ def prompt_for_onboarding_tutorial() -> None:
         ),
         on_start=lambda: OnboardingTutorial().start(),
         on_dismiss=lambda: config.set_onboarding_tutorial_pending(False),
+        tutorial_class=OnboardingTutorial,
     )
 
 
@@ -891,6 +897,7 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         on_start=lambda: StepDeckTutorial().start(),
         on_dismiss=lambda: config.set_step_deck_tutorial_pending(False),
         on_skip=on_skip,
+        tutorial_class=StepDeckTutorial,
     )
 
 
