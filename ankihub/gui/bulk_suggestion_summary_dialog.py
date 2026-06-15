@@ -248,6 +248,13 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     def _fit_to_content(self) -> None:
         self._content_layout.activate()
+        # Word-wrap labels under-report their height to adjustSize() (their sizeHint
+        # assumes a wider, fewer-line layout than the dialog's actual width), which
+        # clips the last line. Pin each one to its real wrapped height at the current
+        # width so adjustSize() reserves enough room.
+        for label in self.findChildren(QLabel):
+            if label.wordWrap() and label.width() > 0:
+                label.setMinimumHeight(label.heightForWidth(label.width()))
         self.adjustSize()
 
     def _issue_blocks(self) -> List[Tuple[str, str, str, List[NoteId]]]:
