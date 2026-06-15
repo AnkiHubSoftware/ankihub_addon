@@ -2206,6 +2206,82 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
     dialog.button_box.button(QDialogButtonBox.StandardButton.No).click()
 
 
+class TestUserDetailsConfig:
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, None),
+            ({"plan": "core"}, "core"),
+        ],
+    )
+    def test_plan(self, user_details: dict, expected: Optional[str]) -> None:
+        config.set_user_details(user_details)
+        assert config.plan() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"is_staff": True}, True),
+            ({"is_staff": False}, False),
+        ],
+    )
+    def test_is_staff(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_staff() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"is_admin": True}, True),
+            ({"is_admin": False}, False),
+        ],
+    )
+    def test_is_admin(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_admin() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"beta_tester": True}, True),
+            ({"beta_tester": False}, False),
+        ],
+    )
+    def test_is_beta_tester(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_beta_tester() == expected
+
+
+class TestTutorialProductMetrics:
+    def test_track_tutorial_started_sends_event(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=True)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=True)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+
+        Tutorial()._track_tutorial_started("tutorial_shown")
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tutorial_shown",
+            properties={
+                "tutorial": "Tutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": True,
+                "beta_tester": True,
+            },
+        )
+
+
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):

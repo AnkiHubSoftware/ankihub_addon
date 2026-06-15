@@ -50,6 +50,7 @@ from .ankihub_client import (
 from .ankihub_client.models import Deck, UserDeckRelation
 from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
+from .product_metrics_client import DEFAULT_PRODUCT_METRICS_URL, STAGING_PRODUCT_METRICS_URL
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
@@ -225,6 +226,7 @@ class PrivateConfig(DataClassJSONMixin):
     user_details: dict = field(default_factory=dict)
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
     onboarding_tutorial_pending: bool = False
+    onboarding_tutorial_show_on_sync: bool = True
     step_deck_tutorial_pending: bool = False
     # Show Step Deck tutorial next time the user opens the deck
     show_step_deck_tutorial: bool = False
@@ -252,6 +254,7 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
+            self.product_metrics_url = STAGING_PRODUCT_METRICS_URL
             self.anking_deck_id = uuid.UUID(
                 self.public_config.get("staging_anking_deck_id") or "dfe7f548-f66e-4277-932b-c7a63db3223a"
             )
@@ -260,6 +263,7 @@ class _Config:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
+            self.product_metrics_url = DEFAULT_PRODUCT_METRICS_URL
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -271,6 +275,9 @@ class _Config:
             override_url = override_url.rstrip("/")
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
+
+        if product_metrics_url := os.getenv("PRODUCT_METRICS_URL"):
+            self.product_metrics_url = product_metrics_url
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
@@ -365,6 +372,10 @@ class _Config:
 
     def set_onboarding_tutorial_pending(self, pending: bool):
         self._private_config.onboarding_tutorial_pending = pending
+        self._update_private_config()
+
+    def set_onboarding_tutorial_show_on_sync(self, show_on_sync: bool):
+        self._private_config.onboarding_tutorial_show_on_sync = show_on_sync
         self._update_private_config()
 
     def set_show_step_deck_tutorial(self, show: bool):
@@ -550,11 +561,26 @@ class _Config:
     def user_id(self) -> Optional[int]:
         return self._private_config.user_details.get("id")
 
+    def plan(self) -> Optional[str]:
+        return self._private_config.user_details.get("plan")
+
+    def is_staff(self) -> bool:
+        return bool(self._private_config.user_details.get("is_staff"))
+
+    def is_admin(self) -> bool:
+        return bool(self._private_config.user_details.get("is_admin"))
+
+    def is_beta_tester(self) -> bool:
+        return bool(self._private_config.user_details.get("beta_tester"))
+
     def last_deck_sync(self) -> Optional[str]:
         return self._private_config.user_details.get("last_deck_sync")
 
     def onboarding_tutorial_pending(self) -> bool:
         return self._private_config.onboarding_tutorial_pending
+
+    def onboarding_tutorial_show_on_sync(self) -> bool:
+        return self._private_config.onboarding_tutorial_show_on_sync
 
     def show_step_deck_tutorial(self) -> bool:
         return self._private_config.show_step_deck_tutorial
