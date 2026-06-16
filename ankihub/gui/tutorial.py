@@ -530,6 +530,9 @@ class Tutorial:
             inject_tutorial_assets(context, on_script_loaded)
 
     def _track_tutorial_started(self, event_name: str) -> None:
+        if not config.get_feature_flags().get("tutorial_metrics_tracker", False):
+            return
+
         user_id = str(config.user_id())
         plan = config.plan()
         is_staff = config.is_staff()

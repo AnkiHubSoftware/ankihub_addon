@@ -2140,6 +2140,7 @@ class TestTutorialProductMetrics:
         from ankihub.gui.tutorial import Tutorial
 
         mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": True})
         mocker.patch.object(config, "user_id", return_value=42)
         mocker.patch.object(config, "plan", return_value="core")
         mocker.patch.object(config, "is_staff", return_value=True)
@@ -2160,6 +2161,17 @@ class TestTutorialProductMetrics:
                 "beta_tester": True,
             },
         )
+
+    def test_track_tutorial_started_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": False})
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+
+        Tutorial()._track_tutorial_started("tutorial_shown")
+
+        mock_client.track.assert_not_called()
 
 
 class TestFeatureFlags:
