@@ -2148,11 +2148,11 @@ class TestTutorialProductMetrics:
         mocker.patch.object(config, "is_beta_tester", return_value=True)
         mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
 
-        Tutorial()._track_tutorial("tutorial_shown")
+        Tutorial()._track_tutorial("tutorial_start")
 
         mock_client.track.assert_called_once_with(
             distinct_id="42",
-            event_name="tutorial_shown",
+            event_name="tutorial_start",
             properties={
                 "tutorial": "Tutorial",
                 "user": "42",
@@ -2169,7 +2169,7 @@ class TestTutorialProductMetrics:
         mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": False})
         mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
 
-        Tutorial()._track_tutorial("tutorial_shown")
+        Tutorial()._track_tutorial("tutorial_start")
 
         mock_client.track.assert_not_called()
 

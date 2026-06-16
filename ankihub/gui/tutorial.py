@@ -565,7 +565,7 @@ class Tutorial:
     def start(self) -> None:
         global active_tutorial
         active_tutorial = self
-        self._track_tutorial(event_name="tutorial_shown")
+        self._track_tutorial(event_name="tutorial_start")
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
