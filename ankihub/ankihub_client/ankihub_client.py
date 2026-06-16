@@ -682,7 +682,7 @@ class AnkiHubClient:
         else:
             deck_csv_content = s3_response_content.decode("utf-8")
 
-        reader = csv.DictReader(deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'")
+        reader = csv.DictReader(re.split(r"\r\n|\n|\r", deck_csv_content), delimiter=CSV_DELIMITER, quotechar="'")
         # TODO Validate .csv
         notes_data_raw = [row for row in reader]
         notes_data_raw = _transform_notes_data(notes_data_raw)
