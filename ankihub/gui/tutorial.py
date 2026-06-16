@@ -1003,10 +1003,10 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             except Exception:
                 rev_today = 0
 
-        target_new_per_day = max(cur_new, new_today + extra)
+        target_new_per_day = max(cur_new + extra, new_today + extra)
         new_sub["perDay"] = target_new_per_day
 
-        target_rev_per_day = max(cur_rev, rev_today + extra, target_new_per_day * 10)
+        target_rev_per_day = max(cur_rev + extra * 10, rev_today + extra * 10, target_new_per_day * 10)
         rev_sub["perDay"] = target_rev_per_day
         aqt.mw.col.decks.update_config(deck_config)
 
