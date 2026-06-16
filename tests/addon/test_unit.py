@@ -2136,7 +2136,7 @@ class TestUserDetailsConfig:
 
 
 class TestTutorialProductMetrics:
-    def test_track_tutorial_started_sends_event(self, mocker: MockerFixture) -> None:
+    def test_track_tutorial_sends_event(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import Tutorial
 
         mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
@@ -2148,7 +2148,7 @@ class TestTutorialProductMetrics:
         mocker.patch.object(config, "is_beta_tester", return_value=True)
         mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
 
-        Tutorial()._track_tutorial_started("tutorial_shown")
+        Tutorial()._track_tutorial("tutorial_shown")
 
         mock_client.track.assert_called_once_with(
             distinct_id="42",
@@ -2162,14 +2162,14 @@ class TestTutorialProductMetrics:
             },
         )
 
-    def test_track_tutorial_started_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
+    def test_track_tutorial_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import Tutorial
 
         mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
         mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": False})
         mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
 
-        Tutorial()._track_tutorial_started("tutorial_shown")
+        Tutorial()._track_tutorial("tutorial_shown")
 
         mock_client.track.assert_not_called()
 

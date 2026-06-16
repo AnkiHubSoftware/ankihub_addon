@@ -529,7 +529,7 @@ class Tutorial:
         for context in contexts:
             inject_tutorial_assets(context, on_script_loaded)
 
-    def _track_tutorial_started(self, event_name: str) -> None:
+    def _track_tutorial(self, event_name: str) -> None:
         if not config.get_feature_flags().get("tutorial_metrics_tracker", False):
             return
 
@@ -555,7 +555,7 @@ class Tutorial:
                 )
             except (ProductMetricsHTTPError, ProductMetricsRequestException) as exc:
                 LOGGER.warning(
-                    "failed_to_track_tutorial_started",
+                    "failed_to_track_tutorial",
                     tutorial=tutorial_name,
                     exception=str(exc),
                 )
@@ -565,7 +565,7 @@ class Tutorial:
     def start(self) -> None:
         global active_tutorial
         active_tutorial = self
-        self._track_tutorial_started(event_name="tutorial_shown")
+        self._track_tutorial(event_name="tutorial_shown")
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
