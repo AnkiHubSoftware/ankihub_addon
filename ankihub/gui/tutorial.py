@@ -836,6 +836,8 @@ def prompt_for_tutorial(
             for context in contexts:
                 web = webview_for_context(context)
                 web.eval(js_for_context(context))
+            if any(isinstance(context, dialog_context) for context in contexts):
+                tutorial_class()._track_tutorial(event_name="tour_shown")
 
     for context in contexts:
         inject_tutorial_assets(context, on_script_loaded)
