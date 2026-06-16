@@ -795,6 +795,7 @@ def prompt_for_tutorial(
             on_start()
             return True, None
         if message == DISMISS_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_dismissed")
             clean_up_webviews()
             on_dismiss()
             return True, None

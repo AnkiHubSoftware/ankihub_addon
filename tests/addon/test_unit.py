@@ -2326,6 +2326,52 @@ class TestTutorialProductMetrics:
             },
         )
 
+    def test_dismiss_tutorial_tracks_tour_dismissed(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import DISMISS_TUTORIAL_PYCMD, OnboardingTutorial, prompt_for_tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", None)
+        mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        message_handlers: list = []
+        mocker.patch(
+            "ankihub.gui.tutorial.gui_hooks.webview_did_receive_js_message.append",
+            side_effect=lambda handler: message_handlers.append(handler),
+        )
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_will_set_content.append")
+        on_dismiss = mocker.Mock()
+
+        prompt_for_tutorial(
+            context_types=(type(aqt.mw.deckBrowser),),
+            contexts=(aqt.mw.deckBrowser,),
+            dialog_context=type(aqt.mw.deckBrowser),
+            dialog_kwargs=dict(title="Tour", body="Take a tour", main_button_label="Take tour"),
+            on_start=mocker.Mock(),
+            on_dismiss=on_dismiss,
+            tutorial_class=OnboardingTutorial,
+        )
+
+        message_handlers[0]((False, None), DISMISS_TUTORIAL_PYCMD, aqt.mw.deckBrowser)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_dismissed",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+        on_dismiss.assert_called_once()
+
 
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
