@@ -295,7 +295,7 @@ class BulkSuggestionSummaryDialog(QDialog):
     def _copy_nids(self, nids: List[NoteId]) -> None:
         search = "nid:" + ",".join(str(nid) for nid in nids)
         aqt.mw.app.clipboard().setText(search)
-        show_tooltip("Copied note IDs", parent=self)
+        show_tooltip("Copied note IDs.", parent=self)
 
     def _guidance_label(self, html: str) -> QLabel:
         label = QLabel(html)
