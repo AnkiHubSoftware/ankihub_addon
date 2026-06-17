@@ -23,6 +23,7 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QModelIndex,
     QPainter,
     QPixmap,
     QPropertyAnimation,
@@ -31,6 +32,8 @@ from aqt.qt import (
     QSize,
     QSizePolicy,
     QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     Qt,
     QToolButton,
     QVBoxLayout,
@@ -90,6 +93,46 @@ def _show_tooltip(message: str, *args, **kwargs) -> None:
             tooltip(message)
         else:
             raise e
+
+
+# Per-item flag (read by _InfoIconDelegate) marking rows that should show a
+# trailing info icon hinting that a tooltip explains the row.
+_INFO_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+class _InfoIconDelegate(QStyledItemDelegate):
+    """Paints a small info icon just after the text of rows flagged with
+    `_INFO_ICON_ROLE`, after the native row (checkbox + text) is drawn."""
+
+    _ICON_SIZE = 16
+    _MARGIN = 6
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._pixmap = tooltip_icon().pixmap(QSize(self._ICON_SIZE, self._ICON_SIZE))
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        super().paint(painter, option, index)
+        if not index.data(_INFO_ICON_ROLE):
+            return
+        rect = option.rect
+        # Place the icon just after the text, not pinned to the column's right
+        # edge. Re-init the option first: the one Qt hands to paint() lacks the
+        # laid-out sub-element geometry, so subElementRect(...ItemText) would
+        # otherwise report the text starting at x=0 (before the checkbox) and the
+        # icon would land on the text.
+        widget = option.widget
+        style = widget.style() if widget else QApplication.style()
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        text_rect = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, widget)
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        text_width = option.fontMetrics.horizontalAdvance(text)
+        x = text_rect.left() + text_width + self._MARGIN
+        # Don't let it spill past the right edge for very long field names.
+        x = min(x, rect.right() - self._ICON_SIZE - self._MARGIN)
+        y = rect.top() + (rect.height() - self._ICON_SIZE) // 2
+        painter.drawPixmap(x, y, self._pixmap)
 
 
 class _ChooseSubsetDialog(QDialog):
@@ -155,6 +198,7 @@ class _ChooseSubsetDialog(QDialog):
         locked_tooltip: Optional[str],
     ) -> None:
         self._list_widget = CustomListWidget()
+        self._list_widget.setItemDelegate(_InfoIconDelegate(self._list_widget))
         for choice in choices:
             item = QListWidgetItem(choice)
             if choice in locked_set:
@@ -162,6 +206,9 @@ class _ChooseSubsetDialog(QDialog):
                 item.setCheckState(Qt.CheckState.Checked)
                 if locked_tooltip:
                     item.setToolTip(locked_tooltip)
+                    # Flag the row so the delegate paints a trailing info icon —
+                    # a disabled row alone gives no hint the tooltip exists.
+                    item.setData(_INFO_ICON_ROLE, True)
             else:
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)  # type: ignore
                 item.setCheckState(Qt.CheckState.Checked if choice in current else Qt.CheckState.Unchecked)
