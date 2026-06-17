@@ -377,16 +377,20 @@ class BulkSuggestionSummaryDialog(QDialog):
         widget.setStyleSheet(".QWidget { background: transparent; }")
         vbox = QVBoxLayout(widget)
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(4)
+        # 12px from the title row down to the guidance text. The row's height is the
+        # (taller) button's, so this is measured from the button — the title sits at
+        # the top alongside it (AlignTop) and is shorter.
+        vbox.setSpacing(12)
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
+        align_top = Qt.AlignmentFlag.AlignTop
         title = self._section_header(f"({len(nids)}) {label}", size=14)
-        title_row.addWidget(title)
+        title_row.addWidget(title, alignment=align_top)
         if key in self._updated_keys:
-            title_row.addWidget(self._badge())
+            title_row.addWidget(self._badge(), alignment=align_top)
         title_row.addStretch(1)
-        title_row.addWidget(self._copy_nids_button(nids))
+        title_row.addWidget(self._copy_nids_button(nids), alignment=align_top)
         vbox.addLayout(title_row)
 
         vbox.addWidget(self._guidance_label(guidance_html))
@@ -400,15 +404,18 @@ class BulkSuggestionSummaryDialog(QDialog):
         frame.setStyleSheet(f"#actionBand {{ background-color: {_action_band_bg()}; }}")
         vbox = QVBoxLayout(frame)
         vbox.setContentsMargins(self._SIDE_MARGIN, 12, self._SIDE_MARGIN, 12)
-        vbox.setSpacing(8)
+        # 12px between rows, matching the "Submission issues" blocks: the title sits at
+        # the top alongside the (taller) button, with 12px down to the description.
+        vbox.setSpacing(12)
         nids = list(self._already_in_deck.keys())
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
+        align_top = Qt.AlignmentFlag.AlignTop
         title = self._section_header(f"({len(nids)}) Notes already in this deck", size=14)
-        title_row.addWidget(title)
+        title_row.addWidget(title, alignment=align_top)
         title_row.addStretch(1)
-        title_row.addWidget(self._copy_nids_button(nids))
+        title_row.addWidget(self._copy_nids_button(nids), alignment=align_top)
         vbox.addLayout(title_row)
 
         description = QLabel(
@@ -425,7 +432,7 @@ class BulkSuggestionSummaryDialog(QDialog):
             return frame
 
         button_row = QHBoxLayout()
-        button_row.setContentsMargins(0, 4, 0, 0)
+        button_row.setContentsMargins(0, 0, 0, 0)
         loading = self._action_state == _ActionState.LOADING
 
         ignore_button = QPushButton("Ignore")
