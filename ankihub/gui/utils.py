@@ -112,26 +112,34 @@ class _InfoIconDelegate(QStyledItemDelegate):
         self._pixmap = tooltip_icon().pixmap(QSize(self._ICON_SIZE, self._ICON_SIZE))
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        super().paint(painter, option, index)
         if not index.data(_INFO_ICON_ROLE):
+            super().paint(painter, option, index)
             return
-        rect = option.rect
-        # Place the icon just after the text, not pinned to the column's right
-        # edge. Re-init the option first: the one Qt hands to paint() lacks the
-        # laid-out sub-element geometry, so subElementRect(...ItemText) would
-        # otherwise report the text starting at x=0 (before the checkbox) and the
-        # icon would land on the text.
-        widget = option.widget
-        style = widget.style() if widget else QApplication.style()
+
+        # Re-init the option: the one Qt hands to paint() lacks the laid-out
+        # sub-element geometry, so subElementRect(...ItemText) would otherwise
+        # report the text starting at x=0 (before the checkbox). Narrow the rect
+        # before super().paint() to reserve room for the icon, so a long field
+        # name elides before the icon instead of being overpainted by it.
+        reserved = self._ICON_SIZE + 2 * self._MARGIN
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)
-        text_rect = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, widget)
+        text_area = opt.rect
+        text_area.setRight(text_area.right() - reserved)
+        opt.rect = text_area
+        super().paint(painter, opt, index)
+
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        text_rect = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget)
         text = index.data(Qt.ItemDataRole.DisplayRole) or ""
-        text_width = option.fontMetrics.horizontalAdvance(text)
-        x = text_rect.left() + text_width + self._MARGIN
-        # Don't let it spill past the right edge for very long field names.
-        x = min(x, rect.right() - self._ICON_SIZE - self._MARGIN)
-        y = rect.top() + (rect.height() - self._ICON_SIZE) // 2
+        # Qt insets item text from text_rect.left() by this margin (see QCommonStyle
+        # CE_ItemViewItem). It's larger on macOS than on Fusion, so omitting it makes
+        # the icon crowd the text there. Add it so the gap is consistent cross-platform.
+        text_margin = style.pixelMetric(QStyle.PixelMetric.PM_FocusFrameHMargin, opt, opt.widget) + 1
+        text_end = text_rect.left() + text_margin + opt.fontMetrics.horizontalAdvance(text)
+        # Sit just after the text, but never into the reserved gap at the edge.
+        x = min(text_end + self._MARGIN, option.rect.right() - self._ICON_SIZE - self._MARGIN)
+        y = option.rect.top() + (option.rect.height() - self._ICON_SIZE) // 2
         painter.drawPixmap(x, y, self._pixmap)
 
 
