@@ -547,6 +547,11 @@ def resubmit_new_note_as_change_suggestion(
     """Resubmit a single note (whose new-note suggestion hit the duplicate-anki_id
     error) as a change suggestion for the existing note. Media was already renamed and
     uploaded by the failed new-note submit, so it is not re-uploaded here."""
+    # The failed new-note submit renamed media to hashed names directly in the DB (raw
+    # SQL, see `_update_media_names_on_notes`) without touching the in-memory note the
+    # caller is holding. Reload so the change suggestion carries the uploaded (hashed)
+    # media names rather than the stale originals (which were never uploaded).
+    note = aqt.mw.col.get_note(note.id)
     new_note_suggestion = _new_note_suggestion(note, ah_did, comment, filters=filters)
     if new_note_suggestion is None:
         return ChangeSuggestionResult.NO_CHANGES

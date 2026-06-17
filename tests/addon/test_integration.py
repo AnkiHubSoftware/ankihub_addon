@@ -225,10 +225,12 @@ from ankihub.main.suggestions import (
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
+    ChangeSuggestionResult,
     PerNoteFilters,
     any_suggestible_from_diffs,
     compute_note_diffs,
     has_empty_first_field,
+    resubmit_new_note_as_change_suggestion,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -2439,6 +2441,49 @@ class TestSuggestNotesInBulk:
                 assert conflict.new_note_suggestion.anki_nid == new_note.id
                 # the error stays in errors_by_nid so it counts as failed
                 assert new_note.id in result.errors_by_nid
+
+    def test_single_resubmit_uses_db_renamed_media_not_stale_in_memory_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """The failed new-note submit renames media in the DB only (raw SQL), leaving the
+        caller's in-memory note stale. The single resubmit must reload the note so the
+        change suggestion carries the uploaded (hashed) media name, not the original."""
+        conflicting_ah_nid = next_deterministic_uuid()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = add_anki_note(note_type=note_type)
+
+            note.fields[0] = 'Q <img src="original.jpg">'
+            aqt.mw.col.update_note(note)
+
+            # Simulate the failed new-note submit's DB-only media rename.
+            aqt.mw.col.db.execute("UPDATE notes SET flds = REPLACE(flds, ?, ?)", "original.jpg", "hashed.jpg")
+            aqt.mw.col.save()
+            # `note` (in memory) is now stale: it still references original.jpg.
+            assert "original.jpg" in note.fields[0]
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            result = resubmit_new_note_as_change_suggestion(
+                note=note,
+                ah_did=ah_did,
+                conflicting_ah_nid=conflicting_ah_nid,
+                change_type=SuggestionType.UPDATED_CONTENT,
+                comment="test",
+            )
+
+            assert result == ChangeSuggestionResult.SUCCESS
+            change_note_suggestion = create_mock.call_args.kwargs["change_note_suggestion"]
+            joined_fields = " ".join(field.value for field in change_note_suggestion.fields)
+            assert "hashed.jpg" in joined_fields
+            assert "original.jpg" not in joined_fields
 
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
