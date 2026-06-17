@@ -147,7 +147,11 @@ export class TutorialEffect {
         }
         if (arrowElement) {
             this.arrowElement = arrowElement;
-            this.getStepElement().appendChild(this.arrowElement);
+            const stepEl = this.getStepElement();
+            // Insert before dialog content so the arrow does not paint on top of body text
+            // when the rotated tip overlaps the panel (appendChild stacks it above siblings).
+            stepEl.insertBefore(this.arrowElement, stepEl.firstElementChild);
+            this.arrowElement.style.pointerEvents = "none";
         }
         let backdropElement: HTMLElement | null = null;
         if (this.options.backdrop instanceof HTMLElement) {
@@ -264,7 +268,11 @@ export class TutorialEffect {
             return;
         }
         const arrowLength = this.arrowElement?.offsetWidth ?? 0;
-        const floatingOffset = Math.sqrt(2 * arrowLength ** 2) / 2;
+        // Half diagonal of the square arrow; small extra gap keeps the rotated diamond off text.
+        const floatingOffset =
+            arrowLength > 0
+                ? Math.sqrt(2 * arrowLength ** 2) / 2 + arrowLength * 0.2
+                : 0;
 
         let middleware = [autoPlacement()];
         if (this.arrowElement) {
@@ -317,12 +325,14 @@ export class TutorialEffect {
 
 let activeEffect: TutorialEffect | null = null;
 let targetResizeHandler: (() => void) | null = null;
+let pendingModalPosition: PositionTargetArgs | null = null;
 
 export function destroyActiveTutorialEffect() {
     if (activeEffect) {
         activeEffect.destroy();
         activeEffect = null;
     }
+    pendingModalPosition = null;
 }
 
 async function createAndShowEffect(options: Partial<TutorialEffectOptions>): Promise<TutorialEffect> {
@@ -330,6 +340,11 @@ async function createAndShowEffect(options: Partial<TutorialEffectOptions>): Pro
     const effect = new TutorialEffect(options);
     await effect.show();
     activeEffect = effect;
+    if (pendingModalPosition) {
+        const { top, left, width, height } = pendingModalPosition;
+        pendingModalPosition = null;
+        effect.setModalPosition(top, left, width, height);
+    }
     return effect;
 }
 
@@ -417,6 +432,8 @@ type PositionTargetArgs = {
 export function positionTutorialModal({ top, left, width, height }: PositionTargetArgs) {
     if (activeEffect) {
         activeEffect.setModalPosition(top, left, width, height);
+    } else {
+        pendingModalPosition = { top, left, width, height };
     }
 }
 
