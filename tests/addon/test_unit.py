@@ -2136,6 +2136,16 @@ class TestUserDetailsConfig:
 
 
 class TestTutorialProductMetrics:
+    @pytest.fixture(autouse=True)
+    def enable_tutorial_metrics_tracker(self, mocker: MockerFixture, request: pytest.FixtureRequest) -> None:
+        if request.node.name == "test_track_tutorial_skips_when_feature_flag_disabled":
+            return
+        mocker.patch.object(
+            config,
+            "get_feature_flags",
+            return_value={"tutorial_metrics_tracker": True},
+        )
+
     def test_track_tutorial_sends_event(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import Tutorial
 
@@ -2172,6 +2182,252 @@ class TestTutorialProductMetrics:
         Tutorial()._track_tutorial("tutorial_start")
 
         mock_client.track.assert_not_called()
+
+    def test_skip_tutorial_tracks_tour_postponed(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch.object(OnboardingTutorial, "_cleanup_step")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+
+        tutorial = OnboardingTutorial()
+        tutorial._skip_tutorial()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_postponed",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_next_tracks_tour_completed_on_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+        mocker.patch.object(Tutorial, "end")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 2
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", tutorial)
+        tutorial.next()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_completed",
+            properties={
+                "tutorial": "TwoStepTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_end_tracks_tour_abandoned_before_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 1
+        tutorial.end()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_abandoned",
+            properties={
+                "tutorial": "TwoStepTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_end_does_not_track_tour_abandoned_on_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 2
+        tutorial.end()
+
+        mock_client.track.assert_not_called()
+
+    def test_start_tracks_tour_reopen_from_help_menu(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "show_current")
+
+        Tutorial().start(reopen=True)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_reopen",
+            properties={
+                "tutorial": "Tutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_dismiss_tutorial_tracks_tour_dismissed(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import DISMISS_TUTORIAL_PYCMD, OnboardingTutorial, prompt_for_tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", None)
+        mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        message_handlers: list = []
+        mocker.patch(
+            "ankihub.gui.tutorial.gui_hooks.webview_did_receive_js_message.append",
+            side_effect=lambda handler: message_handlers.append(handler),
+        )
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_will_set_content.append")
+        on_dismiss = mocker.Mock()
+
+        prompt_for_tutorial(
+            context_types=(type(aqt.mw.deckBrowser),),
+            contexts=(aqt.mw.deckBrowser,),
+            dialog_context=type(aqt.mw.deckBrowser),
+            dialog_kwargs=dict(title="Tour", body="Take a tour", main_button_label="Take tour"),
+            on_start=mocker.Mock(),
+            on_dismiss=on_dismiss,
+            tutorial_class=OnboardingTutorial,
+        )
+
+        message_handlers[0]((False, None), DISMISS_TUTORIAL_PYCMD, aqt.mw.deckBrowser)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_dismissed",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+        on_dismiss.assert_called_once()
+
+    def test_prompt_for_tutorial_tracks_tour_shown(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial, prompt_for_tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", None)
+        mock_web = mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_did_receive_js_message.append")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_will_set_content.append")
+        on_loaded_callbacks: list = []
+
+        def capture_inject(context: Any, on_loaded: Callable[[], None]) -> None:
+            on_loaded_callbacks.append(on_loaded)
+
+        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets", side_effect=capture_inject)
+
+        prompt_for_tutorial(
+            context_types=(type(aqt.mw.deckBrowser),),
+            contexts=(aqt.mw.deckBrowser,),
+            dialog_context=type(aqt.mw.deckBrowser),
+            dialog_kwargs=dict(title="Tour", body="Take a tour", main_button_label="Take tour"),
+            on_start=mocker.Mock(),
+            on_dismiss=mocker.Mock(),
+            tutorial_class=OnboardingTutorial,
+        )
+
+        for on_loaded in on_loaded_callbacks:
+            on_loaded()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_shown",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+        mock_web.return_value.eval.assert_called_once()
 
 
 class TestFeatureFlags:

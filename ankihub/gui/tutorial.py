@@ -562,10 +562,11 @@ class Tutorial:
 
         aqt.mw.taskman.run_in_background(send_event)
 
-    def start(self) -> None:
+    def start(self, *, reopen: bool = False) -> None:
         global active_tutorial
         active_tutorial = self
-        self._track_tutorial(event_name="tutorial_start")
+        event_name = "tour_reopen" if reopen else "tutorial_start"
+        self._track_tutorial(event_name=event_name)
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
         self.show_current()
@@ -575,6 +576,8 @@ class Tutorial:
         self.show_current()
 
     def end(self) -> None:
+        if self.current_step < len(self.steps):
+            self._track_tutorial(event_name="tour_abandoned")
         self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
@@ -582,6 +585,7 @@ class Tutorial:
         active_tutorial = None
 
     def _skip_tutorial(self) -> None:
+        self._track_tutorial(event_name="tour_postponed")
         # It copies the end() method because it can be called from the Tutorial children
         self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
@@ -711,6 +715,7 @@ class Tutorial:
     @ensure_tutorial_active
     def next(self) -> None:
         if self.current_step >= len(self.steps):
+            self._track_tutorial(event_name="tour_completed")
             self.end()
             return
         self._cleanup_step()
@@ -764,6 +769,7 @@ def prompt_for_tutorial(
     on_start: Callable[[], None],
     on_dismiss: Callable[[], None],
     on_skip: Optional[Callable[[], None]] = None,
+    tutorial_class: type[Tutorial] = Tutorial,
 ) -> None:
     if active_tutorial:
         return
@@ -789,10 +795,12 @@ def prompt_for_tutorial(
             on_start()
             return True, None
         if message == DISMISS_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_dismissed")
             clean_up_webviews()
             on_dismiss()
             return True, None
         if message == SKIP_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_postponed")
             clean_up_webviews()
             if on_skip:
                 on_skip()
@@ -828,6 +836,8 @@ def prompt_for_tutorial(
             for context in contexts:
                 web = webview_for_context(context)
                 web.eval(js_for_context(context))
+            if any(isinstance(context, dialog_context) for context in contexts):
+                tutorial_class()._track_tutorial(event_name="tour_shown")
 
     for context in contexts:
         inject_tutorial_assets(context, on_script_loaded)
@@ -858,6 +868,7 @@ def prompt_for_onboarding_tutorial() -> None:
         ),
         on_start=lambda: OnboardingTutorial().start(),
         on_dismiss=lambda: config.set_onboarding_tutorial_pending(False),
+        tutorial_class=OnboardingTutorial,
     )
 
 
@@ -891,6 +902,7 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         on_start=lambda: StepDeckTutorial().start(),
         on_dismiss=lambda: config.set_step_deck_tutorial_pending(False),
         on_skip=on_skip,
+        tutorial_class=StepDeckTutorial,
     )
 
 
@@ -917,8 +929,8 @@ class DeckBrowserOverviewBackdropMixin:
 
 class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
-        return super().start()
+    def start(self, *, reopen: bool = False) -> None:
+        return super().start(reopen=reopen)
 
     def end(self) -> None:
         config.set_onboarding_tutorial_pending(False)
@@ -1119,11 +1131,11 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
+    def start(self, *, reopen: bool = False) -> None:
         self._unhook_browser = self.hook_browser_startup(self._on_browser_startup)
         base_start = super().start
         set_current_deck(parent=aqt.mw, deck_id=self._anking_deck_config.anki_id).success(
-            lambda _: base_start()
+            lambda _: base_start(reopen=reopen)
         ).run_in_background()
 
     def end(self) -> None:

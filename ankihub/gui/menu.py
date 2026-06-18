@@ -481,7 +481,7 @@ def _ankihub_help_setup(parent: QMenu):
         q_onboarding_action = QAction("Onboarding", tours_submenu)
         qconnect(
             q_onboarding_action.triggered,
-            lambda: OnboardingTutorial().start(),
+            lambda: OnboardingTutorial().start(reopen=True),
         )
         tours_submenu.addAction(q_onboarding_action)
 
@@ -493,7 +493,7 @@ def _ankihub_help_setup(parent: QMenu):
         q_step_tour_action = QAction("AnKing Step Deck", tours_submenu)
         qconnect(
             q_step_tour_action.triggered,
-            lambda: StepDeckTutorial().start(),
+            lambda: StepDeckTutorial().start(reopen=True),
         )
         tours_submenu.addAction(q_step_tour_action)
     if tours_submenu.actions():
