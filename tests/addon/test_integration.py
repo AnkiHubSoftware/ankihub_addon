@@ -2241,7 +2241,7 @@ class TestFieldsToSuggestFilters:
 
             # New-note candidate whose only non-empty fields are all globally-protected,
             # with no tags → not suggestible. (Otherwise the dialog would open with an
-            # empty "Include in suggestion" panel that the user can't submit from.)
+            # empty "Select fields to include" panel that the user can't submit from.)
             new_note_protected = add_anki_note(note_type=aqt.mw.col.models.get(NotetypeId(mid)))
             first_field_name = new_note_protected.note_type()["flds"][0]["name"]
             assert not any_suggestible_from_diffs(

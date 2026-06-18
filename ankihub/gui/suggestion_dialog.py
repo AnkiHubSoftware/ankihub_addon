@@ -487,7 +487,7 @@ class SuggestionDialog(QDialog):
         super().__init__(parent)
         # Block input to other Anki windows while the dialog is open — prevents
         # the user from editing the selected notes (or syncing) between dialog
-        # open and submit, which would invalidate the "Include in suggestion"
+        # open and submit, which would invalidate the "Select fields to include"
         # selection.
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self._is_new_note_suggestion = is_new_note_suggestion
