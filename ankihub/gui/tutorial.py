@@ -542,16 +542,21 @@ class Tutorial:
 
         def send_event() -> None:
             try:
+                properties: Dict[str, Any] = {
+                    "tutorial": tutorial_name,
+                    "user": user_id,
+                    "plan": plan,
+                    "is_staff_or_admin": is_staff or is_admin,
+                    "beta_tester": is_beta_tester,
+                }
+
+                if event_name == "tour_next":
+                    properties["step_number"] = self.current_step
+
                 self.product_metrics.track(
                     distinct_id=user_id,
                     event_name=event_name,
-                    properties={
-                        "tutorial": tutorial_name,
-                        "user": user_id,
-                        "plan": plan,
-                        "is_staff_or_admin": is_staff or is_admin,
-                        "beta_tester": is_beta_tester,
-                    },
+                    properties=properties,
                 )
             except (ProductMetricsHTTPError, ProductMetricsRequestException) as exc:
                 LOGGER.warning(
@@ -605,6 +610,7 @@ class Tutorial:
             return True, None
 
         if message == NEXT_STEP_PYCMD:
+            self._track_tutorial(event_name="tour_next")
             step = self.steps[self.current_step - 1]
             if step.next_callback:
                 step.next_callback(self.next if step.auto_advance else lambda: None)
