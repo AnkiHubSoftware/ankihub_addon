@@ -550,7 +550,7 @@ class Tutorial:
                     "beta_tester": is_beta_tester,
                 }
 
-                if event_name == "tour_next":
+                if event_name in ["tour_next", "tour_previous"]:
                     properties["step_number"] = self.current_step
 
                 self.product_metrics.track(
@@ -602,6 +602,7 @@ class Tutorial:
         self, handled: tuple[bool, Any], message: str, context: Any
     ) -> tuple[bool, Any]:
         if message == PREV_STEP_PYCMD:
+            self._track_tutorial(event_name="tour_previous")
             step = self.steps[self.current_step - 1]
             if step.back_callback:
                 step.back_callback(self.back if step.auto_advance else lambda: None)
