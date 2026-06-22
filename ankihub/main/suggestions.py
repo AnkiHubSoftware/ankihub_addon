@@ -26,6 +26,7 @@ from typing import (
 )
 
 import aqt
+from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import ids2str
@@ -551,7 +552,12 @@ def resubmit_new_note_as_change_suggestion(
     # SQL, see `_update_media_names_on_notes`) without touching the in-memory note the
     # caller is holding. Reload so the change suggestion carries the uploaded (hashed)
     # media names rather than the stale originals (which were never uploaded).
-    note = aqt.mw.col.get_note(note.id)
+    try:
+        note = aqt.mw.col.get_note(note.id)
+    except NotFoundError:
+        # Note deleted from the local collection before the user confirmed the resubmit
+        # (rare — the dialog is modal). Nothing to submit.
+        return ChangeSuggestionResult.NO_CHANGES
     new_note_suggestion = _new_note_suggestion(note, ah_did, comment, filters=filters)
     if new_note_suggestion is None:
         return ChangeSuggestionResult.NO_CHANGES

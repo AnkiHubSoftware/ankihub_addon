@@ -126,6 +126,10 @@ class BulkSuggestionSummaryDialog(QDialog):
         # Application-modal (not window-modal) so macOS shows it as a normal centered
         # dialog rather than a sheet sliding out of the parent window's title bar.
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        # Delete the dialog once it closes (any path), so the deferred fit / resubmit
+        # callbacks can detect a closed dialog via sip.isdeleted and bail, and closed
+        # dialogs aren't retained as children of the main window.
+        qconnect(self.finished, self.deleteLater)
 
         self._errors_by_nid: Dict[NoteId, object] = dict(result.errors_by_nid)
         self._already_in_deck: Dict[NoteId, AlreadyInDeckConflict] = dict(result.already_in_deck_by_nid)
@@ -259,6 +263,8 @@ class BulkSuggestionSummaryDialog(QDialog):
         QTimer.singleShot(0, self._fit_to_content)
 
     def _fit_to_content(self) -> None:
+        if sip.isdeleted(self):  # dialog closed before this deferred tick fired
+            return
         self._content_layout.activate()
         # Word-wrap labels under-report their height to adjustSize() (their sizeHint
         # assumes a wider, fewer-line layout than the dialog's actual width), which
