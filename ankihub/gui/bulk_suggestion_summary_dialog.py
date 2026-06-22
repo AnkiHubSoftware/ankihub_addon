@@ -271,6 +271,13 @@ class BulkSuggestionSummaryDialog(QDialog):
             if label.wordWrap() and label.width() > 0:
                 label.setMinimumHeight(label.heightForWidth(label.width()))
         self.adjustSize()
+        # Put focus on the default/primary button so Close doesn't carry a focus ring:
+        # on the Linux theme the default-button and focus borders look identical, so a
+        # focused Close would otherwise read as a second primary button.
+        for button in self.findChildren(QPushButton):
+            if button.isDefault():
+                button.setFocus()
+                break
 
     def _issue_blocks(self) -> List[Tuple[str, str, str, List[NoteId]]]:
         cats = self._issue_categories()
