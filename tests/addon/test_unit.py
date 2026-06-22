@@ -1552,7 +1552,12 @@ class TestBulkSuggestionSummaryDialog:
 
         mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=run_failing)
         dialog._on_resubmit()
-        assert dialog._action_resolved() is True  # Close re-enabled after a hard failure
+        assert dialog._action_state == _ActionState.FAILED
+        # Not trapped: Close stays enabled. The action isn't "resolved" though — OK stays
+        # gated so the user can retry (Resubmit) or leave via Close.
+        assert dialog._close_button.isEnabled() is True
+        assert dialog._action_resolved() is False
+        assert dialog._ok_button.isEnabled() is False
 
 
 class TestMaybeHandleNoteAlreadyExists:

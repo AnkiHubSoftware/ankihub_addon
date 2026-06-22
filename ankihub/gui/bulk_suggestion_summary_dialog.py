@@ -128,6 +128,9 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._ah_did = ah_did
         self._auto_accept = auto_accept
         self._action_state = _ActionState.DEFAULT
+        # The active Resubmit button while the action is pending (else None); tracked so
+        # _render can make it the primary (default + focused) without a widget-tree walk.
+        self._resubmit_button: Optional[QPushButton] = None
         # Summary/category keys to flag with an "Updated" badge after a resubmit.
         self._updated_keys: set = set()
 
@@ -177,11 +180,10 @@ class BulkSuggestionSummaryDialog(QDialog):
     # --- state ------------------------------------------------------------
     def _action_resolved(self) -> bool:
         """Whether the 'Notes already in this deck' action has been dealt with
-        (resolved / ignored / failed, or there was none). Gates the OK button; Close
-        and the window X stay enabled regardless so the user is never trapped."""
-        if self._action_state == _ActionState.LOADING:
-            return False
-        if self._action_state in (_ActionState.IGNORED, _ActionState.RESOLVED, _ActionState.FAILED):
+        (resolved / ignored, or there was none). Gates the OK button. FAILED is *not*
+        resolved — the user can retry via Resubmit, or leave via Close (Close and the
+        window X stay enabled regardless, so they're never trapped)."""
+        if self._action_state in (_ActionState.IGNORED, _ActionState.RESOLVED):
             return True
         return not self._already_in_deck
 
@@ -226,6 +228,7 @@ class BulkSuggestionSummaryDialog(QDialog):
 
     def _render(self) -> None:
         clear_layout(self._content_layout)
+        self._resubmit_button = None  # set by _build_action_band when it shows Resubmit
         self._content_layout.addWidget(self._inset(self._build_summary()))
 
         issue_blocks = self._issue_blocks()
@@ -245,22 +248,38 @@ class BulkSuggestionSummaryDialog(QDialog):
             self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
         self._ok_button.setEnabled(self._action_resolved())
-        # Resubmit (when shown) is the native default/primary button; otherwise OK is —
-        # but only when OK is actually enabled (during LOADING nothing is the primary).
-        resubmit_shown = bool(self._already_in_deck) and self._action_state in (
-            _ActionState.DEFAULT,
-            _ActionState.FAILED,
-        )
-        self._ok_button.setDefault(not resubmit_shown and self._ok_button.isEnabled())
-        # Resize on the next event-loop tick: computing the fit synchronously here
-        # (right after rebuilding the layout) can under-size the dialog because the
-        # freshly-created widgets haven't reported their final size hints yet, which
-        # squashes multi-line rows. Deferring lets the layout settle first.
-        QTimer.singleShot(0, self._fit_to_content)
+        # Exactly one button is the primary (native default + focused): Resubmit while
+        # the action is pending, otherwise OK when enabled (nothing during LOADING).
+        primary = self._primary_button()
+        self._ok_button.setDefault(primary is self._ok_button)
+        if self._resubmit_button is not None:
+            self._resubmit_button.setDefault(primary is self._resubmit_button)
+        # Fit + focus on the next event-loop tick: doing it synchronously here (right
+        # after rebuilding the layout) under-sizes the dialog because the fresh widgets
+        # haven't reported final size hints yet, which squashes multi-line rows.
+        QTimer.singleShot(0, self._after_render)
 
-    def _fit_to_content(self) -> None:
+    def _primary_button(self) -> Optional[QPushButton]:
+        """The single primary button (native default + focused): Resubmit while the
+        action is pending, else OK when enabled, else None (e.g. during LOADING)."""
+        if self._resubmit_button is not None:
+            return self._resubmit_button
+        if self._ok_button.isEnabled():
+            return self._ok_button
+        return None
+
+    def _after_render(self) -> None:
         if sip.isdeleted(self):  # dialog closed before this deferred tick fired
             return
+        self._fit_to_content()
+        primary = self._primary_button()
+        if primary is not None:
+            # Focus the primary so a secondary (e.g. Close) doesn't carry a focus ring:
+            # on the Linux theme the default-button and focus borders look identical, so
+            # a focused Close would otherwise read as a second primary button.
+            primary.setFocus()
+
+    def _fit_to_content(self) -> None:
         self._content_layout.activate()
         # Word-wrap labels under-report their height to adjustSize() (their sizeHint
         # assumes a wider, fewer-line layout than the dialog's actual width), which
@@ -270,13 +289,6 @@ class BulkSuggestionSummaryDialog(QDialog):
             if label.wordWrap() and label.width() > 0:
                 label.setMinimumHeight(label.heightForWidth(label.width()))
         self.adjustSize()
-        # Put focus on the default/primary button so Close doesn't carry a focus ring:
-        # on the Linux theme the default-button and focus borders look identical, so a
-        # focused Close would otherwise read as a second primary button.
-        for button in self.findChildren(QPushButton):
-            if button.isDefault() and button.isEnabled():
-                button.setFocus()
-                break
 
     def _issue_blocks(self) -> List[Tuple[str, str, str, List[NoteId]]]:
         cats = self._issue_categories()
@@ -476,11 +488,10 @@ class BulkSuggestionSummaryDialog(QDialog):
             button_row.addWidget(submitting)
         else:
             resubmit = QPushButton(f"({len(nids)}) Resubmit as change suggestions")
-            # Make it the dialog's default button so it gets the platform's native
-            # primary styling (e.g. the macOS accent button) — no custom stylesheet.
-            resubmit.setDefault(True)
             qconnect(resubmit.clicked, self._on_resubmit)
             button_row.addWidget(resubmit)
+            # Tracked so _render makes it the primary (default → native accent + focus).
+            self._resubmit_button = resubmit
         button_row.addStretch(1)
         vbox.addLayout(button_row)
         return frame
