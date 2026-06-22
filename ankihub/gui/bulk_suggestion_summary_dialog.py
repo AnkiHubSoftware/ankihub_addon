@@ -232,7 +232,9 @@ class BulkSuggestionSummaryDialog(QDialog):
 
         if self._is_all_success():
             # Nothing failed / skipped / pending — show a plain success message rather
-            # than a "Summary" with a breakdown of zeros. Close is redundant here.
+            # than a "Summary" with a breakdown of zeros. Close is redundant here. Extra
+            # top breathing room (per the design) since the message is short.
+            self._content_layout.addSpacing(self._SECTION_GAP)
             self._content_layout.addWidget(self._inset(self._build_success()))
             self._close_button.setVisible(False)
         else:
