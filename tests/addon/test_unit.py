@@ -1529,6 +1529,10 @@ class TestBulkSuggestionSummaryDialog:
         assert dialog._action_state == _ActionState.RESOLVED
         assert dialog._action_resolved() is True
         assert "change_submitted" in dialog._updated_keys
+        # Everything is submitted now, but a resubmit keeps the Summary (with the
+        # "Updated" badge) rather than the all-success message — that's reserved for a
+        # clean initial (DEFAULT) submit.
+        assert dialog._is_all_success() is False
 
     def test_resubmit_partial_failure_recategorizes(self, mocker, next_deterministic_uuid):
         conflicting = next_deterministic_uuid()
