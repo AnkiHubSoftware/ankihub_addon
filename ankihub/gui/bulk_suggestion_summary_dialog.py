@@ -84,16 +84,6 @@ def _divider_color() -> str:
     return "#4d4d4d" if theme_manager.night_mode else "#d0d4da"
 
 
-def _primary_button_qss() -> str:
-    """Solid accent ('primary') button styling, consistent across light/dark."""
-    return (
-        "QPushButton { background-color: #2d7ff9; color: #ffffff; border: none; "
-        "border-radius: 6px; padding: 6px 16px; font-weight: 600; } "
-        "QPushButton:hover { background-color: #1f6fe5; } "
-        "QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }"
-    )
-
-
 class _ActionState(Enum):
     """State of the 'Notes already in this deck' action box."""
 
@@ -257,6 +247,12 @@ class BulkSuggestionSummaryDialog(QDialog):
             self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
         self._ok_button.setEnabled(self._action_resolved())
+        # Resubmit (when shown) is the native default/primary button; otherwise OK is.
+        resubmit_shown = bool(self._already_in_deck) and self._action_state in (
+            _ActionState.DEFAULT,
+            _ActionState.FAILED,
+        )
+        self._ok_button.setDefault(not resubmit_shown)
         # Resize on the next event-loop tick: computing the fit synchronously here
         # (right after rebuilding the layout) can under-size the dialog because the
         # freshly-created widgets haven't reported their final size hints yet, which
@@ -462,11 +458,12 @@ class BulkSuggestionSummaryDialog(QDialog):
         if loading:
             submitting = QPushButton("Submitting…")
             submitting.setEnabled(False)
-            submitting.setStyleSheet(_primary_button_qss())
             button_row.addWidget(submitting)
         else:
             resubmit = QPushButton(f"({len(nids)}) Resubmit as change suggestions")
-            resubmit.setStyleSheet(_primary_button_qss())
+            # Make it the dialog's default button so it gets the platform's native
+            # primary styling (e.g. the macOS accent button) — no custom stylesheet.
+            resubmit.setDefault(True)
             qconnect(resubmit.clicked, self._on_resubmit)
             button_row.addWidget(resubmit)
         button_row.addStretch(1)
