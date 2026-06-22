@@ -170,7 +170,8 @@ class BulkSuggestionSummaryDialog(QDialog):
         qconnect(self._close_button.clicked, self.reject)
         footer.addWidget(self._close_button)
         self._ok_button = QPushButton("OK")
-        self._ok_button.setStyleSheet(_primary_button_qss())
+        # Native default button (the platform's own primary styling); no custom QSS so
+        # it renders natively (e.g. the accent button on macOS).
         self._ok_button.setDefault(True)
         qconnect(self._ok_button.clicked, self.accept)
         footer.addWidget(self._ok_button)
