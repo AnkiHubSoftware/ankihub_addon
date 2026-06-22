@@ -84,9 +84,10 @@ from .utils import (
     warning_triangle_icon,
 )
 
-# "Include in suggestion" panel copy. The subtitle switches to the EMPTY variant
+# "Select fields to include" panel copy. The subtitle switches to the EMPTY variant
 # (plus the warning) when the note has no edited fields and no tag changes.
-INCLUDE_SUBTITLE = "Select which fields you want to submit changes for"
+INCLUDE_TITLE = "Select fields to include"
+INCLUDE_SUBTITLE = "Choose which fields to submit changes for."
 EMPTY_STATE_SUBTITLE = "Edit a note field to create a change suggestion"
 EMPTY_STATE_TITLE = "No changes detected"
 EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
@@ -486,7 +487,7 @@ class SuggestionDialog(QDialog):
         super().__init__(parent)
         # Block input to other Anki windows while the dialog is open — prevents
         # the user from editing the selected notes (or syncing) between dialog
-        # open and submit, which would invalidate the "Include in suggestion"
+        # open and submit, which would invalidate the "Select fields to include"
         # selection.
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self._is_new_note_suggestion = is_new_note_suggestion
@@ -1429,7 +1430,7 @@ class IncludeInSuggestionWidget(QWidget):
         frame.setLayout(frame_layout)
 
         title_row = QHBoxLayout()
-        self._title_label = QLabel("<b>Include in suggestion</b>")
+        self._title_label = QLabel(f"<b>{INCLUDE_TITLE}</b>")
         self._counter_label = QLabel("")
         counter_font = self._counter_label.font()
         counter_font.setPointSize(max(counter_font.pointSize() - 2, 8))

@@ -2241,7 +2241,7 @@ class TestFieldsToSuggestFilters:
 
             # New-note candidate whose only non-empty fields are all globally-protected,
             # with no tags → not suggestible. (Otherwise the dialog would open with an
-            # empty "Include in suggestion" panel that the user can't submit from.)
+            # empty "Select fields to include" panel that the user can't submit from.)
             new_note_protected = add_anki_note(note_type=aqt.mw.col.models.get(NotetypeId(mid)))
             first_field_name = new_note_protected.note_type()["flds"][0]["name"]
             assert not any_suggestible_from_diffs(
@@ -7788,13 +7788,19 @@ def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
 
     # Create a temporary media folder and copy the test media files to it.
     # Patch the media folder path to point to the temporary folder.
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    # Clean up with ignore_errors=True rather than TemporaryDirectory's context
+    # manager: background media-sync tasks can still be writing here at teardown,
+    # and a strict rmtree would then race them and fail with "Directory not empty".
+    tmp_dir = tempfile.mkdtemp()
+    try:
         for file in (TEST_DATA_PATH / "media").glob("*"):
             shutil.copy(file, Path(tmp_dir) / file.name)
 
         mocker.patch("anki.media.MediaManager.dir", return_value=tmp_dir)
 
         yield upload_file_to_s3_with_reusable_presigned_url_mock
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 class TestSuggestionsWithMedia:
