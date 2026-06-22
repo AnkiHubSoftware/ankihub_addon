@@ -152,11 +152,9 @@ class BulkSuggestionSummaryDialog(QDialog):
         footer.addStretch(1)
         # Close (and the window X) stay enabled always, so the user can copy IDs and
         # leave without being trapped. OK is the primary confirm, gated on the
-        # "action required" being resolved. autoDefault off on Close so it never picks
-        # up the default-button accent (which was flipping its text colour).
-        self._close_button = QPushButton("Close")
-        self._close_button.setAutoDefault(False)
-        self._close_button.setDefault(False)
+        # "action required" being resolved. Close is secondary so it never picks up the
+        # default-button accent (which was flipping its text colour).
+        self._close_button = self._as_secondary(QPushButton("Close"))
         qconnect(self._close_button.clicked, self.reject)
         footer.addWidget(self._close_button)
         self._ok_button = QPushButton("OK")
@@ -247,12 +245,13 @@ class BulkSuggestionSummaryDialog(QDialog):
             self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
         self._ok_button.setEnabled(self._action_resolved())
-        # Resubmit (when shown) is the native default/primary button; otherwise OK is.
+        # Resubmit (when shown) is the native default/primary button; otherwise OK is —
+        # but only when OK is actually enabled (during LOADING nothing is the primary).
         resubmit_shown = bool(self._already_in_deck) and self._action_state in (
             _ActionState.DEFAULT,
             _ActionState.FAILED,
         )
-        self._ok_button.setDefault(not resubmit_shown)
+        self._ok_button.setDefault(not resubmit_shown and self._ok_button.isEnabled())
         # Resize on the next event-loop tick: computing the fit synchronously here
         # (right after rebuilding the layout) can under-size the dialog because the
         # freshly-created widgets haven't reported their final size hints yet, which
@@ -275,7 +274,7 @@ class BulkSuggestionSummaryDialog(QDialog):
         # on the Linux theme the default-button and focus borders look identical, so a
         # focused Close would otherwise read as a second primary button.
         for button in self.findChildren(QPushButton):
-            if button.isDefault():
+            if button.isDefault() and button.isEnabled():
                 button.setFocus()
                 break
 
@@ -309,8 +308,17 @@ class BulkSuggestionSummaryDialog(QDialog):
         )
         return badge
 
+    @staticmethod
+    def _as_secondary(button: QPushButton) -> QPushButton:
+        """Stop a non-primary button from ever becoming the dialog's default/accent, so
+        only Resubmit/OK reads as primary and Tab-focusing a secondary doesn't make it
+        look primary (the default and focus borders look alike on the Linux theme)."""
+        button.setAutoDefault(False)
+        button.setDefault(False)
+        return button
+
     def _copy_nids_button(self, nids: List[NoteId]) -> QPushButton:
-        button = QPushButton("Copy note IDs")
+        button = self._as_secondary(QPushButton("Copy note IDs"))
         qconnect(button.clicked, lambda: self._copy_nids(nids))
         return button
 
@@ -457,13 +465,13 @@ class BulkSuggestionSummaryDialog(QDialog):
         button_row.setContentsMargins(0, 0, 0, 0)
         loading = self._action_state == _ActionState.LOADING
 
-        ignore_button = QPushButton("Ignore")
+        ignore_button = self._as_secondary(QPushButton("Ignore"))
         ignore_button.setEnabled(not loading)
         qconnect(ignore_button.clicked, self._on_ignore)
         button_row.addWidget(ignore_button)
 
         if loading:
-            submitting = QPushButton("Submitting…")
+            submitting = self._as_secondary(QPushButton("Submitting…"))
             submitting.setEnabled(False)
             button_row.addWidget(submitting)
         else:
