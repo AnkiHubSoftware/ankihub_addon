@@ -229,23 +229,31 @@ class BulkSuggestionSummaryDialog(QDialog):
     def _render(self) -> None:
         clear_layout(self._content_layout)
         self._resubmit_button = None  # set by _build_action_band when it shows Resubmit
-        self._content_layout.addWidget(self._inset(self._build_summary()))
 
-        issue_blocks = self._issue_blocks()
-        if issue_blocks:
-            self._content_layout.addSpacing(self._SECTION_GAP)
-            self._content_layout.addWidget(self._inset(self._divider()))
-            self._content_layout.addSpacing(self._SECTION_GAP)
-            self._content_layout.addWidget(self._inset(self._section_header("Submission issues")))
-            for key, label, guidance, nids in issue_blocks:
+        if self._is_all_success():
+            # Nothing failed / skipped / pending — show a plain success message rather
+            # than a "Summary" with a breakdown of zeros. Close is redundant here.
+            self._content_layout.addWidget(self._inset(self._build_success()))
+            self._close_button.setVisible(False)
+        else:
+            self._close_button.setVisible(True)
+            self._content_layout.addWidget(self._inset(self._build_summary()))
+
+            issue_blocks = self._issue_blocks()
+            if issue_blocks:
                 self._content_layout.addSpacing(self._SECTION_GAP)
-                self._content_layout.addWidget(self._inset(self._issue_block(key, label, guidance, nids)))
+                self._content_layout.addWidget(self._inset(self._divider()))
+                self._content_layout.addSpacing(self._SECTION_GAP)
+                self._content_layout.addWidget(self._inset(self._section_header("Submission issues")))
+                for key, label, guidance, nids in issue_blocks:
+                    self._content_layout.addSpacing(self._SECTION_GAP)
+                    self._content_layout.addWidget(self._inset(self._issue_block(key, label, guidance, nids)))
 
-        if self._already_in_deck:
-            self._content_layout.addSpacing(self._SECTION_GAP)
-            self._content_layout.addWidget(self._inset(self._section_header("Action required", size=14)))
-            self._content_layout.addSpacing(8)  # "Action required" → band
-            self._content_layout.addWidget(self._build_action_band())  # full-bleed
+            if self._already_in_deck:
+                self._content_layout.addSpacing(self._SECTION_GAP)
+                self._content_layout.addWidget(self._inset(self._section_header("Action required", size=14)))
+                self._content_layout.addSpacing(8)  # "Action required" → band
+                self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
         self._ok_button.setEnabled(self._action_resolved())
         # Exactly one button is the primary (native default + focused): Resubmit while
@@ -362,6 +370,33 @@ class BulkSuggestionSummaryDialog(QDialog):
             row.addWidget(self._badge())
         row.addStretch(1)
         return widget
+
+    def _is_all_success(self) -> bool:
+        """The initial submit went through cleanly — nothing failed, skipped, or pending.
+        Only for the first (DEFAULT) render; after a resubmit we keep the Summary (with
+        its "Updated" badge) rather than collapsing to a bare success message."""
+        return (
+            self._action_state == _ActionState.DEFAULT
+            and not self._errors_by_nid
+            and not self._already_in_deck
+            and (self._change_submitted + self._new_submitted) > 0
+        )
+
+    def _build_success(self) -> QWidget:
+        container = QWidget()
+        container.setStyleSheet(".QWidget { background: transparent; }")
+        vbox = QVBoxLayout(container)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(12)
+
+        vbox.addWidget(self._section_header("Suggestions submitted", size=18))
+        total = self._change_submitted + self._new_submitted
+        suffix = "" if total == 1 else "s"
+        message = QLabel(f"<b>{total}</b> note suggestion{suffix} submitted successfully.")
+        message.setTextFormat(Qt.TextFormat.RichText)
+        message.setWordWrap(True)
+        vbox.addWidget(message)
+        return container
 
     def _build_summary(self) -> QWidget:
         container = QWidget()

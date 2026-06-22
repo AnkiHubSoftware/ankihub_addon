@@ -1418,6 +1418,24 @@ class TestBulkSuggestionSummaryDialog:
             parent=aqt.mw,
         )
 
+    def test_all_success_shows_success_message_and_hides_close(self, next_deterministic_uuid):
+        dialog = self._dialog(next_deterministic_uuid, errors_by_nid={}, change_count=3)
+        assert dialog._is_all_success() is True
+        # Close is redundant in the success case; only OK is shown. (isHidden reflects the
+        # explicit setVisible flag even though the dialog itself isn't shown in the test.)
+        assert dialog._close_button.isHidden() is True
+        assert dialog._ok_button.isEnabled() is True
+
+    def test_skipped_or_failed_keeps_summary_not_success(self, next_deterministic_uuid):
+        # A no-change (skipped) note means it's not a clean success → keep the Summary.
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR]},
+            change_count=2,
+        )
+        assert dialog._is_all_success() is False
+        assert dialog._close_button.isHidden() is False
+
     def test_categorizes_errors_excluding_already_in_deck(self, next_deterministic_uuid):
         conflicting = next_deterministic_uuid()
         conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
