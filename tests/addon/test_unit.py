@@ -1441,13 +1441,14 @@ class TestBulkSuggestionSummaryDialog:
         assert cats["other_errors"] == [NoteId(4)]  # NoteId(5) is in the action box, not Other errors
         # "failed to submit" excludes the skipped (no-change) note: 2,3,4,5 = 4.
         assert dialog._failed_count() == 4
-        assert dialog._can_close() is False  # action required
+        assert dialog._action_resolved() is False  # action required
 
-    def test_no_action_required_allows_close(self, next_deterministic_uuid):
+    def test_no_action_required_enables_ok(self, next_deterministic_uuid):
         dialog = self._dialog(next_deterministic_uuid, errors_by_nid={NoteId(1): ["x"]})
-        assert dialog._can_close() is True
+        assert dialog._action_resolved() is True
+        assert dialog._ok_button.isEnabled() is True
 
-    def test_ignore_enables_close(self, next_deterministic_uuid):
+    def test_ignore_enables_ok(self, next_deterministic_uuid):
         conflicting = next_deterministic_uuid()
         conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
         dialog = self._dialog(
@@ -1455,14 +1456,17 @@ class TestBulkSuggestionSummaryDialog:
             errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
             already_in_deck_by_nid={NoteId(5): conflict},
         )
-        assert dialog._can_close() is False
+        assert dialog._action_resolved() is False
+        assert dialog._ok_button.isEnabled() is False
         dialog._on_ignore()
         assert dialog._action_state == _ActionState.IGNORED
-        assert dialog._can_close() is True
+        assert dialog._action_resolved() is True
+        assert dialog._ok_button.isEnabled() is True
         assert dialog._already_in_deck  # still rendered, just resolved
 
-    def test_window_close_is_gated_until_action_resolved(self, mocker, next_deterministic_uuid):
-        # X / Escape route through reject(); it must be a no-op while an action is required.
+    def test_close_always_enabled_ok_gates_on_action(self, mocker, next_deterministic_uuid):
+        # Close / X (reject) is never gated, so the user can copy IDs and leave; the OK
+        # button is what's gated on the required action being resolved.
         conflicting = next_deterministic_uuid()
         conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
         dialog = self._dialog(
@@ -1470,12 +1474,13 @@ class TestBulkSuggestionSummaryDialog:
             errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
             already_in_deck_by_nid={NoteId(5): conflict},
         )
+        # OK disabled while the action is required; Close enabled regardless.
+        assert dialog._ok_button.isEnabled() is False
+        assert dialog._close_button.isEnabled() is True
+        # reject() (Close / X / Escape) is not blocked even with the action unresolved.
         super_reject = mocker.patch("aqt.qt.QDialog.reject")
         dialog.reject()
-        super_reject.assert_not_called()  # blocked while action required
-        dialog._on_ignore()
-        dialog.reject()
-        super_reject.assert_called_once()  # allowed once resolved
+        super_reject.assert_called_once()
 
     def _patch_resubmit(self, mocker, errors_returned):
         mocker.patch(
@@ -1504,7 +1509,7 @@ class TestBulkSuggestionSummaryDialog:
         assert NoteId(5) not in dialog._errors_by_nid
         assert dialog._already_in_deck == {}
         assert dialog._action_state == _ActionState.RESOLVED
-        assert dialog._can_close() is True
+        assert dialog._action_resolved() is True
         assert "change_submitted" in dialog._updated_keys
 
     def test_resubmit_partial_failure_recategorizes(self, mocker, next_deterministic_uuid):
@@ -1523,7 +1528,7 @@ class TestBulkSuggestionSummaryDialog:
         assert NoteId(5) in dialog._errors_by_nid
         assert dialog._issue_categories()["notes_deleted"] == [NoteId(5)]
         assert "notes_deleted" in dialog._updated_keys
-        assert dialog._can_close() is True
+        assert dialog._action_resolved() is True
 
     def test_hard_resubmit_failure_does_not_trap_user(self, mocker, next_deterministic_uuid):
         conflicting = next_deterministic_uuid()
@@ -1547,7 +1552,7 @@ class TestBulkSuggestionSummaryDialog:
 
         mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=run_failing)
         dialog._on_resubmit()
-        assert dialog._can_close() is True  # Close re-enabled after a hard failure
+        assert dialog._action_resolved() is True  # Close re-enabled after a hard failure
 
 
 class TestMaybeHandleNoteAlreadyExists:

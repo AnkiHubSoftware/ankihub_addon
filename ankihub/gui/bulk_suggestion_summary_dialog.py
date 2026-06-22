@@ -11,7 +11,6 @@ from typing import Dict, List, Mapping, Optional, Tuple
 import aqt
 from anki.notes import NoteId
 from aqt.qt import (
-    QCloseEvent,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -22,6 +21,7 @@ from aqt.qt import (
     QVBoxLayout,
     QWidget,
     qconnect,
+    sip,
 )
 from aqt.theme import theme_manager
 from aqt.utils import openLink
@@ -82,6 +82,16 @@ def _action_band_bg() -> str:
 
 def _divider_color() -> str:
     return "#4d4d4d" if theme_manager.night_mode else "#d0d4da"
+
+
+def _primary_button_qss() -> str:
+    """Solid accent ('primary') button styling, consistent across light/dark."""
+    return (
+        "QPushButton { background-color: #2d7ff9; color: #ffffff; border: none; "
+        "border-radius: 6px; padding: 6px 16px; font-weight: 600; } "
+        "QPushButton:hover { background-color: #1f6fe5; } "
+        "QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }"
+    )
 
 
 class _ActionState(Enum):
@@ -146,9 +156,20 @@ class BulkSuggestionSummaryDialog(QDialog):
         footer = QHBoxLayout()
         footer.setContentsMargins(self._SIDE_MARGIN, 0, self._SIDE_MARGIN, 0)
         footer.addStretch(1)
+        # Close (and the window X) stay enabled always, so the user can copy IDs and
+        # leave without being trapped. OK is the primary confirm, gated on the
+        # "action required" being resolved. autoDefault off on Close so it never picks
+        # up the default-button accent (which was flipping its text colour).
         self._close_button = QPushButton("Close")
-        qconnect(self._close_button.clicked, self.accept)
+        self._close_button.setAutoDefault(False)
+        self._close_button.setDefault(False)
+        qconnect(self._close_button.clicked, self.reject)
         footer.addWidget(self._close_button)
+        self._ok_button = QPushButton("OK")
+        self._ok_button.setStyleSheet(_primary_button_qss())
+        self._ok_button.setDefault(True)
+        qconnect(self._ok_button.clicked, self.accept)
+        footer.addWidget(self._ok_button)
         outer.addLayout(footer)
 
         if self._already_in_deck:
@@ -161,24 +182,15 @@ class BulkSuggestionSummaryDialog(QDialog):
         self._render()
 
     # --- state ------------------------------------------------------------
-    def _can_close(self) -> bool:
+    def _action_resolved(self) -> bool:
+        """Whether the 'Notes already in this deck' action has been dealt with
+        (resolved / ignored / failed, or there was none). Gates the OK button; Close
+        and the window X stay enabled regardless so the user is never trapped."""
         if self._action_state == _ActionState.LOADING:
             return False
         if self._action_state in (_ActionState.IGNORED, _ActionState.RESOLVED, _ActionState.FAILED):
             return True
         return not self._already_in_deck
-
-    # Gate the window-X / Escape close (which call reject()), not just the Close
-    # button, so an unresolved action or an in-flight resubmit can't be dismissed.
-    def reject(self) -> None:
-        if self._can_close():
-            super().reject()
-
-    def closeEvent(self, event: QCloseEvent) -> None:
-        if self._can_close():
-            super().closeEvent(event)
-        else:
-            event.ignore()
 
     def _skipped_nids(self) -> List[NoteId]:
         # Notes that had nothing to submit — surfaced as "skipped" in the Summary, not
@@ -239,7 +251,7 @@ class BulkSuggestionSummaryDialog(QDialog):
             self._content_layout.addSpacing(8)  # "Action required" → band
             self._content_layout.addWidget(self._build_action_band())  # full-bleed
 
-        self._close_button.setEnabled(self._can_close())
+        self._ok_button.setEnabled(self._action_resolved())
         # Resize on the next event-loop tick: computing the fit synchronously here
         # (right after rebuilding the layout) can under-size the dialog because the
         # freshly-created widgets haven't reported their final size hints yet, which
@@ -443,10 +455,11 @@ class BulkSuggestionSummaryDialog(QDialog):
         if loading:
             submitting = QPushButton("Submitting…")
             submitting.setEnabled(False)
+            submitting.setStyleSheet(_primary_button_qss())
             button_row.addWidget(submitting)
         else:
             resubmit = QPushButton(f"({len(nids)}) Resubmit as change suggestions")
-            resubmit.setDefault(True)
+            resubmit.setStyleSheet(_primary_button_qss())
             qconnect(resubmit.clicked, self._on_resubmit)
             button_row.addWidget(resubmit)
         button_row.addStretch(1)
@@ -476,6 +489,8 @@ class BulkSuggestionSummaryDialog(QDialog):
             )
 
         def on_done(future: Future) -> None:
+            if sip.isdeleted(self):  # user closed the dialog while the resubmit was in flight
+                return
             try:
                 errors_by_nid = future.result()
             except Exception as e:  # hard failure (network etc.) — never trap the user
