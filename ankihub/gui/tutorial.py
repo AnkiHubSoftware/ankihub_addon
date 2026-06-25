@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, U
 import aqt
 from anki.cards import CardId
 from anki.config import Config
-from anki.deck_config_pb2 import UPDATE_DECK_CONFIGS_MODE_NORMAL
 from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
 from anki.notes import NoteId
@@ -991,33 +990,15 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             c.config for c in for_update.all_config if c.config.id == for_update.current_deck.config_id
         )
 
-        deck = aqt.mw.col.decks.get(deck_id, default=None)
-        new_today = 0
-        rev_today = 0
-        if isinstance(deck, dict):
-            try:
-                new_today = int(deck.get("newToday", [0, 0])[1])
-            except Exception:
-                new_today = 0
-            try:
-                rev_today = int(deck.get("revToday", [0, 0])[1])
-            except Exception:
-                rev_today = 0
-
-        extra = max(len(cids), 30)
         limits = for_update.current_deck.limits
-
-        target_new_per_day = max(int(limits.new) + extra, new_today + extra)
-        limits.new = target_new_per_day
-
-        target_rev_per_day = max(int(limits.review) + extra * 10, rev_today + extra * 10, target_new_per_day * 10)
-        limits.review = target_rev_per_day
+        limits.new = 9999
+        limits.review = 9999
 
         request = UpdateDeckConfigs(
             target_deck_id=deck_id,
             configs=[current_config],
             limits=limits,
-            mode=UPDATE_DECK_CONFIGS_MODE_NORMAL,
+            mode=0,  # type: ignore[arg-type]
             card_state_customizer=for_update.card_state_customizer,
             new_cards_ignore_review_limit=for_update.new_cards_ignore_review_limit,
             fsrs=for_update.fsrs,
