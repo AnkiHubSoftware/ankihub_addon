@@ -8,7 +8,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, U
 import aqt
 from anki.cards import CardId
 from anki.config import Config
-from anki.decks import DeckId
+from anki.deck_config_pb2 import UPDATE_DECK_CONFIGS_MODE_NORMAL
+from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
 from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
@@ -983,14 +984,14 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _bump_intro_deck_daily_limits(self, anki_did: DeckId, cids: List[CardId]) -> None:
         """Raise new/review per-day caps so intro cards can enter the queue after daily limits were hit."""
-        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
-        new_sub = deck_config.setdefault("new", {})
-        rev_sub = deck_config.setdefault("rev", {})
-        cur_new = int(new_sub.get("perDay", 0))
-        cur_rev = int(rev_sub.get("perDay", 0))
-        extra = max(len(cids), 30)
+        deck_id = DeckId(anki_did)
+        for_update = aqt.mw.col.decks.get_deck_configs_for_update(deck_id)
 
-        deck = aqt.mw.col.decks.get(anki_did, default=None)
+        current_config = next(
+            c.config for c in for_update.all_config if c.config.id == for_update.current_deck.config_id
+        )
+
+        deck = aqt.mw.col.decks.get(deck_id, default=None)
         new_today = 0
         rev_today = 0
         if isinstance(deck, dict):
@@ -1003,16 +1004,31 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             except Exception:
                 rev_today = 0
 
-        target_new_per_day = max(cur_new + extra, new_today + extra)
-        new_sub["perDay"] = target_new_per_day
+        extra = max(len(cids), 30)
+        limits = for_update.current_deck.limits
 
-        target_rev_per_day = max(cur_rev + extra * 10, rev_today + extra * 10, target_new_per_day * 10)
-        rev_sub["perDay"] = target_rev_per_day
-        aqt.mw.col.decks.update_config(deck_config)
+        target_new_per_day = max(int(limits.new) + extra, new_today + extra)
+        limits.new = target_new_per_day
+
+        target_rev_per_day = max(int(limits.review) + extra * 10, rev_today + extra * 10, target_new_per_day * 10)
+        limits.review = target_rev_per_day
+
+        request = UpdateDeckConfigs(
+            target_deck_id=deck_id,
+            configs=[current_config],
+            limits=limits,
+            mode=UPDATE_DECK_CONFIGS_MODE_NORMAL,
+            card_state_customizer=for_update.card_state_customizer,
+            new_cards_ignore_review_limit=for_update.new_cards_ignore_review_limit,
+            fsrs=for_update.fsrs,
+            apply_all_parent_limits=for_update.apply_all_parent_limits,
+        )
+
+        aqt.mw.col.decks.update_deck_configs(request)
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
-        return bool(aqt.mw.col.sched.get_queued_cards().cards)
+        return len(aqt.mw.col.sched.get_queued_cards().cards) >= 14
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
