@@ -1039,8 +1039,8 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             next_callback = self._move_to_intro_deck_overview
             if not self._has_cards_to_review():
                 body_text = (
-                    "There are no cards available right now. Click on <b>Next</b> and we'll "
-                    "bring the cards back so you can continue with the tour."
+                    "To continue the tour, we need the full deck ready for study. Click <b>Next</b> and we'll "
+                    "make that happen"
                 )
                 next_callback = self._reset_cards_and_move_to_intro_deck_overview
 
