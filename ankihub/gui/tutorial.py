@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, U
 import aqt
 from anki.cards import CardId
 from anki.config import Config
-from anki.decks import DeckId
+from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
 from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
@@ -45,7 +45,6 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
-from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.reset_local_changes import reset_local_changes_to_notes
 from ..product_metrics_client import (
@@ -984,19 +983,33 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _bump_intro_deck_daily_limits(self, anki_did: DeckId, cids: List[CardId]) -> None:
         """Raise new/review per-day caps so intro cards can enter the queue after daily limits were hit."""
-        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
-        new_sub = deck_config.setdefault("new", {})
-        rev_sub = deck_config.setdefault("rev", {})
-        cur_new = int(new_sub.get("perDay", 0))
-        cur_rev = int(rev_sub.get("perDay", 0))
-        extra = max(len(cids), 30)
-        new_sub["perDay"] = cur_new + extra
-        rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
-        aqt.mw.col.decks.update_config(deck_config)
+        deck_id = DeckId(anki_did)
+        for_update = aqt.mw.col.decks.get_deck_configs_for_update(deck_id)
+
+        current_config = next(
+            c.config for c in for_update.all_config if c.config.id == for_update.current_deck.config_id
+        )
+
+        limits = for_update.current_deck.limits
+        limits.new = 9999
+        limits.review = 9999
+
+        request = UpdateDeckConfigs(
+            target_deck_id=deck_id,
+            configs=[current_config],
+            limits=limits,
+            mode=0,  # type: ignore[arg-type]
+            card_state_customizer=for_update.card_state_customizer,
+            new_cards_ignore_review_limit=for_update.new_cards_ignore_review_limit,
+            fsrs=for_update.fsrs,
+            apply_all_parent_limits=for_update.apply_all_parent_limits,
+        )
+
+        aqt.mw.col.decks.update_deck_configs(request)
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
-        return bool(aqt.mw.col.sched.get_queued_cards().cards)
+        return len(aqt.mw.col.sched.get_queued_cards().cards) >= 14
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
@@ -1026,8 +1039,8 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             next_callback = self._move_to_intro_deck_overview
             if not self._has_cards_to_review():
                 body_text = (
-                    "There are no cards available right now. Click on <b>Next</b> and we'll "
-                    "bring the cards back so you can continue with the tour."
+                    "To continue the tour, we need the full deck ready for study. Click <b>Next</b> and we'll "
+                    "make that happen"
                 )
                 next_callback = self._reset_cards_and_move_to_intro_deck_overview
 
