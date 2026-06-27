@@ -920,6 +920,19 @@ def anki_theme() -> str:
     return "dark" if theme_manager.night_mode else "light"
 
 
+def panel_background_color() -> str:
+    """Background fill for grouped dialog panels (e.g. Include-in-suggestion + Source)."""
+    return "#262626" if theme_manager.night_mode else "#ededed"
+
+
+def panel_line_color() -> str:
+    """Subtle line color (section dividers, input borders) for grouped dialog panels.
+    Light uses the Figma value; dark uses a grey that reads against the dark fill
+    instead of the stark light line.
+    """
+    return "#4d4d4d" if theme_manager.night_mode else "#d1d5db"
+
+
 def active_window_or_mw() -> QWidget:
     """The purpose of this function is to get a suitable parent widget for a dialog.
     By default it returns the active window.
