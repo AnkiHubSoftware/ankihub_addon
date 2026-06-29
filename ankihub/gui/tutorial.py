@@ -1349,6 +1349,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             self._browser.close()
             self.next()
 
+        self._track_tutorial("tour_unsuspend_cards")
         unsuspend_cards(parent=self._browser, card_ids=list(cids)).success(success).run_in_background()
 
     def _steps(self) -> list[TutorialStep]:
@@ -1438,18 +1439,17 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             QtTutorialStep(
                 body="<b>Suspended cards</b> won't appear in study sessions, and in Browse, "
                 "they show with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
-                "yellow background</span>.<br><br>"
-                "To unsuspend a card, you right-click it and uncheck Toggle Suspend. "
-                "Click <b>Unsuspend</b> to unlock all <b>‘Starter_Cards’</b> cards and begin studying.<br><br>"
+                "yellow background</span>.<br>"
+                "To unsuspend a card there, you right-click it and uncheck Toggle Suspend.<br><br>"
+                "Click on the <b>Unsuspend</b> button below and we'll make a few cards available for you."
                 f"<img src='{media_base}/toggle_suspend.png'>",
                 qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
                 target_outline=True,
-                back_label="Unsuspend",
-                back_callback=self._unsuspend_cards_and_move_to_next_step,
-                next_label="End Tour",
-                next_callback=lambda _: self.end(),
-                auto_advance=False,
+                next_label="Unsuspend",
+                next_callback=self._unsuspend_cards_and_move_to_next_step,
+                back_label="End Tour",
+                back_callback=lambda _: self.end(),
             )
         )
 
@@ -1457,7 +1457,6 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         steps.append(
             TutorialStep(
                 body="These cards are ready for study. Check them out, then try selecting cards on your own!<br><br>"
-                "To remove them later, look for the <b>‘Starter_Cards’</b> tag and suspend the cards.<br><br>"
                 f"<b>Need help?</b> Post in the {forum_link} and our support team will be happy to assist.",
                 target=f"[id='{self._anking_deck_config.anki_id}']",
                 click_target=f"[id='{self._anking_deck_config.anki_id}'] a.deck",
