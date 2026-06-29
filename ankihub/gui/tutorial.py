@@ -1009,7 +1009,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
-        return len(aqt.mw.col.sched.get_queued_cards().cards) >= 14
+        return len(aqt.mw.col.sched.get_queued_cards(fetch_limit=14).cards) >= 14
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
@@ -1083,9 +1083,9 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 TutorialStep(
                     body="The <b>Getting Started with Anki</b> deck is not installed, "
                     "but we’ve already subscribed you to it.<br><br>"
-                    "To make a deck you are subscribed to appear here, "
-                    "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
-                    "Right now you can just <b>click the sync button below</b>.",
+                    "<b>Click the sync button below</b> to install the deck.<br><br>"
+                    "To install decks you've subscribed to, you can always follow "
+                    "Anki menu > AnkiHub > Sync with AnkiHub.",
                     target="center table",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
