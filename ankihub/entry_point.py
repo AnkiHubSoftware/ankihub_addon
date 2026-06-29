@@ -1,5 +1,6 @@
 """Code to be run on Anki start up."""
 
+import platform
 import re
 import time
 from pathlib import Path
@@ -71,6 +72,7 @@ def run() -> None:
         addon_version=ADDON_VERSION,
         anki_version=ANKI_VERSION,
         qt_version=aqt.QT_VERSION_STR,
+        platform=platform.platform(),
         app_url=config.app_url,
         s3_bucket_url=config.s3_bucket_url,
     )
