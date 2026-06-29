@@ -185,7 +185,11 @@ class _AnkiHubDeckUpdater:
 
     def _fetch_and_apply_deck_extension_updates(self, ankihub_did: uuid.UUID) -> bool:
         # returns True if the update was successful, False if the user cancelled it
-        if not (deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)):
+        deck_extensions = self._client.get_deck_extensions_by_deck_id(ankihub_did)
+
+        self._remove_deck_extensions_gone_from_ankihub(ankihub_did, deck_extensions)
+
+        if not deck_extensions:
             LOGGER.info("No extensions to update for deck", ah_did=ankihub_did)
             return True
 
@@ -194,6 +198,15 @@ class _AnkiHubDeckUpdater:
                 return False
 
         return True
+
+    @staticmethod
+    def _remove_deck_extensions_gone_from_ankihub(ankihub_did: uuid.UUID, deck_extensions: List[DeckExtension]) -> None:
+        # Drop config entries for extensions the user no longer has on this deck (unsubscribed
+        # or deleted on AnkiHub). Optional tags already applied to notes are intentionally kept.
+        server_extension_ids = {deck_extension.id for deck_extension in deck_extensions}
+        local_extension_ids = set(config.deck_extensions_ids_for_ah_did(ankihub_did))
+        for extension_id in local_extension_ids - server_extension_ids:
+            config.remove_deck_extension(extension_id)
 
     def _download_updates_for_extension(self, deck_extension: DeckExtension) -> bool:
         # returns True if the update was successful, False if the user cancelled it
