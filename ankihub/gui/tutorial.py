@@ -1441,7 +1441,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 "they show with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
                 "yellow background</span>.<br>"
                 "To unsuspend a card there, you right-click it and uncheck Toggle Suspend.<br><br>"
-                "Click on the <b>Unsuspend</b> button below and we'll make a few cards available for you."
+                "Click on the <b>Unsuspend</b> button below and we'll make a few cards available for you.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
                 qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
