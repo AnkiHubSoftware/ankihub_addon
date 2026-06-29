@@ -44,8 +44,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.theme import theme_manager
-from aqt.utils import show_info, showInfo, showText
+from aqt.utils import show_info, showInfo
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -55,11 +54,8 @@ from ..ankihub_client import (
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.suggestions import (
-    ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
-    ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     AUTO_PROTECT_FEATURE_FLAG,
-    BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
     ChangeSuggestionResult,
     NoteDiff,
@@ -68,16 +64,21 @@ from ..main.suggestions import (
     get_anki_nid_to_ah_dids_dict,
     globally_protected_fields_by_mid,
     has_empty_first_field,
+    parse_duplicate_anki_id_error,
+    resubmit_new_note_as_change_suggestion,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
 from ..main.utils import note_type_name_without_ankihub_modifications
 from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, config
+from .bulk_suggestion_summary_dialog import _on_suggest_notes_in_bulk_done
 from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
+    panel_background_color,
+    panel_line_color,
     show_error_dialog,
     show_tooltip,
     tinted_pixmap,
@@ -91,19 +92,6 @@ INCLUDE_SUBTITLE = "Choose which fields to submit changes for."
 EMPTY_STATE_SUBTITLE = "Edit a note field to create a change suggestion"
 EMPTY_STATE_TITLE = "No changes detected"
 EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
-
-
-def _panel_background_color() -> str:
-    """Background fill for the dialog's grouped panels (Include-in-suggestion + Source)."""
-    return "#262626" if theme_manager.night_mode else "#ededed"
-
-
-def _panel_line_color() -> str:
-    """Subtle line color (section dividers, input borders) for the grouped panels.
-    Light uses the Figma value; dark uses a grey that reads against the dark fill
-    instead of the stark light line.
-    """
-    return "#4d4d4d" if theme_manager.night_mode else "#d1d5db"
 
 
 class SourceType(Enum):
@@ -170,18 +158,144 @@ def open_suggestion_dialog_for_single_suggestion(
     )
 
 
+class NoteAlreadyExistsDialog(QDialog):
+    """Shown when a single new-note suggestion is rejected because the note already
+    exists in the deck on AnkiHub. Offers to resubmit the edits as a change
+    suggestion. Non-blocking; `on_send` runs when the user chooses to resubmit and
+    the dialog closes."""
+
+    def __init__(self, on_send: Callable[[], None], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._on_send = on_send
+        self.setWindowTitle("Note already exists in this deck")
+        # Application-modal (not window-modal) so macOS shows it as a normal centered
+        # dialog rather than a sheet sliding out of the parent window's title bar.
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(16)
+
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        icon = QLabel()
+        icon.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation).pixmap(QSize(36, 36)))
+        icon.setAlignment(Qt.AlignmentFlag.AlignTop)
+        body.addWidget(icon)
+        message = QLabel(
+            "This note already exists in the AnkiHub deck. Send your edits as a change "
+            "suggestion instead, they'll go through the normal review process."
+        )
+        message.setWordWrap(True)
+        message.setMinimumWidth(320)
+        body.addWidget(message, 1)
+        layout.addLayout(body)
+
+        button_box = QDialogButtonBox()
+        cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        send_button = button_box.addButton("Send as change suggestion", QDialogButtonBox.ButtonRole.AcceptRole)
+        send_button.setDefault(True)
+        qconnect(cancel_button.clicked, self.reject)
+        qconnect(send_button.clicked, self._handle_send)
+        layout.addWidget(button_box)
+
+    def _handle_send(self) -> None:
+        # Close first, then kick off the resubmit; the result surfaces as a toast or
+        # an error dialog.
+        self.accept()
+        self._on_send()
+
+
+def _show_note_already_exists_dialog(
+    note: Note,
+    ah_did: uuid.UUID,
+    conflicting_ah_nid: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> None:
+    LOGGER.info("duplicate_note_error_dialog_shown", note_id=note.id, ah_did=str(ah_did))
+
+    def resubmit() -> ChangeSuggestionResult:
+        # New-note flows carry no change type; resubmit as an "Updated content" change.
+        return resubmit_new_note_as_change_suggestion(
+            note=note,
+            ah_did=ah_did,
+            conflicting_ah_nid=conflicting_ah_nid,
+            change_type=SuggestionType.UPDATED_CONTENT,
+            comment=_comment_with_source(suggestion_meta),
+            auto_accept=suggestion_meta.auto_accept,
+            filters=suggestion_meta.filters.for_mid(NotetypeId(note.mid)),
+        )
+
+    def on_resubmit_done(future: Future) -> None:
+        try:
+            result = future.result()
+        except AnkiHubHTTPError as e:
+            _handle_suggestion_error(e, parent)
+            return
+        if result == ChangeSuggestionResult.SUCCESS:
+            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        elif result == ChangeSuggestionResult.NO_CHANGES:
+            show_tooltip("No changes to suggest.", parent=parent)
+        elif result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+            show_error_dialog(
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                title="Note has been deleted from AnkiHub.",
+                parent=parent,
+            )
+
+    def on_send() -> None:
+        LOGGER.info("duplicate_note_resubmitted_as_update_suggestion", note_id=note.id, ah_did=str(ah_did))
+        aqt.mw.taskman.with_progress(task=resubmit, on_done=on_resubmit_done, parent=parent)
+
+    NoteAlreadyExistsDialog(on_send=on_send, parent=parent).show()
+
+
+def _maybe_handle_note_already_exists(
+    e: AnkiHubHTTPError,
+    note: Note,
+    ah_did: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> bool:
+    """If the new-note submit was rejected because the note already exists in the deck,
+    handle it and return True. Returns False to let the generic error
+    handler run (not this error, or the server didn't include the conflicting id)."""
+    if e.response.status_code != 400:
+        return False
+    parsed = parse_duplicate_anki_id_error(e.response.json())
+    if parsed is None:
+        return False
+    conflicting_ah_nid, is_deleted = parsed
+    if is_deleted:
+        show_error_dialog(
+            "This note has been deleted from AnkiHub. No new suggestions can be made.",
+            title="Note has been deleted from AnkiHub.",
+            parent=parent,
+        )
+        return True
+    if conflicting_ah_nid is None:
+        # Older server without the conflicting id — fall back to generic handling.
+        return False
+    _show_note_already_exists_dialog(note, ah_did, conflicting_ah_nid, suggestion_meta, parent)
+    return True
+
+
 def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
     if "suggestion" not in e.response.url:
         raise e
 
     if e.response.status_code == 400:
-        if non_field_errors := e.response.json().get("non_field_errors", None):
+        non_field_errors = e.response.json().get("non_field_errors") or []
+        if non_field_errors:
             error_message = "\n".join(non_field_errors)
         else:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        all_no_changes_errors = all(ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors)
+        all_no_changes_errors = bool(non_field_errors) and all(
+            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
+        )
         if all_no_changes_errors:
             # The dialog OK button is gated on at least one field/tag change being
             # selected, so this branch should be unreachable in normal use. If it
@@ -265,6 +379,10 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 filters=per_note_filters,
             )
         except AnkiHubHTTPError as e:
+            if _maybe_handle_note_already_exists(
+                e=e, note=note, ah_did=ah_did, suggestion_meta=suggestion_meta, parent=parent
+            ):
+                return
             _handle_suggestion_error(e, parent)
             return
         if submitted:
@@ -347,7 +465,12 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             media_upload_cb=media_upload_cb,
             filters=suggestion_meta.filters,
         ),
-        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(
+            future,
+            parent,
+            ah_did=ah_did,
+            auto_accept=suggestion_meta.auto_accept,
+        ),
         parent=parent,
     )
 
@@ -387,77 +510,6 @@ def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
         result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
-
-
-def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
-    try:
-        suggestions_result: BulkNoteSuggestionsResult = future.result()
-    except AnkiHubHTTPError as e:
-        if e.response.status_code == 403:
-            response_data = e.response.json()
-            error_message = response_data.get("detail")
-            if error_message:
-                show_error_dialog(
-                    message=error_message,
-                    parent=parent,
-                    title="Error submitting bulk suggestion :(",
-                )
-                return
-        raise e
-
-    LOGGER.info(
-        "Created note suggestions in bulk.",
-        errors_by_nid=suggestions_result.errors_by_nid,
-    )
-
-    msg_about_created_suggestions = (
-        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n"
-    )
-
-    notes_without_changes = [
-        note for note, errors in suggestions_result.errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)
-    ]
-    notes_that_dont_exist_on_ankihub = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(errors)
-    ]
-    notes_with_empty_first_field = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(errors)
-    ]
-
-    if suggestions_result.errors_by_nid:
-        category_messages = []
-        if notes_without_changes:
-            category_messages.append(
-                f"Notes without changes ({len(notes_without_changes)}):\n"
-                f"{', '.join(str(nid) for nid in notes_without_changes)}"
-            )
-        if notes_that_dont_exist_on_ankihub:
-            category_messages.append(
-                f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
-                f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
-            )
-        if notes_with_empty_first_field:
-            category_messages.append(
-                f"Notes with the first field empty ({len(notes_with_empty_first_field)}):\n"
-                f"{', '.join(str(nid) for nid in notes_with_empty_first_field)}"
-            )
-
-        msg_about_failed_suggestions = (
-            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
-            "All notes with failed suggestions:\n"
-            f"{', '.join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n"
-            + "\n\n".join(category_messages)
-        )
-    else:
-        msg_about_failed_suggestions = ""
-
-    msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
 
 
 class SuggestionDialog(QDialog):
@@ -589,7 +641,7 @@ class SuggestionDialog(QDialog):
         # font-weight on the element (not ::title) overrides Anki's bold-title
         # default, so "Source" stays regular like in Figma.
         self.source_widget_group_box.setStyleSheet(
-            f"#sourceGroupBox {{ background-color: {_panel_background_color()}; "
+            f"#sourceGroupBox {{ background-color: {panel_background_color()}; "
             f"border: none; border-radius: 6px; margin-top: 8px; font-weight: normal; }} "
             f"#sourceGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; "
             f"left: 6px; padding: 0 3px; }}"
@@ -875,7 +927,7 @@ class SourceWidget(QWidget):
         # The inputs sit on the panel's neutral fill, which in dark mode is close
         # to the native input background — a border keeps them legible. Re-assert
         # background-color so the border stylesheet doesn't drop the themed fill.
-        border = _panel_line_color()
+        border = panel_line_color()
         self.source_edit.setStyleSheet(
             f"QLineEdit {{ border: 1px solid {border}; border-radius: 4px; "
             f"padding: 2px 4px; background-color: palette(base); }}"
@@ -1419,7 +1471,7 @@ class IncludeInSuggestionWidget(QWidget):
         frame.setFrameShape(QFrame.Shape.NoFrame)
         frame.setObjectName("includeInSuggestionFrame")
         frame.setStyleSheet(
-            f"#includeInSuggestionFrame {{ background-color: {_panel_background_color()}; border-radius: 6px; }}"
+            f"#includeInSuggestionFrame {{ background-color: {panel_background_color()}; border-radius: 6px; }}"
         )
         frame.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         outer.addWidget(frame)
@@ -1490,7 +1542,7 @@ class IncludeInSuggestionWidget(QWidget):
         if self._body_layout.count() > 0:
             separator = QFrame()
             separator.setFixedHeight(1)
-            separator.setStyleSheet(f"background-color: {_panel_line_color()}; border: none;")
+            separator.setStyleSheet(f"background-color: {panel_line_color()}; border: none;")
             self._body_layout.addWidget(separator)
             # Extra breathing room between the divider and the next section title.
             self._body_layout.addSpacing(4)
