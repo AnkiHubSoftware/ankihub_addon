@@ -1009,7 +1009,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
-        return len(aqt.mw.col.sched.get_queued_cards().cards) >= 14
+        return len(aqt.mw.col.sched.get_queued_cards(fetch_limit=14).cards) >= 14
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
