@@ -205,7 +205,7 @@ bundle = [
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
     { name = "peewee", specifier = "==3.18.2" },
     { name = "sentry-sdk", specifier = "==1.6.0" },
-    { name = "structlog", specifier = "==24.1.0" },
+    { name = "structlog", specifier = "==25.5.0" },
     { name = "tenacity", specifier = "==8.2.2" },
 ]
 dev = [
@@ -2605,11 +2605,14 @@ wheels = [
 
 [[package]]
 name = "structlog"
-version = "24.1.0"
+version = "25.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d1/ac/87aedb7a9ba52f645b9d29a7f48bb12a5c6b7e204b8137549fbe4754b563/structlog-24.1.0.tar.gz", hash = "sha256:41a09886e4d55df25bdcb9b5c9674bccfab723ff43e0a86a1b7b236be8e57b16", size = 1340948, upload-time = "2024-01-08T09:52:54.24Z" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/5c/c22ca8b8715dd625bbdd6bc7ec87395e29940642d8dff213fad1aa8ce84d/structlog-24.1.0-py3-none-any.whl", hash = "sha256:3f6efe7d25fab6e86f277713c218044669906537bb717c1807a09d46bca0714d", size = 65692, upload-time = "2024-01-08T09:52:50.99Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
 ]
 
 [[package]]
