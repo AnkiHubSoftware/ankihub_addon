@@ -1347,8 +1347,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         def success(_):
             self._browser_closed_by_us = True
             self._browser.close()
-            on_done()
+            self.next()
 
+        self._track_tutorial("tour_unsuspend_cards")
         unsuspend_cards(parent=self._browser, card_ids=list(cids)).success(success).run_in_background()
 
     def _steps(self) -> list[TutorialStep]:
@@ -1436,32 +1437,31 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         media_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web/media"
         steps.append(
             QtTutorialStep(
-                body="<b>Suspended cards</b> won't appear in study sessions. In the Browser, "
-                "they're shown with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
-                "yellow background</span>.<br><br>"
-                "During the tour, you can’t perform actions. Normally, to unsuspend a card, "
-                "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
-                "Click <b>Next</b> and we'll unsuspend a few cards for you as an example.<br><br>"
+                body="<b>Suspended cards</b> won't appear in study sessions, and in Browse, "
+                "they show with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
+                "yellow background</span>.<br>"
+                "To unsuspend a card there, you right-click it and uncheck Toggle Suspend.<br><br>"
+                "Click on the <b>Unsuspend</b> button below and we'll make a few cards available for you.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
                 qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
                 target_outline=True,
+                next_label="Unsuspend",
                 next_callback=self._unsuspend_cards_and_move_to_next_step,
+                back_label="End Tour",
+                back_callback=lambda _: self.end(),
             )
         )
 
         forum_link = render_link("https://community.ankihub.net/c/support/5", "forum")
         steps.append(
             TutorialStep(
-                body="We've unsuspended some cards for you and they are ready for study. Check them out, "
-                "then try selecting cards on your own!<br><br>"
+                body="These cards are ready for study. Check them out, then try selecting cards on your own!<br><br>"
                 f"<b>Need help?</b> Post in the {forum_link} and our support team will be happy to assist.",
                 target=f"[id='{self._anking_deck_config.anki_id}']",
                 click_target=f"[id='{self._anking_deck_config.anki_id}'] a.deck",
                 tooltip_context=aqt.mw.deckBrowser,
                 next_label="End tour",
-                back_label="Restart tour",
-                back_callback=lambda _: self.restart(),
                 close_button=False,
             )
         )
@@ -1471,7 +1471,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @cached_property
     def steps(self) -> list[TutorialStep]:
         steps = self._steps()
-        # Hide back button for all but the last step
-        for step in steps[:-1]:
-            step.back_label = ""
+        # Hide back button for all but the penultimate step
+        for step in steps:
+            if step != steps[-2]:
+                step.back_label = ""
         return steps
