@@ -14,7 +14,7 @@ from ..settings import (
     url_plans_page,
 )
 from ..user_state import check_user_feature_access
-from .utils import show_dialog
+from .utils import show_dialog, show_tooltip, using_qt5
 
 
 class FlashCardSelectorDialog(AnkiHubWebViewDialog):
@@ -26,10 +26,20 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         self.ah_did = ah_did
 
     @classmethod
-    def display_for_ah_did(cls, ah_did: uuid.UUID, parent: Any) -> "FlashCardSelectorDialog":
+    def display_for_ah_did(cls, ah_did: uuid.UUID, parent: Any) -> Optional["FlashCardSelectorDialog"]:
         """Display the flashcard selector dialog for the given deck.
         Reuses the dialog if it is already open for the same deck.
-        Otherwise, closes the existing dialog and opens a new one."""
+        Otherwise, closes the existing dialog and opens a new one.
+
+        On Qt5 builds the embedded Chromium-77 webview can't render the flashcard selector page, so
+        the full page is opened in the user's external browser instead and ``None`` is returned (see
+        NRT-822)."""
+        if using_qt5():
+            openLink(url_flashcard_selector(ah_did))
+            show_tooltip("Opening the Flashcard Selector in your web browser…", parent=parent)
+            LOGGER.info("Opened flashcard selector in external browser (Qt5).")
+            return None
+
         if cls.dialog and cls.dialog.ah_did != ah_did and not sip.isdeleted(cls.dialog):
             cls.dialog.close()
             cls.dialog = None
