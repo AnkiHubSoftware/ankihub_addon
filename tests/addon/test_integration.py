@@ -6947,6 +6947,83 @@ class TestDeckUpdater:
                 latest_update=latest_update,
             )
 
+    def test_removes_deck_extension_config_when_no_longer_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # The add-on still has a local config entry for the extension
+            deck_extension = DeckExtensionFactory.create(ah_did=ah_did, tag_group_name="tag_group")
+            config.create_or_update_deck_extension_config(deck_extension)
+            assert config.deck_extension_config(extension_id=deck_extension.id) is not None
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=ah_did),
+            )
+            # The extension is no longer returned by the server (unsubscribed or deleted)
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extensions_by_deck_id",
+                return_value=[],
+            )
+
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
+            )
+
+            # The orphaned config entry is removed
+            assert config.deck_extension_config(extension_id=deck_extension.id) is None
+
+    def test_removing_orphaned_deck_extension_config_is_scoped_to_the_synced_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            synced_ah_did = install_ah_deck()
+            other_ah_did = install_ah_deck()
+
+            # Local config entries for an extension on each deck
+            synced_deck_extension = DeckExtensionFactory.create(ah_did=synced_ah_did, tag_group_name="tag_group_a")
+            other_deck_extension = DeckExtensionFactory.create(ah_did=other_ah_did, tag_group_name="tag_group_b")
+            config.create_or_update_deck_extension_config(synced_deck_extension)
+            config.create_or_update_deck_extension_config(other_deck_extension)
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=synced_ah_did),
+            )
+            # The synced deck no longer has its extension on the server
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extensions_by_deck_id",
+                return_value=[],
+            )
+
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[synced_ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
+            )
+
+            # Only the synced deck's orphaned entry is removed; the other deck's entry is left intact
+            assert config.deck_extension_config(extension_id=synced_deck_extension.id) is None
+            assert config.deck_extension_config(extension_id=other_deck_extension.id) is not None
+
     @pytest.mark.parametrize(
         "current_relation, incoming_relation",
         [
