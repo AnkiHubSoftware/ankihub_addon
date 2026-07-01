@@ -68,6 +68,7 @@ TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
 DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE = TEST_DATA_PATH / "deck_with_one_deleted_basic_note.csv"
+DECK_CSV_WITH_UNICODE_LINE_SEPARATOR = TEST_DATA_PATH / "deck_with_one_basic_note_with_unicode_line_separator.csv"
 
 DECK_CSV_WITHOUT_DELETED_COLUMN = TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv"
 DECK_CSV_GZ_WITHOUT_DELETED_COLUMN = TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv.gz"
@@ -548,6 +549,22 @@ class TestDownloadDeck:
 
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
+
+    def test_download_deck_preserves_unicode_line_separator_in_field(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test1
+        field_value = "front\u2028more content<br>"
+        deck_file_presigned_url = f"{DEFAULT_S3_BUCKET_URL}/{DECK_CSV_WITH_UNICODE_LINE_SEPARATOR.name}?auth=123"
+        with requests_mock.Mocker(real_http=True) as m:
+            m.get(deck_file_presigned_url, content=DECK_CSV_WITH_UNICODE_LINE_SEPARATOR.read_bytes())
+            notes_data = client.download_deck(
+                ah_did=ID_OF_DECK_OF_USER_TEST1,
+                s3_presigned_url=deck_file_presigned_url,
+            )
+
+        assert len(notes_data) == 1
+        assert notes_data[0].fields[0].value == field_value
 
 
 def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck: uuid.UUID):
