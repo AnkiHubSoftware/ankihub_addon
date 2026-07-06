@@ -66,7 +66,18 @@ class OverlayDialog(QDialog):
         self._install_event_filter()
         self._configure_browser_focus(parent)
         self.on_position()
+        # The stays-on-top hint would otherwise keep the overlay above other
+        # applications too, so hide it whenever Anki is not the active app.
+        if is_mac:
+            qconnect(aqt.mw.app.applicationStateChanged, self._on_application_state_changed)
         qconnect(self.finished, self._on_finished)
+
+    def _on_application_state_changed(self, state: Qt.ApplicationState) -> None:
+        if state == Qt.ApplicationState.ApplicationActive:
+            self.show()
+            self._bring_to_front()
+        else:
+            self.hide()
 
     def setup_ui(self) -> None:
         pass
@@ -142,6 +153,11 @@ class OverlayDialog(QDialog):
 
     def _on_finished(self) -> None:
         self._restore_browser_focus()
+        if is_mac:
+            try:
+                aqt.mw.app.applicationStateChanged.disconnect(self._on_application_state_changed)
+            except (TypeError, RuntimeError):
+                pass
         for widget in self._tracked_widgets:
             if widget:
                 widget.removeEventFilter(self)
