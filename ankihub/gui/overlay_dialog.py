@@ -51,12 +51,16 @@ class OverlayDialog(QDialog):
     def __init__(self, parent: QWidget, target: Optional[OverlayTarget]) -> None:
         self._tracked_widgets: Set[Union[QWidget, OverlayTarget]] = set()
         self._browser_search_focus_policy: Optional[Qt.FocusPolicy] = None
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint)
+        window_flags = Qt.WindowType.FramelessWindowHint
+        if is_mac:
+            # On macOS a window-modal QDialog is rendered as a native "sheet"
+            # with an opaque background, which defeats the translucent overlay.
+            # Keep the overlay above its parent with a stays-on-top hint instead.
+            window_flags |= Qt.WindowType.WindowStaysOnTopHint
+        super().__init__(parent, window_flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAutoFillBackground(False)
         self.setStyleSheet("background: transparent;")
-        if is_mac:
-            self.setWindowModality(Qt.WindowModality.WindowModal)
         self.target = target
         self.setup_ui()
         self._install_event_filter()

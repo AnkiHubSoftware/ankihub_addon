@@ -220,6 +220,9 @@ class TutorialOverlayDialog(OverlayDialog):
         self.web.set_bridge_command(self.on_bridge_cmd, self)
         vbox.addWidget(self.web)
         gui_hooks.theme_did_change.append(self._apply_web_transparency)
+        # QWebEngine can paint the first frame opaque before the page finishes
+        # loading, so re-apply the transparent background once the load completes.
+        qconnect(self.web.loadFinished, lambda _ok: self._apply_web_transparency())
         self.refresh()
         qconnect(self.finished, self._cleanup_web)
 
