@@ -99,7 +99,7 @@ jobs:
           qt_package: pyqt6
 
       - name: Enable cloning webapp repo
-        uses: webfactory/ssh-agent@v0.5.4
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
 
