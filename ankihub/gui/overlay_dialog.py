@@ -1,5 +1,8 @@
 from typing import Optional, Set, Union
 
+import aqt
+from anki.utils import is_mac
+from aqt.browser import Browser
 from aqt.qt import (
     QDialog,
     QEvent,
@@ -47,28 +50,95 @@ class OverlayTarget:
 class OverlayDialog(QDialog):
     def __init__(self, parent: QWidget, target: Optional[OverlayTarget]) -> None:
         self._tracked_widgets: Set[Union[QWidget, OverlayTarget]] = set()
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint)
+        self._browser_search_focus_policy: Optional[Qt.FocusPolicy] = None
+        window_flags = Qt.WindowType.FramelessWindowHint
+        if is_mac:
+            # On macOS a window-modal QDialog is rendered as a native "sheet"
+            # with an opaque background, which defeats the translucent overlay.
+            # Keep the overlay above its parent with a stays-on-top hint instead.
+            window_flags |= Qt.WindowType.WindowStaysOnTopHint
+        super().__init__(parent, window_flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAutoFillBackground(False)
+        self.setStyleSheet("background: transparent;")
         self.target = target
         self.setup_ui()
         self._install_event_filter()
+        self._configure_browser_focus(parent)
         self.on_position()
+        # The stays-on-top hint would otherwise keep the overlay above other
+        # applications too, so hide it whenever Anki is not the active app.
+        if is_mac:
+            qconnect(aqt.mw.app.applicationStateChanged, self._on_application_state_changed)
         qconnect(self.finished, self._on_finished)
+
+    def _on_application_state_changed(self, state: Qt.ApplicationState) -> None:
+        if state == Qt.ApplicationState.ApplicationActive:
+            self.show()
+            self._bring_to_front()
+        else:
+            self.hide()
 
     def setup_ui(self) -> None:
         pass
+
+    @staticmethod
+    def _browser_from_widget(widget: Optional[QWidget]) -> Optional[Browser]:
+        if widget is None:
+            return None
+        window = widget if isinstance(widget, Browser) else widget.window()
+        return window if isinstance(window, Browser) else None
+
+    def _configure_browser_focus(self, parent: QWidget) -> None:
+        browser = self._browser_from_widget(parent)
+        if browser is None:
+            return
+        search_edit = browser.form.searchEdit
+        self._browser_search_focus_policy = search_edit.focusPolicy()
+        search_edit.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        browser.clearFocus()
+
+    def _restore_browser_focus(self) -> None:
+        if self._browser_search_focus_policy is None:
+            return
+        browser = self._browser_from_widget(self.parentWidget())
+        if browser is not None:
+            browser.form.searchEdit.setFocusPolicy(self._browser_search_focus_policy)
+        self._browser_search_focus_policy = None
 
     def _install_event_filter(self) -> None:
         if self.target:
             self._tracked_widgets.add(self.target)
             self.target.installEventFilter(self)
-        self._tracked_widgets.add(self.parentWidget())
-        self.parentWidget().installEventFilter(self)
+        parent = self.parentWidget()
+        self._tracked_widgets.add(parent)
+        parent.installEventFilter(self)
+        browser = self._browser_from_widget(parent)
+        if browser is not None:
+            search_edit = browser.form.searchEdit
+            self._tracked_widgets.add(search_edit)
+            search_edit.installEventFilter(self)
+
+    def _focus_overlay(self) -> None:
+        pass
+
+    def _bring_to_front(self) -> None:
+        self.on_position()
+        self.raise_()
+        self._focus_overlay()
 
     def eventFilter(self, obj: Optional[QObject], event: QEvent) -> bool:
-        if obj in self._tracked_widgets:
+        if obj in self._tracked_widgets and event is not None:
             if isinstance(event, (QMoveEvent, QResizeEvent, QWindowStateChangeEvent)):
                 self.on_position()
+            elif event.type() == QEvent.Type.WindowActivate:
+                self._bring_to_front()
+            elif event.type() == QEvent.Type.FocusIn:
+                browser = self._browser_from_widget(self.parentWidget())
+                if browser is not None and obj is browser.form.searchEdit:
+                    browser.form.searchEdit.clearFocus()
+                    self._bring_to_front()
+                    return True
         return super().eventFilter(obj, event)
 
     def on_position(self) -> None:
@@ -77,9 +147,17 @@ class OverlayDialog(QDialog):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self.on_position()
+        self._bring_to_front()
+        if is_mac:
+            aqt.mw.progress.single_shot(0, self._bring_to_front)
 
     def _on_finished(self) -> None:
+        self._restore_browser_focus()
+        if is_mac:
+            try:
+                aqt.mw.app.applicationStateChanged.disconnect(self._on_application_state_changed)
+            except (TypeError, RuntimeError):
+                pass
         for widget in self._tracked_widgets:
             if widget:
                 widget.removeEventFilter(self)

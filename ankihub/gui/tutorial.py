@@ -193,18 +193,40 @@ class TutorialOverlayDialog(OverlayDialog):
         self.target_outline = target_outline
         super().__init__(parent, target)
 
+    def _focus_overlay(self) -> None:
+        self.web.setFocus()
+
+    def _apply_web_transparency(self) -> None:
+        self.web.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.web.setAutoFillBackground(False)
+        self.web.setStyleSheet("background: transparent;")
+        self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
+
+    def _cleanup_web(self) -> None:
+        try:
+            gui_hooks.theme_did_change.remove(self._apply_web_transparency)
+        except ValueError:
+            pass
+        self.web.cleanup()
+
     def setup_ui(self) -> None:
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
         self.web = AnkiWebView(self)
+        self._apply_web_transparency()
         self.web.disable_zoom()
         self.web.set_bridge_command(self.on_bridge_cmd, self)
         vbox.addWidget(self.web)
+        gui_hooks.theme_did_change.append(self._apply_web_transparency)
+        # QWebEngine can paint the first frame opaque before the page finishes
+        # loading, so re-apply the transparent background once the load completes.
+        qconnect(self.web.loadFinished, lambda _ok: self._apply_web_transparency())
         self.refresh()
-        qconnect(self.finished, lambda: self.web.cleanup())
+        qconnect(self.finished, self._cleanup_web)
 
     def refresh(self) -> None:
+        self._apply_web_transparency()
         web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
         self.web.stdHtml(
             "<div id=target></div>",
@@ -213,7 +235,6 @@ class TutorialOverlayDialog(OverlayDialog):
             default_css=False,
             context=self,
         )
-        self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
 
     def on_bridge_cmd(self, cmd: str) -> None:
         if cmd == FLASHCARD_SELECTOR_OPEN_PYCMD:
