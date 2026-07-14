@@ -44,12 +44,6 @@ class AnkiwebLinkIds(Enum):
     SIGNUP_PASSWORD = "#sign-up-password"
 
 
-# TODO: Remove once the backend is ready
-# def simulate_ankiweb_failure() -> bool:
-#     """Simulate AnkiWeb login/signup errors to show failure scenarios."""
-#     return os.environ.get("ANKIWEB_SIMULATE_FAIL") == "true"
-
-
 def simulate_existing_account() -> bool:
     return os.environ.get("ANKIWEB_SIMULATE_EXISTING_ACCOUNT") == "true"
 
