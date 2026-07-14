@@ -1,4 +1,5 @@
 import inspect
+import re
 import uuid
 from functools import partial, wraps
 from pathlib import Path
@@ -1024,3 +1025,12 @@ def refresh_anki_ui_after_moving_cards() -> None:
     browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
     if browser is not None:
         browser.sidebar.refresh()
+
+
+def is_email(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
+        )
+    )

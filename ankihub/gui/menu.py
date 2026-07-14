@@ -1,6 +1,5 @@
 """AnkiHub menu on Anki's main window."""
 
-import re
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +36,7 @@ from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
     choose_ankihub_deck,
+    is_email,
 )
 
 
@@ -179,7 +179,7 @@ class AnkiHubLogin(QWidget):
 
         try:
             credentials = {"password": password}
-            if self._is_email(username_or_email):
+            if is_email(username_or_email):
                 credentials.update({"email": username_or_email})
             else:
                 credentials.update({"username": username_or_email})
@@ -197,7 +197,7 @@ class AnkiHubLogin(QWidget):
         config.save_token(token)
         config.save_user_email(username_or_email)
         username = ""
-        if not self._is_email(username_or_email):
+        if not is_email(username_or_email):
             username = username_or_email
         config.save_username(username)
         LOGGER.info("User signed into AnkiHub.", user=username_or_email)
@@ -208,12 +208,6 @@ class AnkiHubLogin(QWidget):
 
         add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
         self.close()
-
-    def _is_email(self, value):
-        return re.fullmatch(
-            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
-            value,
-        )
 
     def clear_fields(self):
         self.username_or_email_box_text.setText("")
