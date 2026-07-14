@@ -26,6 +26,7 @@ from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config
+from . import intercom
 from .config_dialog import get_config_dialog_manager
 from .decks_dialog import DeckManagementDialog
 from .errors import upload_logs_and_data_in_background, upload_logs_in_background
@@ -280,6 +281,8 @@ def _sign_out_action():
     try:
         AnkiHubClient().signout()
     finally:
+        # Clear the Intercom session so the next user starts clean.
+        intercom.shutdown()
         config.save_token("")
         config.set_feature_flags({})
         config.set_user_details({})

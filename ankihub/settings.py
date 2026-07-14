@@ -243,6 +243,10 @@ class _Config:
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
         self.intro_deck_id: Optional[uuid.UUID] = None
+        # Public Intercom app id. The server-computed identity hash (user_hash) is
+        # delivered per-user via /users/me; only the non-secret app id is stored here
+        # as a fallback for when the server does not include it in user details.
+        self.intercom_app_id: str = ""
 
     def setup_public_config_and_other_settings(self):
         migrate_public_config()
@@ -287,6 +291,8 @@ class _Config:
 
         if intro_deck_id := os.getenv("INTRO_DECK_ID"):
             self.intro_deck_id = uuid.UUID(intro_deck_id)
+
+        self.intercom_app_id = os.getenv("INTERCOM_APP_ID", "") or build_config.get("intercom_app_id", "")
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.

@@ -594,6 +594,11 @@ class Tutorial:
         self._track_tutorial(event_name=event_name)
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
+        from . import intercom
+
+        # Collapse an open Messenger panel so it does not cover the tour;
+        # the launcher itself stays visible behind the backdrop (z-index).
+        intercom.close_messenger()
         self.show_current()
 
     def restart(self) -> None:

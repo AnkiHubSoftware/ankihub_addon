@@ -18,6 +18,7 @@ from .gui import (
     deck_options,
     deckbrowser,
     editor,
+    intercom,
     js_message_handling,
     overview,
     progress,
@@ -266,6 +267,9 @@ def _general_setup() -> None:
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
+
+    intercom.setup()
+    LOGGER.info("Set up Intercom messenger.")
 
     config.token_change_hook.append(refresh_user_state_in_background)
     LOGGER.info("Set up refreshing of user state on token change.")
