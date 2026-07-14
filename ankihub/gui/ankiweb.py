@@ -252,8 +252,9 @@ class AnkiwebDialog(QDialog):
         self.setMaximumHeight(450)
         self.setWindowTitle(initial_widget.title)
 
-    def replace_widget(self, widget: QWidget) -> None:
+    def replace_widget(self, widget: BaseAnkiwebWidget) -> None:
         self.layout().replaceWidget(self._widget, widget)
+        destroy_timer(self._widget._timer)
         self._widget.deleteLater()
         self._widget = widget
         self.setWindowTitle(widget.title)
@@ -273,6 +274,7 @@ class BaseAnkiwebWidget(QWidget):
         extr_bottom_button: QPushButton | None = None,
     ):
         self._dialog = dialog
+        self._timer: Countdown | None = None
         super().__init__()
         self._setup_ui(heading, main_description, form_widget, bottom_label, extr_bottom_button)
 
@@ -320,6 +322,10 @@ class BaseAnkiwebWidget(QWidget):
         vbox.setContentsMargins(20, 0, 20, 20)
         self.setLayout(vbox)
 
+    def init_timer(self, on_timeout: Callable[[int], None]) -> None:
+        destroy_timer(self._timer)
+        self._timer = Countdown(on_timeout, parent=self)
+
 
 class BaseLoginWidget(BaseAnkiwebWidget):
     title = "Sign into AnkiWeb"
@@ -345,7 +351,6 @@ class LoginWithCodeWidget(BaseLoginWidget):
             bottom_label=f"<a href='{AnkiwebLinkIds.SIGNUP_CODE.value}'>Sign up for a new account</a>",
             dialog=dialog,
         )
-        self._timer: Countdown | None = None
 
     def _create_form_widget(self) -> FormWidget:
         self.email_input = email_input = EmailInput()
@@ -385,9 +390,8 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
-        destroy_timer(self._timer)
-        self._timer = timer = Countdown(on_timeout)
-        timer.start()
+        self.init_timer(on_timeout)
+        self._timer.start()
         self.email_box.button.setEnabled(False)
         self.form_widget.error_label.set_error("")
 
@@ -499,7 +503,6 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
     def __init__(self, email: str, dialog: AnkiwebDialog):
         self.email = email
         self._dialog = dialog
-        self._timer: Countdown | None = None
         login_button = Button("Sign in")
         qconnect(login_button.clicked, self._on_login)
         super().__init__("Create a AnkiWeb account", "", self._create_form_widget(), "", dialog, login_button)
@@ -536,15 +539,13 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self.resend_button.setEnabled(True)
 
-        destroy_timer(self._timer)
-        self._timer = Countdown(on_timeout)
+        self.init_timer(on_timeout)
         self._timer.start()
 
     def _on_resend(self) -> None:
         self._start_timer()
 
     def _on_login(self) -> None:
-        destroy_timer(self._timer)
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
 
 
@@ -560,7 +561,6 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Have an account? Sign in.</a>",
             dialog=dialog,
         )
-        self._timer: QTimer | None = None
         if not self._is_retry:
             self._start_timer()
         else:
@@ -621,8 +621,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        destroy_timer(self._timer)
-        self._timer = Countdown(on_timeout)
+        self.init_timer(on_timeout)
         self._timer.start()
         self._update_code_button_state()
 
@@ -653,7 +652,6 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             except Exception as exc:
                 self._dialog.replace_widget(SignupCodeVerificationWidget(self.email, self._dialog, str(exc)))
 
-        destroy_timer(self._timer)
         aqt.mw.taskman.with_progress(task, on_done, parent=self, label="Creating account", immediate=True)
 
 
