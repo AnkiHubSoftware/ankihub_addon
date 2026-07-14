@@ -101,7 +101,7 @@ class Countdown(QTimer):
 
 class Heading(QLabel):
     def __init__(self, text: str, parent: QWidget | None = None):
-        super().__init__(text, parent)
+        super().__init__(text=text, parent=parent)
         font = self.font()
         font.setBold(True)
         font.setPointSize(20)
@@ -110,20 +110,20 @@ class Heading(QLabel):
 
 class Button(QPushButton):
     def __init__(self, text: str, parent: QWidget | None = None):
-        super().__init__(text, parent)
+        super().__init__(text=text, parent=parent)
         self.setFixedWidth(125)
 
 
 class CancelButton(Button):
     def __init__(self, dialog: AnkiwebDialog, parent: QWidget | None = None):
-        super().__init__("Cancel", parent)
+        super().__init__(text="Cancel", parent=parent)
         qconnect(self.clicked, lambda: dialog.close())
 
 
 class LabelWithLink(QLabel):
     def __init__(self, text: str, dialog: AnkiwebDialog, parent: QWidget | None = None):
         self._dialog = dialog
-        super().__init__(text, parent)
+        super().__init__(text=text, parent=parent)
         qconnect(self.linkActivated, self._on_link_activated)
 
     def _on_link_activated(self, link: str) -> None:
@@ -184,11 +184,11 @@ class CodeInput(BaseInput):
 
 
 class EmailInput(BaseInput):
-    def __init__(self, text: str = "", parent: QWidget | None = None):
+    def __init__(self, contents: str = "", parent: QWidget | None = None):
         ankihub_email = config.user()
-        if ankihub_email and is_email(ankihub_email) and not text:
-            text = ankihub_email
-        super().__init__(text, parent)
+        if ankihub_email and is_email(ankihub_email) and not contents:
+            contents = ankihub_email
+        super().__init__(contents, parent=parent)
 
     def is_initial_text_valid(self):
         return is_email(self.text())
@@ -198,9 +198,9 @@ FormRow = tuple[str, QWidget] | QWidget
 
 
 class FormWidget(QGroupBox):
-    def __init__(self, description: str, rows: list[FormRow], dialog: AnkiwebDialog):
+    def __init__(self, description: str, rows: list[FormRow], dialog: AnkiwebDialog, parent: QWidget | None = None):
         self._dialog = dialog
-        super().__init__()
+        super().__init__(parent)
         self._setup_ui(description, rows)
 
     def _setup_ui(self, description: str, rows: list[FormRow]) -> None:
@@ -266,10 +266,11 @@ class BaseAnkiwebWidget(QWidget):
         bottom_label: str,
         dialog: AnkiwebDialog,
         extr_bottom_button: QPushButton | None = None,
+        parent: QWidget | None = None,
     ):
         self._dialog = dialog
         self._timer: Countdown | None = None
-        super().__init__()
+        super().__init__(parent=parent)
         self._setup_ui(heading, main_description, form_widget, bottom_label, extr_bottom_button)
 
     def _setup_ui(
@@ -332,7 +333,14 @@ class BaseLoginWidget(BaseAnkiwebWidget):
         dialog: AnkiwebDialog,
         extr_bottom_button: QPushButton | None = None,
     ):
-        super().__init__(self.title, main_description, form_widget, bottom_label, dialog, extr_bottom_button)
+        super().__init__(
+            heading=self.title,
+            main_description=main_description,
+            form_widget=form_widget,
+            bottom_label=bottom_label,
+            dialog=dialog,
+            extr_bottom_button=extr_bottom_button,
+        )
 
 
 class LoginWithCodeWidget(BaseLoginWidget):
@@ -472,13 +480,26 @@ class BaseSignupWidget(BaseAnkiwebWidget):
         dialog: AnkiwebDialog,
         extr_bottom_button: QPushButton | None = None,
     ):
-        super().__init__(heading, main_description, form_widget, bottom_label, dialog, extr_bottom_button)
+        super().__init__(
+            heading=heading,
+            main_description=main_description,
+            form_widget=form_widget,
+            bottom_label=bottom_label,
+            dialog=dialog,
+            extr_bottom_button=extr_bottom_button,
+        )
 
 
 class SignupErrorWidget(BaseSignupWidget):
     def __init__(self, error: str, dialog: AnkiwebDialog):
         self._dialog = dialog
-        super().__init__("Create an AnkiWeb account", "", self._create_form_widget(error), "", dialog)
+        super().__init__(
+            heading="Create an AnkiWeb account",
+            main_description="",
+            form_widget=self._create_form_widget(error),
+            bottom_label="",
+            dialog=dialog,
+        )
 
     def _create_form_widget(self, error: str) -> FormWidget:
         form_widget = FormWidget(
@@ -499,7 +520,14 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         self._dialog = dialog
         login_button = Button("Sign in")
         qconnect(login_button.clicked, self._on_login)
-        super().__init__("Create an AnkiWeb account", "", self._create_form_widget(), "", dialog, login_button)
+        super().__init__(
+            heading="Create an AnkiWeb account",
+            main_description="",
+            form_widget=self._create_form_widget(),
+            bottom_label="",
+            dialog=dialog,
+            extr_bottom_button=login_button,
+        )
         self._start_timer()
 
     def _create_form_widget(self) -> FormWidget:
