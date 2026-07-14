@@ -128,7 +128,7 @@ class LabelWithLink(QLabel):
         qconnect(self.linkActivated, self._on_link_activated)
 
     def _on_link_activated(self, link: str) -> None:
-        if link in (link.value for link in AnkiwebLinkIds):
+        if link in (link_id.value for link_id in AnkiwebLinkIds):
             widget_type = widget_for_link(AnkiwebLinkIds(link))
             widget = widget_type(self._dialog)
             self._dialog.replace_widget(widget)
