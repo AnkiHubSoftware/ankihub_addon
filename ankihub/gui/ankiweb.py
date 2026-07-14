@@ -377,6 +377,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
 
     def _on_email_changed(self, text: str) -> None:
         self.email_box.button.setEnabled(is_email(text))
+        self.code_box.button.setEnabled(bool(self.code_input.text()) and is_email(text))
 
     def _on_code_changed(self, text: str) -> None:
         self.code_box.button.setEnabled(bool(text) and is_email(self.email_input.text()))
