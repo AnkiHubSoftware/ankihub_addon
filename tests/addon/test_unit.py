@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
@@ -985,7 +985,7 @@ class TestAnkiwebLoginWithCodeWidget:
     def _widget(self, qtbot: QtBot) -> LoginWithCodeWidget:
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
-        return dialog._widget
+        return cast(LoginWithCodeWidget, dialog._widget)
 
     def test_get_code_button_enabled_only_for_valid_email(self, qtbot: QtBot):
         widget = self._widget(qtbot)
@@ -1051,7 +1051,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
         dialog.show()
-        widget: LoginWithCodeWidget = dialog._widget
+        widget = cast(LoginWithCodeWidget, dialog._widget)
         widget.email_input.setText("user@example.com")
         widget.code_input.setText("123456")
 
@@ -1065,7 +1065,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
         dialog.show()
-        widget: LoginWithCodeWidget = dialog._widget
+        widget = cast(LoginWithCodeWidget, dialog._widget)
         widget.email_input.setText("user@example.com")
         widget.code_input.setText("123456")
 
@@ -1092,7 +1092,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         monkeypatch.setenv("ANKIWEB_SIMULATE_EXISTING_ACCOUNT", "true")
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
-        widget: SignupWithCodeWidget = dialog._widget
+        widget = cast(SignupWithCodeWidget, dialog._widget)
         widget.terms_checkbox.setChecked(True)
         widget.email_input.setText("user@example.com")
 
@@ -1105,7 +1105,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         monkeypatch.setenv("ANKIWEB_SIMULATE_GENERAL_ERROR", "true")
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
-        widget: SignupWithCodeWidget = dialog._widget
+        widget = cast(SignupWithCodeWidget, dialog._widget)
         widget.terms_checkbox.setChecked(True)
         widget.email_input.setText("user@example.com")
 
@@ -1119,7 +1119,7 @@ class TestAnkiwebLoginAndSignupSubmission:
     def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot):
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
-        widget: SignupWithCodeWidget = dialog._widget
+        widget = cast(SignupWithCodeWidget, dialog._widget)
         widget.terms_checkbox.setChecked(True)
         widget.email_input.setText("user@example.com")
 
