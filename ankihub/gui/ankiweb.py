@@ -15,6 +15,7 @@ from aqt.qt import (
     QHBoxLayout,
     QIntValidator,
     QLabel,
+    QLayout,
     QLineEdit,
     QPushButton,
     Qt,
@@ -60,7 +61,7 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
     raise Exception(f"unexpected arg received: {type(arg)} {arg}")
 
 
-def widget_for_link(link: AnkiwebLinkIds) -> type[BaseAnkiwebWidget]:
+def widget_for_link(link: AnkiwebLinkIds) -> Callable[[AnkiwebDialog], BaseAnkiwebWidget]:
     if link == AnkiwebLinkIds.LOGIN_CODE:
         return LoginWithCodeWidget
     elif link == AnkiwebLinkIds.LOGIN_PASSWORD:
@@ -80,7 +81,7 @@ def destroy_timer(timer: QTimer | None) -> None:
 
 
 def timer_is_active(timer: Countdown | None) -> bool:
-    return timer and not sip.isdeleted(timer) and timer.isActive() and timer.remaining_seconds > 0
+    return bool(timer) and not sip.isdeleted(timer) and timer.isActive() and timer.remaining_seconds > 0
 
 
 class Countdown(QTimer):
@@ -194,7 +195,7 @@ class EmailInput(BaseInput):
         return is_email(self.text())
 
 
-FormRow = tuple[str, QWidget] | QWidget
+FormRow = tuple[str, QWidget | QLayout] | QWidget | QLayout
 
 
 class FormWidget(QGroupBox):
@@ -205,15 +206,16 @@ class FormWidget(QGroupBox):
 
     def _setup_ui(self, description: str, rows: list[FormRow]) -> None:
         self.error_label = error_label = ErrorLabel(self)
-        description = LabelWithLink(description, self._dialog)
-        description.setWordWrap(True)
-        description.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        description_label = LabelWithLink(description, self._dialog)
+        description_label.setWordWrap(True)
+        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         form_layout = QFormLayout()
         form_layout.addRow(error_label)
-        form_layout.addRow(description)
+        form_layout.addRow(description_label)
         for row in rows:
             if isinstance(row, tuple):
-                form_layout.addRow(*row)
+                label, field = row
+                form_layout.addRow(label, field)
             else:
                 form_layout.addRow(row)
         form_layout.setVerticalSpacing(10)
@@ -284,8 +286,8 @@ class BaseAnkiwebWidget(QWidget):
         vbox = QVBoxLayout()
 
         if heading:
-            heading = Heading(heading)
-            vbox.addWidget(heading)
+            heading_label = Heading(heading)
+            vbox.addWidget(heading_label)
 
         if main_description:
             description_label = QLabel(main_description)
@@ -600,7 +602,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             qconnect(email_input.textChanged, self._on_email_changed)
             self._on_email_changed(self.email)
             qconnect(email_box.button.clicked, self._on_get_code)
-            rows = [("Email", email_box), ("Code", code_box)]
+            rows: list[FormRow] = [("Email", email_box), ("Code", code_box)]
         else:
             instructions_label = QLabel(EMAIL_INSTRUCTIONS)
             instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -705,7 +707,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             qconnect(email_input.textChanged, self._on_email_changed)
             self.email_box = InputWithButtonHbox(email_input, "Sign up")
             qconnect(self.email_box.button.clicked, self._on_sign_up)
-            rows = [terms_hbox, ("Email", self.email_box)]
+            rows: list[FormRow] = [terms_hbox, ("Email", self.email_box)]
         else:
             self.email_input = email_input = EmailInput()
             qconnect(email_input.textChanged, self._on_email_changed)
@@ -740,7 +742,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
         return form_widget
 
-    def _update_signup_button_state(self) -> bool:
+    def _update_signup_button_state(self) -> None:
         enabled = self.terms_checkbox.isChecked() and is_email(self.email_input.text())
         button = self.email_box.button if self.is_code_signup else self.repeat_password_box.button
         if not self.is_code_signup:
@@ -775,10 +777,9 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 fut.result()
                 args = (self.email_input.text(), self._dialog)
                 if self.is_code_signup:
-                    widget_class = SignupCodeVerificationWidget
+                    self._dialog.replace_widget(SignupCodeVerificationWidget(*args))
                 else:
-                    widget_class = SignupEmailVerificationWidget
-                self._dialog.replace_widget(widget_class(*args))
+                    self._dialog.replace_widget(SignupEmailVerificationWidget(*args))
             except Exception as exc:
                 if simulate_existing_account():
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog))
