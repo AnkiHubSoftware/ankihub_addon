@@ -717,6 +717,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             rows=rows,
             dialog=self._dialog,
         )
+        self._update_signup_button_state()
         return form_widget
 
     def _update_signup_button_state(self) -> bool:
