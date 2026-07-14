@@ -85,13 +85,13 @@ def destroy_timer(timer: QTimer | None) -> None:
         timer.deleteLater()
 
 
-def timer_is_active(timer: QTimer | None) -> bool:
-    return timer and not sip.isdeleted(timer) and timer.isActive()
+def timer_is_active(timer: Countdown | None) -> bool:
+    return timer and not sip.isdeleted(timer) and timer.isActive() and timer.remaining_seconds > 0
 
 
 class Countdown(QTimer):
     def __init__(self, callback: Callable[[int], None], seconds: int = 5, parent: QWidget | None = None):
-        self._remaining_seconds = seconds
+        self.remaining_seconds = seconds
         self._callback = callback
         super().__init__(parent)
         self.setInterval(1000)
@@ -99,9 +99,9 @@ class Countdown(QTimer):
         self._on_timeout()
 
     def _on_timeout(self) -> None:
-        self._callback(self._remaining_seconds)
-        self._remaining_seconds -= 1
-        if self._remaining_seconds < 0:
+        self._callback(self.remaining_seconds)
+        self.remaining_seconds -= 1
+        if self.remaining_seconds < 0:
             destroy_timer(self)
 
 
@@ -552,24 +552,26 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
     def __init__(self, email: str, dialog: AnkiwebDialog, error: str = ""):
         self.email = email
         self._dialog = dialog
-        self._error = error
+        self._is_retry = bool(error)
         super().__init__(
             heading="Email confirmation",
             main_description="",
-            form_widget=self._create_form_widget(),
+            form_widget=self._create_form_widget(error),
             bottom_label=f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Have an account? Sign in.</a>",
             dialog=dialog,
         )
         self._timer: QTimer | None = None
-        if not error:
+        if not self._is_retry:
             self._start_timer()
+        else:
+            self._update_code_button_state()
 
-    def _create_form_widget(self) -> FormWidget:
+    def _create_form_widget(self, error: str = "") -> FormWidget:
         self.code_input = code_input = CodeInput()
         qconnect(code_input.textChanged, self._on_code_changed)
         self.code_box = code_box = InputWithButtonHbox(code_input, "Verify code")
         qconnect(code_box.button.clicked, self._on_verify_or_resend)
-        if self._error:
+        if self._is_retry:
             description = ""
             self.email_input = email_input = EmailInput(self.email)
             self.email_box = email_box = InputWithButtonHbox(email_input, "Get code")
@@ -590,24 +592,22 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             rows=rows,
             dialog=self._dialog,
         )
-        if self._error:
-            form_widget.error_label.set_error(self._error)
+        form_widget.error_label.set_error(error)
 
         return form_widget
 
     def _is_resend(self) -> bool:
-        # return self._resend_available and not bool(self.code_input.text())
         return not timer_is_active(self._timer) and not bool(self.code_input.text())
 
     def _update_code_button_state(self) -> None:
         button = self.code_box.button
         filled = bool(self.code_input.text())
-        # enabled = filled or self._resend_available
-        enabled = filled or not timer_is_active(self._timer)
-        if self._is_resend():
-            button.setText("Resend code")
-        else:
-            button.setText("Verify code")
+        enabled = filled or (not self._is_retry and not timer_is_active(self._timer))
+        if not self._is_retry:
+            if self._is_resend():
+                button.setText("Resend code")
+            else:
+                button.setText("Verify code")
         button.setEnabled(enabled)
 
     def _start_timer(self) -> None:
@@ -619,13 +619,11 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 f"If {self.email} exists, we sent a message to its inbox. " + resend_available_status
             )
             if not remaining_secs:
-                # self._resend_available = True
                 self._update_code_button_state()
 
         destroy_timer(self._timer)
         self._timer = Countdown(on_timeout)
         self._timer.start()
-        # self._resend_available = False
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
