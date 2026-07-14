@@ -384,7 +384,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 f"<br>Resend available in {remaining_secs}s" if remaining_secs else "Resend available"
             )
             self.status_label.setText(
-                f"If {email} belongs to an existing account, you will receive a message in your inbox. "
+                f"If {email} belongs to an existing account, you will receive a message in your inbox.<br>"
                 + resend_available_status
             )
             if not remaining_secs:
@@ -534,7 +534,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
                 f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
             )
             self.description_label.setText(
-                f"✉️ If {self.email} exists, we sent a verification link to its inbox. " + resend_available_status
+                f"✉️ If {self.email} exists, we sent a verification link to its inbox.<br>" + resend_available_status
             )
             if not remaining_secs:
                 self.resend_button.setEnabled(True)
@@ -616,7 +616,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
             )
             self.status_label.setText(
-                f"If {self.email} exists, we sent a message to its inbox. " + resend_available_status
+                f"If {self.email} exists, we sent a message to its inbox.<br>" + resend_available_status
             )
             if not remaining_secs:
                 self._update_code_button_state()
