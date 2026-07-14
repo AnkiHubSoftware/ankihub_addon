@@ -267,13 +267,13 @@ class BaseAnkiwebWidget(QWidget):
         form_widget: FormWidget,
         bottom_label: str,
         dialog: AnkiwebDialog,
-        extr_bottom_button: QPushButton | None = None,
+        extra_bottom_button: QPushButton | None = None,
         parent: QWidget | None = None,
     ):
         self._dialog = dialog
         self._timer: Countdown | None = None
         super().__init__(parent=parent)
-        self._setup_ui(heading, main_description, form_widget, bottom_label, extr_bottom_button)
+        self._setup_ui(heading, main_description, form_widget, bottom_label, extra_bottom_button)
 
     def _setup_ui(
         self,
@@ -281,7 +281,7 @@ class BaseAnkiwebWidget(QWidget):
         main_description: str,
         form_widget: FormWidget,
         bottom_label: str,
-        extr_bottom_button: QPushButton | None,
+        extra_bottom_button: QPushButton | None,
     ) -> None:
         vbox = QVBoxLayout()
 
@@ -311,8 +311,8 @@ class BaseAnkiwebWidget(QWidget):
         buttons_hbox = QHBoxLayout()
         buttons_hbox.setAlignment(Qt.AlignmentFlag.AlignRight)
         buttons_hbox.addWidget(cancel_button)
-        if extr_bottom_button:
-            buttons_hbox.addWidget(extr_bottom_button)
+        if extra_bottom_button:
+            buttons_hbox.addWidget(extra_bottom_button)
         bottom_hbox.addLayout(buttons_hbox)
         vbox.addLayout(bottom_hbox)
 
@@ -333,7 +333,7 @@ class BaseLoginWidget(BaseAnkiwebWidget):
         form_widget: FormWidget,
         bottom_label: str,
         dialog: AnkiwebDialog,
-        extr_bottom_button: QPushButton | None = None,
+        extra_bottom_button: QPushButton | None = None,
     ):
         super().__init__(
             heading=self.title,
@@ -341,7 +341,7 @@ class BaseLoginWidget(BaseAnkiwebWidget):
             form_widget=form_widget,
             bottom_label=bottom_label,
             dialog=dialog,
-            extr_bottom_button=extr_bottom_button,
+            extra_bottom_button=extra_bottom_button,
         )
 
 
@@ -478,7 +478,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
         form_widget: FormWidget,
         bottom_label: str,
         dialog: AnkiwebDialog,
-        extr_bottom_button: QPushButton | None = None,
+        extra_bottom_button: QPushButton | None = None,
     ):
         super().__init__(
             heading=heading,
@@ -486,7 +486,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
             form_widget=form_widget,
             bottom_label=bottom_label,
             dialog=dialog,
-            extr_bottom_button=extr_bottom_button,
+            extra_bottom_button=extra_bottom_button,
         )
 
 
@@ -526,7 +526,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             form_widget=self._create_form_widget(),
             bottom_label="",
             dialog=dialog,
-            extr_bottom_button=login_button,
+            extra_bottom_button=login_button,
         )
         self._start_timer()
 
