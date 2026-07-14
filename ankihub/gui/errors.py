@@ -338,6 +338,18 @@ def _is_internet_available():
         return False
 
 
+def _resume_sync_after_terms_accepted() -> None:
+    """Resume the AnkiHub sync that was blocked by an unaccepted terms agreement (Qt5 path).
+
+    On Qt5 the terms page is opened in the external browser and acceptance is detected by polling;
+    once accepted we re-trigger the sync the user originally attempted (see NRT-822).
+    """
+    from .operations.ankihub_sync import sync_with_ankihub
+
+    show_tooltip("Terms accepted. Syncing with AnkiHub…", parent=aqt.mw)
+    sync_with_ankihub(on_done=lambda future: future.result())
+
+
 def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     """Return True if the error was handled, False otherwise."""
     response = error.response
@@ -354,7 +366,11 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
             return False
 
         if response_data.get("detail") == TERMS_AGREEMENT_NOT_ACCEPTED_DETAIL:
-            run_with_delay_when_progress_dialog_is_open(TermsAndConditionsDialog.display, parent=aqt.mw)
+            run_with_delay_when_progress_dialog_is_open(
+                TermsAndConditionsDialog.display,
+                parent=aqt.mw,
+                on_accepted=_resume_sync_after_terms_accepted,
+            )
             return True
 
     elif response.status_code == 406:

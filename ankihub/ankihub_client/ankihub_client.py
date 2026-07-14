@@ -1287,6 +1287,21 @@ class AnkiHubClient:
 
         return response.json()
 
+    def is_terms_agreement_accepted(self) -> bool:
+        """Return whether the user has accepted the terms & conditions (and filled the required
+        personal info gated by the same permission).
+
+        There is no dedicated terms-status endpoint, so this re-issues a lightweight request guarded
+        by that permission: a 200 means accepted, a 403 means not accepted yet. Used to poll for
+        acceptance when the terms page is opened in the external browser (Qt5 builds, see NRT-822).
+        """
+        response = self._send_request("GET", API.ANKIHUB, "/users/decks/")
+        if response.status_code == 200:
+            return True
+        if response.status_code == 403:
+            return False
+        raise AnkiHubHTTPError(response)
+
     def owned_deck_ids(self) -> List[uuid.UUID]:
         data = self.get_user_details()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
