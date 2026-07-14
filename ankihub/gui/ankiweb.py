@@ -322,7 +322,7 @@ class BaseAnkiwebWidget(QWidget):
 
 
 class BaseLoginWidget(BaseAnkiwebWidget):
-    title = "Sign into Anki"
+    title = "Sign into AnkiWeb"
 
     def __init__(
         self,
@@ -463,7 +463,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
 
 
 class BaseSignupWidget(BaseAnkiwebWidget):
-    title = "Create a new account"
+    title = "Create a AnkiWeb account"
 
     def __init__(
         self,
@@ -480,7 +480,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
 class SignupErrorWidget(BaseSignupWidget):
     def __init__(self, error: str, dialog: AnkiwebDialog):
         self._dialog = dialog
-        super().__init__("Create a new account", "", self._create_form_widget(error), "", dialog)
+        super().__init__("Create a AnkiWeb account", "", self._create_form_widget(error), "", dialog)
 
     def _create_form_widget(self, error: str) -> FormWidget:
         form_widget = FormWidget(
@@ -502,7 +502,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         self._timer: Countdown | None = None
         login_button = Button("Sign in")
         qconnect(login_button.clicked, self._on_login)
-        super().__init__("Create a new account", "", self._create_form_widget(), "", dialog, login_button)
+        super().__init__("Create a AnkiWeb account", "", self._create_form_widget(), "", dialog, login_button)
         self._start_timer()
 
     def _create_form_widget(self) -> FormWidget:
@@ -662,7 +662,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self.is_code_signup = is_code_signup
         self._dialog = dialog
         super().__init__(
-            heading="Create a new account",
+            heading="Create a AnkiWeb account",
             main_description="<b>Sign up to gain access to Anki's web companion and cloud storage.</b><br>"
             "This is a free account and it can keep your flashcard data in sync across your devices and the cloud.",
             form_widget=self._create_form_widget(),
