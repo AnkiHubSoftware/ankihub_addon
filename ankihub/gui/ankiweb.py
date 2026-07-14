@@ -4,7 +4,7 @@ import os
 import time
 from concurrent.futures import Future
 from enum import Enum
-from typing import Callable, NoReturn
+from typing import Callable, NoReturn, Union
 
 import aqt
 from aqt.qt import (
@@ -195,7 +195,7 @@ class EmailInput(BaseInput):
         return is_email(self.text())
 
 
-FormRow = tuple[str, QWidget | QLayout] | QWidget | QLayout
+FormRow = Union[tuple[str, Union[QWidget, QLayout]], QWidget, QLayout]
 
 
 class FormWidget(QGroupBox):
