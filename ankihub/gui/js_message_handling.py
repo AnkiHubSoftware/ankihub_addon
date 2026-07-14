@@ -25,6 +25,7 @@ from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import robust_filter
+from .webview import FILE_PICKER_CLOSED_PYCMD, AnkiHubWebViewDialog
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -140,6 +141,14 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return (True, None)
     elif message == OPEN_CONFIG_PYCMD:
         get_config_dialog_manager().open_config()
+        return (True, None)
+    elif message == FILE_PICKER_CLOSED_PYCMD:
+        # On macOS, dismissing the native file picker activates Anki's main window,
+        # which buries the (non-modal) dialog the picker was opened from behind it.
+        if isinstance(context, AnkiHubWebViewDialog) and not sip.isdeleted(context):
+            context.raise_()
+            context.activateWindow()
+
         return (True, None)
     elif message.startswith(ADD_TO_BLOCK_EXAM_SUBDECK):
         kwargs = parse_js_message_kwargs(message)

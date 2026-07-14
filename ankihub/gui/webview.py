@@ -21,6 +21,27 @@ from .. import LOGGER
 from ..settings import config
 from .utils import using_qt5
 
+FILE_PICKER_CLOSED_PYCMD = "ankihub_file_picker_closed"
+
+# When the native file picker opened from the web view is dismissed (file chosen or cancelled),
+# macOS activates Anki's main window instead of this non-modal dialog, burying the dialog behind it.
+# The page notifies us when the picker closes so we can bring the dialog back to the front.
+FILE_PICKER_WATCHER_JS = f"""
+(function() {{
+    if (window.ankihubFilePickerWatcherInstalled) {{
+        return;
+    }}
+    window.ankihubFilePickerWatcherInstalled = true;
+    function notifyFilePickerClosed(event) {{
+        if (event.target && event.target.matches && event.target.matches("input[type=file]")) {{
+            pycmd("{FILE_PICKER_CLOSED_PYCMD}");
+        }}
+    }}
+    document.addEventListener("cancel", notifyFilePickerClosed, true);
+    document.addEventListener("change", notifyFilePickerClosed, true);
+}})();
+"""
+
 
 class AnkiHubWebViewDialog(QDialog):
     """A dialog that displays a web view. The purpose is to show an AnkiHub web app page.
@@ -134,6 +155,7 @@ class AnkiHubWebViewDialog(QDialog):
             return  # pragma: no cover
 
         self._adjust_web_styling()
+        self.web.eval(FILE_PICKER_WATCHER_JS)
         self._on_successful_page_load()
 
     def _handle_auth_failure_if_needed(self) -> None:

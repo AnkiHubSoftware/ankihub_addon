@@ -8761,6 +8761,44 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
+    @pytest.mark.sequential
+    def test_dialog_is_raised_when_file_picker_closes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Regression test: on macOS, dismissing the native file picker opened from the
+        # web view activates Anki's main window, burying the (non-modal) dialog behind it.
+        # The page notifies us via a pycmd so we can bring the dialog back to the front.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+
+            # Load a page with a file input so the file-picker watcher has something to observe.
+            self._mock_load_url_to_show_page(mocker, body='<input type="file" id="fileinput">')
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            raise_mock = mocker.patch.object(dialog, "raise_")
+            activate_mock = mocker.patch.object(dialog, "activateWindow")
+
+            # Wait for the page (and thus the watcher JS) to finish loading, then simulate
+            # the picker closing by dispatching a `cancel` event on the file input.
+            qtbot.wait_until(lambda: dialog.web.page() is not None)
+            qtbot.wait(500)
+            dialog.web.eval(
+                "document.getElementById('fileinput')"
+                ".dispatchEvent(new Event('cancel', {bubbles: true}))"
+            )
+
+            qtbot.wait_until(lambda: raise_mock.called)
+            assert activate_mock.called
+
     def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
         original_load_url = aqt.webview.AnkiWebView.load_url
 
