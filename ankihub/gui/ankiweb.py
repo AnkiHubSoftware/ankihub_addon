@@ -26,6 +26,7 @@ from aqt.qt import (
 )
 from aqt.utils import openLink, tooltip
 
+from ..settings import config
 from .utils import is_email, warning_icon
 
 ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
@@ -168,18 +169,35 @@ class ErrorLabel(QWidget):
         self.status.setText(text)
 
 
-class PasswordInput(QLineEdit):
+class BaseInput(QLineEdit):
+    def is_initial_text_valid(self) -> bool:
+        """Used by InputWithButtonHbox to determine if the associated button should be enabled by default."""
+        return False
+
+
+class PasswordInput(BaseInput):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setEchoMode(QLineEdit.EchoMode.Password)
 
 
-class CodeInput(QLineEdit):
+class CodeInput(BaseInput):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         code_validator = QIntValidator(100000, 999999)
         self.setValidator(code_validator)
         self.setStyleSheet("""QLineEdit {letter-spacing: 2px}""")
+
+
+class EmailInput(BaseInput):
+    def __init__(self, text: str = "", parent: QWidget | None = None):
+        ankihub_email = config.user()
+        if ankihub_email and is_email(ankihub_email) and not text:
+            text = ankihub_email
+        super().__init__(text, parent)
+
+    def is_initial_text_valid(self):
+        return is_email(self.text())
 
 
 FormRow = tuple[str, QWidget] | QWidget
@@ -210,10 +228,10 @@ class FormWidget(QGroupBox):
 
 
 class InputWithButtonHbox(QHBoxLayout):
-    def __init__(self, input_widget: QWidget, button_label: str, parent: QWidget | None = None):
+    def __init__(self, input_widget: BaseInput, button_label: str, parent: QWidget | None = None):
         super().__init__(parent)
         self.button = button = Button(button_label)
-        button.setEnabled(False)
+        button.setEnabled(input_widget.is_initial_text_valid())
         self.setSpacing(5)
         self.addWidget(input_widget)
         self.addWidget(button)
@@ -330,7 +348,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
         self._timer: Countdown | None = None
 
     def _create_form_widget(self) -> FormWidget:
-        self.email_input = email_input = QLineEdit()
+        self.email_input = email_input = EmailInput()
         qconnect(email_input.textChanged, self._on_email_changed)
         self.email_box = email_box = InputWithButtonHbox(email_input, "Get code")
         qconnect(email_box.button.clicked, self._on_get_code)
@@ -403,7 +421,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         )
 
     def _create_form_widget(self) -> FormWidget:
-        self.email_input = email_input = QLineEdit()
+        self.email_input = email_input = EmailInput()
         qconnect(email_input.textChanged, self._on_email_changed)
         self.password_input = password_input = PasswordInput()
         qconnect(password_input.textChanged, self._on_password_changed)
@@ -553,7 +571,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         qconnect(code_box.button.clicked, self._on_verify_or_resend)
         if self._error:
             description = ""
-            self.email_input = email_input = QLineEdit(self.email)
+            self.email_input = email_input = EmailInput(self.email)
             self.email_box = email_box = InputWithButtonHbox(email_input, "Get code")
             qconnect(email_input.textChanged, self._on_email_changed)
             self._on_email_changed(self.email)
@@ -665,13 +683,13 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         terms_hbox.addWidget(terms_checkbox)
         terms_hbox.addWidget(terms_label)
         if self.is_code_signup:
-            self.email_input = email_input = QLineEdit()
+            self.email_input = email_input = EmailInput()
             qconnect(email_input.textChanged, self._on_email_changed)
             self.email_box = InputWithButtonHbox(email_input, "Sign up")
             qconnect(self.email_box.button.clicked, self._on_sign_up)
             rows = [terms_hbox, ("Email", self.email_box)]
         else:
-            self.email_input = email_input = QLineEdit()
+            self.email_input = email_input = EmailInput()
             qconnect(email_input.textChanged, self._on_email_changed)
             self.password_input = password_input = PasswordInput()
             qconnect(password_input.textChanged, self._on_password_changed)
