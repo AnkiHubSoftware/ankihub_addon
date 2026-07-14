@@ -384,9 +384,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
     def _on_get_code(self) -> None:
         def on_timeout(remaining_secs: int) -> None:
             email = self.email_input.text()
-            resend_available_status = (
-                f"<br>Resend available in {remaining_secs}s" if remaining_secs else "Resend available"
-            )
+            resend_available_status = f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available"
             self.status_label.setText(
                 f"If {email} belongs to an existing account, you will receive a message in your inbox.<br>"
                 + resend_available_status
