@@ -363,6 +363,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
         qconnect(email_box.button.clicked, self._on_get_code)
 
         self.code_input = code_input = CodeInput()
+        code_input.setEnabled(False)
         qconnect(code_input.textChanged, self._on_code_changed)
         self.code_box = code_box = InputWithButtonHbox(code_input, "Sign in")
         qconnect(code_box.button.clicked, self._on_sign_in)
@@ -396,6 +397,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
         self.init_timer(on_timeout)
         self._timer.start()
         self.email_box.button.setEnabled(False)
+        self.code_input.setEnabled(True)
         self.form_widget.error_label.set_error("")
 
     def _on_sign_in(self) -> None:
