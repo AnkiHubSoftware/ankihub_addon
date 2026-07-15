@@ -17,6 +17,7 @@ from aqt.qt import (
     QLabel,
     QLayout,
     QLineEdit,
+    QProgressBar,
     QPushButton,
     QSize,
     Qt,
@@ -102,11 +103,11 @@ class Countdown(QTimer):
 
 
 class Heading(QLabel):
-    def __init__(self, text: str, parent: QWidget | None = None):
+    def __init__(self, text: str, font_size: int = 20, parent: QWidget | None = None):
         super().__init__(text=text, parent=parent)
         font = self.font()
         font.setBold(True)
-        font.setPointSize(20)
+        font.setPointSize(font_size)
         self.setFont(font)
 
 
@@ -246,6 +247,7 @@ class FixedDialogLayout(QVBoxLayout):
 class AnkiwebDialog(QDialog):
     def __init__(self, initial_widget: BaseAnkiwebWidget, parent: QWidget | None = None):
         super().__init__(parent)
+        self._progress_widget: InlineProgressWidget | None = None
         self._setup_ui(initial_widget)
 
     def _setup_ui(self, initial_widget: BaseAnkiwebWidget) -> None:
@@ -263,6 +265,26 @@ class AnkiwebDialog(QDialog):
         self._widget = widget
         self.setWindowTitle(widget.title)
         self.adjustSize()
+
+    def show_progress(self, widget: InlineProgressWidget) -> None:
+        self._widget.setVisible(False)
+        if self._progress_widget:
+            self.layout().replaceWidget(self._progress_widget, widget)
+        else:
+            self.layout().addWidget(widget)
+        self._progress_widget = widget
+        self.setWindowTitle(widget.title)
+
+    def hide_progress(self) -> None:
+        assert self._progress_widget
+        self.layout().removeWidget(self._progress_widget)
+        self._progress_widget = None
+        self._widget.setVisible(True)
+        self.setWindowTitle(self._widget.title)
+
+    def update_progress(self, status: str) -> None:
+        if self._progress_widget:
+            aqt.mw.taskman.run_on_main(lambda: self._progress_widget.set_progress_status(status))
 
 
 class BaseAnkiwebWidget(QWidget):
@@ -331,6 +353,52 @@ class BaseAnkiwebWidget(QWidget):
     def init_timer(self, on_timeout: Callable[[int], None]) -> None:
         destroy_timer(self._timer)
         self._timer = Countdown(on_timeout, parent=self)
+
+
+def run_with_progress(
+    dialog: AnkiwebDialog,
+    heading: str,
+    status: str,
+    task: Callable,
+    on_done: Callable[[Future], None] | None = None,
+) -> None:
+    def wrapped_on_done(fut: Future) -> None:
+        if sip.isdeleted(dialog):
+            return
+        dialog.hide_progress()
+        if on_done:
+            on_done(fut)
+
+    dialog.show_progress(InlineProgressWidget(heading=heading, status=status, dialog=dialog))
+    aqt.mw.taskman.run_in_background(task, wrapped_on_done)
+
+
+class InlineProgressWidget(BaseAnkiwebWidget):
+    def __init__(self, heading: str, status: str, dialog: AnkiwebDialog, parent: QWidget | None = None):
+        self._dialog = dialog
+        self.title = heading
+        super().__init__(
+            heading=heading,
+            main_description="",
+            form_widget=self._create_form_widget(status),
+            bottom_label="",
+            dialog=dialog,
+            extra_bottom_button=None,
+            parent=parent,
+        )
+
+    def _create_form_widget(self, status: str) -> FormWidget:
+        self.progress_label = label = Heading(status, 12)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        progress_bar = QProgressBar()
+        progress_bar.setValue(0)
+        progress_bar.setMaximum(0)
+        form_widget = FormWidget(description="", rows=[label, progress_bar], dialog=self._dialog)
+
+        return form_widget
+
+    def set_progress_status(self, status: str) -> None:
+        self.progress_label.setText(status)
 
 
 class BaseLoginWidget(BaseAnkiwebWidget):
@@ -424,7 +492,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 self.form_widget.error_label.set_error(str(exc))
                 self.code_input.clear()
 
-        aqt.mw.taskman.with_progress(task, on_done, parent=self, label="Signing you in", immediate=True)
+        run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
 
 
 class LoginWithPasswordWidget(BaseLoginWidget):
@@ -477,7 +545,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
             except Exception as exc:
                 self.form_widget.error_label.set_error(str(exc))
 
-        aqt.mw.taskman.with_progress(task, on_done, parent=self, label="Signing you in", immediate=True)
+        run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
 
 
 class BaseSignupWidget(BaseAnkiwebWidget):
@@ -680,6 +748,8 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
 
         def task() -> None:
             time.sleep(1)
+            self._dialog.update_progress("Signing you in")
+            time.sleep(1)
             if simulate_expired_code():
                 raise Exception("This code has expired. Request another.")
 
@@ -691,7 +761,9 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             except Exception as exc:
                 self._dialog.replace_widget(SignupCodeVerificationWidget(self.email, self._dialog, str(exc)))
 
-        aqt.mw.taskman.with_progress(task, on_done, parent=self, label="Creating account", immediate=True)
+        run_with_progress(
+            dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
+        )
 
 
 class BaseSignupFirstPageWidget(BaseSignupWidget):
@@ -801,7 +873,9 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 else:
                     self.form_widget.error_label.set_error(str(exc))
 
-        aqt.mw.taskman.with_progress(task, on_done, parent=self, label="Creating account", immediate=True)
+        run_with_progress(
+            dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
+        )
 
 
 class SignupWithPasswordWidget(BaseSignupFirstPageWidget):
