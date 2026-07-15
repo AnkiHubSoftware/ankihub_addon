@@ -176,6 +176,8 @@ class PasswordInput(BaseInput):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setEchoMode(QLineEdit.EchoMode.Password)
+        # Change the mask character to a star
+        self.setStyleSheet('QLineEdit[echoMode="2"] { lineedit-password-character: 9733; }')
 
 
 class CodeInput(BaseInput):
