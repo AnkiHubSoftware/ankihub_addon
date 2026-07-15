@@ -18,6 +18,7 @@ from aqt.qt import (
     QLayout,
     QLineEdit,
     QPushButton,
+    QSize,
     Qt,
     QTimer,
     QVBoxLayout,
@@ -233,6 +234,15 @@ class InputWithButtonHbox(QHBoxLayout):
         self.addWidget(button)
 
 
+class FixedDialogLayout(QVBoxLayout):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+
+    def sizeHint(self) -> QSize:
+        return QSize(525, 450)
+
+
 class AnkiwebDialog(QDialog):
     def __init__(self, initial_widget: BaseAnkiwebWidget, parent: QWidget | None = None):
         super().__init__(parent)
@@ -240,12 +250,10 @@ class AnkiwebDialog(QDialog):
 
     def _setup_ui(self, initial_widget: BaseAnkiwebWidget) -> None:
         self._widget = initial_widget
-        vbox = QVBoxLayout()
+        vbox = FixedDialogLayout()
         vbox.addWidget(initial_widget)
         vbox.setContentsMargins(0, 20, 0, 0)
         self.setLayout(vbox)
-        self.setFixedWidth(525)
-        self.setMaximumHeight(450)
         self.setWindowTitle(initial_widget.title)
 
     def replace_widget(self, widget: BaseAnkiwebWidget) -> None:
