@@ -623,7 +623,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         return not bool(self.code_input.text())
 
     def _update_code_button_state(self) -> None:
-        button = self.code_box.button
+        code_button = self.code_box.button
         code_is_valid = self.code_input.hasAcceptableInput()
         # Button is enabled if the code is valid or it's empty while the timer is not running
         enabled = code_is_valid or (
@@ -631,10 +631,12 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         )
         if not self._is_retry:
             if self._is_resend():
-                button.setText("Resend code")
+                code_button.setText("Resend code")
             else:
-                button.setText("Verify code")
-        button.setEnabled(enabled)
+                code_button.setText("Verify code")
+        code_button.setEnabled(enabled)
+        if self._is_retry:
+            self.email_box.button.setEnabled(not timer_is_active(self._timer))
 
     def _start_timer(self) -> None:
         def on_timeout(remaining_secs: int) -> None:
