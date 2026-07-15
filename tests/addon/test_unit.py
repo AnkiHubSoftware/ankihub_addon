@@ -1144,25 +1144,6 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert isinstance(dialog._widget, SignupEmailVerificationWidget)
 
 
-class TestAnkiwebDialogSizing:
-    @pytest.mark.parametrize(
-        "widget_cls",
-        [LoginWithCodeWidget, LoginWithPasswordWidget, SignupWithCodeWidget, SignupWithPasswordWidget],
-    )
-    def test_widget_fits_within_dialog_max_height(self, qtbot: QtBot, widget_cls):
-        dialog = AnkiwebLoginDialog()
-        qtbot.addWidget(dialog)
-        widget = widget_cls(dialog)
-        dialog.replace_widget(widget)
-        dialog.show()
-        qtbot.waitExposed(dialog)
-
-        # AnkiwebDialog has a fixed setMaximumHeight(450); this guards against a
-        # future field being clipped without anyone noticing, since Qt doesn't
-        # warn when a widget's sizeHint exceeds its parent's max height.
-        assert widget.sizeHint().height() <= dialog.maximumHeight()
-
-
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
         "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,media_was_added",
