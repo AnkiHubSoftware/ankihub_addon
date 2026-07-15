@@ -303,9 +303,10 @@ class BaseAnkiwebWidget(QWidget):
             vbox.addWidget(description_label)
 
         self.form_widget = form_widget
-        vbox.addWidget(form_widget)
+        vbox.addWidget(form_widget, stretch=1)
 
-        self.status_label = status_label = QLabel("")
+        # This reduces layout jumps when the status changes
+        self.status_label = status_label = QLabel("<br>")
         status_label.setWordWrap(True)
         status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         vbox.addWidget(status_label)
