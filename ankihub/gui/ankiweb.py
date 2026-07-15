@@ -377,10 +377,10 @@ class LoginWithCodeWidget(BaseLoginWidget):
 
     def _on_email_changed(self, text: str) -> None:
         self.email_box.button.setEnabled(is_email(text))
-        self.code_box.button.setEnabled(bool(self.code_input.text()) and is_email(text))
+        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(text))
 
     def _on_code_changed(self, text: str) -> None:
-        self.code_box.button.setEnabled(bool(text) and is_email(self.email_input.text()))
+        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(self.email_input.text()))
 
     def _on_get_code(self) -> None:
         def on_timeout(remaining_secs: int) -> None:
@@ -620,12 +620,15 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         return form_widget
 
     def _is_resend(self) -> bool:
-        return not timer_is_active(self._timer) and not bool(self.code_input.text())
+        return not bool(self.code_input.text())
 
     def _update_code_button_state(self) -> None:
         button = self.code_box.button
-        filled = bool(self.code_input.text())
-        enabled = filled or (not self._is_retry and not timer_is_active(self._timer))
+        code_is_valid = self.code_input.hasAcceptableInput()
+        # Button is enabled if the code is valid or it's empty while the timer is not running
+        enabled = code_is_valid or (
+            not self.code_input.text() and not self._is_retry and not timer_is_active(self._timer)
+        )
         if not self._is_retry:
             if self._is_resend():
                 button.setText("Resend code")
