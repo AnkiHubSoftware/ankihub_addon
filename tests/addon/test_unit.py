@@ -77,9 +77,11 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.ankihub_client import (
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_INTERCOM_APP_ID,
     DEFAULT_S3_BUCKET_URL,
     STAGING_API_URL,
     STAGING_APP_URL,
+    STAGING_INTERCOM_APP_ID,
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
@@ -4818,6 +4820,7 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.delenv("S3_BUCKET_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
+        monkeypatch.delenv("INTERCOM_APP_ID", raising=False)
         monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
 
     def test_production_defaults(self):
@@ -4826,6 +4829,7 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == DEFAULT_APP_URL
         assert config.api_url == DEFAULT_API_URL
         assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
+        assert config.intercom_app_id == DEFAULT_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
         assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -4835,6 +4839,7 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == STAGING_APP_URL
         assert config.api_url == STAGING_API_URL
         assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
+        assert config.intercom_app_id == STAGING_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
 
@@ -4884,6 +4889,12 @@ class TestSetupPublicConfigAndOtherSettings:
         config.public_config = {}
         config.setup_public_config_and_other_settings()
         assert config.intro_deck_id == uuid.UUID(custom_id)
+
+    def test_intercom_app_id_env_var_override(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("INTERCOM_APP_ID", "env_app_id")
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.intercom_app_id == "env_app_id"
 
 
 class TestIntercom:

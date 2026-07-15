@@ -69,10 +69,12 @@ LOGGER = structlog.stdlib.get_logger("ankihub")
 DEFAULT_APP_URL = "https://app.ankihub.net"
 DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
 DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
+DEFAULT_INTERCOM_APP_ID = "dwzv6k4w"
 
 STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
+STAGING_INTERCOM_APP_ID = "dwzv6k4w"
 
 API_VERSION = 24.0
 
