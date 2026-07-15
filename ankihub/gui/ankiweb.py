@@ -224,6 +224,7 @@ class FormWidget(QGroupBox):
                 form_layout.addRow(row)
         form_layout.setVerticalSpacing(10)
         form_layout.setHorizontalSpacing(5)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self.setLayout(form_layout)
 
 
