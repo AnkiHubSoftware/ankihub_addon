@@ -8791,10 +8791,7 @@ class TestFlashCardSelector:
             # the picker closing by dispatching a `cancel` event on the file input.
             qtbot.wait_until(lambda: dialog.web.page() is not None)
             qtbot.wait(500)
-            dialog.web.eval(
-                "document.getElementById('fileinput')"
-                ".dispatchEvent(new Event('cancel', {bubbles: true}))"
-            )
+            dialog.web.eval("document.getElementById('fileinput').dispatchEvent(new Event('cancel', {bubbles: true}))")
 
             qtbot.wait_until(lambda: raise_mock.called)
             assert activate_mock.called
