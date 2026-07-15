@@ -1035,7 +1035,7 @@ class TestAnkiwebLoginAndSignupSubmission:
     """
 
     @pytest.fixture(autouse=True)
-    def _patch_with_progress(self, mocker: MockerFixture):
+    def _patch_run_in_background(self, mocker: MockerFixture):
         mocker.patch("ankihub.gui.ankiweb.time.sleep")
 
         def run_sync(task, on_done, **kwargs):
@@ -1044,7 +1044,7 @@ class TestAnkiwebLoginAndSignupSubmission:
             except Exception as exc:
                 on_done(future_with_exception(exc))
 
-        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=run_sync)
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=run_sync)
 
     def test_login_with_code_success_closes_dialog(self, qtbot: QtBot, mocker: MockerFixture):
         tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
