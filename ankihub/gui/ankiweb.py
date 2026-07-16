@@ -236,7 +236,11 @@ class FormWidget(QGroupBox):
         form_layout = QFormLayout()
         for row in rows:
             if isinstance(row, tuple):
-                label, field = row
+                label_text, field = row
+                label = QLabel(label_text)
+                font = label.font()
+                font.setBold(True)
+                label.setFont(font)
                 form_layout.addRow(label, field)
             else:
                 form_layout.addRow(row)
