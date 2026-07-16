@@ -710,6 +710,10 @@ def warning_icon() -> QIcon:
     return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
 
 
+def error_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "error.svg").absolute()))
+
+
 def warning_triangle_icon() -> QIcon:
     """Flat, muted-gray warning triangle (vs the OS-styled yellow `warning_icon`)."""
     return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))

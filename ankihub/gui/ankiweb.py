@@ -30,7 +30,7 @@ from aqt.qt import (
 from aqt.utils import openLink, tooltip
 
 from ..settings import config
-from .utils import is_email, warning_icon
+from .utils import error_icon, is_email
 
 ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
 ANKIWEB_TERMS_LINK = "https://ankiweb.net/account/terms"
@@ -155,15 +155,15 @@ class ErrorLabel(QWidget):
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(1)
+        hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status = status = QLabel("")
         font = self.font()
         font.setBold(True)
         status.setFont(font)
         status.setTextFormat(Qt.TextFormat.RichText)
         status.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        error_icon = warning_icon()
         icon_label = QLabel()
-        icon_label.setPixmap(error_icon.pixmap(16, 16))
+        icon_label.setPixmap(error_icon().pixmap(16, 16))
         hbox.addStretch()
         hbox.addWidget(icon_label)
         hbox.addWidget(status)
