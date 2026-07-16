@@ -1183,6 +1183,9 @@ class TestSetupSyncDialogPatchFailure:
     def test_missing_sync_login_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
         original_sync_login = aqt.sync.sync_login
         get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
+        # Older Anki versions call this synchronously and unpack the result as
+        # (username, password)
+        get_id_and_pass_mock.return_value = ("", "")
         logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
 
         del aqt.sync.sync_login
