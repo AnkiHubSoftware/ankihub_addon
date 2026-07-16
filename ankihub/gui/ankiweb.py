@@ -209,23 +209,32 @@ class FormWidget(QGroupBox):
         self._setup_ui(description, rows)
 
     def _setup_ui(self, description: str, rows: list[FormRow]) -> None:
+        self.setContentsMargins(0, 0, 0, 0)
+        vbox = QVBoxLayout()
+        vbox.setSpacing(16)
+        vbox.setContentsMargins(12, 0, 12, 0)
+
         self.error_label = error_label = ErrorLabel(self)
-        description_label = LabelWithLink(description, self._dialog)
-        description_label.setWordWrap(True)
-        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        vbox.addWidget(error_label)
+
+        if description:
+            description_label = LabelWithLink(description, self._dialog)
+            description_label.setWordWrap(True)
+            description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            vbox.addWidget(description_label)
+
         form_layout = QFormLayout()
-        form_layout.addRow(error_label)
-        form_layout.addRow(description_label)
         for row in rows:
             if isinstance(row, tuple):
                 label, field = row
                 form_layout.addRow(label, field)
             else:
                 form_layout.addRow(row)
-        form_layout.setVerticalSpacing(10)
-        form_layout.setHorizontalSpacing(5)
+        form_layout.setSpacing(8)
         form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        self.setLayout(form_layout)
+        vbox.addLayout(form_layout)
+
+        self.setLayout(vbox)
 
 
 class InputWithButtonHbox(QHBoxLayout):
@@ -257,7 +266,7 @@ class AnkiwebDialog(QDialog):
         self._widget = initial_widget
         vbox = FixedDialogLayout()
         vbox.addWidget(initial_widget)
-        vbox.setContentsMargins(0, 20, 0, 0)
+        vbox.setContentsMargins(20, 20, 20, 20)
         self.setLayout(vbox)
         self.setWindowTitle(initial_widget.title)
 
@@ -350,7 +359,7 @@ class BaseAnkiwebWidget(QWidget):
         bottom_hbox.addLayout(buttons_hbox)
         vbox.addLayout(bottom_hbox)
 
-        vbox.setContentsMargins(20, 0, 20, 20)
+        vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
 
     def init_timer(self, on_timeout: Callable[[int], None]) -> None:
