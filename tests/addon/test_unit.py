@@ -154,6 +154,7 @@ from ankihub.gui.utils import (
     is_email,
     show_dialog,
     show_error_dialog,
+    using_qt5,
 )
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
@@ -1156,7 +1157,8 @@ class TestSetupSyncDialogPatch:
         yield
         aqt.sync.sync_login = original_sync_login
         aqt.main.sync_login = original_sync_login
-        aqt.preferences.sync_login = original_sync_login
+        if not using_qt5():
+            aqt.preferences.sync_login = original_sync_login
 
     def test_all_three_entry_points_route_through_the_patch(self, mocker: MockerFixture):
         dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
@@ -1166,7 +1168,9 @@ class TestSetupSyncDialogPatch:
         # aqt.sync, aqt.main and aqt.preferences each bind their own module-level
         # name to sync_login, so all three have to be reassigned individually.
         assert aqt.sync.sync_login is aqt.main.sync_login
-        assert aqt.sync.sync_login is aqt.preferences.sync_login
+        if not using_qt5():
+            # Skip check in older Anki (2.1.56) where the preferences screen used to have an inline login form
+            assert aqt.sync.sync_login is aqt.preferences.sync_login
 
         on_success = Mock()
         for module in (aqt.sync, aqt.main, aqt.preferences):
@@ -1190,7 +1194,8 @@ class TestSetupSyncDialogPatchFailure:
             # aqt.main and aqt.preferences were never reassigned, since the
             # failure happened before any of the three names were patched
             assert aqt.main.sync_login is original_sync_login
-            assert aqt.preferences.sync_login is original_sync_login
+            if not using_qt5():
+                assert aqt.preferences.sync_login is original_sync_login
 
             on_success = Mock()
             aqt.main.sync_login(aqt.mw, on_success)
