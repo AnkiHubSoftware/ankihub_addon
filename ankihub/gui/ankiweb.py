@@ -35,6 +35,7 @@ from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
 from ..settings import config
+from ..user_state import add_user_state_refreshed_callback
 from .utils import error_icon, is_email
 
 ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
@@ -941,15 +942,32 @@ def patched_sync_login(mw: aqt.main.AnkiQt, on_success: Callable[[], None], *arg
     dialog.show()
 
 
-def setup_sync_dialog_patch() -> None:
+_original_sync_login = aqt.sync.sync_login
+_patched_sync_login = wrap(  # type: ignore
+    _original_sync_login,
+    patched_sync_login,
+    "around",
+)
+
+
+def _patch_or_revert() -> None:
+    if config.get_feature_flags().get("ankiweb_magic_code_login", False):
+        func = _patched_sync_login
+    else:
+        if getattr(aqt.sync, "sync_login", None) != _patched_sync_login:
+            # No revert required; avoid potentially overwriting other add-ons' patches
+            LOGGER.info("Skipped AnkiWeb sync dialog patch.")
+            return
+        func = _original_sync_login
+
     try:
-        patch = wrap(  # type: ignore
-            aqt.sync.sync_login,
-            patched_sync_login,
-            "around",
-        )
-        aqt.sync.sync_login = patch
-        aqt.main.sync_login = patch
-        aqt.preferences.sync_login = patch
+        aqt.sync.sync_login = func
+        aqt.main.sync_login = func
+        aqt.preferences.sync_login = func
     except Exception:
-        LOGGER.exception("Failed to set up AnkiWeb sync dialog patch")
+        LOGGER.exception("Failed to set up or revert AnkiWeb sync dialog patch")
+
+
+def setup_sync_dialog_patch() -> None:
+    _patch_or_revert()
+    add_user_state_refreshed_callback(_patch_or_revert)
