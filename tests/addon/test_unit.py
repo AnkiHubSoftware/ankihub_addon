@@ -104,6 +104,7 @@ from ankihub.gui.ankiweb import (
     SignupErrorWidget,
     SignupWithCodeWidget,
     SignupWithPasswordWidget,
+    _patch_or_revert,
     setup_sync_dialog_patch,
 )
 from ankihub.gui.bulk_suggestion_summary_dialog import (
@@ -208,6 +209,7 @@ from ankihub.user_state import (
     _state,
     add_user_state_refreshed_callback,
     refresh_user_state_in_background,
+    remove_user_state_refreshed_callback,
 )
 
 
@@ -1161,8 +1163,10 @@ class TestSetupSyncDialogPatch:
         aqt.main.sync_login = original_sync_login
         if not using_qt5():
             aqt.preferences.sync_login = original_sync_login
+        remove_user_state_refreshed_callback(_patch_or_revert)
 
-    def test_all_three_entry_points_route_through_the_patch(self, mocker: MockerFixture):
+    def test_all_three_entry_points_route_through_the_patch_when_flag_is_on(self, mocker: MockerFixture):
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": True})
         dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
 
         setup_sync_dialog_patch()
@@ -1180,24 +1184,119 @@ class TestSetupSyncDialogPatch:
             module.sync_login(aqt.mw, on_success)
             dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
 
+    @pytest.mark.parametrize(
+        "feature_flags",
+        [
+            {"ankiweb_magic_code_login": False},  # logged-in user outside the flag's target group
+            {},  # logged-out user: cache is cleared to {} elsewhere
+        ],
+    )
+    def test_native_dialog_is_kept_when_flag_is_off(self, mocker: MockerFixture, feature_flags: dict):
+        mocker.patch.object(config, "get_feature_flags", return_value=feature_flags)
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+        get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
+        get_id_and_pass_mock.return_value = ("", "")
+        original_sync_login = aqt.sync.sync_login
+
+        setup_sync_dialog_patch()
+
+        assert aqt.sync.sync_login is original_sync_login
+        assert aqt.main.sync_login is original_sync_login
+        if not using_qt5():
+            assert aqt.preferences.sync_login is original_sync_login
+
+        on_success = Mock()
+        aqt.main.sync_login(aqt.mw, on_success)
+        get_id_and_pass_mock.assert_called_once()
+        dialog_mock.assert_not_called()
+
+    def test_registers_patch_or_revert_as_a_user_state_refresh_callback(self, mocker: MockerFixture):
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
+        mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+
+        setup_sync_dialog_patch()
+
+        assert _patch_or_revert in _state.user_state_refreshed_callbacks
+
+    def test_flag_flipping_on_toggles_the_patch_on_next_refresh(self, mocker: MockerFixture):
+        """A remote flag change reaches an already-open client the next time feature flags are
+        refreshed (login/logout, post-sync, or the periodic timer), not instantly.
+        """
+        feature_flags = {"ankiweb_magic_code_login": False}
+        mocker.patch.object(config, "get_feature_flags", side_effect=lambda: feature_flags)
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+        original_sync_login = aqt.sync.sync_login
+
+        setup_sync_dialog_patch()
+        assert aqt.sync.sync_login is original_sync_login
+
+        # Simulate the backend turning the flag on for this user and the cache being
+        # refreshed (e.g. by the 60-minute timer in user_state.setup_periodic_user_state_refresh).
+        feature_flags["ankiweb_magic_code_login"] = True
+        _patch_or_revert()
+
+        assert aqt.sync.sync_login is not original_sync_login
+        on_success = Mock()
+        aqt.sync.sync_login(aqt.mw, on_success)
+        dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+
+        # Flipping back off (e.g. the user logs out, clearing the cached flags) reverts it.
+        feature_flags["ankiweb_magic_code_login"] = False
+        _patch_or_revert()
+
+        assert aqt.sync.sync_login is original_sync_login
+
+    def test_does_not_revert_another_addons_patch_when_flag_is_off(self, mocker: MockerFixture):
+        """If some other add-on has already replaced sync_login, we must not clobber it
+        just because our feature flag is off.
+        """
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+
+        def other_addons_sync_login(mw, on_success, *args, **kwargs):
+            pass
+
+        aqt.sync.sync_login = other_addons_sync_login
+        aqt.main.sync_login = other_addons_sync_login
+        if not using_qt5():
+            aqt.preferences.sync_login = other_addons_sync_login
+
+        setup_sync_dialog_patch()
+
+        assert aqt.sync.sync_login is other_addons_sync_login
+        logger_mock.info.assert_called_once()
+
 
 class TestSetupSyncDialogPatchFailure:
-    def test_missing_sync_login_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
+    @pytest.fixture(autouse=True)
+    def _restore_sync_login(self):
+        original_sync_login = aqt.sync.sync_login
+        yield
+        aqt.sync.sync_login = original_sync_login
+        aqt.main.sync_login = original_sync_login
+        if not using_qt5():
+            aqt.preferences.sync_login = original_sync_login
+        remove_user_state_refreshed_callback(_patch_or_revert)
+
+    def test_missing_sync_login_when_reverting_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
+        """Regression test: reverting when the flag is off must not raise just because
+        aqt.sync.sync_login is unexpectedly missing (e.g. removed by another add-on).
+        """
         original_sync_login = aqt.sync.sync_login
         get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
         # Older Anki versions call this synchronously and unpack the result as
         # (username, password)
         get_id_and_pass_mock.return_value = ("", "")
         logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
 
         del aqt.sync.sync_login
         try:
             setup_sync_dialog_patch()  # must not raise, even though sync_login is gone
 
-            logger_mock.exception.assert_called_once()
+            logger_mock.exception.assert_not_called()
 
-            # aqt.main and aqt.preferences were never reassigned, since the
-            # failure happened before any of the three names were patched
+            # aqt.main and aqt.preferences were never reassigned, since reverting was skipped
             assert aqt.main.sync_login is original_sync_login
             if not using_qt5():
                 assert aqt.preferences.sync_login is original_sync_login
@@ -1207,6 +1306,20 @@ class TestSetupSyncDialogPatchFailure:
             get_id_and_pass_mock.assert_called_once()
         finally:
             aqt.sync.sync_login = original_sync_login
+
+    def test_assignment_failure_when_patching_is_logged(self, mocker: MockerFixture):
+        """Regression test: if patching fails partway through (e.g. another add-on made one of the
+        aqt modules reject new attributes), the failure is caught and logged instead of raised.
+        """
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": True})
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+        # A bare object() rejects arbitrary attribute assignment, forcing the
+        # assignment to aqt.preferences.sync_login to fail.
+        mocker.patch.object(aqt, "preferences", object())
+
+        setup_sync_dialog_patch()  # must not raise
+
+        logger_mock.exception.assert_called_once()
 
 
 class TestSuggestionDialog:
