@@ -25,6 +25,7 @@ from .gui import (
     tutorial,
 )
 from .gui.addons import setup_addons
+from .gui.ankiweb import setup_sync_dialog_patch
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
 from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
@@ -263,6 +264,9 @@ def _general_setup() -> None:
 
     setup_full_sync_patch()
     LOGGER.info("Set up AnkiWeb full sync patch.")
+
+    setup_sync_dialog_patch()
+    LOGGER.info("Set up AnkiWeb sync dialog patch.")
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")

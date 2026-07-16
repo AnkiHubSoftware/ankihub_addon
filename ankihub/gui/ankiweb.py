@@ -4,9 +4,13 @@ import os
 import time
 from concurrent.futures import Future
 from enum import Enum
-from typing import Callable, NoReturn, Union
+from typing import Any, Callable, NoReturn, Union
 
 import aqt
+import aqt.main
+import aqt.preferences
+import aqt.sync
+from anki.hooks import wrap
 from aqt.qt import (
     QCheckBox,
     QDialog,
@@ -29,6 +33,7 @@ from aqt.qt import (
 )
 from aqt.utils import openLink, tooltip
 
+from .. import LOGGER
 from ..settings import config
 from .utils import error_icon, is_email
 
@@ -271,9 +276,15 @@ class FixedDialogLayout(QVBoxLayout):
 
 
 class AnkiwebDialog(QDialog):
-    def __init__(self, initial_widget: BaseAnkiwebWidget, parent: QWidget | None = None):
+    def __init__(
+        self,
+        initial_widget: BaseAnkiwebWidget,
+        on_success: Callable[[], None] = lambda: None,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
         self._progress_widget: InlineProgressWidget | None = None
+        self._on_success = on_success
         self._setup_ui(initial_widget)
 
     def _setup_ui(self, initial_widget: BaseAnkiwebWidget) -> None:
@@ -513,6 +524,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 fut.result()
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
+                self._dialog._on_success()
             except Exception as exc:
                 self.form_widget.error_label.set_error(str(exc))
                 self.code_input.clear()
@@ -567,6 +579,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
                 fut.result()
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
+                self._dialog._on_success()
             except Exception as exc:
                 self.form_widget.error_label.set_error(str(exc))
 
@@ -781,6 +794,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 fut.result()
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
+                self._dialog._on_success()
             except Exception as exc:
                 self._dialog.replace_widget(SignupCodeVerificationWidget(self.email, self._dialog, str(exc)))
 
@@ -912,10 +926,30 @@ class SignupWithCodeWidget(BaseSignupFirstPageWidget):
 
 
 class AnkiwebLoginDialog(AnkiwebDialog):
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(initial_widget=LoginWithCodeWidget(self), parent=parent)
+    def __init__(self, on_success: Callable[[], None] = lambda: None, parent: QWidget | None = None):
+        super().__init__(initial_widget=LoginWithCodeWidget(self), on_success=on_success, parent=parent)
 
 
 class AnkiwebSignupDialog(AnkiwebDialog):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(initial_widget=SignupWithCodeWidget(self), parent=parent)
+
+
+def patched_sync_login(mw: aqt.main.AnkiQt, on_success: Callable[[], None], *args: Any, **kwargs: Any) -> None:
+    dialog = AnkiwebLoginDialog(on_success=on_success, parent=mw)
+    dialog.setModal(True)
+    dialog.show()
+
+
+def setup_sync_dialog_patch() -> None:
+    try:
+        patch = wrap(  # type: ignore
+            aqt.sync.sync_login,
+            patched_sync_login,
+            "around",
+        )
+        aqt.sync.sync_login = patch
+        aqt.main.sync_login = patch
+        aqt.preferences.sync_login = patch
+    except Exception:
+        LOGGER.exception("Failed to set up AnkiWeb sync dialog patch")
