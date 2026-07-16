@@ -63,6 +63,13 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
     raise Exception(f"unexpected arg received: {type(arg)} {arg}")
 
 
+def html_link(url: str, title: str, bold: bool = True) -> str:
+    anchor = f"<a href='{url}'>{title}</a>"
+    if bold:
+        anchor = f"<b>{anchor}</b>"
+    return anchor
+
+
 def widget_for_link(link: AnkiwebLinkIds) -> Callable[[AnkiwebDialog], BaseAnkiwebWidget]:
     if link == AnkiwebLinkIds.LOGIN_CODE:
         return LoginWithCodeWidget
@@ -444,7 +451,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
             main_description="<b>Sign in to your account without having to type your password</b>.<br>"
             " A free account is required to keep your collection synchronized.",
             form_widget=self._create_form_widget(),
-            bottom_label=f"<a href='{AnkiwebLinkIds.SIGNUP_CODE.value}'>Sign up for a new account</a>",
+            bottom_label=f"{html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'Sign up for a new account')}",
             dialog=dialog,
         )
 
@@ -462,7 +469,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
 
         form_widget = FormWidget(
             description="We'll email you a magic code for a password-free sign in."
-            f"<br>Or you can <a href='{AnkiwebLinkIds.LOGIN_PASSWORD.value}'>sign in with password instead</a>",
+            f"<br>Or you can {html_link(AnkiwebLinkIds.LOGIN_PASSWORD.value, 'sign in with password instead')}",
             rows=[("Email", email_box), ("Code", code_box)],
             dialog=self._dialog,
         )
@@ -517,7 +524,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
             main_description="<b>Sign in with your email and password.</b><br>"
             "A free account is required to keep your collection synchronized.",
             form_widget=self._create_form_widget(),
-            bottom_label=f"<a href='{AnkiwebLinkIds.SIGNUP_CODE.value}'>Sign up for a new account</a>",
+            bottom_label=f"{html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'Sign up for a new account')}",
             dialog=dialog,
         )
 
@@ -529,12 +536,12 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         self.password_box = password_box = InputWithButtonHbox(password_input, "Sign in")
         qconnect(password_box.button.clicked, self._on_sign_in)
         forgot_password_label = LabelWithLink(
-            f"<a href='{ANKIWEB_RESET_LINK}'>Forgot password?</a>",
+            f"{html_link(ANKIWEB_RESET_LINK, 'Forgot password?', False)}",
             self._dialog,
         )
         form_widget = FormWidget(
             description="We can email you a magic code for a password-free sign in.<br>"
-            f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Get a code instead</a>",
+            f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Get a code instead')}",
             rows=[("Email", email_input), ("Password", password_box), forgot_password_label],
             dialog=self._dialog,
         )
@@ -599,8 +606,8 @@ class SignupErrorWidget(BaseSignupWidget):
     def _create_form_widget(self, error: str) -> FormWidget:
         form_widget = FormWidget(
             description="We can email you a magic code for password-free sign-in.<br>"
-            f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Sign in with code.</a><br><br>"
-            f"Alternatively, you can <a href='{ANKIWEB_RESET_LINK}'>reset your password</a>, if you forgot it.",
+            f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Sign in with code.')}<br><br>"
+            f"Alternatively, you can {html_link(ANKIWEB_RESET_LINK, 'reset your password')}, if you forgot it.",
             rows=[],
             dialog=self._dialog,
         )
@@ -675,7 +682,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             heading="Email confirmation",
             main_description="",
             form_widget=self._create_form_widget(error),
-            bottom_label=f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Have an account? Sign in.</a>",
+            bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
         if not self._is_retry:
@@ -701,7 +708,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             description = (
                 f"Insert the verification code we've sent to {self.email}.<br>"
-                f"If the email is not correct, <a href='{AnkiwebLinkIds.SIGNUP_CODE.value}'>please change it</a>."
+                f"If the email is not correct, {html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'please change it')}."
             )
             rows = [("Code", code_box), instructions_label]
         form_widget = FormWidget(
@@ -790,7 +797,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             main_description="<b>Sign up to gain access to Anki's web companion and cloud storage.</b><br>"
             "This is a free account and it can keep your flashcard data in sync across your devices and the cloud.",
             form_widget=self._create_form_widget(),
-            bottom_label=f"<a href='{AnkiwebLinkIds.LOGIN_CODE.value}'>Have an account? Sign in.</a>",
+            bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
 
@@ -800,7 +807,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self.terms_checkbox = terms_checkbox = QCheckBox()
         qconnect(terms_checkbox.toggled, self._on_terms_toggled)
         terms_label = LabelWithLink(
-            f"I agree to AnkiWeb's <a href='{ANKIWEB_TERMS_LINK}'>Terms & Conditions</a>.", self._dialog
+            f"I agree to AnkiWeb's {html_link(ANKIWEB_TERMS_LINK, 'Terms & Conditions')}.", self._dialog
         )
         terms_hbox.addWidget(terms_checkbox)
         terms_hbox.addWidget(terms_label)
@@ -828,12 +835,12 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         form_description = (
             (
                 "We'll email you a magic code for a password-free sign-up.<br>"
-                f"Or you can <a href='{AnkiwebLinkIds.SIGNUP_PASSWORD.value}'>sign up with password instead</a>."
+                f"Or you can {html_link(AnkiwebLinkIds.SIGNUP_PASSWORD.value, 'sign up with password instead.')}"
             )
             if self.is_code_signup
             else (
                 "We can email you a magic code for a password-free sign up.<br>"
-                f"<a href='{AnkiwebLinkIds.SIGNUP_CODE.value}'>Sign up with code.</a>"
+                f"{html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'Sign up with code.')}"
             )
         )
         form_widget = FormWidget(
