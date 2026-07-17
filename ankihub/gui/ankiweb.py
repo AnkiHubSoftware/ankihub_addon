@@ -378,6 +378,7 @@ class BaseAnkiwebWidget(QWidget):
     def init_timer(self, on_timeout: Callable[[int], None]) -> None:
         destroy_timer(self._timer)
         self._timer = Countdown(on_timeout, parent=self)
+        self._timer.start()
 
 
 def run_with_progress(
@@ -497,7 +498,6 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 self.email_box.button.setEnabled(True)
 
         self.init_timer(on_timeout)
-        self._timer.start()
         self.email_box.button.setEnabled(False)
         self.code_input.setEnabled(True)
         self.form_widget.error_label.set_error("")
@@ -667,7 +667,6 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
                 self.resend_button.setEnabled(True)
 
         self.init_timer(on_timeout)
-        self._timer.start()
 
     def _on_resend(self) -> None:
         self._start_timer()
@@ -754,7 +753,6 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 self._update_code_button_state()
 
         self.init_timer(on_timeout)
-        self._timer.start()
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
