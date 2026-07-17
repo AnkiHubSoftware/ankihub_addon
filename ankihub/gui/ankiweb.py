@@ -222,6 +222,7 @@ class FormWidget(QGroupBox):
         vbox = QVBoxLayout()
         vbox.setSpacing(16)
         vbox.setContentsMargins(12, 12, 12, 12)
+        vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.error_label = error_label = ErrorLabel(self)
         vbox.addWidget(error_label)
