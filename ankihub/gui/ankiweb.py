@@ -661,7 +661,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
                 f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
             )
             self.description_label.setText(
-                f"✉️ If {self.email} exists, we sent a verification link to its inbox.<br>" + resend_available_status
+                f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>" + resend_available_status
             )
             if not remaining_secs:
                 self.resend_button.setEnabled(True)
