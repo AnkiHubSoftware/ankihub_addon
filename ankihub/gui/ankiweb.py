@@ -168,7 +168,6 @@ class ErrorLabel(QWidget):
         hbox.addWidget(icon_label)
         hbox.addWidget(status)
         hbox.addStretch()
-        hbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(hbox)
 
     def set_error(self, text: str) -> None:
