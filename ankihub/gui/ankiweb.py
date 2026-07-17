@@ -267,7 +267,7 @@ class FixedDialogLayout(QVBoxLayout):
         self.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
     def sizeHint(self) -> QSize:
-        return QSize(525, 450)
+        return QSize(525, super().sizeHint().height())
 
 
 class AnkiwebDialog(QDialog):
