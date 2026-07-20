@@ -5037,13 +5037,13 @@ class TestIntercom:
 
         assert web_content.body == ""
 
-    def test_inject_intercom_uses_app_id_from_user_details(self, mocker: MockerFixture) -> None:
+    def test_inject_intercom_uses_app_id_from_config(self, mocker: MockerFixture) -> None:
         from aqt.deckbrowser import DeckBrowser
         from aqt.webview import WebContent
 
         from ankihub.gui import intercom
 
-        mocker.patch.object(config, "intercom_app_id", "fallback_id", create=True)
+        mocker.patch.object(config, "intercom_app_id", "config_app_id", create=True)
         mocker.patch.object(
             config,
             "get_user_details",
@@ -5055,8 +5055,9 @@ class TestIntercom:
 
         intercom._inject_intercom(web_content, context)
 
-        assert "widget.intercom.io/widget/from_server" in web_content.body
-        assert '"app_id": "from_server"' in web_content.body
+        assert "widget.intercom.io/widget/config_app_id" in web_content.body
+        assert '"app_id": "config_app_id"' in web_content.body
+        assert "from_server" not in web_content.body
 
     def test_sync_with_user_preference_shuts_down_when_disabled(self, mocker: MockerFixture) -> None:
         from ankihub.gui import intercom

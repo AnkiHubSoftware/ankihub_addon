@@ -4,10 +4,11 @@ Injects into the deck browser (home) and deck overview (deck details) via the
 ``webview_will_set_content`` hook so the launcher bubble floats over those pages.
 
 Identity verification relies on a ``user_hash`` that must be computed server-side
-(the Intercom secret key must never ship in the addon). The addon reads the
-non-secret ``intercom_app_id`` and the server-computed ``intercom_user_hash`` from
-the cached ``/users/me`` user details. When the hash is absent the Messenger is
-still booted without identity verification.
+(the Intercom secret key must never ship in the addon). The non-secret
+``intercom_app_id`` comes from addon config (env / production / staging defaults);
+the server-computed ``intercom_user_hash`` is read from the cached ``/users/me``
+user details. When the hash is absent the Messenger is still booted without
+identity verification.
 
 The onboarding tour host uses a z-index above Intercom (~2147483001), so the
 launcher stays visible but behind the tour backdrop.
@@ -101,10 +102,9 @@ def _inject_intercom(web_content: WebContent, context: object) -> None:
         return
 
     user_details = config.get_user_details() or {}
-    app_id = user_details.get("intercom_app_id") or config.intercom_app_id
+    app_id = config.intercom_app_id
     if not app_id:
         return
-
     intercom_settings: Dict[str, Any] = {
         "api_base": "https://api-iam.intercom.io",
         "app_id": app_id,
