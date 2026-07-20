@@ -60,7 +60,7 @@ def _general_tab(conf_window) -> None:
     tab.text("Feature Preferences", bold=True)
 
     feature_flags = config.get_feature_flags()
-    if feature_flags.get("intercom_desktop_enabled") and config.is_logged_in():
+    if feature_flags.get("intercom_support_button_anki_preferences") and config.is_logged_in():
         tab.checkbox("ankihub_support_button", "Support button")
 
     if feature_flags.get("show_flashcards_selector_button"):

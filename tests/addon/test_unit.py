@@ -5113,7 +5113,11 @@ class TestIntercom:
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": True})
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": True},
+            )
             setup_config_dialog_manager()
 
             from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
@@ -5153,7 +5157,11 @@ class TestIntercom:
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": False})
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": False},
+            )
             setup_config_dialog_manager()
 
             from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
