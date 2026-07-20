@@ -255,6 +255,9 @@ def _general_setup() -> None:
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
 
+    intercom.setup()
+    LOGGER.info("Set up Intercom messenger.")
+
     from . import media_export  # type: ignore[attr-defined]  # noqa: F401
 
     LOGGER.info("Loaded media_export.")
@@ -267,9 +270,6 @@ def _general_setup() -> None:
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
-
-    intercom.setup()
-    LOGGER.info("Set up Intercom messenger.")
 
     config.token_change_hook.append(refresh_user_state_in_background)
     LOGGER.info("Set up refreshing of user state on token change.")
