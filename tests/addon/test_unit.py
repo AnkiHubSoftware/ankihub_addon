@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
@@ -93,6 +93,16 @@ from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.gui import menu
+from ankihub.gui.ankiweb import (
+    AnkiwebLoginDialog,
+    AnkiwebSignupDialog,
+    LoginWithCodeWidget,
+    LoginWithPasswordWidget,
+    SignupCodeVerificationWidget,
+    SignupErrorWidget,
+    SignupWithCodeWidget,
+    SignupWithPasswordWidget,
+)
 from ankihub.gui.bulk_suggestion_summary_dialog import (
     BulkSuggestionSummaryDialog,
     _ActionState,
@@ -140,6 +150,7 @@ from ankihub.gui.utils import (
     ask_user,
     choose_ankihub_deck,
     extract_argument,
+    is_email,
     show_dialog,
     show_error_dialog,
 )
@@ -950,6 +961,187 @@ class TestAnkiHubLoginDialog:
             window.recover_password_help_text.text()
             == '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
         )
+
+
+class TestIsEmail:
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("test@example.com", True),
+            ("user.name+tag@sub.example.co.uk", True),
+            ("not-an-email", False),
+            ("", False),
+            ("user@", False),
+            ("@example.com", False),
+            ("user@@example.com", False),
+            ("user name@example.com", False),
+        ],
+    )
+    def test_is_email(self, value: str, expected: bool):
+        assert is_email(value) is expected
+
+
+class TestAnkiwebLoginWithCodeWidget:
+    def _widget(self, qtbot: QtBot) -> LoginWithCodeWidget:
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        return cast(LoginWithCodeWidget, dialog._widget)
+
+    def test_get_code_button_enabled_only_for_valid_email(self, qtbot: QtBot):
+        widget = self._widget(qtbot)
+        assert widget.email_box.button.isEnabled() is False
+
+        widget.email_input.setText("not-an-email")
+        assert widget.email_box.button.isEnabled() is False
+
+        widget.email_input.setText("user@example.com")
+        assert widget.email_box.button.isEnabled() is True
+
+    def test_sign_in_button_enabled_only_with_code_and_valid_email(self, qtbot: QtBot):
+        widget = self._widget(qtbot)
+        widget.code_input.setText("123456")
+        assert widget.code_box.button.isEnabled() is False
+
+        widget.email_input.setText("user@example.com")
+        assert widget.code_box.button.isEnabled() is True
+
+        widget.code_input.setText("")
+        assert widget.code_box.button.isEnabled() is False
+
+    def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot):
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_get_code()
+
+        assert widget.email_box.button.isEnabled() is False
+        assert "Resend available in 5s" in widget.status_label.text()
+
+        # Drive the countdown callback directly instead of waiting on the real
+        # 1s-interval QTimer, so the test doesn't have to sleep in real time.
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        assert widget.email_box.button.isEnabled() is True
+        assert "Resend available" in widget.status_label.text()
+
+
+class TestAnkiwebLoginAndSignupSubmission:
+    """Locks down the current (network-stubbed) behavior of the sign-in/sign-up
+    handlers, driven by the ANKIWEB_SIMULATE_* env vars. These will need updating
+    once real network calls replace the simulation, but should keep passing for
+    the equivalent success/expired-code/incorrect-credentials/existing-account
+    scenarios in the meantime.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _patch_run_in_background(self, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb.time.sleep")
+
+        def run_sync(task, on_done, **kwargs):
+            try:
+                on_done(future_with_result(task()))
+            except Exception as exc:
+                on_done(future_with_exception(exc))
+
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=run_sync)
+
+    def test_login_with_code_success_closes_dialog(self, qtbot: QtBot, mocker: MockerFixture):
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+
+    def test_login_with_code_expired_shows_error_and_clears_code(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_SIMULATE_EXPIRED_CODE", "true")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is True
+        assert "expired" in widget.form_widget.error_label.status.text()
+        assert widget.code_input.text() == ""
+
+    def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_SIMULATE_GENERAL_ERROR", "true")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        assert "incorrect" in widget.form_widget.error_label.status.text()
+
+    def test_signup_with_existing_account_shows_dedicated_error_widget(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_SIMULATE_EXISTING_ACCOUNT", "true")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert isinstance(dialog._widget, SignupErrorWidget)
+        assert "already exists" in dialog._widget.form_widget.error_label.status.text()
+
+    def test_signup_with_code_general_error_shows_inline_error(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_SIMULATE_GENERAL_ERROR", "true")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        # Not swapped out for SignupErrorWidget: that only happens for the
+        # existing-account case, other errors stay inline on the same widget.
+        assert dialog._widget is widget
+        assert "unknown error" in widget.form_widget.error_label.status.text()
+
+    def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert isinstance(dialog._widget, SignupCodeVerificationWidget)
+
+    def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot):
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupWithPasswordWidget(dialog)
+        dialog.replace_widget(widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("password123")
+        widget.repeat_password_input.setText("password123")
+
+        widget._on_sign_up()
+
+        assert isinstance(dialog._widget, SignupEmailVerificationWidget)
 
 
 class TestSuggestionDialog:

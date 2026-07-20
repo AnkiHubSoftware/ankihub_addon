@@ -1,4 +1,5 @@
 import inspect
+import re
 import uuid
 from functools import partial, wraps
 from pathlib import Path
@@ -709,6 +710,10 @@ def warning_icon() -> QIcon:
     return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
 
 
+def error_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "error.svg").absolute()))
+
+
 def warning_triangle_icon() -> QIcon:
     """Flat, muted-gray warning triangle (vs the OS-styled yellow `warning_icon`)."""
     return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))
@@ -1024,3 +1029,12 @@ def refresh_anki_ui_after_moving_cards() -> None:
     browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
     if browser is not None:
         browser.sidebar.refresh()
+
+
+def is_email(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
+        )
+    )
