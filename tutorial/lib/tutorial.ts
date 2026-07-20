@@ -128,7 +128,8 @@ export class TutorialEffect {
         this.hostElement.style.left = "0";
         this.hostElement.style.width = "100%";
         this.hostElement.style.height = "100%";
-        this.hostElement.style.zIndex = "10000";
+        // Intercom's launcher uses z-index ~2147483000; keep the tour above it.
+        this.hostElement.style.zIndex = "2147483001";
         this.shadowRoot = this.hostElement.attachShadow({ mode: "open" });
         let modalElement: HTMLElement | null = null;
         if (this.options.modal instanceof HTMLElement) {

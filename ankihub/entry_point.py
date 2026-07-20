@@ -18,6 +18,7 @@ from .gui import (
     deck_options,
     deckbrowser,
     editor,
+    intercom,
     js_message_handling,
     overview,
     progress,
@@ -253,6 +254,9 @@ def _general_setup() -> None:
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
+
+    intercom.setup()
+    LOGGER.info("Set up Intercom messenger.")
 
     from . import media_export  # type: ignore[attr-defined]  # noqa: F401
 

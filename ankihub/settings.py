@@ -41,9 +41,11 @@ from .ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_INTERCOM_APP_ID,
     DEFAULT_S3_BUCKET_URL,
     STAGING_API_URL,
     STAGING_APP_URL,
+    STAGING_INTERCOM_APP_ID,
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
@@ -243,6 +245,7 @@ class _Config:
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
         self.intro_deck_id: Optional[uuid.UUID] = None
+        self.intercom_app_id: str = ""
 
     def setup_public_config_and_other_settings(self):
         migrate_public_config()
@@ -255,6 +258,7 @@ class _Config:
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
             self.product_metrics_url = STAGING_PRODUCT_METRICS_URL
+            self.intercom_app_id = STAGING_INTERCOM_APP_ID
             self.anking_deck_id = uuid.UUID(
                 self.public_config.get("staging_anking_deck_id") or "dfe7f548-f66e-4277-932b-c7a63db3223a"
             )
@@ -264,6 +268,7 @@ class _Config:
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
             self.product_metrics_url = DEFAULT_PRODUCT_METRICS_URL
+            self.intercom_app_id = DEFAULT_INTERCOM_APP_ID
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -287,6 +292,9 @@ class _Config:
 
         if intro_deck_id := os.getenv("INTRO_DECK_ID"):
             self.intro_deck_id = uuid.UUID(intro_deck_id)
+
+        if intercom_app_id := os.getenv("INTERCOM_APP_ID"):
+            self.intercom_app_id = intercom_app_id
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.

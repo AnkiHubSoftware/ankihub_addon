@@ -77,9 +77,11 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.ankihub_client import (
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_INTERCOM_APP_ID,
     DEFAULT_S3_BUCKET_URL,
     STAGING_API_URL,
     STAGING_APP_URL,
+    STAGING_INTERCOM_APP_ID,
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
@@ -5010,6 +5012,7 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.delenv("S3_BUCKET_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
+        monkeypatch.delenv("INTERCOM_APP_ID", raising=False)
         monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
 
     def test_production_defaults(self):
@@ -5018,6 +5021,7 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == DEFAULT_APP_URL
         assert config.api_url == DEFAULT_API_URL
         assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
+        assert config.intercom_app_id == DEFAULT_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
         assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -5027,6 +5031,7 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == STAGING_APP_URL
         assert config.api_url == STAGING_API_URL
         assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
+        assert config.intercom_app_id == STAGING_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
 
@@ -5076,3 +5081,291 @@ class TestSetupPublicConfigAndOtherSettings:
         config.public_config = {}
         config.setup_public_config_and_other_settings()
         assert config.intro_deck_id == uuid.UUID(custom_id)
+
+    def test_intercom_app_id_env_var_override(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("INTERCOM_APP_ID", "env_app_id")
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.intercom_app_id == "env_app_id"
+
+
+class TestIntercom:
+    @pytest.fixture(autouse=True)
+    def _enable_intercom(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(config, "is_logged_in", return_value=True)
+        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": True})
+        if config.public_config is None:
+            config.public_config = {}
+        config.public_config["ankihub_support_button"] = True
+        mocker.patch.object(config, "intercom_app_id", "test_app_id", create=True)
+        mocker.patch.object(
+            config,
+            "get_user_details",
+            return_value={
+                "id": 42,
+                "name": "Test User",
+                "email": "test@example.com",
+                "intercom_user_hash": "hash123",
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "logged_in, feature_flag, preference, expected",
+        [
+            (True, True, True, True),
+            (False, True, True, False),
+            (True, False, True, False),
+            (True, True, False, False),
+        ],
+    )
+    def test_is_enabled_for_user(
+        self,
+        mocker: MockerFixture,
+        logged_in: bool,
+        feature_flag: bool,
+        preference: bool,
+        expected: bool,
+    ) -> None:
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+        mocker.patch.object(
+            config,
+            "get_feature_flags",
+            return_value={"intercom_desktop_enabled": feature_flag},
+        )
+        config.public_config["ankihub_support_button"] = preference
+
+        assert intercom.is_enabled_for_user() is expected
+
+    def test_inject_intercom_on_deck_browser(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/test_app_id" in web_content.body
+        assert '"app_id": "test_app_id"' in web_content.body
+        assert '"user_id": "42"' in web_content.body
+        assert '"user_hash": "hash123"' in web_content.body
+        assert '"name": "Test User"' in web_content.body
+        assert '"email": "test@example.com"' in web_content.body
+
+    def test_inject_intercom_on_overview(self) -> None:
+        from aqt.overview import Overview
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+        context = Overview.__new__(Overview)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/test_app_id" in web_content.body
+
+    def test_inject_intercom_skips_non_home_contexts(self) -> None:
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+
+        intercom._inject_intercom(web_content, object())
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_when_preference_disabled(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        config.public_config["ankihub_support_button"] = False
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": False})
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_without_app_id(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "intercom_app_id", "", create=True)
+        mocker.patch.object(config, "get_user_details", return_value={"id": 42})
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_uses_app_id_from_config(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "intercom_app_id", "config_app_id", create=True)
+        mocker.patch.object(
+            config,
+            "get_user_details",
+            return_value={"id": 42, "intercom_app_id": "from_server"},
+        )
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/config_app_id" in web_content.body
+        assert '"app_id": "config_app_id"' in web_content.body
+        assert "from_server" not in web_content.body
+
+    def test_sync_with_user_preference_shuts_down_when_disabled(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        config.public_config["ankihub_support_button"] = False
+        shutdown = mocker.patch.object(intercom, "shutdown")
+        reset = mocker.patch.object(aqt.mw, "reset")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_called_once()
+        reset.assert_not_called()
+
+    def test_sync_with_user_preference_resets_when_enabled(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        mocker.patch.object(aqt.mw, "state", "deckBrowser")
+        shutdown = mocker.patch.object(intercom, "shutdown")
+        reset = mocker.patch.object(aqt.mw, "reset")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_not_called()
+        reset.assert_called_once()
+
+    def test_close_messenger_evals_hide(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        web = mocker.Mock()
+        mocker.patch.object(aqt.mw, "web", web)
+
+        intercom.close_messenger()
+
+        web.eval.assert_called_once()
+        assert "Intercom('hide')" in web.eval.call_args[0][0]
+
+    def test_tutorial_start_closes_messenger(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial
+
+        close_messenger = mocker.patch("ankihub.gui.intercom.close_messenger")
+        mocker.patch.object(OnboardingTutorial, "_track_tutorial")
+        mocker.patch.object(OnboardingTutorial, "show_current")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+
+        OnboardingTutorial().start(reopen=True)
+
+        close_messenger.assert_called_once()
+
+    def test_support_button_checkbox_in_config_when_flag_enabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_token("test_token")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": True},
+            )
+            setup_config_dialog_manager()
+
+            from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
+            from ankihub.gui.config_dialog import get_config_dialog_manager
+
+            config_dialog_manager: ConfigManager = get_config_dialog_manager()
+            config_window = ConfigWindow(config_dialog_manager)
+            for fn in config_dialog_manager.window_open_hook:
+                fn(config_window)
+            config_window.on_open()
+
+            support_checkboxes = [
+                checkbox for checkbox in config_window.findChildren(QCheckBox) if checkbox.text() == "Support button"
+            ]
+            assert len(support_checkboxes) == 1
+
+            # Support button should be the first Feature Preferences checkbox.
+            feature_checkboxes = [
+                checkbox
+                for checkbox in config_window.findChildren(QCheckBox)
+                if checkbox.text()
+                in {
+                    "Support button",
+                    "AnkiHub Smart Search",
+                    "AnkiHub AI Chatbot",
+                    "Boards and Beyond",
+                    "First Aid Forward",
+                    "Monthly FSRS optimization reminder",
+                }
+            ]
+            assert feature_checkboxes[0].text() == "Support button"
+
+    def test_support_button_checkbox_hidden_when_flag_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.save_token("test_token")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": False},
+            )
+            setup_config_dialog_manager()
+
+            from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
+            from ankihub.gui.config_dialog import get_config_dialog_manager
+
+            config_dialog_manager: ConfigManager = get_config_dialog_manager()
+            config_window = ConfigWindow(config_dialog_manager)
+            for fn in config_dialog_manager.window_open_hook:
+                fn(config_window)
+            config_window.on_open()
+
+            support_checkboxes = [
+                checkbox for checkbox in config_window.findChildren(QCheckBox) if checkbox.text() == "Support button"
+            ]
+            assert support_checkboxes == []
