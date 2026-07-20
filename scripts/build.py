@@ -6,16 +6,18 @@ from pathlib import Path
 
 from generate_manifest import generate_manifest
 from google_api_obfuscate import obfuscate_google_api_key
+from protobuf_gen import generate_protobuf
 
 PROJECT_ROOT = Path(__file__).parent.parent
-ANKIHUB_LIB_TARGET = PROJECT_ROOT / "ankihub/lib"
+SRC_ROOT = PROJECT_ROOT / "ankihub"
+ANKIHUB_LIB_TARGET = SRC_ROOT / "lib"
 MEDIA_IMPORT_SRC = PROJECT_ROOT / "media_import/src/media_import"
 MEDIA_IMPORT_LIBS = MEDIA_IMPORT_SRC / "libs"
-MEDIA_IMPORT_TARGET = PROJECT_ROOT / "ankihub/media_import"
+MEDIA_IMPORT_TARGET = SRC_ROOT / "media_import"
 MEDIA_IMPORT_REQUIREMENTS = PROJECT_ROOT / "media_import" / "requirements.txt"
 
 MEDIA_EXPORT_SRC = PROJECT_ROOT / "media_export/src"
-MEDIA_EXPORT_TARGET = PROJECT_ROOT / "ankihub/media_export"
+MEDIA_EXPORT_TARGET = SRC_ROOT / "media_export"
 
 DJANGO_TARGET = ANKIHUB_LIB_TARGET / "django"
 WEB_APP_SRC = PROJECT_ROOT / "ankihub_web"
@@ -91,3 +93,5 @@ shutil.rmtree(MEDIA_EXPORT_TARGET, ignore_errors=True)
 shutil.copytree(MEDIA_EXPORT_SRC, MEDIA_EXPORT_TARGET)
 
 obfuscate_google_api_key(GOOGLE_API_KEY, MEDIA_IMPORT_TARGET)
+
+generate_protobuf(PROJECT_ROOT, SRC_ROOT)

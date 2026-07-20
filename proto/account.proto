@@ -1,0 +1,246 @@
+syntax = "proto3";
+
+package ankiweb.frontend.account;
+
+service AccountService {
+  rpc GetAccountStatus(GetAccountStatusRequest)
+      returns (GetAccountStatusResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc CheckTerms(CheckTermsRequest) returns (CheckTermsResponse);
+  rpc ConfirmTerms(ConfirmTermsRequest) returns (ConfirmTermsResponse);
+  rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
+  rpc UpdateSettings(UpdateSettingsRequest) returns (UpdateSettingsResponse);
+  rpc TotalMedia(TotalMediaRequest) returns (TotalMediaResponse);
+  rpc RemoveAccount(RemoveAccountRequest) returns (RemoveAccountResponse);
+  rpc Signup(SignupRequest) returns (SignupResponse);
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse);
+  rpc ResendVerification(ResendVerificationRequest)
+      returns (ResendVerificationResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc MagicCodeSignup(MagicCodeSignupRequest) returns (MagicCodeSignupResponse);
+  rpc MagicCodeSignupVerify(MagicCodeSignupVerifyRequest)
+      returns (MagicCodeSignupVerifyResponse);
+  rpc MagicCodeLogin(MagicCodeLoginRequest) returns (MagicCodeLoginResponse);
+  rpc MagicCodeLoginVerify(MagicCodeLoginVerifyRequest)
+      returns (MagicCodeLoginVerifyResponse);
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+enum LoginResponseStatus {
+  LOGIN_RESPONSE_STATUS_UNKNOWN = 0;
+  LOGIN_RESPONSE_STATUS_AUTHENTICATED = 1;
+  LOGIN_RESPONSE_STATUS_INVALID_USER = 2;
+  LOGIN_RESPONSE_STATUS_INVALID_PASS = 3;
+}
+
+message LoginResponse {
+  LoginResponseStatus status = 1;
+  // set only if authenticated
+  string token = 2;
+}
+
+message CheckTermsRequest {}
+
+message CheckTermsResponse {
+  bool needs_to_confirm = 1;
+}
+
+message ConfirmTermsRequest {
+  bool agree_to_terms = 1;
+}
+
+message ConfirmTermsResponse {}
+
+message GetSettingsRequest {}
+
+message GetSettingsResponse {
+  string current_email = 1;
+}
+
+message UpdateSettingsRequest {
+  // always required
+  string current_password = 1;
+
+  // first non-empty one
+  oneof change {
+    string new_password = 2;
+    string new_email = 3;
+  }
+}
+
+enum SettingsResult {
+  SETTINGS_RESULT_UNKNOWN = 0;
+  SETTINGS_RESULT_PASSWORD_CHANGED = 1;
+  SETTINGS_RESULT_EMAIL_CHANGED = 2;
+  SETTINGS_RESULT_INVALID_CURRENT_PASSWORD = 3;
+  SETTINGS_RESULT_INVALID_EMAIL = 4;
+  SETTINGS_RESULT_EMAIL_UNAVAILABLE = 5;
+  SETTINGS_RESULT_SPAM_REPORT = 6;
+}
+
+message UpdateSettingsResponse {
+  SettingsResult result = 1;
+}
+
+message TotalMediaRequest {}
+
+message TotalMediaResponse {
+  uint64 total_bytes = 1;
+}
+
+enum RemoveAccountStatus {
+  REMOVE_ACCOUNT_STATUS_UNKNOWN = 0;
+  REMOVE_ACCOUNT_STATUS_VALID_PASSWORD_REQUIRED = 1;
+  REMOVE_ACCOUNT_STATUS_IN_PROGRESS = 2;
+  REMOVE_ACCOUNT_STATUS_FINISHED = 3;
+}
+
+message RemoveAccountRequest {
+  // May be blank if removal has already begun.
+  string current_password = 1;
+}
+
+message RemoveAccountResponse {
+  RemoveAccountStatus status = 1;
+  uint32 media_removed = 2;
+}
+
+message SignupRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message SignupResponse {
+  SignupStatus status = 1;
+  optional string ankiuser_login_token = 2;
+}
+
+enum SignupStatus {
+  SIGNUP_STATUS_UNKNOWN = 0;
+  SIGNUP_STATUS_SUCCESS = 1;
+  SIGNUP_STATUS_USERNAME_INVALID = 2;
+  SIGNUP_STATUS_USERNAME_TAKEN = 3;
+  SIGNUP_STATUS_SPAM_EMAIL = 4;
+}
+
+enum SendingProgress {
+  SENDING_PROGRESS_UNKNOWN = 0;
+  SENDING_PROGRESS_SENDING = 1;
+  SENDING_PROGRESS_DELIVERED = 2;
+  SENDING_PROGRESS_SPAM = 3;
+  SENDING_PROGRESS_QUOTA = 4;
+  SENDING_PROGRESS_OTHER_DELAY = 5;
+  SENDING_PROGRESS_FAILED = 6;
+}
+
+message SendingState {
+  int64 updated = 1;
+  SendingProgress progress = 2;
+  string email = 3;
+}
+
+message VerifyEmailRequest {
+  optional string token = 1;
+}
+
+message VerifyEmailResponse {
+  oneof state {
+    bool token_verified = 1;
+    SendingState sending_status = 2;
+  }
+}
+
+message ResendVerificationRequest {}
+message ResendVerificationResponse {
+  bool throttled = 1;
+}
+
+message ResetPasswordRequest {
+  oneof action {
+    string email_to = 1;
+    string check_token = 2;
+    SetNewPassword new_password = 3;
+  }
+}
+
+message ResetPasswordResponse {
+  oneof result {
+    SendResetEmailResult send_email = 1;
+    bool token_ok = 2;
+    SetNewPasswordResult set_new_password = 3;
+  }
+}
+
+message SetNewPassword {
+  string token = 1;
+  string new_password = 2;
+}
+
+enum SendResetEmailResult {
+  SEND_RESET_EMAIL_RESULT_UNKNOWN = 0;
+  SEND_RESET_EMAIL_RESULT_THROTTLED = 1;
+  SEND_RESET_EMAIL_RESULT_INVALID_EMAIL = 2;
+  SEND_RESET_EMAIL_RESULT_SUCCESS = 4;
+}
+
+enum SetNewPasswordResult {
+  SET_NEW_PASSWORD_RESULT_UNKNOWN = 0;
+  SET_NEW_PASSWORD_RESULT_INVALID_TOKEN = 1;
+  SET_NEW_PASSWORD_RESULT_SUCCESS = 2;
+}
+
+message GetAccountStatusRequest {}
+
+message GetAccountStatusResponse {
+  bool logged_in = 1;
+  optional string redirect_to = 2;
+}
+
+// Magic-code (passwordless) signup/login. Errors travel as HTTP status codes,
+// not body enums: 400 invalid input, 401 invalid/expired code, 409 account
+// already exists, 429 throttled. 403 is never used (the web client
+// auto-redirects it to the login page).
+
+message MagicCodeSignupRequest {
+  string email = 1;
+  bool terms = 2;
+}
+
+// 200 = account created, code email sent. Errors: 400 invalid email or
+// terms != true, 409 account already exists (client should redirect to
+// login), 429 throttled.
+message MagicCodeSignupResponse {}
+
+message MagicCodeSignupVerifyRequest {
+  string email = 1;
+  string code = 2;
+}
+
+// 200 = code accepted, email confirmed. Errors: 401 invalid/expired code,
+// 429 throttled.
+message MagicCodeSignupVerifyResponse {
+  string ankiuser_login_token = 1;
+}
+
+message MagicCodeLoginRequest {
+  string email = 1;
+}
+
+// Always empty 200 whether or not the account exists (anti-enumeration).
+// Only a per-IP 429 may surface, as it reveals nothing about the email.
+message MagicCodeLoginResponse {}
+
+message MagicCodeLoginVerifyRequest {
+  string email = 1;
+  string code = 2;
+}
+
+// 200 = code accepted. Errors: 401 invalid/expired code OR email not found
+// (indistinguishable by design), 429 throttled.
+message MagicCodeLoginVerifyResponse {
+  string ankiuser_login_token = 1;
+}

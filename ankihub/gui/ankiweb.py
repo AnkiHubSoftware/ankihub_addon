@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from concurrent.futures import Future
 from enum import Enum
@@ -951,7 +952,7 @@ _patched_sync_login = wrap(  # type: ignore
 
 
 def _patch_or_revert() -> None:
-    if config.get_feature_flags().get("ankiweb_magic_code_login", False):
+    if config.get_feature_flags().get("ankiweb_magic_code_login", False) and sys.version_info >= (3, 10):
         func = _patched_sync_login
     else:
         if getattr(aqt.sync, "sync_login", None) != _patched_sync_login:
