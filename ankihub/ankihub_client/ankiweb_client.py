@@ -16,6 +16,8 @@ from ..proto.account_pb import (
     MagicCodeSignupResponse,
     MagicCodeSignupVerifyRequest,
     MagicCodeSignupVerifyResponse,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
     SignupRequest,
     SignupResponse,
 )
@@ -84,3 +86,11 @@ class AnkiWebClientMixin:
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
         return MagicCodeLoginVerifyResponse.from_binary(response.content)
+
+    # FIXME: this only works with cookie authentication
+    def ankiweb_resend_verification(self) -> ResendVerificationResponse:
+        data = ResendVerificationRequest()
+        response = self._send_request("post", API.ANKIWEB, "/account/resend-verification", data=data.to_binary())
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+        return ResendVerificationResponse.from_binary(response.content)
