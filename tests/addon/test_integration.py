@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWidget
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -200,7 +200,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ankihub.gui.utils import _Dialog, robust_filter
+from ankihub.gui.utils import _Dialog, bring_to_front, robust_filter
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -8796,6 +8796,46 @@ class TestFlashCardSelector:
             qtbot.wait_until(lambda: raise_mock.called)
             assert activate_mock.called
 
+    @pytest.mark.sequential
+    def test_dialog_is_raised_when_browser_opened_from_it_closes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Regression test: closing the browser opened from the dialog activates Anki's main
+        # window, burying the (non-modal) dialog behind it.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+
+            self._mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            raise_mock = mocker.patch.object(dialog, "raise_")
+            activate_mock = mocker.patch.object(dialog, "activateWindow")
+
+            browser_will_show_mock = Mock()
+            browser_will_show.append(browser_will_show_mock)
+
+            dialog.web.eval(f"pycmd('{OPEN_BROWSER_PYCMD}')")
+            qtbot.wait_until(lambda: browser_will_show_mock.called)
+
+            # While the browser is still open the dialog must stay where it is -
+            # it is only brought back once the browser goes away.
+            assert not raise_mock.called
+
+            browser: Browser = browser_will_show_mock.call_args[0][0]
+            browser.close()
+
+            qtbot.wait_until(lambda: raise_mock.called)
+            assert activate_mock.called
+
     def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
         original_load_url = aqt.webview.AnkiWebView.load_url
 
@@ -9620,6 +9660,31 @@ def test_update_note_type_templates_and_styles(
         )
         assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get("tmpls")
         assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get("css")
+
+
+class TestBringToFront:
+    def test_raises_and_activates_the_widget(self, anki_session_with_addon_data: AnkiSession):
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            raise_mock = Mock()
+            activate_mock = Mock()
+            widget.raise_ = raise_mock  # type: ignore[method-assign]
+            widget.activateWindow = activate_mock  # type: ignore[method-assign]
+
+            bring_to_front(widget)
+
+            assert raise_mock.called
+            assert activate_mock.called
+
+    def test_deleted_widget_is_ignored(self, anki_session_with_addon_data: AnkiSession):
+        # Callers fire this from signals (e.g. the browser being destroyed), by which point
+        # the widget may already be gone - touching it then would raise RuntimeError.
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            sip.delete(widget)
+            assert sip.isdeleted(widget)
+
+            bring_to_front(widget)  # must not raise
 
 
 @pytest.mark.qt_no_exception_capture
