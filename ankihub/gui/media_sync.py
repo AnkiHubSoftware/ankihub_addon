@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import uuid
 from datetime import datetime
@@ -10,7 +11,9 @@ import aqt
 from anki.errors import NotFoundError
 from anki.models import NotetypeId
 from anki.notes import NoteId
+from aqt.gui_hooks import top_toolbar_did_init_links
 from aqt.qt import QAction
+from aqt.toolbar import Toolbar
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
@@ -19,6 +22,9 @@ from ..common_utils import get_media_names_from_note_field, get_media_names_from
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
+
+SHOW_MEDIA_PROGRESS_PYCMD = "ankihub_show_media_progress"
+TOOLBAR_BUTTON_ID = "ankihub_media_sync"
 
 
 class _AnkiHubMediaSync:
@@ -36,6 +42,9 @@ class _AnkiHubMediaSync:
         # Used to store the Anki profile ID when the media download is started.
         # If the Anki profile changes during the media download, the download is aborted.
         self._anki_profile_id_at_download_start: Optional[str] = None
+
+    def setup_hooks(self) -> None:
+        top_toolbar_did_init_links.append(self._add_top_toolbar_button)
 
     def set_status_action(self, status_action: QAction):
         """Set the QAction that should be used to show the status of the media sync."""
@@ -229,12 +238,16 @@ class _AnkiHubMediaSync:
         self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):
+        status_text: str
         if self._download_in_progress:
-            self._set_status_text("Downloading...")
+            status_text = "Downloading..."
         elif self._amount_uploads_in_progress > 0:
-            self._set_status_text("Uploading...")
+            status_text = "Uploading..."
         else:
-            self._set_status_text("Idle")
+            status_text = "Idle"
+
+        self._set_status_text(status_text)
+        self._set_toolbar_button_status(status_text)
 
     def _set_status_text(self, text: str):
         if self._status_action is None:
@@ -244,6 +257,21 @@ class _AnkiHubMediaSync:
             self._status_action.setText(f"🔃️ Media sync: {text}")
         except RuntimeError:
             LOGGER.warning("Could not set text of media sync status action because the object was deleted.")
+
+    def _add_top_toolbar_button(self, links: list[str], top_toolbar: Toolbar) -> None:
+        link = top_toolbar.create_link(
+            SHOW_MEDIA_PROGRESS_PYCMD, "M", self._on_toolbar_button_clicked, tip="", id=TOOLBAR_BUTTON_ID
+        )
+        links.append(link)
+
+    def _set_toolbar_button_status(self, text: str) -> None:
+        aqt.mw.toolbar.web.eval(
+            """document.getElementById(%s).title = %s;"""
+            % (json.dumps(TOOLBAR_BUTTON_ID), json.dumps(f"Media sync: {text}"))
+        )
+
+    def _on_toolbar_button_clicked(self) -> None:
+        print("todo: show media sync progress")
 
 
 media_sync = _AnkiHubMediaSync()
