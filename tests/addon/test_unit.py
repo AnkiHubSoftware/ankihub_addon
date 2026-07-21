@@ -104,6 +104,7 @@ from ankihub.gui.ankiweb import (
     SignupErrorWidget,
     SignupWithCodeWidget,
     SignupWithPasswordWidget,
+    setup_sync_dialog_patch,
 )
 from ankihub.gui.bulk_suggestion_summary_dialog import (
     BulkSuggestionSummaryDialog,
@@ -155,6 +156,7 @@ from ankihub.gui.utils import (
     is_email,
     show_dialog,
     show_error_dialog,
+    using_qt5,
 )
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
@@ -1144,6 +1146,67 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget._on_sign_up()
 
         assert isinstance(dialog._widget, SignupEmailVerificationWidget)
+
+
+class TestSetupSyncDialogPatch:
+    """Tests for the aqt.sync.sync_login() patch that opens our custom
+    sign-in dialog instead of Anki's password-based dialog.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_sync_login(self):
+        original_sync_login = aqt.sync.sync_login
+        yield
+        aqt.sync.sync_login = original_sync_login
+        aqt.main.sync_login = original_sync_login
+        if not using_qt5():
+            aqt.preferences.sync_login = original_sync_login
+
+    def test_all_three_entry_points_route_through_the_patch(self, mocker: MockerFixture):
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+
+        setup_sync_dialog_patch()
+
+        # aqt.sync, aqt.main and aqt.preferences each bind their own module-level
+        # name to sync_login, so all three have to be reassigned individually.
+        assert aqt.sync.sync_login is aqt.main.sync_login
+        if not using_qt5():
+            # Skip check in older Anki (2.1.56) where the preferences screen used to have an inline login form
+            assert aqt.sync.sync_login is aqt.preferences.sync_login
+
+        on_success = Mock()
+        for module in (aqt.sync, aqt.main, aqt.preferences):
+            dialog_mock.reset_mock()
+            module.sync_login(aqt.mw, on_success)
+            dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+
+
+class TestSetupSyncDialogPatchFailure:
+    def test_missing_sync_login_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
+        original_sync_login = aqt.sync.sync_login
+        get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
+        # Older Anki versions call this synchronously and unpack the result as
+        # (username, password)
+        get_id_and_pass_mock.return_value = ("", "")
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+
+        del aqt.sync.sync_login
+        try:
+            setup_sync_dialog_patch()  # must not raise, even though sync_login is gone
+
+            logger_mock.exception.assert_called_once()
+
+            # aqt.main and aqt.preferences were never reassigned, since the
+            # failure happened before any of the three names were patched
+            assert aqt.main.sync_login is original_sync_login
+            if not using_qt5():
+                assert aqt.preferences.sync_login is original_sync_login
+
+            on_success = Mock()
+            aqt.main.sync_login(aqt.mw, on_success)
+            get_id_and_pass_mock.assert_called_once()
+        finally:
+            aqt.sync.sync_login = original_sync_login
 
 
 class TestSuggestionDialog:
