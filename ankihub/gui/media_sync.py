@@ -42,6 +42,7 @@ class _AnkiHubMediaSync:
         # Used to store the Anki profile ID when the media download is started.
         # If the Anki profile changes during the media download, the download is aborted.
         self._anki_profile_id_at_download_start: Optional[str] = None
+        self._failed = False
 
     def setup_hooks(self) -> None:
         top_toolbar_did_init_links.append(self._add_top_toolbar_button)
@@ -70,6 +71,7 @@ class _AnkiHubMediaSync:
 
         def on_failure(exception: Exception) -> None:
             self._download_in_progress = False
+            self._failed = True
             raise exception
 
         AddonQueryOp(
@@ -152,7 +154,8 @@ class _AnkiHubMediaSync:
                 ah_did=ah_did,
                 missing_media_count=len(missing_media_names),
             )
-            self._client.download_media(missing_media_names, ah_did)
+            if not self._client.download_media(missing_media_names, ah_did):
+                self._failed = True
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
         """Fetch deck media updates from AnkiHub and update the database and the config.
@@ -243,6 +246,8 @@ class _AnkiHubMediaSync:
             status_text = "Downloading..."
         elif self._amount_uploads_in_progress > 0:
             status_text = "Uploading..."
+        elif self._failed:
+            status_text = "Error"
         else:
             status_text = "Idle"
 
