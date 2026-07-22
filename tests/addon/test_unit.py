@@ -19,7 +19,18 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from approvaltests.approvals import verify  # type: ignore
 from approvaltests.namer import NamerFactory  # type: ignore
-from aqt.qt import QApplication, QCheckBox, QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
+from aqt.qt import (
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QLineEdit,
+    QMenu,
+    Qt,
+    QTimer,
+    QValidator,
+    QWidget,
+)
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -1013,6 +1024,25 @@ class TestAnkiwebLoginWithCodeWidget:
 
         widget.code_input.setText("")
         assert widget.code_box.button.isEnabled() is False
+
+    @pytest.mark.parametrize(
+        "value, expected_state",
+        [
+            ("123456", QValidator.State.Acceptable),
+            ("012345", QValidator.State.Acceptable),
+            ("000000", QValidator.State.Acceptable),
+            ("033563", QValidator.State.Acceptable),
+            ("12345", QValidator.State.Intermediate),
+            ("", QValidator.State.Intermediate),
+            ("12345a", QValidator.State.Invalid),
+            ("1234567", QValidator.State.Invalid),
+        ],
+    )
+    def test_code_input_validator(self, qtbot: QtBot, value: str, expected_state: QValidator.State):
+        widget = self._widget(qtbot)
+        validator = widget.code_input.validator()
+        state, _, _ = validator.validate(value, len(value))
+        assert state == expected_state
 
     def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot):
         widget = self._widget(qtbot)
