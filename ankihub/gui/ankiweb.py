@@ -509,16 +509,17 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
+        def on_success(_) -> None:
+            self.init_timer(on_timeout)
+            self.email_box.button.setEnabled(False)
+            self.code_input.setEnabled(True)
+            self.form_widget.error_label.set_error("")
+
         AddonQueryOp(
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_request_login_code(self.email_input.text()),
-            success=lambda _: None,
-        ).run_in_background()
-
-        self.init_timer(on_timeout)
-        self.email_box.button.setEnabled(False)
-        self.code_input.setEnabled(True)
-        self.form_widget.error_label.set_error("")
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_sign_in(self) -> None:
         def task() -> None:
@@ -687,9 +688,10 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
                 self.resend_button.setEnabled(True)
 
         AddonQueryOp(
-            parent=self, op=lambda _: AnkiHubClient().ankiweb_resend_verification(), success=lambda _: None
-        ).run_in_background()
-        self.init_timer(on_timeout)
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_resend_verification(),
+            success=lambda _: self.init_timer(on_timeout),
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_resend(self) -> None:
         self._start_timer()
