@@ -51,13 +51,13 @@ class _AnkiHubMediaSync:
         # If the Anki profile changes during the media download, the download is aborted.
         self._anki_profile_id_at_download_start: Optional[str] = None
         self._failed = False
-        self._toolbar_link = aqt.mw.toolbar.create_link(
-            SHOW_MEDIA_PROGRESS_PYCMD, "", self._on_toolbar_button_clicked, tip="", id=TOOLBAR_BUTTON_ID
-        )
 
     def setup_hooks(self) -> None:
         top_toolbar_did_redraw.append(lambda _: self.refresh_sync_status_text())
         theme_did_change.append(self.refresh_sync_status_text)
+        self._toolbar_link = aqt.mw.toolbar.create_link(
+            SHOW_MEDIA_PROGRESS_PYCMD, "", self._on_toolbar_button_clicked, tip="", id=TOOLBAR_BUTTON_ID
+        )
 
     def set_status_action(self, status_action: QAction):
         """Set the QAction that should be used to show the status of the media sync."""
