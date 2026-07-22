@@ -78,6 +78,7 @@ class _AnkiHubMediaSync:
         LOGGER.info("Starting media download...")
 
         self._download_in_progress = True
+        self._failed = False
         self._anki_profile_id_at_download_start = get_anki_profile_id()
         self.refresh_sync_status_text()
 
@@ -103,6 +104,7 @@ class _AnkiHubMediaSync:
         LOGGER.info("Starting media upload...")
 
         self._amount_uploads_in_progress += 1
+        self._failed = False
         self.refresh_sync_status_text()
 
         media_paths = self._media_paths_for_media_names(media_names)
