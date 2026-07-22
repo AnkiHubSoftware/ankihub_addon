@@ -308,7 +308,8 @@ class _AnkiHubMediaSync:
         aqt.mw.toolbar.web.eval(js)
 
     def _on_toolbar_button_clicked(self) -> None:
-        print("todo: show media sync progress")
+        # TODO: KNW-175 - media progress dialog
+        pass
 
 
 media_sync = _AnkiHubMediaSync()
