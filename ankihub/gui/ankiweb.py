@@ -17,12 +17,13 @@ from aqt.qt import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QIntValidator,
     QLabel,
     QLayout,
     QLineEdit,
     QProgressBar,
     QPushButton,
+    QRegularExpression,
+    QRegularExpressionValidator,
     QSize,
     Qt,
     QTimer,
@@ -198,7 +199,7 @@ class PasswordInput(BaseInput):
 class CodeInput(BaseInput):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        code_validator = QIntValidator(100000, 999999)
+        code_validator = QRegularExpressionValidator(QRegularExpression(r"\d{6}"))
         self.setValidator(code_validator)
         self.setStyleSheet("""QLineEdit {letter-spacing: 2px}""")
 
