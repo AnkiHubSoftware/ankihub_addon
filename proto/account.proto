@@ -17,12 +17,6 @@ service AccountService {
   rpc ResendVerification(ResendVerificationRequest)
       returns (ResendVerificationResponse);
   rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
-  rpc MagicCodeSignup(MagicCodeSignupRequest) returns (MagicCodeSignupResponse);
-  rpc MagicCodeSignupVerify(MagicCodeSignupVerifyRequest)
-      returns (MagicCodeSignupVerifyResponse);
-  rpc MagicCodeLogin(MagicCodeLoginRequest) returns (MagicCodeLoginResponse);
-  rpc MagicCodeLoginVerify(MagicCodeLoginVerifyRequest)
-      returns (MagicCodeLoginVerifyResponse);
 }
 
 message LoginRequest {
@@ -198,49 +192,4 @@ message GetAccountStatusRequest {}
 message GetAccountStatusResponse {
   bool logged_in = 1;
   optional string redirect_to = 2;
-}
-
-// Magic-code (passwordless) signup/login. Errors travel as HTTP status codes,
-// not body enums: 400 invalid input, 401 invalid/expired code, 409 account
-// already exists, 429 throttled. 403 is never used (the web client
-// auto-redirects it to the login page).
-
-message MagicCodeSignupRequest {
-  string email = 1;
-  bool terms = 2;
-}
-
-// 200 = account created, code email sent. Errors: 400 invalid email or
-// terms != true, 409 account already exists (client should redirect to
-// login), 429 throttled.
-message MagicCodeSignupResponse {}
-
-message MagicCodeSignupVerifyRequest {
-  string email = 1;
-  string code = 2;
-}
-
-// 200 = code accepted, email confirmed. Errors: 401 invalid/expired code,
-// 429 throttled.
-message MagicCodeSignupVerifyResponse {
-  string ankiuser_login_token = 1;
-}
-
-message MagicCodeLoginRequest {
-  string email = 1;
-}
-
-// Always empty 200 whether or not the account exists (anti-enumeration).
-// Only a per-IP 429 may surface, as it reveals nothing about the email.
-message MagicCodeLoginResponse {}
-
-message MagicCodeLoginVerifyRequest {
-  string email = 1;
-  string code = 2;
-}
-
-// 200 = code accepted. Errors: 401 invalid/expired code OR email not found
-// (indistinguishable by design), 429 throttled.
-message MagicCodeLoginVerifyResponse {
-  string ankiuser_login_token = 1;
 }

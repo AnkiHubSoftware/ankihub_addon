@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package ankiweb.user_backend.magic_code;
+
+// Magic-code (passwordless) auth for Anki clients. These are HTTP
+// endpoints on the user_backend sync server (no service block): the
+// verify responses hand out the account's sync host key, which must
+// never transit the web frontend surface.
+//
+// Status codes: 400 = input validation, 401 = invalid/expired code (or
+// unknown email, indistinguishable by design), 409 = account already
+// exists (signup only), 429 = throttled.
+
+message MagicCodeSignupRequest {
+  string email = 1;
+  bool terms = 2;
+}
+
+// 200 = account created, code email sent. Errors: 400 invalid email or
+// terms != true, 409 account already exists (client should redirect to
+// login), 429 throttled.
+message MagicCodeSignupResponse {
+  // Conservative lifetime of the emailed code, in seconds. Provided so
+  // clients can drive countdown/resend UX without hardcoding the value.
+  uint32 code_ttl_secs = 1;
+}
+
+message MagicCodeSignupVerifyRequest {
+  string email = 1;
+  string code = 2;
+}
+
+// 200 = code accepted, email confirmed. Errors: 401 invalid/expired code,
+// 429 throttled.
+message MagicCodeSignupVerifyResponse {
+  // The account's sync host key — the same value the collection sync
+  // hostKey endpoint returns after a password login. Anki clients store
+  // this as their sync credential.
+  string host_key = 1;
+}
+
+message MagicCodeLoginRequest {
+  string email = 1;
+}
+
+// Always the same 200 whether or not the account exists (anti-enumeration).
+// Only a per-IP 429 may surface, as it reveals nothing about the email.
+// The login flow implementation should mirror MagicCodeSignupResponse and
+// return code_ttl_secs here (constant, so it leaks nothing).
+message MagicCodeLoginResponse {}
+
+message MagicCodeLoginVerifyRequest {
+  string email = 1;
+  string code = 2;
+}
+
+// 200 = code accepted. Errors: 401 invalid/expired code OR email not found
+// (indistinguishable by design), 429 throttled.
+message MagicCodeLoginVerifyResponse {
+  // The account's sync host key — the same value the collection sync
+  // hostKey endpoint returns after a password login. Anki clients store
+  // this as their sync credential.
+  string host_key = 1;
+}

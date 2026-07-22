@@ -209,6 +209,8 @@ class API(Enum):
     ANKIHUB = "ankihub"
     S3 = "s3"
     ANKIWEB = "ankiweb"
+    # The user_backend sync server, which serves the magic-code endpoints
+    ANKIWEB_USER_BACKEND = "ankiweb_user_backend"
 
 
 if TYPE_CHECKING or sys.version_info >= (3, 10):
@@ -230,6 +232,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
+        ankiweb_url: str = DEFAULT_ANKIWEB_URL,
         ankiweb_api_url: str = DEFAULT_ANKIWEB_API_URL,
     ):
         """Create a new AnkiHubClient.
@@ -239,6 +242,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
+        self.ankiweb_url = ankiweb_url
         self.ankiweb_api_url = ankiweb_api_url
         self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
@@ -271,6 +275,8 @@ class AnkiHubClient(AnkiWebClientMixin):
             url = f"{self.s3_bucket_url}{url_suffix}"
         elif api == API.ANKIWEB:
             url = f"{self.ankiweb_api_url}{url_suffix}"
+        elif api == API.ANKIWEB_USER_BACKEND:
+            url = f"{self.ankiweb_url}{url_suffix}"
         else:
             raise ValueError(f"Unknown API: {api}")
 
@@ -319,7 +325,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         If the last request failed because of an exception, that exception is raised.
         """
         timeout: Union[int, Tuple[int, int]]
-        if api in (API.ANKIHUB, API.ANKIWEB):
+        if api in (API.ANKIHUB, API.ANKIWEB, API.ANKIWEB_USER_BACKEND):
             read_timeout = LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
             timeout = (CONNECTION_TIMEOUT, read_timeout)
         else:
