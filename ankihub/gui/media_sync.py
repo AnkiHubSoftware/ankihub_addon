@@ -296,6 +296,7 @@ class _AnkiHubMediaSync:
                 toolbarButton = %(elem_js)s;
                 toolbarButton.title = %(title)s;
                 toolbarButton.innerHTML = %(icon)s;
+                toolbarButton.style.verticalAlign = "middle";
             })();""" % dict(
                 elem_js=elem_js,
                 toolbar_link=json.dumps(self._toolbar_link),
