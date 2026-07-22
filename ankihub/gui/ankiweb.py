@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 from concurrent.futures import Future
 from enum import Enum
 from typing import Any, Callable, NoReturn, Union
@@ -35,8 +34,10 @@ from aqt.qt import (
 from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
+from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
 ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
@@ -510,6 +511,12 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(self.email_input.text()),
+            success=lambda _: None,
+        ).run_in_background()
+
         self.init_timer(on_timeout)
         self.email_box.button.setEnabled(False)
         self.code_input.setEnabled(True)
@@ -517,7 +524,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
 
     def _on_sign_in(self) -> None:
         def task() -> None:
-            time.sleep(1)
+            AnkiHubClient().ankiweb_verify_login_code(self.email_input.text(), self.code_input.text())
             if simulate_expired_code():
                 raise Exception("This code has expired. Request another.")
 
@@ -572,7 +579,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
 
     def _on_sign_in(self) -> None:
         def task() -> None:
-            time.sleep(1)
+            AnkiHubClient().ankiweb_login(self.email_input.text(), self.password_input.text())
             if simulate_general_error():
                 raise Exception("Inserted email and/or password are incorrect.")
 
@@ -681,6 +688,9 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self.resend_button.setEnabled(True)
 
+        AddonQueryOp(
+            parent=self, op=lambda _: AnkiHubClient().ankiweb_resend_verification(), success=lambda _: None
+        ).run_in_background()
         self.init_timer(on_timeout)
 
     def _on_resend(self) -> None:
@@ -785,9 +795,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             return
 
         def task() -> None:
-            time.sleep(1)
-            self._dialog.update_progress("Signing you in")
-            time.sleep(1)
+            AnkiHubClient().ankiweb_verify_signup_code(self.email_input.text(), self.code_input.text())
             if simulate_expired_code():
                 raise Exception("This code has expired. Request another.")
 
@@ -892,7 +900,11 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
 
     def _on_sign_up(self) -> None:
         def task() -> None:
-            time.sleep(1)
+            client = AnkiHubClient()
+            if self.is_code_signup:
+                client.ankiweb_request_signup_code(self.email_input.text(), self.terms_checkbox.isChecked())
+            else:
+                client.ankiweb_signup(self.email_input.text(), self.password_input.text())
             if simulate_existing_account():
                 raise Exception("An account with that email already exists.")
             elif simulate_general_error() and not simulate_expired_code():
