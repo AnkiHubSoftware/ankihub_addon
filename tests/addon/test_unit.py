@@ -2965,6 +2965,7 @@ class TestTutorialProductMetrics:
                 "plan": "core",
                 "is_staff_or_admin": False,
                 "beta_tester": False,
+                "step_number": 1,
             },
         )
 
