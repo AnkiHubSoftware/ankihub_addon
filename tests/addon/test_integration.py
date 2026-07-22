@@ -489,6 +489,8 @@ def create_change_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_me
     Returns the mock for the create_change_note_suggestion method. It can be used to get information
     about the suggestion that was passed to the client."""
 
+    entry_point.run()
+
     create_change_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
         "create_change_note_suggestion",
@@ -520,6 +522,8 @@ def create_new_note_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_
     """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
     about the suggestion that was passed to the client."""
+
+    entry_point.run()
 
     create_new_note_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
@@ -7808,6 +7812,8 @@ class TestMediaSyncMediaDownload:
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -7861,6 +7867,8 @@ class TestMediaSyncMediaDownload:
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -7893,6 +7901,9 @@ class TestMediaSyncMediaDownload:
         qtbot: QtBot,
     ):
         """Test that media download now filters by media actually referenced in notes."""
+
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
