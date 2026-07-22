@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from concurrent.futures import Future
 from enum import Enum
@@ -53,18 +52,6 @@ class AnkiwebLinkIds(Enum):
     LOGIN_PASSWORD = "#sign-in-password"
     SIGNUP_CODE = "#sign-up-code"
     SIGNUP_PASSWORD = "#sign-up-password"
-
-
-def simulate_existing_account() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_EXISTING_ACCOUNT") == "true"
-
-
-def simulate_expired_code() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_EXPIRED_CODE") == "true"
-
-
-def simulate_general_error() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_GENERAL_ERROR") == "true"
 
 
 def assert_exhaustive(arg: NoReturn) -> NoReturn:
@@ -524,8 +511,6 @@ class LoginWithCodeWidget(BaseLoginWidget):
     def _on_sign_in(self) -> None:
         def task() -> None:
             AnkiHubClient().ankiweb_verify_login_code(self.email_input.text(), self.code_input.text())
-            if simulate_expired_code():
-                raise Exception("This code has expired. Request another.")
 
         def on_done(fut: Future) -> None:
             try:
@@ -579,8 +564,6 @@ class LoginWithPasswordWidget(BaseLoginWidget):
     def _on_sign_in(self) -> None:
         def task() -> None:
             AnkiHubClient().ankiweb_login(self.email_input.text(), self.password_input.text())
-            if simulate_general_error():
-                raise Exception("Inserted email and/or password are incorrect.")
 
         def on_done(fut: Future) -> None:
             try:
@@ -796,8 +779,6 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
 
         def task() -> None:
             AnkiHubClient().ankiweb_verify_signup_code(self.email_input.text(), self.code_input.text())
-            if simulate_expired_code():
-                raise Exception("This code has expired. Request another.")
 
         def on_done(fut: Future) -> None:
             try:
@@ -905,10 +886,6 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 client.ankiweb_request_signup_code(self.email_input.text(), self.terms_checkbox.isChecked())
             else:
                 client.ankiweb_signup(self.email_input.text(), self.password_input.text())
-            if simulate_existing_account():
-                raise Exception("An account with that email already exists.")
-            elif simulate_general_error() and not simulate_expired_code():
-                raise Exception("Some unknown error")
 
         def on_done(fut: Future) -> None:
             try:
@@ -919,7 +896,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 else:
                     self._dialog.replace_widget(SignupEmailVerificationWidget(*args))
             except Exception as exc:
-                if simulate_existing_account():
+                if "An account with this email already exists" in str(exc):
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog))
                 else:
                     self.form_widget.error_label.set_error(str(exc))
