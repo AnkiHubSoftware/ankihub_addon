@@ -84,6 +84,10 @@ def run() -> None:
 
     anki_logger.setup()
 
+    # This needs to be set up early before the toolbar is drawn
+    media_sync.setup_hooks()
+    LOGGER.info("Set up media sync hooks.")
+
 
 def _setup_on_profile_did_open() -> None:
     """Makes sure that _on_profile_did_open gets called after the profile is loaded and before

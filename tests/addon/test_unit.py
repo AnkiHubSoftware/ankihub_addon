@@ -270,6 +270,8 @@ class TestUploadMediaForSuggestion:
 
 class TestMediaSyncMediaDownload:
     def test_with_exception(self, mocker: MockerFixture, qtbot: QtBot):
+        entry_point.run()
+
         update_and_download_mock = mocker.patch.object(
             media_sync,
             "_update_deck_media_and_download_missing_media",
@@ -294,6 +296,8 @@ class TestMediaSyncMediaUpload:
         qtbot: QtBot,
         next_deterministic_uuid,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             upload_media_mock = mocker.patch.object(
                 media_sync._client,
@@ -3325,6 +3329,8 @@ class TestCreateCollaborativeDeck:
         mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
         creating_deck_fails: bool,
     ) -> None:
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             # Setup Anki deck with a note.
             deck_name = "test"
