@@ -73,7 +73,6 @@ DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
 DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
 DEFAULT_INTERCOM_APP_ID = "vm55jg8j"
 DEFAULT_ANKIWEB_URL = "https://ankiweb.net"
-DEFAULT_ANKIWEB_API_URL = f"{DEFAULT_ANKIWEB_URL}/svc"
 
 STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
@@ -230,7 +229,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
-        ankiweb_api_url: str = DEFAULT_ANKIWEB_API_URL,
+        ankiweb_url: str = DEFAULT_ANKIWEB_URL,
     ):
         """Create a new AnkiHubClient.
         The token can be set with the token parameter or with the get_token parameter.
@@ -239,7 +238,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
-        self.ankiweb_api_url = ankiweb_api_url
+        self.ankiweb_url = ankiweb_url
         self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
         self.get_token = get_token
@@ -270,7 +269,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         elif api == API.S3:
             url = f"{self.s3_bucket_url}{url_suffix}"
         elif api == API.ANKIWEB:
-            url = f"{self.ankiweb_api_url}{url_suffix}"
+            url = f"{self.ankiweb_url}{url_suffix}"
         else:
             raise ValueError(f"Unknown API: {api}")
 

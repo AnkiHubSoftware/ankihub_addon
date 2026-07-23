@@ -39,7 +39,6 @@ from structlog.typing import Processor
 from . import LOGGER
 from .ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
-    DEFAULT_ANKIWEB_API_URL,
     DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
@@ -276,7 +275,6 @@ class _Config:
 
         # There's no staging website for AnkiWeb yet
         self.ankiweb_url = DEFAULT_ANKIWEB_URL
-        self.ankiweb_api_url = DEFAULT_ANKIWEB_API_URL
 
         # Priority chain for app_url (lowest to highest):
         # staging/prod (above) < user config (non-null) < build_config.json < env var
@@ -305,7 +303,6 @@ class _Config:
         if override_url := os.getenv("ANKIWEB_URL"):
             override_url = override_url.rstrip("/")
             self.ankiweb_url = override_url
-            self.ankiweb_api_url = f"{override_url}/svc"
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.
