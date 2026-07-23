@@ -779,7 +779,8 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             return
 
         def task() -> None:
-            AnkiHubClient().ankiweb_verify_signup_code(self.email_input.text(), self.code_input.text())
+            email = self.email_input.text() if self._is_retry else self.email
+            AnkiHubClient().ankiweb_verify_signup_code(email, self.code_input.text())
 
         def on_done(fut: Future) -> None:
             try:
