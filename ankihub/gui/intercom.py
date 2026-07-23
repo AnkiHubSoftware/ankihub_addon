@@ -108,6 +108,7 @@ def _inject_intercom(web_content: WebContent, context: object) -> None:
     intercom_settings: Dict[str, Any] = {
         "api_base": "https://api-iam.intercom.io",
         "app_id": app_id,
+        "source": "anki_desktop",
     }
     if (user_id := user_details.get("id")) is not None:
         intercom_settings["user_id"] = str(user_id)
