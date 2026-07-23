@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from concurrent.futures import Future
 from enum import Enum
+from http import HTTPStatus
 from typing import Any, Callable, NoReturn, Union
 
 import aqt
@@ -35,6 +36,7 @@ from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
 from .operations import AddonQueryOp
@@ -62,6 +64,14 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
 def persist_ankiweb_credentials(email: str, host_key: str) -> None:
     aqt.mw.pm.set_sync_username(email)
     aqt.mw.pm.set_sync_key(host_key)
+
+
+def error_message_for_code_request(exc: Exception) -> str:
+    if isinstance(exc, AnkiWebHTTPError) and exc.response.status_code == HTTPStatus.UNAUTHORIZED:
+        error = "Invalid code"
+    else:
+        error = str(exc)
+    return error
 
 
 def html_link(url: str, title: str, bold: bool = True) -> str:
@@ -527,7 +537,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(str(exc))
+                self.form_widget.error_label.set_error(error_message_for_code_request(exc))
                 self.code_input.clear()
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
@@ -801,7 +811,10 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             except Exception as exc:
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
-                        email=self.email, code_ttl_secs=self.code_ttl_secs, dialog=self._dialog, error=str(exc)
+                        email=self.email,
+                        code_ttl_secs=self.code_ttl_secs,
+                        dialog=self._dialog,
+                        error=error_message_for_code_request(exc),
                     )
                 )
 
