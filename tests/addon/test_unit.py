@@ -100,7 +100,10 @@ from ankihub.ankihub_client.ankihub_client import (
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
-from ankihub.ankihub_client.ankiweb_client import AnkiWebHTTPError
+
+if sys.version_info >= (3, 10):
+    # ankiweb_client requires protobuf-py, which is only available on Python 3.10+
+    from ankihub.ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
