@@ -885,10 +885,11 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
     def _on_sign_up(self) -> None:
         def task() -> Optional[str]:
             client = AnkiHubClient()
+            terms = self.terms_checkbox.isChecked()
             if self.is_code_signup:
-                client.ankiweb_request_signup_code(self.email_input.text(), self.terms_checkbox.isChecked())
+                client.ankiweb_request_signup_code(self.email_input.text(), terms)
             else:
-                return client.ankiweb_signup(self.email_input.text(), self.password_input.text()).host_key
+                return client.ankiweb_signup(self.email_input.text(), self.password_input.text(), terms).host_key
 
         def on_done(fut: Future) -> None:
             try:

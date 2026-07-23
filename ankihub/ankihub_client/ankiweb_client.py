@@ -65,8 +65,8 @@ class AnkiWebClientMixin:
             raise AnkiWebHTTPError(response)
         return LoginResponse.from_binary(response.content)
 
-    def ankiweb_signup(self, email: str, password: str) -> SignupResponse:
-        data = SignupRequest(email=email, password=password)
+    def ankiweb_signup(self, email: str, password: str, terms: bool) -> SignupResponse:
+        data = SignupRequest(email=email, password=password, terms=terms)
         response = self._send_request("post", API.ANKIWEB, "/auth/signup", data=data.to_binary())
         if response.status_code != 200:
             raise AnkiWebHTTPError(response)
