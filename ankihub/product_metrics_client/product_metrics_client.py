@@ -16,7 +16,7 @@ from tenacity import (
 
 from .models import ProductEvent, SendEventsResponse
 
-DEFAULT_PRODUCT_METRICS_URL = "https://product-events.ankihub.net"
+DEFAULT_PRODUCT_METRICS_URL = "https://yy3euaefggc6x4w6r7ibkgcg6a0xcile.lambda-url.us-east-1.on.aws/"
 STAGING_PRODUCT_METRICS_URL = "https://w37bseplgye6l7hrgmuhyquvd40iqtxl.lambda-url.us-east-1.on.aws/"
 
 MAX_EVENTS = 500

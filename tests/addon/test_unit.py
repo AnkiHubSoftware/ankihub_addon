@@ -2771,8 +2771,9 @@ class TestUserDetailsConfig:
     @pytest.mark.parametrize(
         "user_details,expected",
         [
-            ({}, None),
-            ({"plan": "core"}, "core"),
+            ({"memberships": []}, None),
+            ({"memberships": [{"plan": "core"}]}, "core"),
+            ({"memberships": [{"plan": "core"}, {"plan": "Ankihub AI"}]}, "Ankihub AI"),
         ],
     )
     def test_plan(self, user_details: dict, expected: Optional[str]) -> None:
@@ -2965,6 +2966,7 @@ class TestTutorialProductMetrics:
                 "plan": "core",
                 "is_staff_or_admin": False,
                 "beta_tester": False,
+                "step_number": 1,
             },
         )
 

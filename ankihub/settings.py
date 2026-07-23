@@ -570,7 +570,11 @@ class _Config:
         return self._private_config.user_details.get("id")
 
     def plan(self) -> Optional[str]:
-        return self._private_config.user_details.get("plan")
+        membership = self._private_config.user_details.get("memberships", [])
+        if not membership:
+            return None
+
+        return membership[-1].get("plan")
 
     def is_staff(self) -> bool:
         return bool(self._private_config.user_details.get("is_staff"))
