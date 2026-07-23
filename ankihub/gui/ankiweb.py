@@ -59,6 +59,11 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
     raise Exception(f"unexpected arg received: {type(arg)} {arg}")
 
 
+def persist_ankiweb_credentials(email: str, host_key: str) -> None:
+    aqt.mw.pm.set_sync_username(email)
+    aqt.mw.pm.set_sync_key(host_key)
+
+
 def html_link(url: str, title: str, bold: bool = True) -> str:
     anchor = f"<a href='{url}'>{title}</a>"
     if bold:
@@ -510,12 +515,14 @@ class LoginWithCodeWidget(BaseLoginWidget):
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_sign_in(self) -> None:
-        def task() -> None:
-            AnkiHubClient().ankiweb_verify_login_code(self.email_input.text(), self.code_input.text())
+        def task() -> str:
+            return AnkiHubClient().ankiweb_verify_login_code(self.email_input.text(), self.code_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                email = self.email_input.text()
+                persist_ankiweb_credentials(email=email, host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
@@ -563,12 +570,14 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         self.password_box.button.setEnabled(bool(text) and is_email(self.email_input.text()))
 
     def _on_sign_in(self) -> None:
-        def task() -> None:
-            AnkiHubClient().ankiweb_login(self.email_input.text(), self.password_input.text())
+        def task() -> str:
+            return AnkiHubClient().ankiweb_login(self.email_input.text(), self.password_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                email = self.email_input.text()
+                persist_ankiweb_credentials(email=email, host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
@@ -774,18 +783,21 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
     def _on_get_code(self) -> None:
         self._start_timer()
 
+    def _get_email(self) -> str:
+        return self.email_input.text() if self._is_retry else self.email
+
     def _on_verify_or_resend(self) -> None:
         if self._is_resend():
             self._start_timer()
             return
 
-        def task() -> None:
-            email = self.email_input.text() if self._is_retry else self.email
-            AnkiHubClient().ankiweb_verify_signup_code(email, self.code_input.text())
+        def task() -> str:
+            return AnkiHubClient().ankiweb_verify_signup_code(self._get_email(), self.code_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                persist_ankiweb_credentials(email=self._get_email(), host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
