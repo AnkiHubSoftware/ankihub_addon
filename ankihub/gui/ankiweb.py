@@ -36,7 +36,6 @@ from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
 from .operations import AddonQueryOp
@@ -67,6 +66,8 @@ def persist_ankiweb_credentials(email: str, host_key: str) -> None:
 
 
 def error_message_for_code_request(exc: Exception) -> str:
+    from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
+
     if isinstance(exc, AnkiWebHTTPError) and exc.response.status_code == HTTPStatus.UNAUTHORIZED:
         error = "Invalid code"
     else:
