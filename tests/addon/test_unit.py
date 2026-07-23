@@ -8,6 +8,7 @@ import time
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
@@ -99,6 +100,7 @@ from ankihub.ankihub_client.ankihub_client import (
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
+from ankihub.ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
@@ -1061,7 +1063,7 @@ class TestAnkiwebLoginWithCodeWidget:
         sys.version_info < (3, 10), reason="AnkiWeb client methods require protobuf-py, only available on 3.10+"
     )
     def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_login_code")
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(code_ttl_secs=5))
         mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
 
         widget = self._widget(qtbot)
@@ -1127,6 +1129,25 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         assert dialog.isVisible() is True
         assert "expired" in widget.form_widget.error_label.status.text()
+        assert widget.code_input.text() == ""
+
+    def test_login_with_code_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is True
+        assert widget.form_widget.error_label.status.text() == "Invalid code"
         assert widget.code_input.text() == ""
 
     def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, mocker: MockerFixture):
@@ -1202,7 +1223,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "unknown error" in widget.form_widget.error_label.status.text()
 
     def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_signup_code")
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_signup_code", return_value=Mock(code_ttl_secs=300))
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = cast(SignupWithCodeWidget, dialog._widget)
@@ -1224,7 +1245,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         dialog.show()
         # Freshly created (not a retry after an error), so the widget only has
         # `self.email` and no `email_input` field.
-        widget = SignupCodeVerificationWidget(email="user@example.com", dialog=dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
         dialog.replace_widget(widget)
         widget.code_input.setText("123456")
 
@@ -1246,7 +1267,9 @@ class TestAnkiwebLoginAndSignupSubmission:
         qtbot.addWidget(dialog)
         # Passing an error makes this a retry widget, which shows an editable
         # email field instead of the original read-only `self.email`.
-        widget = SignupCodeVerificationWidget(email="user@example.com", dialog=dialog, error="Some unknown error")
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com", code_ttl_secs=300, dialog=dialog, error="Some unknown error"
+        )
         dialog.replace_widget(widget)
         widget.email_input.setText("other@example.com")
         widget.code_input.setText("123456")
@@ -1255,6 +1278,25 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         verify_mock.assert_called_once_with("other@example.com", "123456")
         persist_mock.assert_called_once_with(email="other@example.com", host_key="hostkey123")
+
+    def test_signup_code_verification_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # A new SignupCodeVerificationWidget (retry mode) replaces the current one on error.
+        new_widget = dialog._widget
+        assert isinstance(new_widget, SignupCodeVerificationWidget)
+        assert new_widget.form_widget.error_label.status.text() == "Invalid code"
 
     def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
