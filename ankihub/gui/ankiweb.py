@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from concurrent.futures import Future
 from enum import Enum
-from typing import Any, Callable, NoReturn, Optional, Union
+from typing import Any, Callable, NoReturn, Union
 
 import aqt
 import aqt.main
@@ -95,7 +95,7 @@ def timer_is_active(timer: Countdown | None) -> bool:
 
 
 class Countdown(QTimer):
-    def __init__(self, callback: Callable[[int], None], seconds: int = 5, parent: QWidget | None = None):
+    def __init__(self, callback: Callable[[int], None], seconds: int = 120, parent: QWidget | None = None):
         self.remaining_seconds = seconds
         self._callback = callback
         super().__init__(parent)
@@ -380,9 +380,9 @@ class BaseAnkiwebWidget(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
 
-    def init_timer(self, on_timeout: Callable[[int], None]) -> None:
+    def init_timer(self, on_timeout: Callable[[int], None], seconds: int = 120) -> None:
         destroy_timer(self._timer)
-        self._timer = Countdown(on_timeout, parent=self)
+        self._timer = Countdown(callback=on_timeout, seconds=seconds, parent=self)
         self._timer.start()
 
 
@@ -695,8 +695,9 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
 
 class SignupCodeVerificationWidget(BaseSignupWidget):
-    def __init__(self, email: str, dialog: AnkiwebDialog, error: str = ""):
+    def __init__(self, email: str, code_ttl_secs: int, dialog: AnkiwebDialog, error: str = ""):
         self.email = email
+        self.code_ttl_secs = code_ttl_secs
         self._dialog = dialog
         self._is_retry = bool(error)
         super().__init__(
@@ -771,7 +772,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        self.init_timer(on_timeout)
+        self.init_timer(on_timeout, self.code_ttl_secs)
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
@@ -802,7 +803,11 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self._dialog.replace_widget(SignupCodeVerificationWidget(self.email, self._dialog, str(exc)))
+                self._dialog.replace_widget(
+                    SignupCodeVerificationWidget(
+                        email=self.email, code_ttl_secs=self.code_ttl_secs, dialog=self._dialog, error=str(exc)
+                    )
+                )
 
         run_with_progress(
             dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
@@ -895,22 +900,23 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
 
     def _on_sign_up(self) -> None:
-        def task() -> Optional[str]:
+        def task() -> Union[str, int]:
             client = AnkiHubClient()
             terms = self.terms_checkbox.isChecked()
             if self.is_code_signup:
-                client.ankiweb_request_signup_code(self.email_input.text(), terms)
+                return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
             else:
                 return client.ankiweb_signup(self.email_input.text(), self.password_input.text(), terms).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                host_key = fut.result()
+                hkey_or_ttl = fut.result()
                 kwargs = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
+                    kwargs["code_ttl_secs"] = hkey_or_ttl
                     self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
                 else:
-                    kwargs["host_key"] = host_key
+                    kwargs["host_key"] = hkey_or_ttl
                     self._dialog.replace_widget(SignupEmailVerificationWidget(**kwargs))
             except Exception as exc:
                 if "An account with this email already exists" in str(exc):
