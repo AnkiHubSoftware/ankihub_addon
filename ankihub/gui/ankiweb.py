@@ -648,14 +648,13 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             dialog=dialog,
             extra_bottom_button=login_button,
         )
-        self._start_timer()
+        self._resend()
 
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.resend_button = resend_button = QPushButton("Resend verification email")
-        resend_button.setEnabled(False)
-        qconnect(resend_button.clicked, self._on_resend)
+        qconnect(resend_button.clicked, self._resend)
         instructions_label = QLabel(EMAIL_INSTRUCTIONS)
         instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         form_widget = FormWidget(
@@ -670,25 +669,22 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
         return form_widget
 
-    def _start_timer(self) -> None:
-        def on_timeout(remaining_secs: int) -> None:
-            resend_available_status = (
-                f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
-            )
-            self.description_label.setText(
-                f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>" + resend_available_status
-            )
-            if not remaining_secs:
-                self.resend_button.setEnabled(True)
+    def _resend(self) -> None:
+        def on_success(throttled: bool) -> None:
+            if throttled:
+                self.form_widget.error_label.set_error("Sorry, no more emails can be sent to that address today.")
+                self.description_label.setText("")
+            else:
+                # TODO: use /verify-email to get actual status
+                self.description_label.setText(
+                    f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>"
+                )
 
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key),
-            success=lambda _: self.init_timer(on_timeout),
+            op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
+            success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
-
-    def _on_resend(self) -> None:
-        self._start_timer()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
