@@ -39,6 +39,7 @@ from structlog.typing import Processor
 from . import LOGGER
 from .ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
     DEFAULT_INTERCOM_APP_ID,
@@ -272,6 +273,9 @@ class _Config:
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
+        # There's no staging website for AnkiWeb yet
+        self.ankiweb_url = DEFAULT_ANKIWEB_URL
+
         # Priority chain for app_url (lowest to highest):
         # staging/prod (above) < user config (non-null) < build_config.json < env var
         if override_url := (
@@ -295,6 +299,10 @@ class _Config:
 
         if intercom_app_id := os.getenv("INTERCOM_APP_ID"):
             self.intercom_app_id = intercom_app_id
+
+        if override_url := os.getenv("ANKIWEB_URL"):
+            override_url = override_url.rstrip("/")
+            self.ankiweb_url = override_url
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.

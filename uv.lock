@@ -2,11 +2,9 @@ version = 1
 revision = 3
 requires-python = ">=3.9"
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -31,11 +29,9 @@ name = "anki"
 version = "2.1.56"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -63,11 +59,9 @@ name = "anki"
 version = "25.2.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -96,11 +90,9 @@ name = "anki"
 version = "25.9.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -154,12 +146,14 @@ bundle = [
     { name = "django-cotton" },
     { name = "mashumaro" },
     { name = "peewee" },
+    { name = "protobuf-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "sentry-sdk" },
     { name = "structlog" },
     { name = "tenacity" },
 ]
 dev = [
     { name = "approvaltests" },
+    { name = "buf-bin", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "coverage" },
     { name = "django-stubs", version = "5.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "django-stubs", version = "5.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
@@ -167,6 +161,7 @@ dev = [
     { name = "faker" },
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "protoc-gen-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "pytest" },
     { name = "pytest-anki" },
     { name = "pytest-cov" },
@@ -204,18 +199,21 @@ bundle = [
     { name = "django-cotton", specifier = ">=2.5.1" },
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
     { name = "peewee", specifier = "==3.18.2" },
+    { name = "protobuf-py", marker = "python_full_version >= '3.10'" },
     { name = "sentry-sdk", specifier = "==1.6.0" },
     { name = "structlog", specifier = "==24.1.0" },
     { name = "tenacity", specifier = "==8.2.2" },
 ]
 dev = [
     { name = "approvaltests", specifier = ">=12.2.0" },
+    { name = "buf-bin", marker = "python_full_version >= '3.10'" },
     { name = "coverage", specifier = ">=6.5.0" },
     { name = "django-stubs", specifier = ">=5.1.3" },
     { name = "factory-boy", specifier = ">=3.2.1" },
     { name = "faker", specifier = ">=19.12.0" },
     { name = "mypy", specifier = ">=1.18.2" },
     { name = "pre-commit", specifier = ">=2.20.0" },
+    { name = "protoc-gen-py", marker = "python_full_version >= '3.10'" },
     { name = "pytest", specifier = ">=8.2.2" },
     { name = "pytest-anki", git = "https://github.com/ankipalace/pytest-anki.git?branch=main" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
@@ -269,11 +267,9 @@ name = "aqt"
 version = "2.1.56"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -300,11 +296,9 @@ name = "aqt"
 version = "25.2.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -334,11 +328,9 @@ name = "aqt"
 version = "25.9.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -413,6 +405,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/21/28/9b3f50ce0e048515135495f198351908d99540d69bfdc8c1d15b73dc55ce/blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf", size = 22460, upload-time = "2024-11-08T17:25:47.436Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc", size = 8458, upload-time = "2024-11-08T17:25:46.184Z" },
+]
+
+[[package]]
+name = "buf-bin"
+version = "1.72.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/4d/4b305995cc79c08abfff452b97df4f78c0bf22e54b55d30c9e3ff3e3e6a8/buf_bin-1.72.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:80b91a34c1bde6103909522423692fd174add77be14f9549c90d0331ac22f041", size = 15371262, upload-time = "2026-07-17T20:39:53.022Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/e0/3dc0dd9c98ab862236171fd2799bec0eb955b076eeb5c1345a474ff317d3/buf_bin-1.72.0-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:c3cb5720e8905290b0d08ad49b4f57f73b8e1f19c85cad7f7746ecfc2fb3fd06", size = 16538315, upload-time = "2026-07-17T20:39:56.13Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/7d/f98609c72149f8f47408d887f265a30c4bfa030af97b2d160fabc401b61a/buf_bin-1.72.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:79e9e0622e7b61a11b7267e33ac5e3bc9862eb45fe73098b74f961d1d398c467", size = 14560062, upload-time = "2026-07-17T20:39:59.104Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/92/ece9420f79ea0bc3803e659c7633f3c5795e850f32721c88bc8d937bcf8f/buf_bin-1.72.0-py3-none-manylinux2014_armv7l.manylinux_2_17_armv7l.musllinux_1_1_armv7l.whl", hash = "sha256:faf906ca80efea5e16024d816f3edb4dbc0006bc5ac77dbe9b0cc2987d58cee7", size = 14746573, upload-time = "2026-07-17T20:40:01.841Z" },
+    { url = "https://files.pythonhosted.org/packages/81/69/7a8a68c9b1155b5611415ca745b27c2b00332a970b14fd881d681e93b948/buf_bin-1.72.0-py3-none-manylinux2014_ppc64le.manylinux_2_17_ppc64le.musllinux_1_1_ppc64le.whl", hash = "sha256:1563276ff0c35addd796c674e8a84f95f88a3fa567f3329ecdd7ffec35efea93", size = 14256237, upload-time = "2026-07-17T20:40:04.578Z" },
+    { url = "https://files.pythonhosted.org/packages/36/ec/3bff6981672c1a5a2b4ceb51e82a252d3521c83c95a3426a4de25a3c3dad/buf_bin-1.72.0-py3-none-manylinux2014_s390x.manylinux_2_17_s390x.musllinux_1_1_s390x.whl", hash = "sha256:f8f077ffc21b8eb47b63e001988fdb3f638cb62431ec3d6b9d40ba826ec5761c", size = 15508730, upload-time = "2026-07-17T20:40:08.364Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/d1/d54430879c503643e3b5ca8b9ed6072b006ad263babd95fc9bfdf0e1a2bf/buf_bin-1.72.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.musllinux_1_1_x86_64.whl", hash = "sha256:01573bdff85d11b905f431dc707e954e4ecc408bb65983d1b6f77098b112151f", size = 16134094, upload-time = "2026-07-17T20:40:11.334Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/b9/01d8d60211a0b27e2199d0c50bc265d750c55237708df1f3fb0d4929f1a1/buf_bin-1.72.0-py3-none-manylinux_2_17_riscv64.musllinux_1_2_riscv64.whl", hash = "sha256:879e29b073d976fc21ea3e2464fceca904f92cb5ce4b7bbaf2b56e8ab5a090b1", size = 14759134, upload-time = "2026-07-17T20:40:14.265Z" },
+    { url = "https://files.pythonhosted.org/packages/87/2a/4d0d8b4289e11f48867c913d419ca0ddccec9a0ac48e483a549b948daebd/buf_bin-1.72.0-py3-none-win_amd64.whl", hash = "sha256:21939478a4db814d4465fc09123f6a44e62e546a3f18c025c5744741238e7021", size = 16476768, upload-time = "2026-07-17T20:40:17.188Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/b4/f7c85432667929de32fb340f2793267f3d242450586ac155b65237d67722/buf_bin-1.72.0-py3-none-win_arm64.whl", hash = "sha256:a92484e502e11ebd90b528eef5c09e21eeb1d83fffeb29edef284a3f76e04025", size = 14649036, upload-time = "2026-07-17T20:40:20.217Z" },
 ]
 
 [[package]]
@@ -529,11 +538,9 @@ name = "click"
 version = "8.3.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
@@ -748,11 +755,9 @@ name = "django-stubs"
 version = "5.2.8"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
@@ -789,11 +794,9 @@ name = "django-stubs-ext"
 version = "5.2.8"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
@@ -1484,11 +1487,9 @@ name = "pip-system-certs"
 version = "5.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
@@ -1679,6 +1680,65 @@ wheels = [
 ]
 
 [[package]]
+name = "protobuf-py"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf-py-ext", marker = "(python_full_version >= '3.10' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (python_full_version >= '3.10' and platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and platform_machine == 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (python_full_version < '3.10' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'AMD64' and platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine != 'AMD64' and platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'AMD64' and platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'AMD64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine == 'AMD64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'AMD64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'ARM64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine == 'ARM64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'ARM64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'arm64' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_machine != 'arm64' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'arm64' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_python_implementation != 'CPython' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (platform_python_implementation != 'CPython' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_python_implementation != 'CPython' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/56/b93a2ed9588779cd19dff9d62a611a7852987db195a0c9e6ca6d4a66682f/protobuf_py-0.2.0.tar.gz", hash = "sha256:e4f2e08c8c99a0d652f20c7e52d9290e04e14f4f086fc16a83ce728bd509f0ba", size = 148832, upload-time = "2026-07-14T05:15:24.122Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/74/78/f86aba47416d66fab4f522bca7916920b94e5e5cf73e79ea49c6a5e5c8ab/protobuf_py-0.2.0-py3-none-any.whl", hash = "sha256:6811340f5a803c4e23575d9ee47c00c1385e18d93964b8cbacb0fa86eb3378f3", size = 199903, upload-time = "2026-07-14T05:14:46.744Z" },
+]
+
+[[package]]
+name = "protobuf-py-ext"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/8a/45b769a5475f2c95696907265074c3c8113e091a7afaa27e8b4ca7ce0a95/protobuf_py_ext-0.2.0.tar.gz", hash = "sha256:b4a79dc7c341ac05a47081a58b0692ea5ec4530aa9a08c94da0c9023d988080e", size = 31488, upload-time = "2026-07-14T05:15:25.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/98/197802e24a0b1bc138d9a32f9522998d8465bd02b996ae178af8f948d8e2/protobuf_py_ext-0.2.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:3a6e1b8d653a26a67b1bc17bb0efda237bc8b9f1179efc415de2549d536e1ae2", size = 304882, upload-time = "2026-07-14T05:14:48.378Z" },
+    { url = "https://files.pythonhosted.org/packages/12/7e/db5ace17eef81afafdda3a710e9e1eb376cb2984e2e51cb1b56e9cd49440/protobuf_py_ext-0.2.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7640e2e7cf53d4d8aaa3063659d2ee2be52687e66fd4087039c700b11ba837bf", size = 312969, upload-time = "2026-07-14T05:14:49.815Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/7e/81b63b4de45f3a91b3fa6a6d209d325f9c3c69289dc81c75f3305fadd9ef/protobuf_py_ext-0.2.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:959acb10bd84fabfbbe09d10f3c45a8cb59fce803f97a6af0805dc2a93f739d3", size = 327164, upload-time = "2026-07-14T05:14:51.178Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/a5/5d9c39d154e6a554c7f6b5a42d370ef4211d369572229681a582e194b6da/protobuf_py_ext-0.2.0-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:2d2ace3421a6c4ac7a413b84de2910086a54af37ca46aafc4899d4935a2bd5b9", size = 490567, upload-time = "2026-07-14T05:14:52.392Z" },
+    { url = "https://files.pythonhosted.org/packages/85/7f/65d2083373d5a19a2900d90dfdcc960968f493b6fceb1dd612d5a537336f/protobuf_py_ext-0.2.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:722b69b1993effa4c03ea0e90916273388fa7e2f3077faef8863c99d6ca36da2", size = 540066, upload-time = "2026-07-14T05:14:53.925Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/eb/92530ff853c5601e8f9ca65f125fd9832266f5c9a4dff6b2a47dfae8a788/protobuf_py_ext-0.2.0-cp310-abi3-win_amd64.whl", hash = "sha256:cba5e1dfba68ecd69cedfaf8761aa7fb408fa4723f5b3e341208b13f3ebdebb1", size = 250251, upload-time = "2026-07-14T05:14:55.175Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/18/c9e603abecf90fa8c08f619e12c018707ae8ce8ee34a30102cda1963656f/protobuf_py_ext-0.2.0-cp310-abi3-win_arm64.whl", hash = "sha256:3cafe6fd772e661f6b593223412795026abb5a14e7c645823a27f01d53b3af4b", size = 240701, upload-time = "2026-07-14T05:14:56.442Z" },
+    { url = "https://files.pythonhosted.org/packages/63/2d/66603f517b15073d0638be557cb64e12ca3ab4a7e1996de9c4d8afa20a8d/protobuf_py_ext-0.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1e37bb6880e7065c29760fd969414d56aa117c5a707abaa11e98164b7e962452", size = 303802, upload-time = "2026-07-14T05:14:57.565Z" },
+    { url = "https://files.pythonhosted.org/packages/01/cc/bfb5b23a94f2447d314fc5cd933dffa981df0e789cfc5c0280fc502190a3/protobuf_py_ext-0.2.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6f1b91efb7bddea459d70ba86001720e29859a788eaaa8bde2cd8c71ccae1ec4", size = 314159, upload-time = "2026-07-14T05:14:58.735Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/ee/9624cc545c6f558ff158732aea9eea6e5f0cb56b919d45a5769582e4dedb/protobuf_py_ext-0.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b69392ef99bfd5b2598466e2cde82d90fc4077924c9a9b24e651aa093fb0f763", size = 325915, upload-time = "2026-07-14T05:15:00.11Z" },
+    { url = "https://files.pythonhosted.org/packages/15/55/a962e054435d2cdcb3effa55ec385b8959d588d9d12978ccf53b33d23c6b/protobuf_py_ext-0.2.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:a1cc3cdab302ed310aeed4a4586f0600b458291430ea95d2eb6d1d05d4c6f592", size = 491459, upload-time = "2026-07-14T05:15:01.252Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/3a/7f2701ee6d28c821cfd9a9b123b69d7ecfc6dad067c00a1f6f86e49c9cbe/protobuf_py_ext-0.2.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6325c5676a09dd8f129d2d72b5c1f3a97aaf172f5db016abefd5eaf4fc6f53eb", size = 538696, upload-time = "2026-07-14T05:15:02.594Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/c4/7e6bf96c5fac84a557036d185c7fbd0f561e89e4459e130f867796333a7b/protobuf_py_ext-0.2.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c70440ad22fa38fda6a73987c0fb84ba37252fb23c87ddf2fc8d935bb32a127b", size = 303874, upload-time = "2026-07-14T05:15:03.928Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/5c/7acb810f41b5821eee0249b5820ae3a5a6335251b3b70336048d36d0ba1a/protobuf_py_ext-0.2.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:86a7d7e047c2e3b764cf288cad7578b1be9fac90476a68d22c52112248d94fe6", size = 314215, upload-time = "2026-07-14T05:15:05.039Z" },
+    { url = "https://files.pythonhosted.org/packages/03/ea/eb328fd99817e0308cb3d4669c0d553186650c45098ade52aee0520f1293/protobuf_py_ext-0.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e997e59916d3ab7206c68a858a61eeb2c9bdebb1aad0eccddf5b4c78be2d8cc6", size = 326016, upload-time = "2026-07-14T05:15:06.15Z" },
+    { url = "https://files.pythonhosted.org/packages/56/23/a3d58915611515523c0098958e7cd2abb8b9491c37821baf875a9ae901f0/protobuf_py_ext-0.2.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:12a1ccec44f29060d496d608711825e73f1649bb98ee50d974b769ae2a205d51", size = 491556, upload-time = "2026-07-14T05:15:07.505Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/01/3e0f533d540033f61bb088cbc3fad0a245b9d0de93585af6c74fd38996f0/protobuf_py_ext-0.2.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:f4bc97fd4d50e9029ce9aff57f9af211a4e893a68603180b23cdc20e2f1ffcbd", size = 538726, upload-time = "2026-07-14T05:15:08.75Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/f2/47efc784f3753a6b0d726b26b4ebe3c5f3d94ba84a525543432e2aa14fd7/protobuf_py_ext-0.2.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:35f316c6732f63f4002e6441294da3f730d43624cd179b9cfae3d0ffabbc972a", size = 301017, upload-time = "2026-07-14T05:15:09.935Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/fe/ec47d9fde881176cdd729fcd95032233372d05f8061b4727c5c758637a83/protobuf_py_ext-0.2.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e126dceb0a83a7146e91520abf648e281a8137f9a4ac86baee358e24721e537d", size = 312792, upload-time = "2026-07-14T05:15:11.103Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/80/548045a14f3ae298cf2f996c952061d58a1dc5eef231786954ad53d2f578/protobuf_py_ext-0.2.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e0d5abee03e1031cc905d9443bb0b9d14d6fa8d36c7f64ff0c555ec883d5afef", size = 324495, upload-time = "2026-07-14T05:15:12.583Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/be/92fd8698a1cb033e2851cf45ab69815aff362a6577cd301c27fed00e9388/protobuf_py_ext-0.2.0-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:70243a1f803037acdce7022040818cbc55d3348bdc3903ffb1d4b18fecbf18ff", size = 489849, upload-time = "2026-07-14T05:15:14.051Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/3b/ee34c785c0cddad7666b6d1d0a1c2524e122c1cc96e1855cb905ceca325b/protobuf_py_ext-0.2.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:f4982b1abf24a30a6414ebbb6001171abcbf8f5b945d4a2ca273d132be879732", size = 536823, upload-time = "2026-07-14T05:15:15.465Z" },
+    { url = "https://files.pythonhosted.org/packages/15/5a/032bb471ae761cb4b7021ae54cda3587cdc0fca3fcef396cf27a2f85a8a7/protobuf_py_ext-0.2.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:ba51b6298cda70cdabd88a6cc0f998e5d74856254db5bcf009eb22c5248eb0ef", size = 295335, upload-time = "2026-07-14T05:15:16.592Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/12/082fe80c66ba7b87ceb71c31faebe8989015cb0d7feee2006fba00f1c194/protobuf_py_ext-0.2.0-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:626d0982819b316529729223b52676049e0912bd4a75696059317037bf241b0c", size = 306898, upload-time = "2026-07-14T05:15:17.929Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/41/364b0f19165d8476ec1a5c121ed0cb2579c952f5872c4d4eeb3df534a22c/protobuf_py_ext-0.2.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:efd6fef4b16b564396f96e58663ac077c42d686968c4ce5771c2333cf50e6fbb", size = 321085, upload-time = "2026-07-14T05:15:19.189Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/60/d445897080aca64f36f212d3725a57da2e46983ce517657d831b2542be29/protobuf_py_ext-0.2.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:ded28f377c32b0dc51b134924a54a553fbcaaeb87eaa68f2a80973169ca06b01", size = 484260, upload-time = "2026-07-14T05:15:20.49Z" },
+    { url = "https://files.pythonhosted.org/packages/96/26/f41f884487187cd812687782681c31acdf007b00df85927db6e998b81c97/protobuf_py_ext-0.2.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:d303366fdb084d0532e243909b96bbb35fbfd8bb960728489d9729396794711f", size = 533528, upload-time = "2026-07-14T05:15:21.77Z" },
+]
+
+[[package]]
+name = "protoc-gen-py"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-25-2-7') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt-25-2-7' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/a5/a1a91241f305c927d341c13b34771593ecbdf1ab1dba422b1b2fdbd0b37f/protoc_gen_py-0.2.0.tar.gz", hash = "sha256:361d02bdef26ffdad6af07fa61dc85906f727121418f16fa9088efad975396e7", size = 11012, upload-time = "2026-07-14T05:15:25.831Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/25/ef7cd45c5a486ecc4ce33b0233f98bc7cddc03d1999cd5f6c9877457b209/protoc_gen_py-0.2.0-py3-none-any.whl", hash = "sha256:273caf03dff3fe62834875a63d8e0db0b213d40be04e7836e46eb49899e7f00f", size = 12549, upload-time = "2026-07-14T05:15:22.95Z" },
+]
+
+[[package]]
 name = "psutil"
 version = "7.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1773,11 +1833,9 @@ name = "pyqt6"
 version = "6.7.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1801,11 +1859,9 @@ name = "pyqt6"
 version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1828,11 +1884,9 @@ name = "pyqt6-qt6"
 version = "6.7.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1850,11 +1904,9 @@ name = "pyqt6-qt6"
 version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1909,11 +1961,9 @@ name = "pyqt6-webengine"
 version = "6.7.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1936,11 +1986,9 @@ name = "pyqt6-webengine"
 version = "6.8.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1964,11 +2012,9 @@ name = "pyqt6-webengine-qt6"
 version = "6.7.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -1989,11 +2035,9 @@ name = "pyqt6-webengine-qt6"
 version = "6.8.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation == 'PyPy'",
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
@@ -2641,10 +2685,8 @@ name = "testfixtures"
 version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and platform_python_implementation == 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation == 'PyPy'",
-    "python_full_version >= '3.12' and platform_python_implementation != 'PyPy'",
-    "python_full_version == '3.11.*' and platform_python_implementation != 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation == 'PyPy'",
+    "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/37/1084db985a7bda417f012570f369d18a6b4afbc59bc423908d0219c38188/testfixtures-9.1.0.tar.gz", hash = "sha256:517e9cf353942723533ae1100ca45dd27fe0785c3ad2765075f5cb1cbce01482", size = 88605, upload-time = "2025-07-08T19:30:55.157Z" }
 wheels = [

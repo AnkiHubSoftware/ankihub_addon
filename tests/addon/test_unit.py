@@ -2,10 +2,13 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import tempfile
 import time
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
@@ -86,6 +89,7 @@ from ankihub.ankihub_client import (
     TagGroupValidationResponse,
 )
 from ankihub.ankihub_client.ankihub_client import (
+    DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
     DEFAULT_INTERCOM_APP_ID,
@@ -96,6 +100,10 @@ from ankihub.ankihub_client.ankihub_client import (
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
+
+if sys.version_info >= (3, 10):
+    # ankiweb_client requires protobuf-py, which is only available on Python 3.10+
+    from ankihub.ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
@@ -998,6 +1006,16 @@ class TestIsEmail:
         assert is_email(value) is expected
 
 
+def _run_in_background_synchronously(task: Callable, on_done: Callable[[Future], None], **kwargs: Any) -> None:
+    """Stand-in for aqt.mw.taskman.run_in_background that runs the task on the
+    calling thread instead of a worker thread, so tests don't need a real event loop.
+    """
+    try:
+        on_done(future_with_result(task()))
+    except Exception as exc:
+        on_done(future_with_exception(exc))
+
+
 class TestAnkiwebLoginWithCodeWidget:
     def _widget(self, qtbot: QtBot) -> LoginWithCodeWidget:
         dialog = AnkiwebLoginDialog()
@@ -1044,7 +1062,13 @@ class TestAnkiwebLoginWithCodeWidget:
         state, _, _ = validator.validate(value, len(value))
         assert state == expected_state
 
-    def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot):
+    @pytest.mark.skipif(
+        sys.version_info < (3, 10), reason="AnkiWeb client methods require protobuf-py, only available on 3.10+"
+    )
+    def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(code_ttl_secs=5))
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
         widget = self._widget(qtbot)
         widget.email_input.setText("user@example.com")
 
@@ -1062,27 +1086,21 @@ class TestAnkiwebLoginWithCodeWidget:
         assert "Resend available" in widget.status_label.text()
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="AnkiWeb client methods require protobuf-py, only available on 3.10+"
+)
 class TestAnkiwebLoginAndSignupSubmission:
-    """Locks down the current (network-stubbed) behavior of the sign-in/sign-up
-    handlers, driven by the ANKIWEB_SIMULATE_* env vars. These will need updating
-    once real network calls replace the simulation, but should keep passing for
-    the equivalent success/expired-code/incorrect-credentials/existing-account
-    scenarios in the meantime.
+    """Exercises the sign-in/sign-up handlers with the AnkiHubClient's AnkiWeb methods
+    mocked out, since real AnkiWeb requests can't be made in CI.
     """
 
     @pytest.fixture(autouse=True)
     def _patch_run_in_background(self, mocker: MockerFixture):
-        mocker.patch("ankihub.gui.ankiweb.time.sleep")
-
-        def run_sync(task, on_done, **kwargs):
-            try:
-                on_done(future_with_result(task()))
-            except Exception as exc:
-                on_done(future_with_exception(exc))
-
-        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=run_sync)
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
 
     def test_login_with_code_success_closes_dialog(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_login_code", return_value=Mock(host_key="hostkey123"))
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
         tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
@@ -1095,9 +1113,14 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         assert dialog.isVisible() is False
         tooltip_mock.assert_called_once()
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
 
-    def test_login_with_code_expired_shows_error_and_clears_code(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("ANKIWEB_SIMULATE_EXPIRED_CODE", "true")
+    def test_login_with_code_expired_shows_error_and_clears_code(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=Exception("This code has expired. Request another."),
+        )
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
         dialog.show()
@@ -1111,8 +1134,31 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "expired" in widget.form_widget.error_label.status.text()
         assert widget.code_input.text() == ""
 
-    def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("ANKIWEB_SIMULATE_GENERAL_ERROR", "true")
+    def test_login_with_code_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is True
+        assert widget.form_widget.error_label.status.text() == "Invalid code"
+        assert widget.code_input.text() == ""
+
+    def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_login",
+            side_effect=Exception("Inserted email and/or password are incorrect."),
+        )
         dialog = AnkiwebLoginDialog()
         qtbot.addWidget(dialog)
         widget = LoginWithPasswordWidget(dialog)
@@ -1124,8 +1170,33 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         assert "incorrect" in widget.form_widget.error_label.status.text()
 
-    def test_signup_with_existing_account_shows_dedicated_error_widget(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("ANKIWEB_SIMULATE_EXISTING_ACCOUNT", "true")
+    def test_login_with_password_success_persists_credentials_and_closes_dialog(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_login", return_value=Mock(host_key="hostkey123"))
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        dialog.replace_widget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
+
+    def test_signup_with_existing_account_shows_dedicated_error_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_signup_code",
+            side_effect=Exception("An account with this email already exists."),
+        )
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = cast(SignupWithCodeWidget, dialog._widget)
@@ -1137,8 +1208,10 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert isinstance(dialog._widget, SignupErrorWidget)
         assert "already exists" in dialog._widget.form_widget.error_label.status.text()
 
-    def test_signup_with_code_general_error_shows_inline_error(self, qtbot: QtBot, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("ANKIWEB_SIMULATE_GENERAL_ERROR", "true")
+    def test_signup_with_code_general_error_shows_inline_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_signup_code", side_effect=Exception("Some unknown error")
+        )
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = cast(SignupWithCodeWidget, dialog._widget)
@@ -1152,7 +1225,8 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert dialog._widget is widget
         assert "unknown error" in widget.form_widget.error_label.status.text()
 
-    def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot):
+    def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_signup_code", return_value=Mock(code_ttl_secs=300))
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = cast(SignupWithCodeWidget, dialog._widget)
@@ -1163,8 +1237,79 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         assert isinstance(dialog._widget, SignupCodeVerificationWidget)
 
-    def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot):
+    def test_signup_code_verification_success_persists_credentials(self, qtbot: QtBot, mocker: MockerFixture):
+        verify_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_verify_signup_code", return_value=Mock(host_key="hostkey123")
+        )
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        # Freshly created (not a retry after an error), so the widget only has
+        # `self.email` and no `email_input` field.
+        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # Regression check: this used to reference a non-existing `self.email_input`
+        # and crash for a freshly created (non-retry) widget.
+        verify_mock.assert_called_once_with("user@example.com", "123456")
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+
+    def test_signup_code_verification_retry_uses_email_input(self, qtbot: QtBot, mocker: MockerFixture):
+        verify_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_verify_signup_code", return_value=Mock(host_key="hostkey123")
+        )
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        # Passing an error makes this a retry widget, which shows an editable
+        # email field instead of the original read-only `self.email`.
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com", code_ttl_secs=300, dialog=dialog, error="Some unknown error"
+        )
+        dialog.replace_widget(widget)
+        widget.email_input.setText("other@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        verify_mock.assert_called_once_with("other@example.com", "123456")
+        persist_mock.assert_called_once_with(email="other@example.com", host_key="hostkey123")
+
+    def test_signup_code_verification_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # A new SignupCodeVerificationWidget (retry mode) replaces the current one on error.
+        new_widget = dialog._widget
+        assert isinstance(new_widget, SignupCodeVerificationWidget)
+        assert new_widget.form_widget.error_label.status.text() == "Invalid code"
+
+    def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        signup_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_signup", return_value=Mock(host_key="hostkey123")
+        )
+        # SignupEmailVerificationWidget kicks off a resend-verification request as soon
+        # as it's constructed, to start the "resend available in Ns" countdown.
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification")
 
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
@@ -1177,7 +1322,9 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         widget._on_sign_up()
 
+        signup_mock.assert_called_once_with("user@example.com", "password123", True)
         assert isinstance(dialog._widget, SignupEmailVerificationWidget)
+        assert dialog._widget.host_key == "hostkey123"
 
 
 class TestSetupSyncDialogPatch:
@@ -5218,6 +5365,7 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.setattr(config, "load_public_config", lambda: None)
         monkeypatch.delenv("ANKIHUB_APP_URL", raising=False)
         monkeypatch.delenv("S3_BUCKET_URL", raising=False)
+        monkeypatch.delenv("ANKIWEB_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
         monkeypatch.delenv("INTERCOM_APP_ID", raising=False)
@@ -5229,6 +5377,7 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == DEFAULT_APP_URL
         assert config.api_url == DEFAULT_API_URL
         assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
+        assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
         assert config.intercom_app_id == DEFAULT_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
         assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
@@ -5239,6 +5388,8 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == STAGING_APP_URL
         assert config.api_url == STAGING_API_URL
         assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
+        # There's no staging website for AnkiWeb yet, so it stays pointed at production.
+        assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
         assert config.intercom_app_id == STAGING_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
@@ -5275,6 +5426,12 @@ class TestSetupPublicConfigAndOtherSettings:
         config.public_config = {}
         config.setup_public_config_and_other_settings()
         assert config.s3_bucket_url == "https://custom-s3.example.com"
+
+    def test_ankiweb_url_env_var_override(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_URL", "https://custom-ankiweb.example.com/")
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.ankiweb_url == "https://custom-ankiweb.example.com"
 
     def test_anking_deck_id_env_var_override(self, monkeypatch: MonkeyPatch):
         custom_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
