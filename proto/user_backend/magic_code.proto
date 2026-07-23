@@ -45,9 +45,12 @@ message MagicCodeLoginRequest {
 
 // Always the same 200 whether or not the account exists (anti-enumeration).
 // Only a per-IP 429 may surface, as it reveals nothing about the email.
-// The login flow implementation should mirror MagicCodeSignupResponse and
-// return code_ttl_secs here (constant, so it leaks nothing).
-message MagicCodeLoginResponse {}
+message MagicCodeLoginResponse {
+  // Same constant as MagicCodeSignupResponse.code_ttl_secs, returned
+  // whether or not the account exists (and whether or not the send was
+  // throttled) so it leaks nothing.
+  uint32 code_ttl_secs = 1;
+}
 
 message MagicCodeLoginVerifyRequest {
   string email = 1;

@@ -502,15 +502,15 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
-        def on_success(_) -> None:
-            self.init_timer(on_timeout)
+        def on_success(code_ttl_secs: int) -> None:
+            self.init_timer(on_timeout, code_ttl_secs)
             self.email_box.button.setEnabled(False)
             self.code_input.setEnabled(True)
             self.form_widget.error_label.set_error("")
 
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(self.email_input.text()),
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(self.email_input.text()).code_ttl_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
