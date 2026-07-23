@@ -5364,6 +5364,7 @@ class TestIntercom:
         assert '"user_hash": "hash123"' in web_content.body
         assert '"name": "Test User"' in web_content.body
         assert '"email": "test@example.com"' in web_content.body
+        assert '"source": "anki_desktop"' in web_content.body
 
     def test_inject_intercom_on_overview(self) -> None:
         from aqt.overview import Overview
