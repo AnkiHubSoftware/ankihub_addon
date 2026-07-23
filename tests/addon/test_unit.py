@@ -77,7 +77,6 @@ from ankihub.ankihub_client import (
     TagGroupValidationResponse,
 )
 from ankihub.ankihub_client.ankihub_client import (
-    DEFAULT_ANKIWEB_API_URL,
     DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
@@ -5231,7 +5230,6 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.api_url == DEFAULT_API_URL
         assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
         assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
-        assert config.ankiweb_api_url == DEFAULT_ANKIWEB_API_URL
         assert config.intercom_app_id == DEFAULT_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
         assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
@@ -5244,7 +5242,6 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
         # There's no staging website for AnkiWeb yet, so it stays pointed at production.
         assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
-        assert config.ankiweb_api_url == DEFAULT_ANKIWEB_API_URL
         assert config.intercom_app_id == STAGING_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
@@ -5287,7 +5284,6 @@ class TestSetupPublicConfigAndOtherSettings:
         config.public_config = {}
         config.setup_public_config_and_other_settings()
         assert config.ankiweb_url == "https://custom-ankiweb.example.com"
-        assert config.ankiweb_api_url == "https://custom-ankiweb.example.com/svc"
 
     def test_anking_deck_id_env_var_override(self, monkeypatch: MonkeyPatch):
         custom_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
