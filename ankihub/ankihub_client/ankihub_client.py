@@ -73,7 +73,6 @@ DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
 DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
 DEFAULT_INTERCOM_APP_ID = "vm55jg8j"
 DEFAULT_ANKIWEB_URL = "https://ankiweb.net"
-DEFAULT_ANKIWEB_API_URL = f"{DEFAULT_ANKIWEB_URL}/svc"
 
 STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
@@ -209,8 +208,6 @@ class API(Enum):
     ANKIHUB = "ankihub"
     S3 = "s3"
     ANKIWEB = "ankiweb"
-    # The user_backend sync server, which serves the magic-code endpoints
-    ANKIWEB_USER_BACKEND = "ankiweb_user_backend"
 
 
 if TYPE_CHECKING or sys.version_info >= (3, 10):
@@ -233,7 +230,6 @@ class AnkiHubClient(AnkiWebClientMixin):
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
         ankiweb_url: str = DEFAULT_ANKIWEB_URL,
-        ankiweb_api_url: str = DEFAULT_ANKIWEB_API_URL,
     ):
         """Create a new AnkiHubClient.
         The token can be set with the token parameter or with the get_token parameter.
@@ -243,7 +239,6 @@ class AnkiHubClient(AnkiWebClientMixin):
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
         self.ankiweb_url = ankiweb_url
-        self.ankiweb_api_url = ankiweb_api_url
         self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
         self.get_token = get_token
@@ -274,8 +269,6 @@ class AnkiHubClient(AnkiWebClientMixin):
         elif api == API.S3:
             url = f"{self.s3_bucket_url}{url_suffix}"
         elif api == API.ANKIWEB:
-            url = f"{self.ankiweb_api_url}{url_suffix}"
-        elif api == API.ANKIWEB_USER_BACKEND:
             url = f"{self.ankiweb_url}{url_suffix}"
         else:
             raise ValueError(f"Unknown API: {api}")
@@ -325,7 +318,7 @@ class AnkiHubClient(AnkiWebClientMixin):
         If the last request failed because of an exception, that exception is raised.
         """
         timeout: Union[int, Tuple[int, int]]
-        if api in (API.ANKIHUB, API.ANKIWEB, API.ANKIWEB_USER_BACKEND):
+        if api in (API.ANKIHUB, API.ANKIWEB):
             read_timeout = LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
             timeout = (CONNECTION_TIMEOUT, read_timeout)
         else:

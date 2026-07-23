@@ -70,7 +70,6 @@ class AddonAnkiHubClient(AnkiHubClient):
             api_url=config.api_url,
             s3_bucket_url=config.s3_bucket_url,
             ankiweb_url=config.ankiweb_url,
-            ankiweb_api_url=config.ankiweb_api_url,
             response_hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             get_token=lambda: config.token(),
             local_media_dir_path_cb=lambda: (Path(aqt.mw.col.media.dir()) if aqt.mw.col else None),
