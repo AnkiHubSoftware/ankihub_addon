@@ -65,7 +65,7 @@ def persist_ankiweb_credentials(email: str, host_key: str) -> None:
     aqt.mw.pm.set_sync_key(host_key)
 
 
-def error_message_for_code_request(exc: Exception) -> str:
+def error_message_for_code_response(exc: Exception) -> str:
     from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
 
     if isinstance(exc, AnkiWebHTTPError) and exc.response.status_code == HTTPStatus.UNAUTHORIZED:
@@ -538,7 +538,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(error_message_for_code_request(exc))
+                self.form_widget.error_label.set_error(error_message_for_code_response(exc))
                 self.code_input.clear()
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
@@ -815,7 +815,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                         email=self.email,
                         code_ttl_secs=self.code_ttl_secs,
                         dialog=self._dialog,
-                        error=error_message_for_code_request(exc),
+                        error=error_message_for_code_response(exc),
                     )
                 )
 
