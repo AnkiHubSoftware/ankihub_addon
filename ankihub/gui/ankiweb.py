@@ -75,6 +75,16 @@ def error_message_for_code_response(exc: Exception) -> str:
     return error
 
 
+def error_message_for_password_login(exc: Exception) -> str:
+    from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
+
+    if isinstance(exc, AnkiWebHTTPError) and exc.response.status_code == HTTPStatus.UNAUTHORIZED:
+        error = "Inserted email and/or password are incorrect."
+    else:
+        error = str(exc)
+    return error
+
+
 def html_link(url: str, title: str, bold: bool = True) -> str:
     anchor = f"<a href='{url}'>{title}</a>"
     if bold:
@@ -593,7 +603,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(str(exc))
+                self.form_widget.error_label.set_error(error_message_for_password_login(exc))
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
 
