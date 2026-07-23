@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from concurrent.futures import Future
 from enum import Enum
-from typing import Any, Callable, NoReturn, Union
+from typing import Any, Callable, NoReturn, Optional, Union
 
 import aqt
 import aqt.main
@@ -625,8 +625,9 @@ class SignupErrorWidget(BaseSignupWidget):
 
 
 class SignupEmailVerificationWidget(BaseSignupWidget):
-    def __init__(self, email: str, dialog: AnkiwebDialog):
+    def __init__(self, email: str, host_key: str, dialog: AnkiwebDialog):
         self.email = email
+        self.host_key = host_key
         self._dialog = dialog
         login_button = Button("Sign in")
         qconnect(login_button.clicked, self._on_login)
@@ -673,7 +674,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_resend_verification(),
+            op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key),
             success=lambda _: self.init_timer(on_timeout),
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
@@ -882,21 +883,22 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
 
     def _on_sign_up(self) -> None:
-        def task() -> None:
+        def task() -> Optional[str]:
             client = AnkiHubClient()
             if self.is_code_signup:
                 client.ankiweb_request_signup_code(self.email_input.text(), self.terms_checkbox.isChecked())
             else:
-                client.ankiweb_signup(self.email_input.text(), self.password_input.text())
+                return client.ankiweb_signup(self.email_input.text(), self.password_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
-                args = (self.email_input.text(), self._dialog)
+                host_key = fut.result()
+                kwargs = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
-                    self._dialog.replace_widget(SignupCodeVerificationWidget(*args))
+                    self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
                 else:
-                    self._dialog.replace_widget(SignupEmailVerificationWidget(*args))
+                    kwargs["host_key"] = host_key
+                    self._dialog.replace_widget(SignupEmailVerificationWidget(**kwargs))
             except Exception as exc:
                 if "An account with this email already exists" in str(exc):
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog))

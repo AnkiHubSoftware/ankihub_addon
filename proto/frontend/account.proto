@@ -148,7 +148,10 @@ message VerifyEmailResponse {
   }
 }
 
-message ResendVerificationRequest {}
+message ResendVerificationRequest {
+  optional string hkey = 1;
+}
+
 message ResendVerificationResponse {
   bool throttled = 1;
 }
