@@ -273,6 +273,8 @@ class TestUploadMediaForSuggestion:
 
 class TestMediaSyncMediaDownload:
     def test_with_exception(self, mocker: MockerFixture, qtbot: QtBot):
+        entry_point.run()
+
         update_and_download_mock = mocker.patch.object(
             media_sync,
             "_update_deck_media_and_download_missing_media",
@@ -297,6 +299,8 @@ class TestMediaSyncMediaUpload:
         qtbot: QtBot,
         next_deterministic_uuid,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             upload_media_mock = mocker.patch.object(
                 media_sync._client,
@@ -2875,8 +2879,9 @@ class TestUserDetailsConfig:
     @pytest.mark.parametrize(
         "user_details,expected",
         [
-            ({}, None),
-            ({"plan": "core"}, "core"),
+            ({"memberships": []}, None),
+            ({"memberships": [{"plan": "core"}]}, "core"),
+            ({"memberships": [{"plan": "core"}, {"plan": "Ankihub AI"}]}, "Ankihub AI"),
         ],
     )
     def test_plan(self, user_details: dict, expected: Optional[str]) -> None:
@@ -3069,6 +3074,7 @@ class TestTutorialProductMetrics:
                 "plan": "core",
                 "is_staff_or_admin": False,
                 "beta_tester": False,
+                "step_number": 1,
             },
         )
 
@@ -3429,6 +3435,8 @@ class TestCreateCollaborativeDeck:
         mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
         creating_deck_fails: bool,
     ) -> None:
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             # Setup Anki deck with a note.
             deck_name = "test"
@@ -5476,6 +5484,7 @@ class TestIntercom:
         assert '"user_hash": "hash123"' in web_content.body
         assert '"name": "Test User"' in web_content.body
         assert '"email": "test@example.com"' in web_content.body
+        assert '"source": "anki_desktop"' in web_content.body
 
     def test_inject_intercom_on_overview(self) -> None:
         from aqt.overview import Overview
@@ -5576,24 +5585,50 @@ class TestIntercom:
 
         config.public_config["ankihub_support_button"] = False
         shutdown = mocker.patch.object(intercom, "shutdown")
-        reset = mocker.patch.object(aqt.mw, "reset")
+        boot = mocker.patch.object(intercom, "_boot_on_current_home_screen")
 
         intercom.sync_with_user_preference()
 
         shutdown.assert_called_once()
-        reset.assert_not_called()
+        boot.assert_not_called()
 
-    def test_sync_with_user_preference_resets_when_enabled(self, mocker: MockerFixture) -> None:
+    def test_sync_with_user_preference_boots_when_enabled_on_home(self, mocker: MockerFixture) -> None:
         from ankihub.gui import intercom
 
+        web = mocker.Mock()
         mocker.patch.object(aqt.mw, "state", "deckBrowser")
+        mocker.patch.object(aqt.mw, "web", web)
         shutdown = mocker.patch.object(intercom, "shutdown")
-        reset = mocker.patch.object(aqt.mw, "reset")
 
         intercom.sync_with_user_preference()
 
         shutdown.assert_not_called()
-        reset.assert_called_once()
+        web.eval.assert_called_once()
+        assert "widget.intercom.io/widget/test_app_id" in web.eval.call_args[0][0]
+
+    def test_sync_with_user_preference_skips_boot_off_home(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        web = mocker.Mock()
+        mocker.patch.object(aqt.mw, "state", "review")
+        mocker.patch.object(aqt.mw, "web", web)
+        shutdown = mocker.patch.object(intercom, "shutdown")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_not_called()
+        web.eval.assert_not_called()
+
+    def test_setup_registers_user_state_refresh_callback(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        append = mocker.patch.object(aqt.gui_hooks.webview_will_set_content, "append")
+        add_callback = mocker.patch("ankihub.user_state.add_user_state_refreshed_callback")
+
+        intercom.setup()
+
+        append.assert_called_once_with(intercom._inject_intercom)
+        add_callback.assert_called_once_with(intercom.sync_with_user_preference)
 
     def test_close_messenger_evals_hide(self, mocker: MockerFixture) -> None:
         from ankihub.gui import intercom

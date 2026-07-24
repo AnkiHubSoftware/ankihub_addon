@@ -570,7 +570,7 @@ class Tutorial:
                     "beta_tester": is_beta_tester,
                 }
 
-                if event_name in ["tour_next", "tour_previous"]:
+                if event_name in ["tour_next", "tour_previous", "tour_abandoned"]:
                     properties["step_number"] = self.current_step
 
                 self.product_metrics.track(
