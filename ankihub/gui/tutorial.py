@@ -899,7 +899,7 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         dialog_kwargs=dict(
             title="📘 Add cards to your study queue",
             body="When installed, the AnKing Step Deck comes with all cards hidden (suspended). "
-            "Take this tour to learn how to <b>select cards to study</b> and <b>set your daily limits</b>.<br><br>"
+            "Take this tour to learn how to <b>select cards to study</b>.<br><br>"
             "You can revisit this anytime in AnkiHub's Help menu.",
             secondary_button_label="Not now",
             main_button_label="Take tour",
@@ -1354,20 +1354,11 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _steps(self) -> list[TutorialStep]:
         steps = []
-        steps.append(
-            TutorialStep(
-                body="Click on the deck’s gear icon and select <b>Options</b>.",
-                target=f"[id='{self._anking_deck_config.anki_id}'] .opts",
-                tooltip_context=aqt.mw.deckBrowser,
-                shown_callback=self._on_gears_icon_step,
-                hidden_callback=self._on_gears_icon_step_hidden,
-            )
-        )
 
         steps.append(
             TutorialStep(
                 id="browse_button",
-                body="Now click on <b>Browse</b>.",
+                body="Click on <b>Browse</b>.",
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
