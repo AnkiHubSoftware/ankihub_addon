@@ -8763,7 +8763,6 @@ class TestFlashCardSelector:
             qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
     @pytest.mark.sequential
-    @pytest.mark.sequential
     def test_dialog_is_raised_when_browser_opened_from_it_closes(
         self,
         anki_session_with_addon_data: AnkiSession,
