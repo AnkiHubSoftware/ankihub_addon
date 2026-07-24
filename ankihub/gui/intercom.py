@@ -118,6 +118,7 @@ def _build_boot_js() -> Optional[str]:
         "api_base": "https://api-iam.intercom.io",
         "app_id": app_id,
         "source": "anki_desktop",
+        "z_index": 2147483000,
     }
     if (user_id := user_details.get("id")) is not None:
         intercom_settings["user_id"] = str(user_id)
