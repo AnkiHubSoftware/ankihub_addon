@@ -625,7 +625,7 @@ class SignupErrorWidget(BaseSignupWidget):
         form_widget = FormWidget(
             description="We can email you a magic code for password-free sign-in.<br>"
             f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Sign in with code.')}<br><br>"
-            f"Alternatively, you can {html_link(ANKIWEB_RESET_LINK, 'reset your password')}, if you forgot it.",
+            f"Alternatively, you can {html_link(ANKIWEB_RESET_LINK, 'reset your password')}.",
             rows=[],
             dialog=self._dialog,
         )
