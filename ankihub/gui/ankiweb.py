@@ -654,6 +654,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        description_label.setWordWrap(True)
         self.resend_button = resend_button = QPushButton("Resend verification email")
         qconnect(resend_button.clicked, self._resend)
         instructions_label = QLabel(EMAIL_INSTRUCTIONS)
