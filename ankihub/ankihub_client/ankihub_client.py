@@ -568,8 +568,9 @@ class AnkiHubClient:
         if s3_response.status_code != 204:
             raise AnkiHubHTTPError(s3_response)
 
-    def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
+    def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> bool:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
+        all_succeeded = True
         with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
@@ -583,17 +584,18 @@ class AnkiHubClient:
                 if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
-                    return
-
+                    return all_succeeded
                 if future.result():
                     downloaded_media_count += 1
-
+                else:
+                    all_succeeded = False
         LOGGER.info(
             "Downloaded media from AnkiHub.",
             ah_did=deck_id,
             attempted_count=len(media_names),
             downloaded_count=downloaded_media_count,
         )
+        return all_succeeded
 
     def _download_media(self, media_file_path: Path, media_remote_path: str) -> bool:
         response = self._send_request("GET", API.S3, media_remote_path, stream=True)

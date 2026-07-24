@@ -719,6 +719,22 @@ def warning_triangle_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))
 
 
+def media_sync_svg() -> str:
+    if theme_manager.night_mode:
+        icon_name = "media-sync-dark.svg"
+    else:
+        icon_name = "media-sync-light.svg"
+    return (ICONS_PATH / icon_name).read_text(encoding="utf-8")
+
+
+def media_sync_error_svg() -> str:
+    if theme_manager.night_mode:
+        icon_name = "media-sync-error-dark.svg"
+    else:
+        icon_name = "media-sync-error-light.svg"
+    return (ICONS_PATH / icon_name).read_text(encoding="utf-8")
+
+
 def tinted_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
     """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
     and antialiased edges stay intact). Used to theme flat single-color icons."""
