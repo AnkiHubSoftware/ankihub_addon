@@ -934,7 +934,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         def on_done(fut: Future) -> None:
             try:
                 hkey_or_ttl = fut.result()
-                kwargs = dict(email=self.email_input.text(), dialog=self._dialog)
+                kwargs: dict[str, Any] = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
                     kwargs["code_ttl_secs"] = hkey_or_ttl
                     self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
