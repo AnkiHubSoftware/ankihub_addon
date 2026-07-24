@@ -8,7 +8,6 @@ import time
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timedelta
-from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
@@ -100,10 +99,6 @@ from ankihub.ankihub_client.ankihub_client import (
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
-
-if sys.version_info >= (3, 10):
-    # ankiweb_client requires protobuf-py, which is only available on Python 3.10+
-    from ankihub.ankihub_client.ankiweb_client import AnkiWebHTTPError
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     DailyCardReviewSummary,
@@ -1134,25 +1129,6 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "expired" in widget.form_widget.error_label.status.text()
         assert widget.code_input.text() == ""
 
-    def test_login_with_code_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch.object(
-            AddonAnkiHubClient,
-            "ankiweb_verify_login_code",
-            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
-        )
-        dialog = AnkiwebLoginDialog()
-        qtbot.addWidget(dialog)
-        dialog.show()
-        widget = cast(LoginWithCodeWidget, dialog._widget)
-        widget.email_input.setText("user@example.com")
-        widget.code_input.setText("123456")
-
-        widget._on_sign_in()
-
-        assert dialog.isVisible() is True
-        assert widget.form_widget.error_label.status.text() == "Invalid code"
-        assert widget.code_input.text() == ""
-
     def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, mocker: MockerFixture):
         mocker.patch.object(
             AddonAnkiHubClient,
@@ -1281,25 +1257,6 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         verify_mock.assert_called_once_with("other@example.com", "123456")
         persist_mock.assert_called_once_with(email="other@example.com", host_key="hostkey123")
-
-    def test_signup_code_verification_unauthorized_shows_invalid_code_error(self, qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch.object(
-            AddonAnkiHubClient,
-            "ankiweb_verify_signup_code",
-            side_effect=AnkiWebHTTPError(response=Mock(status_code=HTTPStatus.UNAUTHORIZED)),
-        )
-        dialog = AnkiwebSignupDialog()
-        qtbot.addWidget(dialog)
-        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
-        dialog.replace_widget(widget)
-        widget.code_input.setText("123456")
-
-        widget._on_verify_or_resend()
-
-        # A new SignupCodeVerificationWidget (retry mode) replaces the current one on error.
-        new_widget = dialog._widget
-        assert isinstance(new_widget, SignupCodeVerificationWidget)
-        assert new_widget.form_widget.error_label.status.text() == "Invalid code"
 
     def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget

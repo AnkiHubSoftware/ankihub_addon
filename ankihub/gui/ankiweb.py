@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from concurrent.futures import Future
 from enum import Enum
-from http import HTTPStatus
 from typing import Any, Callable, NoReturn, Union
 
 import aqt
@@ -63,16 +62,6 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
 def persist_ankiweb_credentials(email: str, host_key: str) -> None:
     aqt.mw.pm.set_sync_username(email)
     aqt.mw.pm.set_sync_key(host_key)
-
-
-def error_message_for_code_response(exc: Exception) -> str:
-    from ..ankihub_client.ankiweb_client import AnkiWebHTTPError
-
-    if isinstance(exc, AnkiWebHTTPError) and exc.response.status_code == HTTPStatus.UNAUTHORIZED:
-        error = "Invalid code"
-    else:
-        error = str(exc)
-    return error
 
 
 def html_link(url: str, title: str, bold: bool = True) -> str:
@@ -539,7 +528,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(error_message_for_code_response(exc))
+                self.form_widget.error_label.set_error(str(exc))
                 self.code_input.clear()
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
@@ -827,7 +816,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                         email=self._get_email(),
                         code_ttl_secs=self.code_ttl_secs,
                         dialog=self._dialog,
-                        error=error_message_for_code_response(exc),
+                        error=str(exc),
                         remaining_seconds=self._timer.remaining_seconds,
                     )
                 )
