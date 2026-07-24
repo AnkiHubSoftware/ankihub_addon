@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWidget, sip
+from aqt.qt import QAction, QDialog, QEvent, QFileDialog, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -201,6 +201,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_single_suggestion,
 )
 from ankihub.gui.utils import _Dialog, bring_to_front, robust_filter
+from ankihub.gui.webview import SheetFilePickerWebPage
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -8762,40 +8763,6 @@ class TestFlashCardSelector:
             qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
     @pytest.mark.sequential
-    def test_dialog_is_raised_when_file_picker_closes(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        mocker: MockerFixture,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        # Regression test: on macOS, dismissing the native file picker opened from the
-        # web view activates Anki's main window, burying the (non-modal) dialog behind it.
-        # The page notifies us via a pycmd so we can bring the dialog back to the front.
-        entry_point.run()
-        with anki_session_with_addon_data.profile_loaded():
-            mocker.patch.object(config, "token", return_value="test_token")
-
-            # Load a page with a file input so the file-picker watcher has something to observe.
-            self._mock_load_url_to_show_page(mocker, body='<input type="file" id="fileinput">')
-
-            dialog = FlashCardSelectorDialog.display_for_ah_did(
-                ah_did=next_deterministic_uuid(),
-                parent=aqt.mw,
-            )
-
-            raise_mock = mocker.patch.object(dialog, "raise_")
-            activate_mock = mocker.patch.object(dialog, "activateWindow")
-
-            # Wait for the page (and thus the watcher JS) to finish loading, then simulate
-            # the picker closing by dispatching a `cancel` event on the file input.
-            qtbot.wait_until(lambda: dialog.web.page() is not None)
-            qtbot.wait(500)
-            dialog.web.eval("document.getElementById('fileinput').dispatchEvent(new Event('cancel', {bubbles: true}))")
-
-            qtbot.wait_until(lambda: raise_mock.called)
-            assert activate_mock.called
-
     @pytest.mark.sequential
     def test_dialog_is_raised_when_browser_opened_from_it_closes(
         self,
@@ -9685,6 +9652,72 @@ class TestBringToFront:
             assert sip.isdeleted(widget)
 
             bring_to_front(widget)  # must not raise
+
+
+class TestSheetFilePickerWebPage:
+    # NOTE: the underlying bug is a macOS-only focus steal (dismissing the picker buries the
+    # dialog behind Anki's main window). That is a visual/window-manager behavior with no
+    # automated seam, so these tests lock in the *mechanism* that fixes it - the picker being a
+    # window-modal sheet parented to the dialog - plus the chooseFiles() return-value contract.
+    def _open_dialog(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> FlashCardSelectorDialog:
+        mocker.patch.object(config, "token", return_value="test_token")
+        mocker.patch.object(AnkiWebView, "load_url")
+        return FlashCardSelectorDialog.display_for_ah_did(ah_did=next_deterministic_uuid(), parent=aqt.mw)
+
+    def test_dialog_uses_the_sheet_file_picker_page(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert isinstance(dialog.web.page(), SheetFilePickerWebPage)
+
+    def test_choose_files_opens_window_modal_sheet_and_returns_selection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = True
+            picker.selectedFiles.return_value = ["/tmp/deck.csv"]
+            picker_cls = mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], ["text/csv"])
+
+            assert result == ["/tmp/deck.csv"]
+            # Parent + WindowModal is what makes it a sheet, so focus returns to the dialog.
+            picker_cls.assert_called_once_with(dialog)
+            picker.setWindowModality.assert_called_once_with(Qt.WindowModality.WindowModal)
+            picker.setMimeTypeFilters.assert_called_once_with(["text/csv", "application/octet-stream"])
+
+    def test_choose_files_returns_empty_list_on_cancel(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert result == []
 
 
 @pytest.mark.qt_no_exception_capture
