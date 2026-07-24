@@ -519,9 +519,10 @@ class LoginWithCodeWidget(BaseLoginWidget):
             self.code_input.setEnabled(True)
             self.form_widget.error_label.set_error("")
 
+        email = self.email_input.text()
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(self.email_input.text()).code_ttl_secs,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
@@ -779,8 +780,17 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        self.init_timer(on_timeout, self.code_ttl_secs)
-        self._update_code_button_state()
+        def on_success(code_ttl_secs: int) -> None:
+            self.code_ttl_secs = code_ttl_secs
+            self.init_timer(on_timeout, self.code_ttl_secs)
+            self._update_code_button_state()
+
+        email = self._get_email()
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_code_changed(self, text: str) -> None:
         self._update_code_button_state()
@@ -812,7 +822,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             except Exception as exc:
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
-                        email=self.email,
+                        email=self._get_email(),
                         code_ttl_secs=self.code_ttl_secs,
                         dialog=self._dialog,
                         error=error_message_for_code_response(exc),
