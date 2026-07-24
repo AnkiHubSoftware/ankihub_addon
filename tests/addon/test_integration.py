@@ -9719,6 +9719,27 @@ class TestSheetFilePickerWebPage:
 
             assert result == []
 
+    def test_dialog_stays_open_when_file_picker_is_cancelled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Cancelling the file picker must not dismiss the Smart Search dialog - it should
+        # remain open (and, on macOS, in front rather than buried behind the main window).
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert dialog.isVisible()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False  # user cancelled
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            dialog.web.page().chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert not sip.isdeleted(dialog)
+            assert dialog.isVisible()
+
 
 @pytest.mark.qt_no_exception_capture
 @pytest.mark.parametrize(
