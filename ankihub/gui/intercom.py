@@ -15,7 +15,7 @@ launcher stays visible but behind the tour backdrop.
 """
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import aqt
 from aqt.webview import WebContent
@@ -50,7 +50,12 @@ window.intercomSettings = __SETTINGS__;
 
 
 def setup() -> None:
+    from ..user_state import add_user_state_refreshed_callback
+
     aqt.gui_hooks.webview_will_set_content.append(_inject_intercom)
+    # Feature flags / login land asynchronously; re-apply so home screens that
+    # rendered while logged out (or before flags arrived) pick up the launcher.
+    add_user_state_refreshed_callback(sync_with_user_preference)
 
 
 def shutdown() -> None:
@@ -79,32 +84,36 @@ def is_enabled_for_user() -> bool:
 
 
 def sync_with_user_preference() -> None:
-    """Apply the Support button preference after Config is closed.
+    """Apply Intercom visibility after Config changes or user-state refresh.
 
-    When disabled, shut Intercom down immediately. When enabled, reset the main
-    window so the deck browser / overview re-injects the snippet.
+    When disabled, shut Intercom down immediately. When enabled on the deck
+    browser / overview, boot (or update) the Messenger in the current webview
+    without requiring a navigation.
     """
     if not is_enabled_for_user():
         shutdown()
         return
-    if aqt.mw and aqt.mw.state in ("deckBrowser", "overview"):
-        aqt.mw.reset()
+    _boot_on_current_home_screen()
 
 
-def _inject_intercom(web_content: WebContent, context: object) -> None:
-    from aqt.deckbrowser import DeckBrowser
-    from aqt.overview import Overview
-
-    if not isinstance(context, (DeckBrowser, Overview)):
+def _boot_on_current_home_screen() -> None:
+    if not (aqt.mw and aqt.mw.web and aqt.mw.state in ("deckBrowser", "overview")):
         return
-
-    if not is_enabled_for_user():
+    boot_js = _build_boot_js()
+    if not boot_js:
         return
+    aqt.mw.web.eval(boot_js)
+    LOGGER.info(
+        "Booted Intercom Messenger on current home screen.",
+        state=aqt.mw.state,
+    )
 
+
+def _build_boot_js() -> Optional[str]:
     user_details = config.get_user_details() or {}
     app_id = config.intercom_app_id
     if not app_id:
-        return
+        return None
     intercom_settings: Dict[str, Any] = {
         "api_base": "https://api-iam.intercom.io",
         "app_id": app_id,
@@ -120,10 +129,27 @@ def _inject_intercom(web_content: WebContent, context: object) -> None:
     if user_hash := user_details.get("intercom_user_hash"):
         intercom_settings["user_hash"] = user_hash
 
-    boot_js = _INTERCOM_LOADER_JS.replace("__SETTINGS__", json.dumps(intercom_settings)).replace("__APP_ID__", app_id)
+    return _INTERCOM_LOADER_JS.replace("__SETTINGS__", json.dumps(intercom_settings)).replace("__APP_ID__", app_id)
+
+
+def _inject_intercom(web_content: WebContent, context: object) -> None:
+    from aqt.deckbrowser import DeckBrowser
+    from aqt.overview import Overview
+
+    if not isinstance(context, (DeckBrowser, Overview)):
+        return
+
+    if not is_enabled_for_user():
+        return
+
+    boot_js = _build_boot_js()
+    if not boot_js:
+        return
+
+    user_details = config.get_user_details() or {}
     web_content.body += f"<script>{boot_js}</script>"
     LOGGER.info(
         "Injected Intercom Messenger.",
         context=type(context).__name__,
-        identity_verified=bool(user_hash),
+        identity_verified=bool(user_details.get("intercom_user_hash")),
     )
