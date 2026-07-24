@@ -780,17 +780,8 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        def on_success(code_ttl_secs: int) -> None:
-            self.code_ttl_secs = code_ttl_secs
-            self.init_timer(on_timeout, self.code_ttl_secs)
-            self._update_code_button_state()
-
-        email = self._get_email()
-        AddonQueryOp(
-            parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
-            success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
+        self.init_timer(on_timeout, self.code_ttl_secs)
+        self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
         self._update_code_button_state()
@@ -799,7 +790,16 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         self.email_box.button.setEnabled(is_email(text))
 
     def _on_get_code(self) -> None:
-        self._start_timer()
+        def on_success(code_ttl_secs: int) -> None:
+            self.code_ttl_secs = code_ttl_secs
+            self._start_timer()
+
+        email = self._get_email()
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _get_email(self) -> str:
         return self.email_input.text() if self._is_retry else self.email
