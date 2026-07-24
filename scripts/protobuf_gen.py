@@ -6,6 +6,9 @@ from typing import Any
 
 def run_buf(*args: str, **kwargs: Any) -> int:
     buf_exe = shutil.which("buf")
+    if buf_exe is None:
+        print("the `buf` executable was not found. Please run `just install` to update your packages and ensure you are in the virtual environment")
+        exit(1)
     return subprocess.check_call([buf_exe, *args], **kwargs)
 
 
