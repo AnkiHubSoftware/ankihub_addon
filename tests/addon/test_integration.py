@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QFileDialog, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
