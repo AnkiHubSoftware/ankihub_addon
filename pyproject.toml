@@ -32,11 +32,11 @@ dev = [
   "typeguard>=2.13.3",
   "types-factory-boy>=0.3.1",
   "types-requests>=2.28.9",
-  "urllib3>=1.26.14,<2",
+  "urllib3>=2.6.3,<3",
   "vcrpy>=4.2.0",
 ]
 bundle = [
-  "sentry_sdk==1.6.0",
+  "sentry_sdk==1.45.1",
   "tenacity==8.2.2",
   "structlog==24.1.0",
   "peewee==3.18.2",
