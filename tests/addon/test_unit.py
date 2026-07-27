@@ -5660,7 +5660,6 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
-            config.save_token("test_token")
             mocker.patch.object(
                 config,
                 "get_feature_flags",
@@ -5706,7 +5705,6 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
-            config.save_token("test_token")
             mocker.patch.object(
                 config,
                 "get_feature_flags",
