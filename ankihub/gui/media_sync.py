@@ -135,7 +135,7 @@ class _AnkiHubMediaSync:
         self._errors = []
         self.refresh_sync_status()
         self._dialog.update_status(self._get_status(), is_retry=is_retry)
-        self._last_op_callback = lambda: self.start_media_upload(media_names, ankihub_did, on_success, is_retry)
+        self._last_op_callback = lambda: self.start_media_upload(media_names, ankihub_did, on_success, is_retry=True)
 
         media_paths = self._media_paths_for_media_names(media_names)
         self._dialog.progress_bar.setValue(0)
