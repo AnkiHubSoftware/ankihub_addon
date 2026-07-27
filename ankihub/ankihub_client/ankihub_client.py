@@ -603,8 +603,7 @@ class AnkiHubClient:
                         future.cancel()
                 try:
                     on_downloaded_file(future)
-                    if future.result():
-                        downloaded_media_count += 1
+                    downloaded_media_count += 1
                 except:
                     pass
         LOGGER.info(
