@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sqlite3
-import sys
 import tempfile
 import time
 import uuid
@@ -1015,6 +1014,7 @@ def _run_in_background_synchronously(task: Callable, on_done: Callable[[Future],
         on_done(future_with_exception(exc))
 
 
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
 class TestAnkiwebLoginWithCodeWidget:
     def _widget(self, qtbot: QtBot) -> LoginWithCodeWidget:
         dialog = AnkiwebLoginDialog()
@@ -1061,9 +1061,6 @@ class TestAnkiwebLoginWithCodeWidget:
         state, _, _ = validator.validate(value, len(value))
         assert state == expected_state
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 10), reason="AnkiWeb client methods require protobuf-py, only available on 3.10+"
-    )
     def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot, mocker: MockerFixture):
         mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(code_ttl_secs=5))
         mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
@@ -1085,9 +1082,7 @@ class TestAnkiwebLoginWithCodeWidget:
         assert "Resend available" in widget.status_label.text()
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 10), reason="AnkiWeb client methods require protobuf-py, only available on 3.10+"
-)
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
 class TestAnkiwebLoginAndSignupSubmission:
     """Exercises the sign-in/sign-up handlers with the AnkiHubClient's AnkiWeb methods
     mocked out, since real AnkiWeb requests can't be made in CI.
@@ -1288,6 +1283,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert dialog._widget.host_key == "hostkey123"
 
 
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
 class TestSetupSyncDialogPatch:
     """Tests for the aqt.sync.sync_login() patch that opens our custom
     sign-in dialog instead of Anki's password-based dialog.
@@ -1299,8 +1295,7 @@ class TestSetupSyncDialogPatch:
         yield
         aqt.sync.sync_login = original_sync_login
         aqt.main.sync_login = original_sync_login
-        if not using_qt5():
-            aqt.preferences.sync_login = original_sync_login
+        aqt.preferences.sync_login = original_sync_login
         remove_user_state_refreshed_callback(_patch_or_revert)
 
     def test_all_three_entry_points_route_through_the_patch_when_flag_is_on(self, mocker: MockerFixture):
@@ -1312,9 +1307,7 @@ class TestSetupSyncDialogPatch:
         # aqt.sync, aqt.main and aqt.preferences each bind their own module-level
         # name to sync_login, so all three have to be reassigned individually.
         assert aqt.sync.sync_login is aqt.main.sync_login
-        if not using_qt5():
-            # Skip check in older Anki (2.1.56) where the preferences screen used to have an inline login form
-            assert aqt.sync.sync_login is aqt.preferences.sync_login
+        assert aqt.sync.sync_login is aqt.preferences.sync_login
 
         on_success = Mock()
         for module in (aqt.sync, aqt.main, aqt.preferences):
@@ -1340,8 +1333,7 @@ class TestSetupSyncDialogPatch:
 
         assert aqt.sync.sync_login is original_sync_login
         assert aqt.main.sync_login is original_sync_login
-        if not using_qt5():
-            assert aqt.preferences.sync_login is original_sync_login
+        assert aqt.preferences.sync_login is original_sync_login
 
         on_success = Mock()
         aqt.main.sync_login(aqt.mw, on_success)
@@ -1396,8 +1388,7 @@ class TestSetupSyncDialogPatch:
 
         aqt.sync.sync_login = other_addons_sync_login
         aqt.main.sync_login = other_addons_sync_login
-        if not using_qt5():
-            aqt.preferences.sync_login = other_addons_sync_login
+        aqt.preferences.sync_login = other_addons_sync_login
 
         setup_sync_dialog_patch()
 
@@ -1405,6 +1396,7 @@ class TestSetupSyncDialogPatch:
         logger_mock.info.assert_called_once()
 
 
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
 class TestSetupSyncDialogPatchFailure:
     @pytest.fixture(autouse=True)
     def _restore_sync_login(self):
@@ -1412,8 +1404,7 @@ class TestSetupSyncDialogPatchFailure:
         yield
         aqt.sync.sync_login = original_sync_login
         aqt.main.sync_login = original_sync_login
-        if not using_qt5():
-            aqt.preferences.sync_login = original_sync_login
+        aqt.preferences.sync_login = original_sync_login
         remove_user_state_refreshed_callback(_patch_or_revert)
 
     def test_missing_sync_login_when_reverting_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
@@ -1436,8 +1427,7 @@ class TestSetupSyncDialogPatchFailure:
 
             # aqt.main and aqt.preferences were never reassigned, since reverting was skipped
             assert aqt.main.sync_login is original_sync_login
-            if not using_qt5():
-                assert aqt.preferences.sync_login is original_sync_login
+            assert aqt.preferences.sync_login is original_sync_login
 
             on_success = Mock()
             aqt.main.sync_login(aqt.mw, on_success)
