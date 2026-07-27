@@ -15,6 +15,7 @@ from .ankihub_client import (  # noqa: F401
     STAGING_S3_BUCKET_URL,
     AnkiHubClient,
     AnkiHubHTTPError,
+    AnkiHubMediaDownloadError,
     AnkiHubRequestException,
 )
 from .models import (  # noqa: F401
