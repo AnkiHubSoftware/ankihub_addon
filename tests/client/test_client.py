@@ -1444,7 +1444,7 @@ def test_download_media(
             f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/" + "image.png",
             content=b"test data",
         )
-        client.download_media(media_names=["image.png"], deck_id=deck_id)
+        client.download_media(media_names=["image.png"], deck_id=deck_id, on_downloaded_file=Mock())
 
         assert (Path(temp_dir) / "image.png").exists()
         assert (Path(temp_dir) / "image.png").read_bytes() == b"test data"
@@ -1517,7 +1517,7 @@ class TestUploadMediaForSuggestion:
             TEST_MEDIA_PATH / media_name_map[original_media_path.name] for original_media_path in original_media_paths
         }
 
-        client.upload_media(new_media_paths, ah_did=next_deterministic_uuid())
+        client.upload_media(new_media_paths, ah_did=next_deterministic_uuid(), on_media_chunk_uploaded=Mock())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
