@@ -518,7 +518,7 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 try:
                     on_media_chunk_uploaded(future)
-                except:
+                except Exception:
                     pass
                 if self.should_stop_background_threads:
                     for future in futures:
@@ -604,7 +604,7 @@ class AnkiHubClient:
                 try:
                     on_downloaded_file(future)
                     downloaded_media_count += 1
-                except:
+                except Exception:
                     pass
         LOGGER.info(
             "Downloaded media from AnkiHub.",
