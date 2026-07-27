@@ -208,8 +208,11 @@ class _AnkiHubMediaSync:
             self._update_deck_media(ankihub_did=ah_did)
             all_missing.append((ah_did, self._missing_media_for_ah_deck(ah_did)))
 
-        self._dialog.progress_bar.setValue(0)
-        self._dialog.set_maximum(sum(len(m[1]) for m in all_missing))
+        def reset_progress() -> None:
+            self._dialog.progress_bar.setValue(0)
+            self._dialog.set_maximum(sum(len(m[1]) for m in all_missing))
+
+        aqt.mw.taskman.run_on_main(reset_progress)
 
         for ah_did, missing_media_names in all_missing:
             if not missing_media_names:
