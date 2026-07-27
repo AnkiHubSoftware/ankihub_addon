@@ -385,7 +385,7 @@ class _AnkiHubMediaSync:
 
 
 class FixedDialogLayout(QVBoxLayout):
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
