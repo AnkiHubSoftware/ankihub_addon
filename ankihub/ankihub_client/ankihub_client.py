@@ -601,6 +601,7 @@ class AnkiHubClient:
                 if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
+                    return
                 try:
                     on_downloaded_file(future)
                     downloaded_media_count += 1
