@@ -197,6 +197,7 @@ class AnkiHubLogin(QWidget):
 
         config.save_token(token)
         config.save_user_email(username_or_email)
+        aqt.mw.pm.save()
         username = ""
         if not is_email(username_or_email):
             username = username_or_email

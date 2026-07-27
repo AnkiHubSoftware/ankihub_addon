@@ -62,6 +62,7 @@ def assert_exhaustive(arg: NoReturn) -> NoReturn:
 def persist_ankiweb_credentials(email: str, host_key: str) -> None:
     aqt.mw.pm.set_sync_username(email)
     aqt.mw.pm.set_sync_key(host_key)
+    aqt.mw.pm.save()
 
 
 def html_link(url: str, title: str, bold: bool = True) -> str:
