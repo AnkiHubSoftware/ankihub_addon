@@ -129,7 +129,7 @@ class _AnkiHubMediaSync:
         """Upload the referenced media files to AnkiHub in the background."""
         LOGGER.info("Starting media upload...")
 
-        media_names = [m for m in media_names]
+        media_names = list(media_names)
         self.allow_background_threads()
         self._amount_uploads_in_progress += 1
         self._errors = []
