@@ -108,7 +108,7 @@ class _AnkiHubMediaSync:
 
         def on_failure(exception: Exception) -> None:
             self._download_in_progress = False
-            self._errors = []
+            self._errors = [exception]
             self.refresh_sync_status()
             self._dialog.update_status(self._get_status())
             raise exception
@@ -143,6 +143,9 @@ class _AnkiHubMediaSync:
 
         def on_failure(exception: Exception) -> None:
             self._amount_uploads_in_progress -= 1
+            self._errors = [exception]
+            self.refresh_sync_status()
+            self._dialog.update_status(self._get_status())
             raise exception
 
         AddonQueryOp(
