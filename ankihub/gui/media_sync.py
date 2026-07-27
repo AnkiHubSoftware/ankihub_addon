@@ -83,6 +83,7 @@ class _AnkiHubMediaSync:
     def set_status_action(self, status_action: QAction):
         """Set the QAction that should be used to show the status of the media sync."""
         self._status_action = status_action
+        qconnect(status_action.triggered, self._on_status_action_triggered)
 
     def start_media_download(self, is_retry: bool = False):
         """Download missing media for all subscribed decks from AnkiHub in the background.
@@ -370,6 +371,10 @@ class _AnkiHubMediaSync:
 
     def _on_toolbar_button_clicked(self) -> None:
         self._dialog.show()
+
+    def _on_status_action_triggered(self) -> None:
+        if self._get_status() != MediaSyncStatus.IDLE:
+            self._dialog.show()
 
 
 class FixedDialogLayout(QVBoxLayout):
