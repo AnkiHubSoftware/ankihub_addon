@@ -40,8 +40,6 @@ from ..user_state import add_user_state_refreshed_callback
 from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
-ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
-ANKIWEB_TERMS_LINK = "https://ankiweb.net/account/terms"
 EMAIL_INSTRUCTIONS = (
     "Didn't receive an email?<ul><li>Check your spam folder. "
     "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
@@ -63,6 +61,14 @@ def persist_ankiweb_credentials(email: str, host_key: str) -> None:
     aqt.mw.pm.set_sync_username(email)
     aqt.mw.pm.set_sync_key(host_key)
     aqt.mw.pm.save()
+
+
+def ankiweb_reset_url() -> str:
+    return f"{config.ankiweb_url}/account/reset-password"
+
+
+def ankiweb_terms_url() -> str:
+    return f"{config.ankiweb_url}/account/terms"
 
 
 def html_link(url: str, title: str, bold: bool = True) -> str:
@@ -554,7 +560,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         self.password_box = password_box = InputWithButtonHbox(password_input, "Sign in")
         qconnect(password_box.button.clicked, self._on_sign_in)
         forgot_password_label = LabelWithLink(
-            f"{html_link(ANKIWEB_RESET_LINK, 'Forgot password?', False)}",
+            f"{html_link(ankiweb_reset_url(), 'Forgot password?', False)}",
             self._dialog,
         )
         form_widget = FormWidget(
@@ -626,7 +632,7 @@ class SignupErrorWidget(BaseSignupWidget):
         form_widget = FormWidget(
             description="We can email you a magic code for password-free sign-in.<br>"
             f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Sign in with code.')}<br><br>"
-            f"Alternatively, you can {html_link(ANKIWEB_RESET_LINK, 'reset your password')}.",
+            f"Alternatively, you can {html_link(ankiweb_reset_url(), 'reset your password')}.",
             rows=[],
             dialog=self._dialog,
         )
@@ -847,7 +853,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self.terms_checkbox = terms_checkbox = QCheckBox()
         qconnect(terms_checkbox.toggled, self._on_terms_toggled)
         terms_label = LabelWithLink(
-            f"I agree to AnkiWeb's {html_link(ANKIWEB_TERMS_LINK, 'Terms & Conditions')}.", self._dialog
+            f"I agree to AnkiWeb's {html_link(ankiweb_terms_url(), 'Terms & Conditions')}.", self._dialog
         )
         terms_hbox.addWidget(terms_checkbox)
         terms_hbox.addWidget(terms_label)
