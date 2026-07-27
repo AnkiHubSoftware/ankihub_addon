@@ -518,6 +518,9 @@ class MediaSyncProgressDialog(QDialog):
 
     def increment_progress(self, increment: int = 1) -> None:
         self.progress_bar.setValue(self.progress_bar.value() + increment)
+        self.update_count_label()
+
+    def update_count_label(self) -> None:
         self.count_label.setText(f"{self.progress_bar.value()}/{self.progress_bar.maximum()} files")
 
     def set_maximum(self, maximum: int) -> None:
@@ -526,6 +529,7 @@ class MediaSyncProgressDialog(QDialog):
         else:
             self.progress_bar.setMaximum(1)
             self.progress_bar.setValue(1)
+        self.update_count_label()
 
 
 media_sync = _AnkiHubMediaSync()
