@@ -5657,6 +5657,7 @@ class TestIntercom:
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
+        qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
@@ -5672,6 +5673,7 @@ class TestIntercom:
 
             config_dialog_manager: ConfigManager = get_config_dialog_manager()
             config_window = ConfigWindow(config_dialog_manager)
+            qtbot.addWidget(config_window)
             for fn in config_dialog_manager.window_open_hook:
                 fn(config_window)
             config_window.on_open()
@@ -5701,6 +5703,7 @@ class TestIntercom:
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
+        qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
@@ -5716,6 +5719,7 @@ class TestIntercom:
 
             config_dialog_manager: ConfigManager = get_config_dialog_manager()
             config_window = ConfigWindow(config_dialog_manager)
+            qtbot.addWidget(config_window)
             for fn in config_dialog_manager.window_open_hook:
                 fn(config_window)
             config_window.on_open()
