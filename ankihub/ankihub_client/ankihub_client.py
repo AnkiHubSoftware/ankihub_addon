@@ -518,8 +518,9 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 try:
                     on_media_chunk_uploaded(future)
-                except Exception:
-                    pass
+                    future.result()
+                except Exception as exc:
+                    LOGGER.warning("Failed to upload media chunk", exc_info=exc)
                 if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
@@ -604,9 +605,11 @@ class AnkiHubClient:
                     return
                 try:
                     on_downloaded_file(future)
+                    future.result()
                     downloaded_media_count += 1
-                except Exception:
-                    pass
+                except Exception as exc:
+                    if not isinstance(exc, AnkiHubMediaDownloadError):
+                        LOGGER.warning("Failed to download media file", exc_info=exc)
         LOGGER.info(
             "Downloaded media from AnkiHub.",
             ah_did=deck_id,
