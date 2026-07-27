@@ -71,7 +71,6 @@ class _AnkiHubMediaSync:
         self._errors: list[Exception] = []
         # Used for retry
         self._last_op_callback: Optional[Callable] = None
-        self._dialog = MediaSyncProgressDialog()
 
     def setup_hooks(self) -> None:
         top_toolbar_did_redraw.append(lambda _: self.refresh_sync_status())
@@ -184,6 +183,10 @@ class _AnkiHubMediaSync:
     def _client(self) -> AddonAnkiHubClient:
         # The client can't be initialized in __init__ because the add-on config is not set up yet at that point.
         return AddonAnkiHubClient()
+
+    @cached_property
+    def _dialog(self) -> "MediaSyncProgressDialog":
+        return MediaSyncProgressDialog()
 
     def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
         media_dir_path = Path(aqt.mw.col.media.dir())
