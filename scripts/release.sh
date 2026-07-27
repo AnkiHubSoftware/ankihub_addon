@@ -1,6 +1,6 @@
 set -e
 
-python scripts/build.py
+uv run scripts/build.py
 
 mkdir -p dist
 rm -rf dist/release
