@@ -432,9 +432,9 @@ class MediaSyncProgressDialog(QDialog):
         self.cancel_button = cancel_button = QPushButton("Cancel")
         qconnect(cancel_button.clicked, self._on_cancel)
         self.minimize_button = minimize_button = QPushButton("Minimize")
-        qconnect(minimize_button.clicked, self.close)
+        qconnect(minimize_button.clicked, self.hide)
         self.close_button = close_button = QPushButton("Close")
-        qconnect(close_button.clicked, self.close)
+        qconnect(close_button.clicked, self.hide)
         self.retry_button = retry_button = QPushButton("Retry")
         qconnect(retry_button.clicked, self._on_retry)
         hbox3.addWidget(toggle_log_button)
@@ -526,10 +526,6 @@ class MediaSyncProgressDialog(QDialog):
         else:
             self.progress_bar.setMaximum(1)
             self.progress_bar.setValue(1)
-
-    def close(self) -> bool:
-        self.setVisible(False)
-        return False
 
 
 media_sync = _AnkiHubMediaSync()
