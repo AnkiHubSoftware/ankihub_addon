@@ -34,9 +34,9 @@ class AnkiWebHTTPError(Exception):
         self.response = response
 
     def __str__(self):
-        try:
-            return self.response.text
-        except Exception:
+        if text := self.response.text:
+            return text
+        else:
             return f"AnkiWeb responded with status error code {self.response.status_code}"
 
 
