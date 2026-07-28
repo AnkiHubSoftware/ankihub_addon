@@ -719,20 +719,27 @@ def warning_triangle_icon() -> QIcon:
     return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))
 
 
-def media_sync_svg() -> str:
+def _icon_name_for_anki_theme(name: str) -> str:
     if theme_manager.night_mode:
-        icon_name = "media-sync-dark.svg"
+        return f"{name}-dark.svg"
     else:
-        icon_name = "media-sync-light.svg"
-    return (ICONS_PATH / icon_name).read_text(encoding="utf-8")
+        return f"{name}-light.svg"
+
+
+def media_sync_svg() -> str:
+    return (ICONS_PATH / _icon_name_for_anki_theme("media-sync")).read_text(encoding="utf-8")
 
 
 def media_sync_error_svg() -> str:
-    if theme_manager.night_mode:
-        icon_name = "media-sync-error-dark.svg"
-    else:
-        icon_name = "media-sync-error-light.svg"
-    return (ICONS_PATH / icon_name).read_text(encoding="utf-8")
+    return (ICONS_PATH / _icon_name_for_anki_theme("media-sync-error")).read_text(encoding="utf-8")
+
+
+def media_download_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / _icon_name_for_anki_theme("media-download")).absolute()))
+
+
+def media_upload_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / _icon_name_for_anki_theme("media-upload")).absolute()))
 
 
 def tinted_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:

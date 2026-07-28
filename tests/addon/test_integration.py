@@ -7849,7 +7849,7 @@ class TestMediaSyncMediaDownload:
                 ah_did,
                 since=None,
             )
-            download_media_mock.assert_called_once_with(["image.png"], ah_did)
+            download_media_mock.assert_called_once_with(["image.png"], ah_did, media_sync._on_downloaded_file)
 
             # Assert that the deck media was added to the database
             assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == [deck_media]
@@ -7948,7 +7948,9 @@ class TestMediaSyncMediaDownload:
             )
 
             # Should only download the referenced media, not the unreferenced one
-            download_media_mock.assert_called_once_with(["referenced_image.png"], ah_did)
+            download_media_mock.assert_called_once_with(
+                ["referenced_image.png"], ah_did, media_sync._on_downloaded_file
+            )
 
             # Assert that both media were added to the database (this happens before filtering)
             db_media = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)

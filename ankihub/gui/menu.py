@@ -587,4 +587,4 @@ def _media_sync_status_setup(parent: QMenu):
     parent._media_sync_status_action = QAction("", parent)  # type: ignore
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
-    media_sync.refresh_sync_status_text()
+    media_sync.refresh_sync_status()

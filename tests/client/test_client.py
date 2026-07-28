@@ -8,10 +8,11 @@ import tempfile
 import time
 import uuid
 import zipfile
+from concurrent.futures import Future
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional, cast
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, cast
 from unittest.mock import Mock
 
 import pytest
@@ -33,6 +34,7 @@ from ankihub.ankihub_client import (
     DEFAULT_S3_BUCKET_URL,
     AnkiHubClient,
     AnkiHubHTTPError,
+    AnkiHubMediaDownloadError,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
@@ -1432,22 +1434,139 @@ def test_suggest_auto_accepted_optional_tags(
     assert chunk == expected_response
 
 
-def test_download_media(
-    requests_mock: Mocker,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
+class TestDownloadMedia:
+    def test_download_media(
+        self,
+        requests_mock: Mocker,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
 
-        deck_id = next_deterministic_uuid()
-        requests_mock.get(
-            f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/" + "image.png",
-            content=b"test data",
-        )
-        client.download_media(media_names=["image.png"], deck_id=deck_id)
+            deck_id = next_deterministic_uuid()
+            requests_mock.get(
+                f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/" + "image.png",
+                content=b"test data",
+            )
+            client.download_media(media_names=["image.png"], deck_id=deck_id, on_downloaded_file=Mock())
 
-        assert (Path(temp_dir) / "image.png").exists()
-        assert (Path(temp_dir) / "image.png").read_bytes() == b"test data"
+            assert (Path(temp_dir) / "image.png").exists()
+            assert (Path(temp_dir) / "image.png").read_bytes() == b"test data"
+
+    def test_on_downloaded_file_is_called_once_per_file(
+        self,
+        requests_mock: Mocker,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
+
+            deck_id = next_deterministic_uuid()
+            media_names = ["image_1.png", "image_2.png", "image_3.png"]
+            for media_name in media_names:
+                requests_mock.get(
+                    f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/{media_name}",
+                    content=b"test data",
+                )
+
+            futures: List[Future] = []
+            client.download_media(media_names=media_names, deck_id=deck_id, on_downloaded_file=futures.append)
+
+            assert len(futures) == len(media_names)
+
+    def test_with_failed_download(
+        self,
+        requests_mock: Mocker,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
+
+            deck_id = next_deterministic_uuid()
+            requests_mock.get(
+                f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/missing.png",
+                status_code=404,
+                reason="Not Found",
+            )
+
+            futures: List[Future] = []
+            # The failure is reported through the future instead of being raised to the caller
+            client.download_media(media_names=["missing.png"], deck_id=deck_id, on_downloaded_file=futures.append)
+
+            assert len(futures) == 1
+            with pytest.raises(AnkiHubMediaDownloadError) as exc_info:
+                futures[0].result()
+
+            exception = exc_info.value
+            assert exception.filename == f"/deck_assets/{deck_id}/missing.png"
+            assert exception.response.status_code == 404
+            assert not (Path(temp_dir) / "missing.png").exists()
+
+    def test_failed_download_doesnt_prevent_other_downloads(
+        self,
+        requests_mock: Mocker,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
+
+            deck_id = next_deterministic_uuid()
+            requests_mock.get(
+                f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/missing.png",
+                status_code=404,
+                reason="Not Found",
+            )
+            requests_mock.get(
+                f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/image.png",
+                content=b"test data",
+            )
+
+            futures: List[Future] = []
+            client.download_media(
+                media_names=["missing.png", "image.png"],
+                deck_id=deck_id,
+                on_downloaded_file=futures.append,
+            )
+
+            assert len(futures) == 2
+            assert [type(future.exception()) for future in futures].count(AnkiHubMediaDownloadError) == 1
+            assert (Path(temp_dir) / "image.png").read_bytes() == b"test data"
+
+    def test_exception_in_on_downloaded_file_is_swallowed(
+        self,
+        requests_mock: Mocker,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
+
+            deck_id = next_deterministic_uuid()
+            media_names = ["image_1.png", "image_2.png"]
+            for media_name in media_names:
+                requests_mock.get(
+                    f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/{media_name}",
+                    content=b"test data",
+                )
+
+            calls: List[Future] = []
+
+            def on_downloaded_file(future: Future) -> None:
+                calls.append(future)
+                raise RuntimeError("callback failed")
+
+            # A failing callback should neither abort the download nor propagate to the caller.
+            client.download_media(media_names=media_names, deck_id=deck_id, on_downloaded_file=on_downloaded_file)
+
+            assert len(calls) == len(media_names)
+
+    def test_media_download_error_message(self):
+        response = requests.Response()
+        response.status_code = 404
+        response.reason = "Not Found"
+
+        exception = AnkiHubMediaDownloadError(response, "image.png")
+
+        assert str(exception) == "Unable to download media file image.png: 404 Not Found"
 
 
 class TestUploadMediaForSuggestion:
@@ -1517,7 +1636,7 @@ class TestUploadMediaForSuggestion:
             TEST_MEDIA_PATH / media_name_map[original_media_path.name] for original_media_path in original_media_paths
         }
 
-        client.upload_media(new_media_paths, ah_did=next_deterministic_uuid())
+        client.upload_media(new_media_paths, ah_did=next_deterministic_uuid(), on_media_chunk_uploaded=Mock())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
@@ -1682,7 +1801,112 @@ class TestUploadMediaForDeck:
     ):
         media_names = get_media_names_from_notes_data(notes_data, lambda mid: self._empty_notetype())
         media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
-        client.upload_media(media_paths, ah_did)
+        client.upload_media(media_paths, ah_did, on_media_chunk_uploaded=Mock())
+
+
+class TestUploadMediaProgress:
+    MEDIA_NAMES = ["testfile_1.jpeg", "testfile_2.jpeg", "testfile_3.jpeg"]
+
+    def test_on_media_chunk_uploaded_is_called_once_for_a_single_chunk(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = self._client_with_mocked_upload(mocker, temp_dir)
+
+            futures: List[Future] = []
+            client.upload_media(
+                self._media_paths(),
+                ah_did=next_deterministic_uuid(),
+                on_media_chunk_uploaded=futures.append,
+            )
+
+            # All files fit into one chunk and the future reports how many files it contained.
+            assert len(futures) == 1
+            assert futures[0].result() == len(self.MEDIA_NAMES)
+
+    def test_on_media_chunk_uploaded_is_called_once_per_chunk(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = self._client_with_mocked_upload(mocker, temp_dir)
+            # Make each media file end up in its own chunk.
+            mocker.patch("ankihub.ankihub_client.ankihub_client.CHUNK_BYTES_THRESHOLD", 0)
+
+            futures: List[Future] = []
+            client.upload_media(
+                self._media_paths(),
+                ah_did=next_deterministic_uuid(),
+                on_media_chunk_uploaded=futures.append,
+            )
+
+            assert len(futures) == len(self.MEDIA_NAMES)
+            assert sum(future.result() for future in futures) == len(self.MEDIA_NAMES)
+
+    def test_with_failed_upload(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = self._client_with_mocked_upload(mocker, temp_dir)
+
+            response = requests.Response()
+            response.status_code = 403
+            response.reason = "Forbidden"
+            mocker.patch.object(
+                client,
+                "_upload_file_to_s3_with_reusable_presigned_url",
+                side_effect=AnkiHubHTTPError(response),
+            )
+
+            futures: List[Future] = []
+            # The failure is reported through the future instead of being raised to the caller.
+            client.upload_media(
+                self._media_paths(),
+                ah_did=next_deterministic_uuid(),
+                on_media_chunk_uploaded=futures.append,
+            )
+
+            assert len(futures) == 1
+            with pytest.raises(AnkiHubHTTPError):
+                futures[0].result()
+
+    def test_exception_in_on_media_chunk_uploaded_is_swallowed(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = self._client_with_mocked_upload(mocker, temp_dir)
+            mocker.patch("ankihub.ankihub_client.ankihub_client.CHUNK_BYTES_THRESHOLD", 0)
+
+            calls: List[Future] = []
+
+            def on_media_chunk_uploaded(future: Future) -> None:
+                calls.append(future)
+                raise RuntimeError("callback failed")
+
+            # A failing callback should neither abort the upload nor propagate to the caller.
+            client.upload_media(
+                self._media_paths(),
+                ah_did=next_deterministic_uuid(),
+                on_media_chunk_uploaded=on_media_chunk_uploaded,
+            )
+
+            assert len(calls) == len(self.MEDIA_NAMES)
+
+    def _media_paths(self) -> Set[Path]:
+        return {TEST_MEDIA_PATH / media_name for media_name in self.MEDIA_NAMES}
+
+    def _client_with_mocked_upload(self, mocker: MockerFixture, local_media_dir: str) -> AnkiHubClient:
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(local_media_dir))
+        mocker.patch.object(client, "_get_presigned_url_for_multiple_uploads")
+        mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
+        return client
 
 
 @pytest.mark.vcr()
