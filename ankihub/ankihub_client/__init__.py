@@ -5,6 +5,7 @@ The ankihub.common_utils module is an exception.
 
 from .ankihub_client import (  # noqa: F401
     API_VERSION,
+    DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
     DEFAULT_INTERCOM_APP_ID,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-import time
+import sys
 from concurrent.futures import Future
 from enum import Enum
 from typing import Any, Callable, NoReturn, Union
@@ -35,12 +34,12 @@ from aqt.qt import (
 from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
+from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
-ANKIWEB_RESET_LINK = "https://ankiweb.net/account/reset-password"
-ANKIWEB_TERMS_LINK = "https://ankiweb.net/account/terms"
 EMAIL_INSTRUCTIONS = (
     "Didn't receive an email?<ul><li>Check your spam folder. "
     "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
@@ -54,20 +53,22 @@ class AnkiwebLinkIds(Enum):
     SIGNUP_PASSWORD = "#sign-up-password"
 
 
-def simulate_existing_account() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_EXISTING_ACCOUNT") == "true"
-
-
-def simulate_expired_code() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_EXPIRED_CODE") == "true"
-
-
-def simulate_general_error() -> bool:
-    return os.environ.get("ANKIWEB_SIMULATE_GENERAL_ERROR") == "true"
-
-
 def assert_exhaustive(arg: NoReturn) -> NoReturn:
     raise Exception(f"unexpected arg received: {type(arg)} {arg}")
+
+
+def persist_ankiweb_credentials(email: str, host_key: str) -> None:
+    aqt.mw.pm.set_sync_username(email)
+    aqt.mw.pm.set_sync_key(host_key)
+    aqt.mw.pm.save()
+
+
+def ankiweb_reset_url() -> str:
+    return f"{config.ankiweb_url}/account/reset-password"
+
+
+def ankiweb_terms_url() -> str:
+    return f"{config.ankiweb_url}/account/terms"
 
 
 def html_link(url: str, title: str, bold: bool = True) -> str:
@@ -101,7 +102,7 @@ def timer_is_active(timer: Countdown | None) -> bool:
 
 
 class Countdown(QTimer):
-    def __init__(self, callback: Callable[[int], None], seconds: int = 5, parent: QWidget | None = None):
+    def __init__(self, callback: Callable[[int], None], seconds: int = 120, parent: QWidget | None = None):
         self.remaining_seconds = seconds
         self._callback = callback
         super().__init__(parent)
@@ -164,17 +165,15 @@ class ErrorLabel(QWidget):
         hbox.setSpacing(4)
         hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status = status = QLabel("")
+        status.setWordWrap(True)
         font = self.font()
         font.setBold(True)
         status.setFont(font)
         status.setTextFormat(Qt.TextFormat.RichText)
-        status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
         icon_label.setPixmap(error_icon().pixmap(20, 20))
-        hbox.addStretch()
         hbox.addWidget(icon_label)
-        hbox.addWidget(status)
-        hbox.addStretch()
+        hbox.addWidget(status, stretch=1)
         self.setLayout(hbox)
 
     def set_error(self, text: str) -> None:
@@ -388,9 +387,9 @@ class BaseAnkiwebWidget(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
 
-    def init_timer(self, on_timeout: Callable[[int], None]) -> None:
+    def init_timer(self, on_timeout: Callable[[int], None], seconds: int = 120) -> None:
         destroy_timer(self._timer)
-        self._timer = Countdown(on_timeout, parent=self)
+        self._timer = Countdown(callback=on_timeout, seconds=seconds, parent=self)
         self._timer.start()
 
 
@@ -510,20 +509,28 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
-        self.init_timer(on_timeout)
-        self.email_box.button.setEnabled(False)
-        self.code_input.setEnabled(True)
-        self.form_widget.error_label.set_error("")
+        def on_success(code_ttl_secs: int) -> None:
+            self.init_timer(on_timeout, code_ttl_secs)
+            self.email_box.button.setEnabled(False)
+            self.code_input.setEnabled(True)
+            self.form_widget.error_label.set_error("")
+
+        email = self.email_input.text()
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_sign_in(self) -> None:
-        def task() -> None:
-            time.sleep(1)
-            if simulate_expired_code():
-                raise Exception("This code has expired. Request another.")
+        def task() -> str:
+            return AnkiHubClient().ankiweb_verify_login_code(self.email_input.text(), self.code_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                email = self.email_input.text()
+                persist_ankiweb_credentials(email=email, host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
@@ -553,7 +560,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         self.password_box = password_box = InputWithButtonHbox(password_input, "Sign in")
         qconnect(password_box.button.clicked, self._on_sign_in)
         forgot_password_label = LabelWithLink(
-            f"{html_link(ANKIWEB_RESET_LINK, 'Forgot password?', False)}",
+            f"{html_link(ankiweb_reset_url(), 'Forgot password?', False)}",
             self._dialog,
         )
         form_widget = FormWidget(
@@ -571,14 +578,14 @@ class LoginWithPasswordWidget(BaseLoginWidget):
         self.password_box.button.setEnabled(bool(text) and is_email(self.email_input.text()))
 
     def _on_sign_in(self) -> None:
-        def task() -> None:
-            time.sleep(1)
-            if simulate_general_error():
-                raise Exception("Inserted email and/or password are incorrect.")
+        def task() -> str:
+            return AnkiHubClient().ankiweb_login(self.email_input.text(), self.password_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                email = self.email_input.text()
+                persist_ankiweb_credentials(email=email, host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
@@ -625,7 +632,7 @@ class SignupErrorWidget(BaseSignupWidget):
         form_widget = FormWidget(
             description="We can email you a magic code for password-free sign-in.<br>"
             f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Sign in with code.')}<br><br>"
-            f"Alternatively, you can {html_link(ANKIWEB_RESET_LINK, 'reset your password')}, if you forgot it.",
+            f"Alternatively, you can {html_link(ankiweb_reset_url(), 'reset your password')}.",
             rows=[],
             dialog=self._dialog,
         )
@@ -635,8 +642,9 @@ class SignupErrorWidget(BaseSignupWidget):
 
 
 class SignupEmailVerificationWidget(BaseSignupWidget):
-    def __init__(self, email: str, dialog: AnkiwebDialog):
+    def __init__(self, email: str, host_key: str, dialog: AnkiwebDialog):
         self.email = email
+        self.host_key = host_key
         self._dialog = dialog
         login_button = Button("Sign in")
         qconnect(login_button.clicked, self._on_login)
@@ -648,14 +656,14 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             dialog=dialog,
             extra_bottom_button=login_button,
         )
-        self._start_timer()
+        self._resend()
 
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        description_label.setWordWrap(True)
         self.resend_button = resend_button = QPushButton("Resend verification email")
-        resend_button.setEnabled(False)
-        qconnect(resend_button.clicked, self._on_resend)
+        qconnect(resend_button.clicked, self._resend)
         instructions_label = QLabel(EMAIL_INSTRUCTIONS)
         instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         form_widget = FormWidget(
@@ -670,29 +678,33 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
         return form_widget
 
-    def _start_timer(self) -> None:
-        def on_timeout(remaining_secs: int) -> None:
-            resend_available_status = (
-                f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
-            )
-            self.description_label.setText(
-                f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>" + resend_available_status
-            )
-            if not remaining_secs:
-                self.resend_button.setEnabled(True)
+    def _resend(self) -> None:
+        def on_success(throttled: bool) -> None:
+            if throttled:
+                self.form_widget.error_label.set_error("Sorry, no more emails can be sent to that address today.")
+                self.description_label.setText("")
+            else:
+                # TODO: use /verify-email to get actual status
+                self.description_label.setText(
+                    f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>"
+                )
 
-        self.init_timer(on_timeout)
-
-    def _on_resend(self) -> None:
-        self._start_timer()
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
 
 
 class SignupCodeVerificationWidget(BaseSignupWidget):
-    def __init__(self, email: str, dialog: AnkiwebDialog, error: str = ""):
+    def __init__(
+        self, email: str, code_ttl_secs: int, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0
+    ):
         self.email = email
+        self.code_ttl_secs = remaining_seconds or code_ttl_secs
         self._dialog = dialog
         self._is_retry = bool(error)
         super().__init__(
@@ -702,7 +714,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
-        if not self._is_retry:
+        if not self._is_retry or remaining_seconds:
             self._start_timer()
         else:
             self._update_code_button_state()
@@ -767,7 +779,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        self.init_timer(on_timeout)
+        self.init_timer(on_timeout, self.code_ttl_secs)
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
@@ -777,28 +789,45 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         self.email_box.button.setEnabled(is_email(text))
 
     def _on_get_code(self) -> None:
-        self._start_timer()
+        def on_success(code_ttl_secs: int) -> None:
+            self.code_ttl_secs = code_ttl_secs
+            self._start_timer()
+
+        email = self._get_email()
+        AddonQueryOp(
+            parent=self,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            success=on_success,
+        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
+
+    def _get_email(self) -> str:
+        return self.email_input.text() if self._is_retry else self.email
 
     def _on_verify_or_resend(self) -> None:
         if self._is_resend():
             self._start_timer()
             return
 
-        def task() -> None:
-            time.sleep(1)
-            self._dialog.update_progress("Signing you in")
-            time.sleep(1)
-            if simulate_expired_code():
-                raise Exception("This code has expired. Request another.")
+        def task() -> str:
+            return AnkiHubClient().ankiweb_verify_signup_code(self._get_email(), self.code_input.text()).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
+                host_key = fut.result()
+                persist_ankiweb_credentials(email=self._get_email(), host_key=host_key)
                 self._dialog.close()
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self._dialog.replace_widget(SignupCodeVerificationWidget(self.email, self._dialog, str(exc)))
+                self._dialog.replace_widget(
+                    SignupCodeVerificationWidget(
+                        email=self._get_email(),
+                        code_ttl_secs=self.code_ttl_secs,
+                        dialog=self._dialog,
+                        error=str(exc),
+                        remaining_seconds=self._timer.remaining_seconds,
+                    )
+                )
 
         run_with_progress(
             dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
@@ -824,7 +853,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self.terms_checkbox = terms_checkbox = QCheckBox()
         qconnect(terms_checkbox.toggled, self._on_terms_toggled)
         terms_label = LabelWithLink(
-            f"I agree to AnkiWeb's {html_link(ANKIWEB_TERMS_LINK, 'Terms & Conditions')}.", self._dialog
+            f"I agree to AnkiWeb's {html_link(ankiweb_terms_url(), 'Terms & Conditions')}.", self._dialog
         )
         terms_hbox.addWidget(terms_checkbox)
         terms_hbox.addWidget(terms_label)
@@ -891,23 +920,26 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
 
     def _on_sign_up(self) -> None:
-        def task() -> None:
-            time.sleep(1)
-            if simulate_existing_account():
-                raise Exception("An account with that email already exists.")
-            elif simulate_general_error() and not simulate_expired_code():
-                raise Exception("Some unknown error")
+        def task() -> Union[str, int]:
+            client = AnkiHubClient()
+            terms = self.terms_checkbox.isChecked()
+            if self.is_code_signup:
+                return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
+            else:
+                return client.ankiweb_signup(self.email_input.text(), self.password_input.text(), terms).host_key
 
         def on_done(fut: Future) -> None:
             try:
-                fut.result()
-                args = (self.email_input.text(), self._dialog)
+                hkey_or_ttl = fut.result()
+                kwargs: dict[str, Any] = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
-                    self._dialog.replace_widget(SignupCodeVerificationWidget(*args))
+                    kwargs["code_ttl_secs"] = hkey_or_ttl
+                    self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
                 else:
-                    self._dialog.replace_widget(SignupEmailVerificationWidget(*args))
+                    kwargs["host_key"] = hkey_or_ttl
+                    self._dialog.replace_widget(SignupEmailVerificationWidget(**kwargs))
             except Exception as exc:
-                if simulate_existing_account():
+                if "An account with this email already exists" in str(exc):
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog))
                 else:
                     self.form_widget.error_label.set_error(str(exc))
@@ -952,7 +984,7 @@ _patched_sync_login = wrap(  # type: ignore
 
 
 def _patch_or_revert() -> None:
-    if config.get_feature_flags().get("ankiweb_magic_code_login", False):
+    if config.get_feature_flags().get("ankiweb_magic_code_login", False) and sys.version_info >= (3, 10):
         func = _patched_sync_login
     else:
         if getattr(aqt.sync, "sync_login", None) != _patched_sync_login:

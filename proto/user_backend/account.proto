@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package ankiweb.user_backend.account;
+
+// Password-based signup/login for Anki clients. These are HTTP endpoints
+// on the user_backend sync server (no service block): the responses hand
+// out the account's sync host key, which must never transit the web
+// frontend surface. The web signup (frontend /svc/account/signup) is a
+// separate flow that never returns the hkey.
+//
+// Status codes: 400 = input validation, 401 = invalid credentials,
+// 409 = account already exists (signup only), 429 = throttled.
+
+message SignupRequest {
+  string email = 1;
+  string password = 2;
+  bool terms = 3;
+}
+
+// 200 = account created, terms recorded, verification email queued.
+// Errors: 400 invalid email or terms != true, 409 account already exists
+// (client should redirect to login), 429 throttled.
+message SignupResponse {
+  // The account's sync host key — the same value the collection sync
+  // hostKey endpoint returns after a password login. Anki clients store
+  // this as their sync credential.
+  string host_key = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+// 200 = authenticated. Errors: 401 unknown email OR wrong password
+// (indistinguishable by design), 429 throttled.
+message LoginResponse {
+  // The account's sync host key (see SignupResponse.host_key).
+  string host_key = 1;
+}
