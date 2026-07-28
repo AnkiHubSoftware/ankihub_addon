@@ -704,7 +704,10 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         self, email: str, code_ttl_secs: int, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0
     ):
         self.email = email
-        self.code_ttl_secs = remaining_seconds or code_ttl_secs
+        if remaining_seconds > 0:
+            self.code_ttl_secs = remaining_seconds
+        else:
+            self.code_ttl_secs = code_ttl_secs
         self._dialog = dialog
         self._is_retry = bool(error)
         super().__init__(
@@ -714,7 +717,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
-        if not self._is_retry or remaining_seconds:
+        if not self._is_retry or remaining_seconds > 0:
             self._start_timer()
         else:
             self._update_code_button_state()
