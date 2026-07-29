@@ -1223,7 +1223,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         dialog.show()
         # Freshly created (not a retry after an error), so the widget only has
         # `self.email` and no `email_input` field.
-        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
         dialog.replace_widget(widget)
         widget.code_input.setText("123456")
 
@@ -1246,7 +1246,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         # Passing an error makes this a retry widget, which shows an editable
         # email field instead of the original read-only `self.email`.
         widget = SignupCodeVerificationWidget(
-            email="user@example.com", code_ttl_secs=300, dialog=dialog, error="Some unknown error"
+            email="user@example.com", remaining_seconds=300, dialog=dialog, error="Some unknown error"
         )
         dialog.replace_widget(widget)
         widget.email_input.setText("other@example.com")

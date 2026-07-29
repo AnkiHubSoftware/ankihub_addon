@@ -700,15 +700,10 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
 
 class SignupCodeVerificationWidget(BaseSignupWidget):
-    def __init__(
-        self, email: str, code_ttl_secs: int, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0
-    ):
+    def __init__(self, email: str, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0):
         self.email = email
-        if remaining_seconds > 0:
-            self.remaining_seconds = remaining_seconds
-        else:
-            self.remaining_seconds = code_ttl_secs
         self._dialog = dialog
+        self.remaining_seconds = remaining_seconds
         self._is_retry = bool(error)
         super().__init__(
             heading="Email confirmation",
@@ -822,13 +817,16 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
+                if self._timer.remaining_seconds > 0:
+                    remaining_seconds = self._timer.remaining_seconds
+                else:
+                    remaining_seconds = self.remaining_seconds
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
                         email=self._get_email(),
-                        code_ttl_secs=self.remaining_seconds,
                         dialog=self._dialog,
                         error=str(exc),
-                        remaining_seconds=self._timer.remaining_seconds,
+                        remaining_seconds=remaining_seconds,
                     )
                 )
 
@@ -936,7 +934,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 hkey_or_ttl = fut.result()
                 kwargs: dict[str, Any] = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
-                    kwargs["code_ttl_secs"] = hkey_or_ttl
+                    kwargs["remaining_seconds"] = hkey_or_ttl
                     self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
                 else:
                     kwargs["host_key"] = hkey_or_ttl
