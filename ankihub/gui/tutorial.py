@@ -12,6 +12,7 @@ from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
 from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
+from anki.utils import is_mac
 from aqt import gui_hooks
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
@@ -194,12 +195,14 @@ class TutorialOverlayDialog(OverlayDialog):
         super().__init__(parent, target)
 
     def _focus_overlay(self) -> None:
+        if is_mac:
+            return
         self.web.setFocus()
 
     def _apply_web_transparency(self) -> None:
         self.web.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.web.setAutoFillBackground(False)
-        self.web.setStyleSheet("background: transparent;")
+        self.web.setStyleSheet("background: transparent; border: 0; outline: none;")
         self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
 
     def _cleanup_web(self) -> None:
