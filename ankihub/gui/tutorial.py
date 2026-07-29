@@ -3,14 +3,13 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict, Union, cast
 
 import aqt
 from anki.cards import CardId
 from anki.config import Config
 from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
-from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
 from aqt import gui_hooks
 from aqt.browser import Browser
@@ -20,7 +19,6 @@ from aqt.deckoptions import DeckOptionsDialog
 from aqt.editor import Editor
 from aqt.main import AnkiQt, MainWindowState
 from aqt.operations.deck import set_current_deck
-from aqt.operations.scheduling import unsuspend_cards
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QAbstractItemView,
@@ -923,9 +921,9 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         contexts=contexts,
         dialog_context=DeckBrowser,
         dialog_kwargs=dict(
-            title="📘 Add cards to your study queue",
-            body="When installed, the AnKing Step Deck comes with all cards hidden (suspended). "
-            "Take this tour to learn how to <b>select cards to study</b>.<br><br>"
+            title="🔍 Search for cards to study",
+            body="When installed, the AnKing Step Deck comes with most of its cards hidden (suspended). "
+            "Take this tour to learn how to <b>select more cards to study</b>.<br><br>"
             "You can revisit this anytime in AnkiHub's Help menu.",
             secondary_button_label="Not now",
             main_button_label="Take tour",
@@ -1329,54 +1327,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         aqt.dialogs.open("Browser", aqt.mw)
         # _on_browser_startup() takes care of moving to the next step after the browser is properly set up
 
-    def _unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
-        nids = [
-            1500401546879,
-            1500401591194,
-            1470839334989,
-            1470839322331,
-            1470839316273,
-            1470839294833,
-            1470839280347,
-            1550661266842,
-            1472161006747,
-            1478831098355,
-            1474154340790,
-            1472426521266,
-            1472426529103,
-            1474224658849,
-            1482115345843,
-            1482021715220,
-            1484686747922,
-            1462992514871,
-            1485913667420,
-            1485913618153,
-            1462326105448,
-            1462326951145,
-            1608908268526,
-            1518568098631,
-            1482361493392,
-            1474509558350,
-            1502065388242,
-            1488680344608,
-            1483930816351,
-            1476583175080,
-            1478834028289,
-            1540336057514,
-            1480908234945,
-            1478833957640,
-        ]
-        cids: Set[CardId] = set()
-        for nid in nids:
-            cids.update(aqt.mw.col.card_ids_of_note(NoteId(nid)))
-
-        def success(_):
-            self._browser_closed_by_us = True
-            self._browser.close()
-            self.next()
-
-        self._track_tutorial("tour_unsuspend_cards")
-        unsuspend_cards(parent=self._browser, card_ids=list(cids)).success(success).run_in_background()
+    def _close_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+        self._browser_closed_by_us = True
+        self._browser.close()
+        self.next()
 
     def _steps(self) -> list[TutorialStep]:
         steps = []
@@ -1443,15 +1397,11 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 "they show with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
                 "yellow background</span>.<br>"
                 "To unsuspend a card there, you right-click it and uncheck Toggle Suspend.<br><br>"
-                "Click on the <b>Unsuspend</b> button below and we'll make a few cards available for you.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
                 qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
                 target_outline=True,
-                next_label="Unsuspend",
-                next_callback=self._unsuspend_cards_and_move_to_next_step,
-                back_label="End Tour",
-                back_callback=lambda _: self.end(),
+                next_callback=self._close_browser_and_move_to_next_step,
             )
         )
 
