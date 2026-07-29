@@ -1144,8 +1144,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 "These daily stats show you:<br><ul>"
                 "<li><b class='text-text-information-main'>New</b>: cards that you have downloaded or created yourself,"
                 " but have never studied before</li>"
-                "<li><b class='text-text-destructive-main'>Learning</b>: cards that were seen "
-                "for the first time recently, and are still being learned</li>"
+                "<li><b class='text-text-destructive-main'>Learning</b>: cards that are still being learned</li>"
                 "<li><b class='text-text-confirmation-main'>To Review</b>: cards that you have finished learning. "
                 "They will be shown again after their delay has elapsed</li></ul>",
                 target="td",
