@@ -154,6 +154,10 @@ class LabelWithLink(QLabel):
 
 
 class ErrorLabel(QWidget):
+    _ICON_SIZE = 20
+    # FormWidget's inner content width, given the dialog's fixed 525px width and margins.
+    _FALLBACK_MAX_WIDTH = 461
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._setup_ui()
@@ -163,22 +167,48 @@ class ErrorLabel(QWidget):
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(4)
-        hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status = status = QLabel("")
         status.setWordWrap(True)
+        status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = self.font()
         font.setBold(True)
         status.setFont(font)
         status.setTextFormat(Qt.TextFormat.RichText)
         icon_label = QLabel()
-        icon_label.setPixmap(error_icon().pixmap(20, 20))
+        icon_label.setPixmap(error_icon().pixmap(self._ICON_SIZE, self._ICON_SIZE))
+        # status is given a shrink-to-fit width in _update_status_width (instead of
+        # stretch=1), so the row has a fixed sizeHint that setAlignment can center
+        # as a whole, with the row's width following the text length.
+        hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hbox.addWidget(icon_label)
-        hbox.addWidget(status, stretch=1)
+        hbox.addWidget(status)
         self.setLayout(hbox)
 
     def set_error(self, text: str) -> None:
         self.setVisible(bool(text))
         self.status.setText(text)
+        self._update_status_width()
+
+    def _update_status_width(self) -> None:
+        # Measure the label's own sizeHint with word wrap temporarily disabled. This
+        # matches exactly how Qt will render the (rich) text on a single line, which
+        # a manual QFontMetrics calculation doesn't reliably reproduce (e.g. it
+        # ignores HTML formatting and any stylesheet font overrides applied at
+        # render time).
+        status = self.status
+        status.setWordWrap(False)
+        natural_width = status.sizeHint().width()
+        status.setWordWrap(True)
+        # Small buffer to avoid the rare case where sizeHint() is one pixel short
+        # of what's needed, which would otherwise force an unwanted wrap.
+        self.status.setFixedWidth(min(natural_width + 2, self._max_status_width()))
+
+    def _max_status_width(self) -> int:
+        # The dialog has a fixed width (see FixedDialogLayout), so relying on
+        # parentWidget().width() is unreliable here: set_error() often runs before
+        # the layout has been activated for the first time, when width() still
+        # reports a placeholder size instead of the final ~461px content width.
+        return max(self._FALLBACK_MAX_WIDTH - self._ICON_SIZE - 8, 0)
 
 
 class BaseInput(QLineEdit):
