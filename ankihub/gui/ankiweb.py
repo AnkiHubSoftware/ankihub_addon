@@ -705,9 +705,9 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
     ):
         self.email = email
         if remaining_seconds > 0:
-            self.code_ttl_secs = remaining_seconds
+            self.remaining_seconds = remaining_seconds
         else:
-            self.code_ttl_secs = code_ttl_secs
+            self.remaining_seconds = code_ttl_secs
         self._dialog = dialog
         self._is_retry = bool(error)
         super().__init__(
@@ -782,7 +782,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        self.init_timer(on_timeout, self.code_ttl_secs)
+        self.init_timer(on_timeout, self.remaining_seconds)
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
@@ -793,7 +793,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
 
     def _on_get_code(self) -> None:
         def on_success(code_ttl_secs: int) -> None:
-            self.code_ttl_secs = code_ttl_secs
+            self.remaining_seconds = code_ttl_secs
             self._start_timer()
 
         email = self._get_email()
@@ -825,7 +825,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
                         email=self._get_email(),
-                        code_ttl_secs=self.code_ttl_secs,
+                        code_ttl_secs=self.remaining_seconds,
                         dialog=self._dialog,
                         error=str(exc),
                         remaining_seconds=self._timer.remaining_seconds,
