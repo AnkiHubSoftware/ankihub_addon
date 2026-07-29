@@ -21,7 +21,6 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 -   Install uv: https://docs.astral.sh/uv/getting-started/installation/
 -   Set up project environment and install dependencies:
     -   **Default (most systems):** `uv sync --group dev --group aqt --group bundle` or `just install`
-    -   **For glibc 2.35 systems (e.g., PopOS 22.04):** `uv sync --group dev --group aqt_25_2_7 --group bundle` or `just install aqt_25_2_7`
     -   **Legacy Anki (2.1.56):** `uv sync --group dev --group aqt_legacy --group bundle` or `just install aqt_legacy`
 
     (Requires [just](https://github.com/casey/just) for the `just install` commands)
