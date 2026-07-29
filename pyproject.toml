@@ -2,7 +2,7 @@
 name = "ankihub_addon"
 description = "AnkiHub add-on for Anki"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 version = "2026.07.01.3"
 dependencies = []
 
@@ -48,8 +48,8 @@ bundle = [
   "django-cotton>=2.5.1",
   "protobuf-py; python_version >= '3.10'",
 ]
-aqt = ["aqt[qt]==25.9.2"]
-aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
+aqt = ["aqt[qt]==26.5"]
+aqt_legacy = ["aqt==2.1.56; python_version == '3.9'", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
 aqt_25_2_7 = [
   "aqt==25.2.7",
   "PyQt6==6.7.*",
