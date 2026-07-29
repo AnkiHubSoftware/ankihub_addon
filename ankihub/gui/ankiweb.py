@@ -730,12 +730,10 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
 
 
 class SignupCodeVerificationWidget(BaseSignupWidget):
-    def __init__(
-        self, email: str, code_ttl_secs: int, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0
-    ):
+    def __init__(self, email: str, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0):
         self.email = email
-        self.code_ttl_secs = remaining_seconds or code_ttl_secs
         self._dialog = dialog
+        self.remaining_seconds = remaining_seconds
         self._is_retry = bool(error)
         super().__init__(
             heading="Email confirmation",
@@ -744,7 +742,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
-        if not self._is_retry or remaining_seconds:
+        if not self._is_retry or remaining_seconds > 0:
             self._start_timer()
         else:
             self._update_code_button_state()
@@ -809,7 +807,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             if not remaining_secs:
                 self._update_code_button_state()
 
-        self.init_timer(on_timeout, self.code_ttl_secs)
+        self.init_timer(on_timeout, self.remaining_seconds)
         self._update_code_button_state()
 
     def _on_code_changed(self, text: str) -> None:
@@ -820,7 +818,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
 
     def _on_get_code(self) -> None:
         def on_success(code_ttl_secs: int) -> None:
-            self.code_ttl_secs = code_ttl_secs
+            self.remaining_seconds = code_ttl_secs
             self._start_timer()
 
         email = self._get_email()
@@ -849,13 +847,16 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
+                if self._timer.remaining_seconds > 0:
+                    remaining_seconds = self._timer.remaining_seconds
+                else:
+                    remaining_seconds = self.remaining_seconds
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
                         email=self._get_email(),
-                        code_ttl_secs=self.code_ttl_secs,
                         dialog=self._dialog,
                         error=str(exc),
-                        remaining_seconds=self._timer.remaining_seconds,
+                        remaining_seconds=remaining_seconds,
                     )
                 )
 
@@ -963,7 +964,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 hkey_or_ttl = fut.result()
                 kwargs: dict[str, Any] = dict(email=self.email_input.text(), dialog=self._dialog)
                 if self.is_code_signup:
-                    kwargs["code_ttl_secs"] = hkey_or_ttl
+                    kwargs["remaining_seconds"] = hkey_or_ttl
                     self._dialog.replace_widget(SignupCodeVerificationWidget(**kwargs))
                 else:
                     kwargs["host_key"] = hkey_or_ttl

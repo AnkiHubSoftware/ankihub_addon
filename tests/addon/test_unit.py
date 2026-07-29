@@ -1223,7 +1223,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         dialog.show()
         # Freshly created (not a retry after an error), so the widget only has
         # `self.email` and no `email_input` field.
-        widget = SignupCodeVerificationWidget(email="user@example.com", code_ttl_secs=300, dialog=dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
         dialog.replace_widget(widget)
         widget.code_input.setText("123456")
 
@@ -1246,7 +1246,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         # Passing an error makes this a retry widget, which shows an editable
         # email field instead of the original read-only `self.email`.
         widget = SignupCodeVerificationWidget(
-            email="user@example.com", code_ttl_secs=300, dialog=dialog, error="Some unknown error"
+            email="user@example.com", remaining_seconds=300, dialog=dialog, error="Some unknown error"
         )
         dialog.replace_widget(widget)
         widget.email_input.setText("other@example.com")
@@ -1256,6 +1256,56 @@ class TestAnkiwebLoginAndSignupSubmission:
 
         verify_mock.assert_called_once_with("other@example.com", "123456")
         persist_mock.assert_called_once_with(email="other@example.com", host_key="hostkey123")
+
+    def test_signup_code_verification_reuses_timer(self, qtbot: QtBot, mocker: MockerFixture):
+        code_ttl_secs = 300
+        elapsed_secs = 5
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_signup_code", side_effect=Exception("some error"))
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=code_ttl_secs, dialog=dialog)
+        dialog.replace_widget(widget)
+        # Simulate the countdown having run for a few seconds, so the time left is
+        # distinguishable from the full TTL. `Countdown` also counts down once on
+        # construction, hence the extra second.
+        for _ in range(elapsed_secs):
+            widget._timer._on_timeout()
+        remaining_seconds = code_ttl_secs - elapsed_secs - 1
+        assert widget._timer.remaining_seconds == remaining_seconds
+
+        widget.code_input.setText("123456")
+        widget._on_verify_or_resend()
+
+        # The retry widget resumes the countdown of the failed one instead of
+        # restarting it from the full TTL.
+        retry_widget = dialog._widget
+        assert retry_widget is not widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert retry_widget.remaining_seconds == remaining_seconds
+
+    def test_signup_code_verification_restarts_timer_when_it_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
+        code_ttl_secs = 3
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_signup_code", side_effect=Exception("some error"))
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=code_ttl_secs, dialog=dialog)
+        dialog.replace_widget(widget)
+        # Let the countdown run out. `Countdown` counts down once on construction,
+        # hence one tick less than the TTL.
+        for _ in range(code_ttl_secs - 1):
+            widget._timer._on_timeout()
+        assert widget._timer.remaining_seconds == 0
+
+        widget.code_input.setText("123456")
+        widget._on_verify_or_resend()
+
+        # There is no countdown left to resume, so the retry widget starts over from
+        # the full TTL instead of inheriting the expired one.
+        retry_widget = dialog._widget
+        assert retry_widget is not widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert retry_widget.remaining_seconds == code_ttl_secs
+        assert retry_widget._timer.remaining_seconds == code_ttl_secs - 1
 
     def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
