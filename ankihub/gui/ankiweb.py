@@ -218,8 +218,16 @@ FormRow = Union[tuple[str, Union[QWidget, QLayout]], QWidget, QLayout]
 
 
 class FormWidget(QGroupBox):
-    def __init__(self, description: str, rows: list[FormRow], dialog: AnkiwebDialog, parent: QWidget | None = None):
+    def __init__(
+        self,
+        description: str,
+        rows: list[FormRow],
+        dialog: AnkiwebDialog,
+        parent: QWidget | None = None,
+        back_to: AnkiwebLinkIds | None = None,
+    ):
         self._dialog = dialog
+        self.back_to = back_to
         super().__init__(parent)
         self._setup_ui(description, rows)
 
@@ -378,6 +386,13 @@ class BaseAnkiwebWidget(QWidget):
         cancel_button = CancelButton(self._dialog)
         buttons_hbox = QHBoxLayout()
         buttons_hbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        if form_widget.back_to:
+            back_button = Button("Back")
+            qconnect(
+                back_button.clicked,
+                lambda: self._dialog.replace_widget(widget_for_link(form_widget.back_to)(self._dialog)),
+            )
+            buttons_hbox.addWidget(back_button)
         buttons_hbox.addWidget(cancel_button)
         if extra_bottom_button:
             buttons_hbox.addWidget(extra_bottom_button)
@@ -635,6 +650,7 @@ class SignupErrorWidget(BaseSignupWidget):
             f"Alternatively, you can {html_link(ankiweb_reset_url(), 'reset your password')}.",
             rows=[],
             dialog=self._dialog,
+            back_to=AnkiwebLinkIds.SIGNUP_CODE,
         )
         form_widget.error_label.set_error(error)
 
@@ -741,9 +757,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             )
             rows = [("Code", code_box), instructions_label]
         form_widget = FormWidget(
-            description=description,
-            rows=rows,
-            dialog=self._dialog,
+            description=description, rows=rows, dialog=self._dialog, back_to=AnkiwebLinkIds.SIGNUP_CODE
         )
         form_widget.error_label.set_error(error)
 
