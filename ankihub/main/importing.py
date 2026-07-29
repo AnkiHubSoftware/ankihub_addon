@@ -24,6 +24,7 @@ from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
 from ..settings import (
     TAG_FOR_INSTRUCTION_NOTES,
+    TAG_STARTER_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
     config,
@@ -678,6 +679,11 @@ class AnkiHubImporter:
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Collection[Card]:
         if is_tag_in_list(TAG_FOR_INSTRUCTION_NOTES, note.tags):
+            return []
+
+        if config.get_feature_flags().get("unsuspend_card_by_default", False) and is_tag_in_list(
+            TAG_STARTER_NOTES, note.tags
+        ):
             return []
 
         def new_cards() -> List[Card]:
