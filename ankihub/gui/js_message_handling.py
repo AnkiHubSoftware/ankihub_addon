@@ -25,7 +25,7 @@ from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import bring_to_front, robust_filter
-from .webview import AnkiHubWebViewDialog
+from .webview import WEBVIEW_DIALOG_ESCAPE_PYCMD, AnkiHubWebViewDialog
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -174,6 +174,12 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         qconnect(dialog.finished, on_dialog_finished)
         dialog.show()
+
+        return (True, None)
+    elif message == WEBVIEW_DIALOG_ESCAPE_PYCMD:
+        # Only sent for Escape presses the page didn't consume, so the dialog is what closes.
+        if isinstance(context, AnkiHubWebViewDialog):
+            context.close()
 
         return (True, None)
 
