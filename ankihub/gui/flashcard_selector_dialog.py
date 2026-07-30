@@ -9,6 +9,7 @@ from aqt.utils import openLink
 from .. import LOGGER
 from ..gui.webview import AnkiHubWebViewDialog
 from ..settings import (
+    config,
     url_flashcard_selector,
     url_flashcard_selector_embed,
     url_plans_page,
@@ -43,7 +44,10 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         return cls.dialog
 
     def _setup_ui(self) -> None:
-        self.setWindowTitle("AnkiHub | Flashcard Selector")
+        if config.get_feature_flags().get("smart_search_revamp", False):
+            self.setWindowTitle("AnkiHub | Smart Search")
+        else:
+            self.setWindowTitle("AnkiHub | Flashcard Selector")
         self.resize(1000, 800)
 
         super()._setup_ui()

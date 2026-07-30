@@ -46,7 +46,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWidget
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -138,6 +138,7 @@ from ankihub.gui.auto_sync import SYNC_RATE_LIMIT_SECONDS, _setup_ankihub_sync_o
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.browser import (
+    ChatbotDialog,
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
     SuggestionTypeSearchNode,
@@ -200,7 +201,13 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ankihub.gui.utils import _Dialog, robust_filter
+from ankihub.gui.utils import _Dialog, bring_to_front, robust_filter
+from ankihub.gui.webview import (
+    WEBVIEW_DIALOG_ESCAPE_PYCMD,
+    AnkiHubWebView,
+    AnkiHubWebViewDialog,
+    SheetFilePickerWebPage,
+)
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -8406,6 +8413,22 @@ class TestConfigDialog:
             qtbot.wait(500)
 
 
+def mock_load_url_to_show_page(mocker: MockerFixture, body: str, url_substring: str = "flashcard-selector") -> None:
+    """Make AnkiWebView.load_url render `body` instead of fetching the AnkiHub web app page."""
+    original_load_url = aqt.webview.AnkiWebView.load_url
+
+    def new_load_url(self, url: QUrl, *args, **kwargs):
+        self = cast(AnkiWebView, self)
+        # Only intercept the web app page itself - stdHtml relies on other load_url calls
+        # to load the page.
+        if url_substring in url.toString():
+            return self.stdHtml(body)
+        else:
+            return original_load_url(self, url, *args, **kwargs)
+
+    mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+
+
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -8710,7 +8733,7 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token", return_value="test_token")
 
-            self._mock_load_url_to_show_page(mocker, body="Invalid token")
+            mock_load_url_to_show_page(mocker, body="Invalid token")
 
             dialog = FlashCardSelectorDialog.display_for_ah_did(
                 ah_did=next_deterministic_uuid(),
@@ -8742,7 +8765,8 @@ class TestFlashCardSelector:
             dialog.view_in_web_browser_button.click()
 
             openLink_mock.assert_called_once_with(url_flashcard_selector(ah_did))
-            assert not dialog.isVisible()
+            # The dialog stays open so the user doesn't lose their search when they come back.
+            assert dialog.isVisible()
 
     @pytest.mark.sequential
     def test_sync_notes_actions(
@@ -8762,7 +8786,7 @@ class TestFlashCardSelector:
             )
 
             # Mock the page so that it's loaded and we can run javascript on it
-            self._mock_load_url_to_show_page(mocker, body="")
+            mock_load_url_to_show_page(mocker, body="")
 
             ah_did = next_deterministic_uuid()
             dialog = FlashCardSelectorDialog.display_for_ah_did(
@@ -8776,19 +8800,246 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
-    def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
-        original_load_url = aqt.webview.AnkiWebView.load_url
+    @pytest.mark.sequential
+    def test_dialog_is_raised_when_browser_opened_from_it_closes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Regression test: closing the browser opened from the dialog activates Anki's main
+        # window, burying the (non-modal) dialog behind it.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
 
-        def new_load_url(self, url: QUrl, *args, **kwargs):
-            self = cast(AnkiWebView, self)
-            # Check if the URL is the flashcard selector page.
-            # This is necessary, because stdHtml relies on other load_url calls to load the page.
-            if "flashcard-selector" in url.toString():
-                return self.stdHtml(body)
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            raise_mock = mocker.patch.object(dialog, "raise_")
+            activate_mock = mocker.patch.object(dialog, "activateWindow")
+
+            browser_will_show_mock = Mock()
+            browser_will_show.append(browser_will_show_mock)
+
+            dialog.web.eval(f"pycmd('{OPEN_BROWSER_PYCMD}')")
+            qtbot.wait_until(lambda: browser_will_show_mock.called)
+
+            # While the browser is still open the dialog must stay where it is -
+            # it is only brought back once the browser goes away.
+            assert not raise_mock.called
+
+            browser: Browser = browser_will_show_mock.call_args[0][0]
+            browser.close()
+
+            qtbot.wait_until(lambda: raise_mock.called)
+            assert activate_mock.called
+
+
+class TestAnkiHubWebViewDialogEscape:
+    """Escape closes the dialog only when nothing in the page consumed the key press."""
+
+    # A page that handles Escape itself, the way an AnkiHub web app modal does.
+    PAGE_CONSUMING_ESCAPE = """
+        <script>
+            window.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                }
+            });
+        </script>
+    """
+
+    @pytest.mark.sequential
+    def test_escape_closes_dialog_when_page_does_not_consume_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            qtbot.wait_until(lambda: not dialog.isVisible())
+
+    @pytest.mark.sequential
+    def test_escape_does_not_close_dialog_when_page_consumes_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body=self.PAGE_CONSUMING_ESCAPE)
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            # Give the deferred check and the resulting pycmd round trip time to happen.
+            qtbot.wait(1000)
+            assert dialog.isVisible()
+
+    @pytest.mark.sequential
+    def test_escape_pycmd_closes_dialog(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            dialog.web.eval(f"pycmd('{WEBVIEW_DIALOG_ESCAPE_PYCMD}')")
+
+            qtbot.wait_until(lambda: not dialog.isVisible())
+
+    @pytest.mark.sequential
+    def test_ankis_own_escape_close_path_is_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Fails loudly if a future Anki bump reworks onEsc(), instead of silently restoring the
+        # old close-everything behaviour.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            assert isinstance(dialog.web, AnkiHubWebView)
+
+            dialog.web.onEsc()
+
+            qtbot.wait(500)
+            assert dialog.isVisible()
+
+    @pytest.mark.sequential
+    def test_escape_handler_is_installed_once_when_dialog_is_displayed_again(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Displaying the dialog again connects another loadFinished handler, so the snippet is
+        # evaluated more than once per page. It must not stack listeners and close twice.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            ah_did = next_deterministic_uuid()
+            dialog = FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            assert FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw) is dialog
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            close_mock = mocker.patch.object(dialog, "close")
+
+            self._press_escape(dialog)
+
+            qtbot.wait_until(lambda: close_mock.called)
+            qtbot.wait(500)
+            assert close_mock.call_count == 1
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "page_consumes_escape, expected_still_visible",
+        [
+            (False, False),
+            (True, True),
+        ],
+    )
+    def test_escape_in_chatbot_dialog(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        page_consumes_escape: bool,
+        expected_still_visible: bool,
+    ):
+        # The chatbot dialog is application-modal and has no footer, so it is built along a
+        # different path than the flashcard selector.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(
+                mocker,
+                body=self.PAGE_CONSUMING_ESCAPE if page_consumes_escape else "",
+                url_substring="/ai/chatbot/",
+            )
+
+            dialog = ChatbotDialog.display_for_ah_nid(ah_nid=next_deterministic_uuid(), parent=aqt.mw)
+            assert dialog is not None
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            if expected_still_visible:
+                qtbot.wait(1000)
+                assert dialog.isVisible()
             else:
-                return original_load_url(self, url, *args, **kwargs)
+                qtbot.wait_until(lambda: not dialog.isVisible())
 
-        mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+    def _press_escape(self, dialog: AnkiHubWebViewDialog) -> None:
+        """Dispatch an Escape keydown in the page, the way a real key press arrives."""
+        dialog.web.eval(
+            """
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {key: "Escape", bubbles: true, cancelable: true})
+            );
+            """
+        )
+
+    def _wait_until_escape_handler_installed(self, dialog: AnkiHubWebViewDialog, qtbot: QtBot) -> None:
+        results: List[Any] = []
+
+        def handler_installed() -> bool:
+            dialog.web.evalWithCallback("window.ankihubEscapeHandlerInstalled === true", results.append)
+            return bool(results) and bool(results[-1])
+
+        qtbot.wait_until(handler_installed)
 
 
 @pytest.mark.qt_no_exception_capture
@@ -9600,6 +9851,118 @@ def test_update_note_type_templates_and_styles(
         )
         assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get("tmpls")
         assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get("css")
+
+
+class TestBringToFront:
+    def test_raises_and_activates_the_widget(self, anki_session_with_addon_data: AnkiSession):
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            raise_mock = Mock()
+            activate_mock = Mock()
+            widget.raise_ = raise_mock  # type: ignore[method-assign]
+            widget.activateWindow = activate_mock  # type: ignore[method-assign]
+
+            bring_to_front(widget)
+
+            assert raise_mock.called
+            assert activate_mock.called
+
+    def test_deleted_widget_is_ignored(self, anki_session_with_addon_data: AnkiSession):
+        # Callers fire this from signals (e.g. the browser being destroyed), by which point
+        # the widget may already be gone - touching it then would raise RuntimeError.
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            sip.delete(widget)
+            assert sip.isdeleted(widget)
+
+            bring_to_front(widget)  # must not raise
+
+
+class TestSheetFilePickerWebPage:
+    # NOTE: the underlying bug is a macOS-only focus steal (dismissing the picker buries the
+    # dialog behind Anki's main window). That is a visual/window-manager behavior with no
+    # automated seam, so these tests lock in the *mechanism* that fixes it - the picker being a
+    # window-modal sheet parented to the dialog - plus the chooseFiles() return-value contract.
+    def _open_dialog(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> FlashCardSelectorDialog:
+        mocker.patch.object(config, "token", return_value="test_token")
+        mocker.patch.object(AnkiWebView, "load_url")
+        return FlashCardSelectorDialog.display_for_ah_did(ah_did=next_deterministic_uuid(), parent=aqt.mw)
+
+    def test_dialog_uses_the_sheet_file_picker_page(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert isinstance(dialog.web.page(), SheetFilePickerWebPage)
+
+    def test_choose_files_opens_window_modal_sheet_and_returns_selection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = True
+            picker.selectedFiles.return_value = ["/tmp/deck.csv"]
+            picker_cls = mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], ["text/csv"])
+
+            assert result == ["/tmp/deck.csv"]
+            # Parent + WindowModal is what makes it a sheet, so focus returns to the dialog.
+            picker_cls.assert_called_once_with(dialog)
+            picker.setWindowModality.assert_called_once_with(Qt.WindowModality.WindowModal)
+            picker.setMimeTypeFilters.assert_called_once_with(["text/csv", "application/octet-stream"])
+
+    def test_choose_files_returns_empty_list_on_cancel(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert result == []
+
+    def test_dialog_stays_open_when_file_picker_is_cancelled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Cancelling the file picker must not dismiss the Smart Search dialog - it should
+        # remain open (and, on macOS, in front rather than buried behind the main window).
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert dialog.isVisible()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False  # user cancelled
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            dialog.web.page().chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert not sip.isdeleted(dialog)
+            assert dialog.isVisible()
 
 
 @pytest.mark.qt_no_exception_capture

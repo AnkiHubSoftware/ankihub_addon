@@ -41,6 +41,7 @@ from aqt.qt import (
     QWidget,
     pyqtSlot,
     qconnect,
+    sip,
 )
 from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
@@ -67,6 +68,24 @@ def add_button_from_param(button_box: QDialogButtonBox, button_param: ButtonPara
         button = button_box.addButton(*button_param)
 
     return button
+
+
+def bring_to_front(widget: QWidget) -> None:
+    """Bring an already-visible window back to the front.
+
+    On macOS, closing a window that was opened from one of our non-modal dialogs (a native
+    file picker, the Anki browser) activates Anki's main window rather than the dialog,
+    burying the dialog behind it. Callers hook whatever signals that closing to call this.
+
+    Does not show the widget - it is for windows that are already open. The deletion guard
+    matters because callers typically fire this from a signal, by which point the window
+    may be gone.
+    """
+    if sip.isdeleted(widget):
+        return
+
+    widget.raise_()
+    widget.activateWindow()
 
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
