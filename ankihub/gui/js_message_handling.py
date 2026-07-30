@@ -24,7 +24,8 @@ from ..gui.terms_dialog import TermsAndConditionsDialog
 from ..settings import config, url_view_note
 from .config_dialog import get_config_dialog_manager
 from .operations.scheduling import suspend_notes, unsuspend_notes
-from .utils import robust_filter
+from .utils import bring_to_front, robust_filter
+from .webview import AnkiHubWebViewDialog
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -97,6 +98,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
         if search_string:
             browser.search_for(search_string)
+
+        if isinstance(context, AnkiHubWebViewDialog):
+            # The browser is destroyed via deleteLater(), so this fires once it is gone.
+            qconnect(browser.destroyed, lambda: bring_to_front(context))
 
         return (True, None)
     elif message.startswith(SUSPEND_NOTES_PYCMD):

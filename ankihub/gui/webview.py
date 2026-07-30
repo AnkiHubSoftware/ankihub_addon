@@ -1,10 +1,11 @@
 from abc import abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, List, Optional
 
 from aqt import Qt, QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QPushButton,
     QUrl,
@@ -51,6 +52,12 @@ class AnkiHubWebViewDialog(QDialog):
     def _setup_ui(self) -> None:
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
+
+        # Use a page that opens the file picker as a window-modal sheet attached to this
+        # dialog (see SheetFilePickerWebPage). Otherwise, on macOS, dismissing the picker
+        # activates Anki's main window and buries this non-modal dialog behind it.
+        page = SheetFilePickerWebPage(self.web, self.web.page().profile(), self.web._onBridgeCmd, dialog=self)
+        self.web.setPage(page)
 
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
@@ -246,3 +253,50 @@ class CustomWebPage(AnkiWebPage):
                 feature,
                 QWebEnginePage.PermissionPolicy.PermissionDeniedByUser,
             )
+
+
+class SheetFilePickerWebPage(CustomWebPage):
+    """A web page that opens the file picker as a window-modal sheet on its owning dialog.
+
+    By default, QtWebEngine opens the file picker (triggered by an ``<input type=file>`` in
+    the page) as a top-level window. On macOS, dismissing it - selecting a file or, more
+    visibly, cancelling - hands focus back to Anki's main window rather than to the non-modal
+    dialog the picker was opened from, so the dialog blinks behind the main window.
+
+    Overriding chooseFiles() to show a window-modal QFileDialog parented to the dialog makes
+    the picker a native sheet, so macOS returns focus to the dialog on close and the main
+    window never comes forward.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget,
+        profile: QWebEngineProfile,
+        onBridgeCmd: Callable[[str], Any],
+        dialog: QDialog,
+    ):
+        super().__init__(parent, profile, onBridgeCmd)
+        self._dialog = dialog
+
+    def chooseFiles(
+        self,
+        mode: "QWebEnginePage.FileSelectionMode",
+        oldFiles: Iterable[Optional[str]],
+        acceptedMimeTypes: Iterable[Optional[str]],
+    ) -> List[str]:
+        picker = QFileDialog(self._dialog)
+        # Parent + WindowModal makes this a native sheet on macOS, so focus returns to the
+        # dialog (not Anki's main window) when the picker closes.
+        picker.setWindowModality(Qt.WindowModality.WindowModal)
+        if mode == QWebEnginePage.FileSelectionMode.FileSelectOpenMultiple:
+            picker.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        else:
+            picker.setFileMode(QFileDialog.FileMode.ExistingFile)
+
+        # Preserve the page's `accept` filter where it maps to real MIME types (entries that
+        # are bare extensions or wildcards are ignored, leaving all files selectable).
+        mime_type_filters = [mime for mime in acceptedMimeTypes if mime and "/" in mime and "*" not in mime]
+        if mime_type_filters:
+            picker.setMimeTypeFilters([*mime_type_filters, "application/octet-stream"])
+
+        return picker.selectedFiles() if picker.exec() else []
