@@ -633,8 +633,9 @@ class BaseSignupWidget(BaseAnkiwebWidget):
 
 
 class SignupErrorWidget(BaseSignupWidget):
-    def __init__(self, error: str, dialog: AnkiwebDialog):
+    def __init__(self, error: str, dialog: AnkiwebDialog, is_code_signup: bool):
         self._dialog = dialog
+        self.is_code_signup = is_code_signup
         super().__init__(
             heading="Create an AnkiWeb account",
             main_description="",
@@ -650,7 +651,7 @@ class SignupErrorWidget(BaseSignupWidget):
             f"Alternatively, you can {html_link(ankiweb_reset_url(), 'reset your password')}.",
             rows=[],
             dialog=self._dialog,
-            back_to=AnkiwebLinkIds.SIGNUP_CODE,
+            back_to=AnkiwebLinkIds.SIGNUP_CODE if self.is_code_signup else AnkiwebLinkIds.SIGNUP_PASSWORD,
         )
         form_widget.error_label.set_error(error)
 
@@ -954,7 +955,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                     self._dialog.replace_widget(SignupEmailVerificationWidget(**kwargs))
             except Exception as exc:
                 if "An account with this email already exists" in str(exc):
-                    self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog))
+                    self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog, self.is_code_signup))
                 else:
                     self.form_widget.error_label.set_error(str(exc))
 
