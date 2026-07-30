@@ -11,9 +11,8 @@ from anki.hooks import wrap
 from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 from aqt.main import AnkiQt
 
-from .ankihub_client import DEFAULT_ANKIWEB_URL
-
 from . import LOGGER, anki_logger
+from .ankihub_client import DEFAULT_ANKIWEB_URL
 from .db import ankihub_db
 from .gui import (
     browser,
