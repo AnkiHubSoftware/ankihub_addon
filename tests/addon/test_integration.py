@@ -8743,7 +8743,8 @@ class TestFlashCardSelector:
             dialog.view_in_web_browser_button.click()
 
             openLink_mock.assert_called_once_with(url_flashcard_selector(ah_did))
-            assert not dialog.isVisible()
+            # The dialog stays open so the user doesn't lose their search when they come back.
+            assert dialog.isVisible()
 
     @pytest.mark.sequential
     def test_sync_notes_actions(

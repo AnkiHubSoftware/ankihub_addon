@@ -207,8 +207,9 @@ class AnkiHubWebViewDialog(QDialog):
         self.web.eval(css_code)
 
     def _on_view_in_web_browser_button_clicked(self) -> None:
+        # Leaves the dialog open on purpose: closing it would discard state the external page
+        # can't reproduce, e.g. the user's search results.
         openLink(self._get_non_embed_url())
-        self.close()
 
 
 class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
