@@ -554,8 +554,8 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
-        def on_success(code_ttl_secs: int) -> None:
-            self.init_timer(on_timeout, code_ttl_secs)
+        def on_success(resend_cooldown_secs: int) -> None:
+            self.init_timer(on_timeout, resend_cooldown_secs)
             self.email_box.button.setEnabled(False)
             self.code_input.setEnabled(True)
             self.form_widget.error_label.set_error("")
@@ -563,7 +563,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
         email = self.email_input.text()
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).resend_cooldown_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
@@ -759,7 +759,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
-        if not self._is_retry or remaining_seconds > 0:
+        if not self._is_retry or self.remaining_seconds > 0:
             self._start_timer()
         else:
             self._update_code_button_state()
@@ -832,14 +832,14 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         self.email_box.button.setEnabled(is_email(text))
 
     def _on_get_code(self) -> None:
-        def on_success(code_ttl_secs: int) -> None:
-            self.remaining_seconds = code_ttl_secs
+        def on_success(resend_cooldown_secs: int) -> None:
+            self.remaining_seconds = resend_cooldown_secs
             self._start_timer()
 
         email = self._get_email()
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).resend_cooldown_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
 
@@ -970,7 +970,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             client = AnkiHubClient()
             terms = self.terms_checkbox.isChecked()
             if self.is_code_signup:
-                return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
+                return client.ankiweb_request_signup_code(self.email_input.text(), terms).resend_cooldown_secs
             else:
                 return client.ankiweb_signup(self.email_input.text(), self.password_input.text(), terms).host_key
 
