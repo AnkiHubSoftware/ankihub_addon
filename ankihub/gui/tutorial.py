@@ -1423,8 +1423,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @cached_property
     def steps(self) -> list[TutorialStep]:
         steps = self._steps()
-        # Hide back button for all but the penultimate step
+        # Hide back button for all steps
         for step in steps:
-            if step != steps[-2]:
-                step.back_label = ""
+            step.back_label = ""
         return steps
