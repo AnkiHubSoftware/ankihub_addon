@@ -1081,6 +1081,46 @@ class TestAnkiwebLoginWithCodeWidget:
         assert widget.email_box.button.isEnabled() is True
         assert "Resend available" in widget.status_label.text()
 
+    def test_get_code_cooldown_persists_when_dialog_is_reopened(self, qtbot: QtBot, mocker: MockerFixture):
+        """Closing and reopening the AnkiWeb dialog recreates LoginWithCodeWidget from
+        scratch. The resend cooldown should still be enforced client-side (mirroring
+        what the server already enforces per email), instead of the button coming back
+        enabled with no countdown shown.
+        """
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+        widget._on_get_code()
+        assert widget.email_box.button.isEnabled() is False
+
+        # Simulate closing the dialog and opening a brand new one, which creates a
+        # brand new LoginWithCodeWidget with no memory of the previous instance.
+        new_widget = self._widget(qtbot)
+        new_widget.email_input.setText("user@example.com")
+
+        assert new_widget.email_box.button.isEnabled() is False
+        assert new_widget.code_input.isEnabled() is True
+        assert "Resend available in" in new_widget.status_label.text()
+
+    def test_get_code_cooldown_does_not_apply_to_a_different_email(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+        widget._on_get_code()
+
+        new_widget = self._widget(qtbot)
+        new_widget.email_input.setText("someone-else@example.com")
+
+        assert new_widget.email_box.button.isEnabled() is True
+
 
 @pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
 class TestAnkiwebLoginAndSignupSubmission:
@@ -1201,7 +1241,9 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "unknown error" in widget.form_widget.error_label.status.text()
 
     def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_signup_code", return_value=Mock(resend_cooldown_secs=300))
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_signup_code", return_value=Mock(resend_cooldown_secs=300)
+        )
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = cast(SignupWithCodeWidget, dialog._widget)

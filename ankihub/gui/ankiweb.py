@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sys
+import time
 from concurrent.futures import Future
 from enum import Enum
+from math import ceil
 from typing import Any, Callable, NoReturn, Union
 
 import aqt
@@ -99,6 +101,39 @@ def destroy_timer(timer: QTimer | None) -> None:
 
 def timer_is_active(timer: Countdown | None) -> bool:
     return bool(timer) and not sip.isdeleted(timer) and timer.isActive() and timer.remaining_seconds > 0
+
+
+class ResendCooldownTracker:
+    """Tracks per-email magic-code resend cooldowns for the lifetime of the Anki
+    session (i.e. independently of any widget). Widgets only hold the cooldown's
+    remaining time in memory, so closing and reopening the AnkiWeb dialog
+    recreates them from scratch and would otherwise let the user bypass the
+    cooldown the server already enforces for that email.
+    """
+
+    def __init__(self) -> None:
+        self._deadlines: dict[tuple[str, str], float] = {}
+
+    def start(self, scope: str, email: str, seconds: int) -> None:
+        key = (scope, email)
+        if seconds > 0:
+            self._deadlines[key] = time.monotonic() + seconds
+        else:
+            self._deadlines.pop(key, None)
+
+    def remaining_seconds(self, scope: str, email: str) -> int:
+        key = (scope, email)
+        deadline = self._deadlines.get(key)
+        if deadline is None:
+            return 0
+        remaining = ceil(deadline - time.monotonic())
+        if remaining <= 0:
+            self._deadlines.pop(key, None)
+            return 0
+        return remaining
+
+
+_resend_cooldowns = ResendCooldownTracker()
 
 
 class Countdown(QTimer):
@@ -506,6 +541,8 @@ class BaseLoginWidget(BaseAnkiwebWidget):
 
 
 class LoginWithCodeWidget(BaseLoginWidget):
+    _COOLDOWN_SCOPE = "login"
+
     def __init__(self, dialog: AnkiwebDialog):
         self._dialog = dialog
         super().__init__(
@@ -515,6 +552,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'Sign up for a new account')}",
             dialog=dialog,
         )
+        self._sync_state_for_email(self.email_input.text())
 
     def _create_form_widget(self) -> FormWidget:
         self.email_input = email_input = EmailInput()
@@ -537,13 +575,30 @@ class LoginWithCodeWidget(BaseLoginWidget):
         return form_widget
 
     def _on_email_changed(self, text: str) -> None:
-        self.email_box.button.setEnabled(is_email(text))
-        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(text))
+        self._sync_state_for_email(text)
 
     def _on_code_changed(self, text: str) -> None:
         self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(self.email_input.text()))
 
-    def _on_get_code(self) -> None:
+    def _sync_state_for_email(self, email: str) -> None:
+        """Reflects any cooldown already tracked for `email` (e.g. from a code
+        requested before the dialog was closed and reopened) instead of always
+        allowing a new request whenever the email field shows a valid address.
+        """
+        email_valid = is_email(email)
+        remaining = _resend_cooldowns.remaining_seconds(self._COOLDOWN_SCOPE, email) if email_valid else 0
+        if remaining > 0:
+            self.code_input.setEnabled(True)
+            self._start_cooldown(remaining)
+        else:
+            if timer_is_active(self._timer):
+                destroy_timer(self._timer)
+                self._timer = None
+                self.status_label.setText("")
+            self.email_box.button.setEnabled(email_valid)
+        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and email_valid)
+
+    def _start_cooldown(self, remaining_secs: int) -> None:
         def on_timeout(remaining_secs: int) -> None:
             email = self.email_input.text()
             resend_available_status = f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available"
@@ -554,9 +609,13 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
+        self.init_timer(on_timeout, remaining_secs)
+        self.email_box.button.setEnabled(False)
+
+    def _on_get_code(self) -> None:
         def on_success(resend_cooldown_secs: int) -> None:
-            self.init_timer(on_timeout, resend_cooldown_secs)
-            self.email_box.button.setEnabled(False)
+            _resend_cooldowns.start(self._COOLDOWN_SCOPE, email, resend_cooldown_secs)
+            self._start_cooldown(resend_cooldown_secs)
             self.code_input.setEnabled(True)
             self.form_widget.error_label.set_error("")
 
