@@ -1141,7 +1141,7 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         )
         steps.append(
             TutorialStep(
-                "These daily stats show you:<br><ul>"
+                "These daily stats show you:<br><ul style='list-style: disc; padding-left: 1.25rem;'>"
                 "<li><b class='text-text-information-main'>New</b>: cards that you have downloaded or created yourself,"
                 " but have never studied before</li>"
                 "<li><b class='text-text-destructive-main'>Learning</b>: cards that are still being learned</li>"
