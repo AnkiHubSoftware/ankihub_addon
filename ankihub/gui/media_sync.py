@@ -138,8 +138,7 @@ class _AnkiHubMediaSync:
         self._last_op_callback = lambda: self.start_media_upload(media_names, ankihub_did, on_success, is_retry=True)
 
         media_paths = self._media_paths_for_media_names(media_names)
-        self._dialog.progress_bar.setValue(0)
-        self._dialog.set_maximum(len(media_paths))
+        self._dialog.reset_progress(len(media_paths))
 
         def on_failure(exception: Exception) -> None:
             self._amount_uploads_in_progress -= 1
@@ -157,7 +156,7 @@ class _AnkiHubMediaSync:
     def _on_media_chunk_uploaded(self, future: Future) -> None:
         try:
             count = future.result()
-            aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress(count))
+            aqt.mw.taskman.run_on_main(lambda: self._dialog.update_progress(count))
         except Exception as exc:
             self._errors.append(exc)
 
@@ -181,6 +180,10 @@ class _AnkiHubMediaSync:
         self._stop_background_threads = False
         self._reset()
         self.refresh_sync_status(False)
+
+    def close_for_profile(self):
+        self.stop_background_threads()
+        self._dialog.reset_progress(0)
 
     def refresh_sync_status(self, is_retry: bool):
         """Refresh the status text on the status action and the toolbar button."""
@@ -220,11 +223,7 @@ class _AnkiHubMediaSync:
             self._update_deck_media(ankihub_did=ah_did)
             all_missing.append((ah_did, self._missing_media_for_ah_deck(ah_did)))
 
-        def reset_progress() -> None:
-            self._dialog.progress_bar.setValue(0)
-            self._dialog.set_maximum(sum(len(m[1]) for m in all_missing))
-
-        aqt.mw.taskman.run_on_main(reset_progress)
+        aqt.mw.taskman.run_on_main(lambda: self._dialog.reset_progress(sum(len(m[1]) for m in all_missing)))
 
         for ah_did, missing_media_names in all_missing:
             if not missing_media_names:
@@ -243,7 +242,7 @@ class _AnkiHubMediaSync:
             future.result()
         except Exception as exc:
             self._errors.append(exc)
-        aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress())
+        aqt.mw.taskman.run_on_main(lambda: self._dialog.update_progress(1))
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
         """Fetch deck media updates from AnkiHub and update the database and the config.
@@ -527,12 +526,21 @@ class MediaSyncProgressDialog(QDialog):
         self.error_log_area.show()
         self._on_toggle_log()
 
-    def increment_progress(self, increment: int = 1) -> None:
+    def update_progress(self, increment: int = 0) -> None:
         self.progress_bar.setValue(self.progress_bar.value() + increment)
         self.update_count_label()
 
+    def reset_progress(self, maximum: int) -> None:
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(maximum)
+        self.update_count_label()
+
     def update_count_label(self) -> None:
-        self.count_label.setText(f"{self.progress_bar.value()}/{self.progress_bar.maximum()} files")
+        if self.progress_bar.maximum():
+            label = f"{self.progress_bar.value()}/{self.progress_bar.maximum()} files"
+        else:
+            label = ""
+        self.count_label.setText(label)
 
     def set_maximum(self, maximum: int) -> None:
         if maximum:
