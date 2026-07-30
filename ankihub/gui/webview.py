@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional
 
 from aqt import Qt, QWebEnginePage, QWebEngineProfile, pyqtSlot
@@ -17,10 +18,29 @@ from aqt.qt import (
 from aqt.theme import theme_manager
 from aqt.utils import openLink
 from aqt.webview import AnkiWebPage, AnkiWebView
+from jinja2 import Template
 
 from .. import LOGGER
 from ..settings import config
 from .utils import using_qt5
+
+WEBVIEW_DIALOG_ESCAPE_PYCMD = "ankihub_webview_dialog_escape"
+
+WEBVIEW_DIALOG_ESCAPE_JS_PATH = Path(__file__).parent / "web/webview_dialog_escape.js"
+
+
+class AnkiHubWebView(AnkiWebView):
+    """An AnkiWebView that leaves Escape handling to its hosting dialog.
+
+    AnkiWebView closes the nearest parent dialog on any Escape press, without checking whether
+    the page handled the key first. Its injected listener can't be removed from JS and the
+    resulting "close" command is consumed before the webview_did_receive_js_message hook runs,
+    so onEsc() is the only place to intercept it. See webview_dialog_escape.js for the
+    handling that replaces it.
+    """
+
+    def onEsc(self) -> None:
+        LOGGER.debug("Ignored Anki's Escape close request; the dialog decides when to close.")
 
 
 class AnkiHubWebViewDialog(QDialog):
@@ -50,7 +70,7 @@ class AnkiHubWebViewDialog(QDialog):
         return True
 
     def _setup_ui(self) -> None:
-        self.web = AnkiWebView(parent=self)
+        self.web = AnkiHubWebView(parent=self)
         self.web.set_open_links_externally(False)
 
         # Use a page that opens the file picker as a window-modal sheet attached to this
@@ -141,7 +161,13 @@ class AnkiHubWebViewDialog(QDialog):
             return  # pragma: no cover
 
         self._adjust_web_styling()
+        self._setup_escape_handling()
         self._on_successful_page_load()
+
+    def _setup_escape_handling(self) -> None:
+        """Close this dialog on Escape only when the page didn't consume the key press."""
+        js = Template(WEBVIEW_DIALOG_ESCAPE_JS_PATH.read_text()).render(ESCAPE_PYCMD=WEBVIEW_DIALOG_ESCAPE_PYCMD)
+        self.web.eval(js)
 
     def _handle_auth_failure_if_needed(self) -> None:
         def check_auth_failure_callback(value: str) -> None:
