@@ -156,7 +156,7 @@ class _AnkiHubMediaSync:
     def _on_media_chunk_uploaded(self, future: Future) -> None:
         try:
             count = future.result()
-            aqt.mw.taskman.run_on_main(lambda: self._dialog.update_progress(count))
+            aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress(count))
         except Exception as exc:
             self._errors.append(exc)
 
@@ -241,7 +241,7 @@ class _AnkiHubMediaSync:
             future.result()
         except Exception as exc:
             self._errors.append(exc)
-        aqt.mw.taskman.run_on_main(lambda: self._dialog.update_progress(1))
+        aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress())
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
         """Fetch deck media updates from AnkiHub and update the database and the config.
@@ -525,7 +525,7 @@ class MediaSyncProgressDialog(QDialog):
         self.error_log_area.show()
         self._on_toggle_log()
 
-    def update_progress(self, increment: int = 0) -> None:
+    def increment_progress(self, increment: int = 1) -> None:
         self.progress_bar.setValue(self.progress_bar.value() + increment)
         self.update_count_label()
 
