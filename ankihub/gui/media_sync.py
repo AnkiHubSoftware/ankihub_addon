@@ -160,17 +160,10 @@ class _AnkiHubMediaSync:
         except Exception as exc:
             self._errors.append(exc)
 
-    def _reset(self) -> None:
-        self._download_in_progress = False
-        self._amount_uploads_in_progress = 0
-        self._errors = []
-        self._canceling = False
-
     def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
         self._stop_background_threads = True
-        self._reset()
         self._canceling = True
         self.refresh_sync_status(False)
 
@@ -178,7 +171,10 @@ class _AnkiHubMediaSync:
         """Allow background media sync operations to be started after they have been stopped."""
         self._client.allow_background_threads()
         self._stop_background_threads = False
-        self._reset()
+        self._download_in_progress = False
+        self._amount_uploads_in_progress = 0
+        self._errors = []
+        self._canceling = False
         self.refresh_sync_status(False)
 
     def close_for_profile(self):
@@ -330,14 +326,14 @@ class _AnkiHubMediaSync:
 
     def _get_status(self) -> MediaSyncStatus:
         status: MediaSyncStatus
-        if self._download_in_progress:
+        if self._canceling:
+            status = MediaSyncStatus.CANCELING
+        elif self._download_in_progress:
             status = MediaSyncStatus.DOWNLOAD
         elif self._amount_uploads_in_progress > 0:
             status = MediaSyncStatus.UPLOAD
         elif self._errors:
             status = MediaSyncStatus.ERROR
-        elif self._canceling:
-            status = MediaSyncStatus.CANCELING
         else:
             status = MediaSyncStatus.IDLE
         return status
