@@ -521,6 +521,8 @@ class AnkiHubClient(AnkiWebClientMixin):
         with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             futures: List[Future] = []
             for chunk_number, chunk in enumerate(media_path_chunks):
+                if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting upload tasks...")
                 futures.append(
                     executor.submit(
                         self._zip_and_upload_media_chunk,
@@ -538,6 +540,7 @@ class AnkiHubClient(AnkiWebClientMixin):
                 except Exception as exc:
                     LOGGER.warning("Failed to upload media chunk", exc_info=exc)
                 if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting upload tasks...")
                     for future in futures:
                         future.cancel()
                     return
@@ -555,6 +558,9 @@ class AnkiHubClient(AnkiWebClientMixin):
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
     ) -> int:
+        if self.should_stop_background_threads:
+            return 0
+
         # Zip the media files found locally
         zip_filepath = Path(self.local_media_dir_path_cb() / f"{ah_did}_{chunk_number}_deck_assets_part.zip")
         LOGGER.debug("Creating zipped media file", zip_filepath=zip_filepath)
@@ -563,20 +569,27 @@ class AnkiHubClient(AnkiWebClientMixin):
                 if media_path.is_file():
                     media_zip.write(media_path, arcname=media_path.name)
 
+        def remove_zip() -> None:
+            # Remove the zip file from the local machine after the upload
+            LOGGER.debug("Removing file from local files", zip_filepath=zip_filepath.name)
+            try:
+                os.remove(zip_filepath)
+            except FileNotFoundError:
+                LOGGER.warning(
+                    "Could not remove file from local files.",
+                    zip_filepath=zip_filepath.name,
+                )
+
+        if self.should_stop_background_threads:
+            remove_zip()
+            return 0
+
         # Upload to S3
         LOGGER.debug("Uploading file to S3", zip_filepath=zip_filepath.name)
         self._upload_file_to_s3_with_reusable_presigned_url(s3_presigned_info=s3_presigned_info, filepath=zip_filepath)
         LOGGER.debug("Successfully uploaded file to S3", zip_filepath=zip_filepath.name)
+        remove_zip()
 
-        # Remove the zip file from the local machine after the upload
-        LOGGER.debug("Removing file from local files", zip_filepath=zip_filepath.name)
-        try:
-            os.remove(zip_filepath)
-        except FileNotFoundError:
-            LOGGER.warning(
-                "Could not remove file from local files.",
-                zip_filepath=zip_filepath.name,
-            )
         return len(chunk)
 
     def _upload_file_to_s3_with_reusable_presigned_url(self, s3_presigned_info: dict, filepath: Path) -> None:
@@ -609,6 +622,11 @@ class AnkiHubClient(AnkiWebClientMixin):
             media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
+                if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting download tasks...")
+                    for future in futures:
+                        future.cancel()
+                    return
                 media_path = media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(media_name)
                 futures.append(executor.submit(self._download_media, media_path, media_remote_path))
@@ -616,6 +634,7 @@ class AnkiHubClient(AnkiWebClientMixin):
             downloaded_media_count = 0
             for future in as_completed(futures):
                 if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting download tasks...")
                     for future in futures:
                         future.cancel()
                     return

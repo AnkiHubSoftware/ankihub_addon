@@ -222,6 +222,9 @@ class _AnkiHubMediaSync:
         aqt.mw.taskman.run_on_main(lambda: self._dialog.reset_progress(sum(len(m[1]) for m in all_missing)))
 
         for ah_did, missing_media_names in all_missing:
+            if self._stop_background_threads:
+                LOGGER.info("Background threads stopped, aborting download of media files...")
+                break
             if not missing_media_names:
                 LOGGER.info("No missing media for deck.", ah_did=ah_did)
                 continue
