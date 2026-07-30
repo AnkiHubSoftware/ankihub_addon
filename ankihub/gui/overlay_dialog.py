@@ -57,6 +57,9 @@ class OverlayDialog(QDialog):
             # with an opaque background, which defeats the translucent overlay.
             # Keep the overlay above its parent with a stays-on-top hint instead.
             window_flags |= Qt.WindowType.WindowStaysOnTopHint
+            # MacOS can render a visible native ring/shadow around translucent
+            # frameless dialogs; disable drop shadow to keep the overlay clean.
+            window_flags |= Qt.WindowType.NoDropShadowWindowHint
         super().__init__(parent, window_flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAutoFillBackground(False)
