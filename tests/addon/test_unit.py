@@ -109,8 +109,12 @@ from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.gui import menu
 from ankihub.gui.ankiweb import (
+    ERROR_DIALOG_LINK,
+    AnkiwebLinkIds,
     AnkiwebLoginDialog,
     AnkiwebSignupDialog,
+    ErrorLabel,
+    LabelWithLink,
     LoginWithCodeWidget,
     LoginWithPasswordWidget,
     SignupCodeVerificationWidget,
@@ -1331,6 +1335,247 @@ class TestAnkiwebLoginAndSignupSubmission:
         signup_mock.assert_called_once_with("user@example.com", "password123", True)
         assert isinstance(dialog._widget, SignupEmailVerificationWidget)
         assert dialog._widget.host_key == "hostkey123"
+
+    def test_login_with_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text()
+
+    def test_get_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        # Unlike the sign-in handlers, requesting a code runs as an AddonQueryOp, whose
+        # failure callback feeds the exception into the error label.
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_login_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_get_code()
+
+        qtbot.wait_until(lambda: "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text())
+
+    def test_login_with_password_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_login",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        error_text = widget.form_widget.error_label.status.text()
+        assert "Can't reach AnkiWeb" in error_text
+        # The raw exception isn't surfaced inline, only behind the error details link.
+        assert "connection refused" not in error_text
+
+    def test_signup_with_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_signup_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert dialog._widget is widget
+        assert "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text()
+
+    def test_fresh_signup_code_verification_shows_no_error(self, qtbot: QtBot):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
+        dialog.replace_widget(widget)
+
+        # No exception is passed for a freshly created widget, so the error label stays
+        # empty and hidden instead of showing a placeholder for the missing exception.
+        assert widget.form_widget.error_label.status.text() == ""
+        assert widget.form_widget.error_label.isHidden() is True
+
+    def test_signup_code_verification_retry_shows_generic_message_for_request_exception(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # The exception is carried over to the retry widget, which renders it as the
+        # generic connection error message.
+        retry_widget = dialog._widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert "Can't reach AnkiWeb" in retry_widget.form_widget.error_label.status.text()
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebErrorLabel:
+    """Tests for the inline error label of the AnkiWeb dialogs. Errors reported by AnkiWeb
+    itself are shown as-is, while failures to reach it get a generic message plus a link
+    to the error details dialog.
+    """
+
+    @pytest.fixture
+    def error_label(self, qtbot: QtBot) -> ErrorLabel:
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        error_label = ErrorLabel(dialog)
+        qtbot.addWidget(error_label)
+        return error_label
+
+    def test_generic_exception_is_shown_as_is_and_not_reported(self, error_label: ErrorLabel, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs")
+
+        error_label.set_exception(Exception("This code has expired. Request another."))
+
+        # Errors AnkiWeb responded with are expected, so they are neither rephrased nor
+        # sent to Sentry.
+        assert error_label.status.text() == "This code has expired. Request another."
+        assert error_label.isHidden() is False
+        report_mock.assert_not_called()
+
+    def test_request_exception_shows_generic_message_with_details_link(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs", return_value="event-id")
+        exc = AnkiHubRequestException(original_exception=ConnectionError("connection refused"))
+
+        error_label.set_exception(exc)
+
+        error_text = error_label.status.text()
+        assert "Can't reach AnkiWeb" in error_text
+        assert ERROR_DIALOG_LINK in error_text
+        assert "connection refused" not in error_text
+        report_mock.assert_called_once_with(exc)
+
+    def test_request_exception_is_not_reported_when_error_reporting_is_disabled(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs")
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        exc = AnkiHubRequestException(original_exception=ConnectionError())
+
+        error_label.set_exception(exc)
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        report_mock.assert_not_called()
+        assert "Can't reach AnkiWeb" in error_label.status.text()
+        # The details are still available, just without a Sentry event ID.
+        show_dialog_mock.assert_called_once_with(exc, None)
+
+    def test_details_link_opens_error_dialog_with_sentry_event_id(self, error_label: ErrorLabel, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs", return_value="event-id")
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        exc = AnkiHubRequestException(original_exception=ConnectionError())
+
+        error_label.set_exception(exc)
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        show_dialog_mock.assert_called_once_with(exc, "event-id")
+        # The link is a pseudo link handled by the label itself, so it must not be
+        # opened in a browser.
+        open_link_mock.assert_not_called()
+
+    def test_details_link_does_nothing_after_the_error_was_replaced(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        error_label.set_exception(AnkiHubRequestException(original_exception=ConnectionError()))
+
+        # set_error() drops the exception the details dialog would have been about.
+        error_label.set_error("Sorry, no more emails can be sent to that address today.")
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        show_dialog_mock.assert_not_called()
+
+    def test_set_error_with_empty_text_hides_the_label(self, error_label: ErrorLabel):
+        error_label.set_error("some error")
+        assert error_label.isHidden() is False
+
+        error_label.set_error("")
+        assert error_label.isHidden() is True
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebLabelWithLink:
+    def test_widget_link_replaces_the_dialog_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit(AnkiwebLinkIds.LOGIN_PASSWORD.value)
+
+        assert isinstance(dialog._widget, LoginWithPasswordWidget)
+        open_link_mock.assert_not_called()
+
+    def test_external_link_is_opened_without_a_link_handler(self, qtbot: QtBot, mocker: MockerFixture):
+        # Most labels (e.g. "Forgot password?", the terms & conditions) are created
+        # without a link handler, which used to make link activation raise.
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit("https://ankiweb.net/account/reset-password")
+
+        open_link_mock.assert_called_once_with("https://ankiweb.net/account/reset-password")
+
+    def test_external_link_is_opened_when_the_link_handler_declines(self, qtbot: QtBot, mocker: MockerFixture):
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog, link_handler=lambda link: False)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit("https://ankiweb.net/account/reset-password")
+
+        open_link_mock.assert_called_once_with("https://ankiweb.net/account/reset-password")
 
 
 @pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
