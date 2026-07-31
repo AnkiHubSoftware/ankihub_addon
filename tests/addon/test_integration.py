@@ -56,6 +56,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.addon_ankihub_client import CollectionNotAvailableError
 from ankihub.gui.block_exam_dialog import BlockExamSubdeckDialog
 from ankihub.gui.enable_fsrs_dialog import ENABLE_FSRS_REMINDER_INTERVAL_DAYS, maybe_show_enable_fsrs_reminder
 from ankihub.gui.optimize_fsrs_dialog import (
@@ -7965,6 +7966,41 @@ class TestMediaSyncMediaDownload:
             media_names = {m.name for m in db_media}
             assert media_names == {"referenced_image.png", "unreferenced_image.png"}
 
+    def test_collection_not_available_exception_is_recorded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, _ = install_sample_ah_deck()
+            latest_media_update = datetime.now()
+            media = DeckMediaFactory.create(
+                name="test.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(media=[media], latest_update=latest_media_update),
+                ],
+            )
+            # Simulate closed collection
+            mocker.patch("aqt.mw.col", None)
+            with qtbot.captureExceptions() as exceptions:
+                media_sync.start_media_download()
+                qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+            # Exception is reported by the dialog but not raised
+            assert len(exceptions) == 0
+            assert isinstance(media_sync._errors[0], CollectionNotAvailableError)
+
 
 @fixture
 def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
@@ -8254,6 +8290,42 @@ class TestSuggestionsWithMedia:
             name_of_uploaded_media = namelist[0]
 
         assert name_of_uploaded_media == expected_media_name
+
+    def test_collection_not_available_exception_is_recorded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_client_media_upload: Mock,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+
+            # Simulate closed collection
+            def close_collection(*args, **kwargs):
+                mocker.patch("aqt.mw.col", None)
+                return {}
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "_get_presigned_url_for_multiple_uploads",
+                side_effect=close_collection,
+            )
+
+            with qtbot.captureExceptions() as exceptions:
+                media_sync.start_media_upload(["testfile_1.jpeg"], ah_did)
+                qtbot.wait_until(lambda: media_sync._amount_uploads_in_progress == 0)
+
+            # Exception is reported by the dialog but not raised
+            assert len(exceptions) == 0
+            assert isinstance(media_sync._errors[0], CollectionNotAvailableError)
+            assert media_sync._dialog.error_label.text() == "Collection is unavailable."
+
+            # Nothing was uploaded to S3
+            assert mock_client_media_upload.call_count == 0
 
 
 class TestAddonInstallAndUpdate:
