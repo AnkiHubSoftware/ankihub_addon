@@ -34,13 +34,19 @@ from aqt.qt import (
 )
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient
+from ..addon_ankihub_client import AddonAnkiHubClient, CollectionNotAvailableError, collection_or_error
 from ..ankihub_client.models import DeckMedia
 from ..common_utils import get_media_names_from_note_field, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
-from .utils import error_icon, media_download_icon, media_sync_error_svg, media_sync_svg, media_upload_icon
+from .utils import (
+    error_icon,
+    media_download_icon,
+    media_sync_error_svg,
+    media_sync_svg,
+    media_upload_icon,
+)
 
 SHOW_MEDIA_PROGRESS_PYCMD = "ankihub_show_media_progress"
 TOOLBAR_BUTTON_ID = "ankihub_media_sync"
@@ -52,6 +58,17 @@ class MediaSyncStatus(Enum):
     ERROR = "Error"
     CANCELING = "Canceling..."
     IDLE = "Idle"
+
+
+def _is_collection_error(exc: Exception) -> bool:
+    return isinstance(exc, CollectionNotAvailableError) or "CollectionNotOpen" in str(exc)
+
+
+def _format_error(exc: Exception) -> str:
+    if _is_collection_error(exc):
+        return "Collection is unavailable."
+    else:
+        return str(exc)
 
 
 class _AnkiHubMediaSync:
@@ -112,7 +129,8 @@ class _AnkiHubMediaSync:
             self._errors = [exception]
             self._canceling = False
             self.refresh_sync_status(is_retry)
-            raise exception
+            if not _is_collection_error(exception):
+                raise exception
 
         AddonQueryOp(
             parent=aqt.mw,
@@ -145,7 +163,8 @@ class _AnkiHubMediaSync:
             self._errors = [exception]
             self._canceling = False
             self.refresh_sync_status(is_retry)
-            raise exception
+            if not _is_collection_error(exception):
+                raise exception
 
         AddonQueryOp(
             parent=aqt.mw,
@@ -196,7 +215,7 @@ class _AnkiHubMediaSync:
         return MediaSyncProgressDialog()
 
     def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
-        media_dir_path = Path(aqt.mw.col.media.dir())
+        media_dir_path = Path(collection_or_error().media.dir())
         return {media_dir_path / media_name for media_name in media_names}
 
     def _on_upload_finished(
@@ -290,7 +309,7 @@ class _AnkiHubMediaSync:
         note_type_ids: Set[int] = set()
         for nid in anki_nids:
             try:
-                note = aqt.mw.col.get_note(nid)
+                note = collection_or_error().get_note(nid)
             except NotFoundError:
                 continue
             note_type_ids.add(note.mid)
@@ -313,7 +332,7 @@ class _AnkiHubMediaSync:
         # Filter to only media that is both downloadable AND referenced by notes
         media_list = [m for m in media_list if m.name in referenced_media]
 
-        media_dir_path = Path(aqt.mw.col.media.dir())
+        media_dir_path = Path(collection_or_error().media.dir())
         result = [
             media.name
             for media in media_list
@@ -498,9 +517,9 @@ class MediaSyncProgressDialog(QDialog):
             toggle_log = len(media_sync._errors) > 1
             if toggle_log:
                 error_text = "Some errors found. See full log for details."
-                self.error_log_browser.setPlainText("\n".join(str(error) for error in media_sync._errors))
+                self.error_log_browser.setPlainText("\n".join(_format_error(error) for error in media_sync._errors))
             else:
-                error_text = str(media_sync._errors[0])
+                error_text = _format_error(media_sync._errors[0])
             self.error_label.setText(error_text)
         elif status == MediaSyncStatus.CANCELING:
             label = status.value
