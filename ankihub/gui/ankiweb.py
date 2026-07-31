@@ -172,7 +172,7 @@ class LabelWithLink(QLabel):
             widget_type = widget_for_link(AnkiwebLinkIds(link))
             widget = widget_type(self._dialog)
             self._dialog.replace_widget(widget)
-        elif not self._link_handler(link):
+        elif not (self._link_handler and self._link_handler(link)):
             openLink(link)
 
 
