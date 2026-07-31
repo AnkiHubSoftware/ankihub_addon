@@ -218,11 +218,20 @@ class BaseInput(QLineEdit):
 
 
 class PasswordInput(BaseInput):
+    _BASE_STYLE = 'QLineEdit[echoMode="2"] { lineedit-password-character: 9733; }'
+    _PROBLEM_STYLE = "QLineEdit { border: 1px solid #cc3333 }"
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setEchoMode(QLineEdit.EchoMode.Password)
-        # Change the mask character to a star
-        self.setStyleSheet('QLineEdit[echoMode="2"] { lineedit-password-character: 9733; }')
+        # Change the mask character to a star.
+        self.set_problem_style(False)
+
+    def set_problem_style(self, problem: bool) -> None:
+        style = self._BASE_STYLE
+        if problem:
+            style += f"\n{self._PROBLEM_STYLE}"
+        self.setStyleSheet(style)
 
 
 class CodeInput(BaseInput):
@@ -949,7 +958,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         if not self.is_code_signup:
             password = self.password_input.text()
             repeat_password = self.repeat_password_input.text()
-            enabled &= bool(password) and password == repeat_password
+            enabled &= bool(password) and bool(repeat_password)
 
         button.setEnabled(enabled)
 
@@ -969,6 +978,11 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         def task() -> Union[str, int]:
             client = AnkiHubClient()
             terms = self.terms_checkbox.isChecked()
+            if not self.is_code_signup and self.password_input.text() != self.repeat_password_input.text():
+                self.password_input.set_problem_style(True)
+                self.repeat_password_input.set_problem_style(True)
+                raise ValueError("The passwords do not match")
+
             if self.is_code_signup:
                 return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
             else:
