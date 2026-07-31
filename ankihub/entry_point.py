@@ -148,7 +148,7 @@ def _on_profile_did_open() -> None:
 
 
 def _on_profile_will_close() -> None:
-    media_sync.stop_background_threads()
+    media_sync.close_for_profile()
     LOGGER.info("Profile will close, stopping background threads.")
 
 

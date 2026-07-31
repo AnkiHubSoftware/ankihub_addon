@@ -56,6 +56,7 @@ class MediaSyncStatus(Enum):
     DOWNLOAD = "Downloading..."
     UPLOAD = "Uploading..."
     ERROR = "Error"
+    CANCELING = "Canceling..."
     IDLE = "Idle"
 
 
@@ -82,6 +83,7 @@ class _AnkiHubMediaSync:
         self._amount_uploads_in_progress = 0
         self._status_action: Optional[QAction] = None
         self._stop_background_threads = False
+        self._canceling = False
         # Used to store the Anki profile ID when the media download is started.
         # If the Anki profile changes during the media download, the download is aborted.
         self._anki_profile_id_at_download_start: Optional[str] = None
@@ -90,8 +92,8 @@ class _AnkiHubMediaSync:
         self._last_op_callback: Optional[Callable] = None
 
     def setup_hooks(self) -> None:
-        top_toolbar_did_redraw.append(lambda _: self.refresh_sync_status())
-        theme_did_change.append(self.refresh_sync_status)
+        top_toolbar_did_redraw.append(lambda _: self.refresh_sync_status(False))
+        theme_did_change.append(lambda: self.refresh_sync_status(False))
         self._toolbar_link = aqt.mw.toolbar.create_link(
             SHOW_MEDIA_PROGRESS_PYCMD, "", self._on_toolbar_button_clicked, tip="", id=TOOLBAR_BUTTON_ID
         )
@@ -119,15 +121,14 @@ class _AnkiHubMediaSync:
         self._download_in_progress = True
         self._errors = []
         self._anki_profile_id_at_download_start = get_anki_profile_id()
-        self.refresh_sync_status()
-        self._dialog.update_status(self._get_status(), is_retry=is_retry)
+        self.refresh_sync_status(is_retry)
         self._last_op_callback = lambda: self.start_media_download(is_retry=True)
 
         def on_failure(exception: Exception) -> None:
             self._download_in_progress = False
             self._errors = [exception]
-            self.refresh_sync_status()
-            self._dialog.update_status(self._get_status())
+            self._canceling = False
+            self.refresh_sync_status(is_retry)
             if not _is_collection_error(exception):
                 raise exception
 
@@ -151,19 +152,17 @@ class _AnkiHubMediaSync:
         self.allow_background_threads()
         self._amount_uploads_in_progress += 1
         self._errors = []
-        self.refresh_sync_status()
-        self._dialog.update_status(self._get_status(), is_retry=is_retry)
+        self.refresh_sync_status(is_retry)
         self._last_op_callback = lambda: self.start_media_upload(media_names, ankihub_did, on_success, is_retry=True)
 
         media_paths = self._media_paths_for_media_names(media_names)
-        self._dialog.progress_bar.setValue(0)
-        self._dialog.set_maximum(len(media_paths))
+        self._dialog.reset_progress(len(media_paths))
 
         def on_failure(exception: Exception) -> None:
             self._amount_uploads_in_progress -= 1
             self._errors = [exception]
-            self.refresh_sync_status()
-            self._dialog.update_status(self._get_status())
+            self._canceling = False
+            self.refresh_sync_status(is_retry)
             if not _is_collection_error(exception):
                 raise exception
 
@@ -180,26 +179,31 @@ class _AnkiHubMediaSync:
         except Exception as exc:
             self._errors.append(exc)
 
-    def _reset(self) -> None:
-        self._download_in_progress = False
-        self._amount_uploads_in_progress = 0
-        self._errors = []
-
     def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
         self._stop_background_threads = True
-        self._reset()
+        self._canceling = True
+        self.refresh_sync_status(False)
 
     def allow_background_threads(self):
         """Allow background media sync operations to be started after they have been stopped."""
         self._client.allow_background_threads()
         self._stop_background_threads = False
+        self._download_in_progress = False
+        self._amount_uploads_in_progress = 0
+        self._errors = []
+        self._canceling = False
+        self.refresh_sync_status(False)
 
-    def refresh_sync_status(self):
+    def close_for_profile(self):
+        self.stop_background_threads()
+        self._dialog.reset_progress(0)
+
+    def refresh_sync_status(self, is_retry: bool):
         """Refresh the status text on the status action and the toolbar button."""
         # GUI operations must be performed on the main thread.
-        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
+        aqt.mw.taskman.run_on_main(lambda: self._refresh_media_download_status_inner(is_retry))
 
     @cached_property
     def _client(self) -> AddonAnkiHubClient:
@@ -220,9 +224,9 @@ class _AnkiHubMediaSync:
         on_success: Optional[Callable[[], None]] = None,
     ):
         self._amount_uploads_in_progress -= 1
+        self._canceling = False
         LOGGER.info("Uploaded media to AnkiHub.")
-        self.refresh_sync_status()
-        self._dialog.update_status(self._get_status())
+        self.refresh_sync_status(False)
 
         if on_success is not None:
             on_success()
@@ -234,13 +238,12 @@ class _AnkiHubMediaSync:
             self._update_deck_media(ankihub_did=ah_did)
             all_missing.append((ah_did, self._missing_media_for_ah_deck(ah_did)))
 
-        def reset_progress() -> None:
-            self._dialog.progress_bar.setValue(0)
-            self._dialog.set_maximum(sum(len(m[1]) for m in all_missing))
-
-        aqt.mw.taskman.run_on_main(reset_progress)
+        aqt.mw.taskman.run_on_main(lambda: self._dialog.reset_progress(sum(len(m[1]) for m in all_missing)))
 
         for ah_did, missing_media_names in all_missing:
+            if self._stop_background_threads:
+                LOGGER.info("Background threads stopped, aborting download of media files...")
+                break
             if not missing_media_names:
                 LOGGER.info("No missing media for deck.", ah_did=ah_did)
                 continue
@@ -340,12 +343,14 @@ class _AnkiHubMediaSync:
 
     def _on_download_finished(self, _: None) -> None:
         self._download_in_progress = False
-        self.refresh_sync_status()
-        self._dialog.update_status(self._get_status())
+        self._canceling = False
+        self.refresh_sync_status(False)
 
     def _get_status(self) -> MediaSyncStatus:
         status: MediaSyncStatus
-        if self._download_in_progress:
+        if self._canceling:
+            status = MediaSyncStatus.CANCELING
+        elif self._download_in_progress:
             status = MediaSyncStatus.DOWNLOAD
         elif self._amount_uploads_in_progress > 0:
             status = MediaSyncStatus.UPLOAD
@@ -355,10 +360,11 @@ class _AnkiHubMediaSync:
             status = MediaSyncStatus.IDLE
         return status
 
-    def _refresh_media_download_status_inner(self):
+    def _refresh_media_download_status_inner(self, is_retry: bool):
         status = self._get_status()
         self._set_status_text(status)
         self._set_toolbar_button_status(status)
+        self._dialog.update_status(status, is_retry=is_retry)
 
     def _set_status_text(self, status: MediaSyncStatus):
         if self._status_action is None:
@@ -476,7 +482,6 @@ class MediaSyncProgressDialog(QDialog):
 
     def _on_cancel(self) -> None:
         media_sync.stop_background_threads()
-        self.status_label.setText("Canceling")
 
     def _on_toggle_log(self) -> None:
         if self.error_log_area.isHidden():
@@ -516,6 +521,9 @@ class MediaSyncProgressDialog(QDialog):
             else:
                 error_text = _format_error(media_sync._errors[0])
             self.error_label.setText(error_text)
+        elif status == MediaSyncStatus.CANCELING:
+            label = status.value
+            close = True
         elif status == MediaSyncStatus.IDLE:
             label = "Finished"
             close = True
@@ -539,16 +547,17 @@ class MediaSyncProgressDialog(QDialog):
         self.progress_bar.setValue(self.progress_bar.value() + increment)
         self.update_count_label()
 
-    def update_count_label(self) -> None:
-        self.count_label.setText(f"{self.progress_bar.value()}/{self.progress_bar.maximum()} files")
-
-    def set_maximum(self, maximum: int) -> None:
-        if maximum:
-            self.progress_bar.setMaximum(maximum)
-        else:
-            self.progress_bar.setMaximum(1)
-            self.progress_bar.setValue(1)
+    def reset_progress(self, maximum: int) -> None:
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(maximum)
         self.update_count_label()
+
+    def update_count_label(self) -> None:
+        if self.progress_bar.maximum():
+            label = f"{self.progress_bar.value()}/{self.progress_bar.maximum()} files"
+        else:
+            label = ""
+        self.count_label.setText(label)
 
 
 media_sync = _AnkiHubMediaSync()
