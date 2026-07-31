@@ -829,7 +829,8 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         form_widget = FormWidget(
             description=description, rows=rows, dialog=self._dialog, back_to=AnkiwebLinkIds.SIGNUP_CODE
         )
-        form_widget.error_label.set_exception(exc)
+        if exc:
+            form_widget.error_label.set_exception(exc)
 
         return form_widget
 
