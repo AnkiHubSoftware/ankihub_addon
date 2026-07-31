@@ -345,7 +345,7 @@ class _AnkiHubMediaSync:
         status = self._get_status()
         self._set_status_text(status)
         self._set_toolbar_button_status(status)
-        self._dialog.update_status(self._get_status(), is_retry=is_retry)
+        self._dialog.update_status(status, is_retry=is_retry)
 
     def _set_status_text(self, status: MediaSyncStatus):
         if self._status_action is None:
