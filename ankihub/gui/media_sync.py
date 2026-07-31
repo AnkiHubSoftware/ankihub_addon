@@ -343,7 +343,6 @@ class _AnkiHubMediaSync:
 
     def _refresh_media_download_status_inner(self, is_retry: bool):
         status = self._get_status()
-        print("_refresh_media_download_status_inner", status)
         self._set_status_text(status)
         self._set_toolbar_button_status(status)
         self._dialog.update_status(self._get_status(), is_retry=is_retry)
