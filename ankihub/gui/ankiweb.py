@@ -35,6 +35,7 @@ from aqt.utils import openLink, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubRequestException
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
 from .operations import AddonQueryOp
@@ -89,6 +90,17 @@ def widget_for_link(link: AnkiwebLinkIds) -> Callable[[AnkiwebDialog], BaseAnkiw
         return SignupWithPasswordWidget
     else:
         assert_exhaustive(link)
+
+
+def _format_error(exc: Exception) -> str:
+    print("_format_error", exc)
+    if isinstance(exc, AnkiHubRequestException):
+        return (
+            "Can't reach AnkiWeb. "
+            "Check your connection and retry. If it keeps failing, AnkiWeb may be temporarily down."
+        )
+    else:
+        return str(exc)
 
 
 def destroy_timer(timer: QTimer | None) -> None:
@@ -565,7 +577,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
 
     def _on_sign_in(self) -> None:
         def task() -> str:
@@ -580,7 +592,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(str(exc))
+                self.form_widget.error_label.set_error(_format_error(exc))
                 self.code_input.clear()
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
@@ -635,7 +647,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(str(exc))
+                self.form_widget.error_label.set_error(_format_error(exc))
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
 
@@ -740,7 +752,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
@@ -841,7 +853,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(str(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
 
     def _get_email(self) -> str:
         return self.email_input.text() if self._is_retry else self.email
@@ -870,7 +882,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                     SignupCodeVerificationWidget(
                         email=self._get_email(),
                         dialog=self._dialog,
-                        error=str(exc),
+                        error=_format_error(exc),
                         remaining_seconds=remaining_seconds,
                     )
                 )
@@ -988,7 +1000,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 if "An account with this email already exists" in str(exc):
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog, self.is_code_signup))
                 else:
-                    self.form_widget.error_label.set_error(str(exc))
+                    self.form_widget.error_label.set_error(_format_error(exc))
 
         run_with_progress(
             dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
