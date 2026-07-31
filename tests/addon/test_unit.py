@@ -140,7 +140,11 @@ from ankihub.gui.errors import (
     upload_logs_in_background,
 )
 from ankihub.gui.exceptions import DeckDownloadAndInstallError
-from ankihub.gui.media_sync import media_sync
+from ankihub.gui.media_sync import (
+    MediaSyncProgressDialog,
+    MediaSyncStatus,
+    media_sync,
+)
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
@@ -319,6 +323,290 @@ class TestMediaSyncMediaUpload:
             assert media_sync._amount_uploads_in_progress == 0
             assert len(exceptions) == 1
             upload_media_mock.assert_called_once()  # sanity check
+
+
+class TestMediaSyncProgressDialog:
+    @pytest.fixture
+    def dialog(self, qtbot: QtBot) -> MediaSyncProgressDialog:
+        # A dialog of its own instead of media_sync._dialog, so that these tests can't
+        # leak dialog state into each other through the media_sync singleton.
+        result = MediaSyncProgressDialog()
+        qtbot.addWidget(result)
+        return result
+
+    def _visible_buttons(self, dialog: MediaSyncProgressDialog) -> set:
+        # isHidden reflects the explicit setVisible flags even though the dialog itself
+        # isn't shown in these tests.
+        return {
+            name
+            for name, button in (
+                ("toggle_log", dialog.toggle_log_button),
+                ("close", dialog.close_button),
+                ("retry", dialog.retry_button),
+                ("cancel", dialog.cancel_button),
+                ("minimize", dialog.minimize_button),
+            )
+            if not button.isHidden()
+        }
+
+    def test_log_starts_collapsed(self, dialog: MediaSyncProgressDialog):
+        assert dialog.toggle_log_button.text() == "Show log"
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.error_log_spacer.isHidden() is False
+
+    def test_toggle_log_button_expands_and_collapses_the_log(self, dialog: MediaSyncProgressDialog):
+        dialog.toggle_log_button.click()
+        assert dialog.toggle_log_button.text() == "Hide log"
+        assert dialog.error_log_area.isHidden() is False
+        assert dialog.error_log_spacer.isHidden() is True
+
+        dialog.toggle_log_button.click()
+        assert dialog.toggle_log_button.text() == "Show log"
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.error_log_spacer.isHidden() is False
+
+    @pytest.mark.parametrize(
+        "status, is_retry, expected_label",
+        [
+            (MediaSyncStatus.DOWNLOAD, False, "Downloading from AnkiHub"),
+            (MediaSyncStatus.DOWNLOAD, True, "Retrying: Downloading from AnkiHub"),
+            (MediaSyncStatus.UPLOAD, False, "Uploading to AnkiHub"),
+            (MediaSyncStatus.UPLOAD, True, "Retrying: Uploading to AnkiHub"),
+        ],
+    )
+    def test_update_status_while_sync_is_in_progress(
+        self,
+        dialog: MediaSyncProgressDialog,
+        status: MediaSyncStatus,
+        is_retry: bool,
+        expected_label: str,
+    ):
+        dialog.update_status(status, is_retry=is_retry)
+
+        assert dialog.status_label.text() == expected_label
+        # The sync can be canceled or left running in the background, but there is
+        # nothing to close, retry or log yet.
+        assert self._visible_buttons(dialog) == {"cancel", "minimize"}
+        assert dialog.progress_bar.isHidden() is False
+        assert dialog.error_label.isHidden() is True
+        assert not dialog.icon_label.pixmap().isNull()
+
+    @pytest.mark.parametrize(
+        "status, expected_label",
+        [
+            (MediaSyncStatus.CANCELING, "Canceling..."),
+            (MediaSyncStatus.IDLE, "Finished"),
+        ],
+    )
+    def test_update_status_when_sync_is_not_in_progress(
+        self, dialog: MediaSyncProgressDialog, status: MediaSyncStatus, expected_label: str
+    ):
+        dialog.update_status(status)
+
+        assert dialog.status_label.text() == expected_label
+        assert self._visible_buttons(dialog) == {"close"}
+        assert dialog.progress_bar.isHidden() is True
+        assert dialog.error_label.isHidden() is True
+
+    def test_update_status_with_single_error(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed")])
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.status_label.text() == "Error! Attention needed."
+        # A single error is shown inline, so the log isn't offered.
+        assert dialog.error_label.text() == "upload failed"
+        assert dialog.error_label.isHidden() is False
+        assert self._visible_buttons(dialog) == {"close", "retry"}
+        assert dialog.progress_bar.isHidden() is True
+
+    def test_update_status_with_multiple_errors(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed"), Exception("download failed")])
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.error_label.text() == "Some errors found. See full log for details."
+        assert dialog.error_log_browser.toPlainText() == "upload failed\ndownload failed"
+        assert self._visible_buttons(dialog) == {"close", "retry", "toggle_log"}
+
+    def test_update_status_collapses_an_expanded_log(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed"), Exception("download failed")])
+        dialog.update_status(MediaSyncStatus.ERROR)
+        dialog.toggle_log_button.click()
+        assert dialog.error_log_area.isHidden() is False  # sanity check
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.toggle_log_button.text() == "Show log"
+
+    def test_progress_is_reset_and_incremented(self, dialog: MediaSyncProgressDialog):
+        dialog.reset_progress(3)
+        assert dialog.progress_bar.value() == 0
+        assert dialog.progress_bar.maximum() == 3
+        assert dialog.count_label.text() == "0/3 files"
+
+        dialog.increment_progress()
+        assert dialog.count_label.text() == "1/3 files"
+
+        # Uploads report progress in chunks of multiple files.
+        dialog.increment_progress(2)
+        assert dialog.progress_bar.value() == 3
+        assert dialog.count_label.text() == "3/3 files"
+
+        # Starting another sync resets the progress instead of continuing from the old value.
+        dialog.reset_progress(1)
+        assert dialog.progress_bar.value() == 0
+        assert dialog.count_label.text() == "0/1 files"
+
+    def test_reset_progress_without_files_clears_the_count_label(self, dialog: MediaSyncProgressDialog):
+        dialog.reset_progress(3)
+
+        dialog.reset_progress(0)
+
+        assert dialog.count_label.text() == ""
+
+    def test_cancel_button_stops_background_threads(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        stop_background_threads_mock = mocker.patch.object(media_sync, "stop_background_threads")
+        dialog.update_status(MediaSyncStatus.DOWNLOAD)
+
+        dialog.cancel_button.click()
+
+        stop_background_threads_mock.assert_called_once()
+
+    def test_retry_button_repeats_the_last_operation(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed")])
+        last_op_callback_mock = mocker.patch.object(media_sync, "_last_op_callback")
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        dialog.retry_button.click()
+
+        last_op_callback_mock.assert_called_once()
+
+    def test_minimize_and_close_buttons_hide_the_dialog(self, dialog: MediaSyncProgressDialog):
+        dialog.update_status(MediaSyncStatus.DOWNLOAD)
+        dialog.show()
+        dialog.minimize_button.click()
+        assert dialog.isHidden() is True
+
+        dialog.update_status(MediaSyncStatus.IDLE)
+        dialog.show()
+        dialog.close_button.click()
+        assert dialog.isHidden() is True
+
+
+class TestMediaSyncProgressDialogUpdates:
+    """Covers that the media sync keeps its progress dialog up to date."""
+
+    @pytest.fixture
+    def dialog_mock(self) -> Generator[Mock, None, None]:
+        # Assigning into __dict__ instead of using mocker.patch.object, because reading the
+        # _dialog cached_property would construct a real dialog and cache it on the singleton.
+        previous = media_sync.__dict__.get("_dialog")
+        mock = Mock()
+        media_sync.__dict__["_dialog"] = mock
+        yield mock
+        if previous is None:
+            del media_sync.__dict__["_dialog"]
+        else:
+            media_sync.__dict__["_dialog"] = previous
+
+    @pytest.fixture(autouse=True)
+    def _mock_toolbar_button_status(self, mocker: MockerFixture) -> None:
+        # Updating the toolbar button needs the toolbar link created in setup_hooks().
+        mocker.patch.object(media_sync, "_set_toolbar_button_status")
+
+    @pytest.mark.parametrize(
+        "state_attribute, state_value, expected_status",
+        [
+            ("_canceling", True, MediaSyncStatus.CANCELING),
+            ("_download_in_progress", True, MediaSyncStatus.DOWNLOAD),
+            ("_amount_uploads_in_progress", 1, MediaSyncStatus.UPLOAD),
+            ("_errors", [Exception("upload failed")], MediaSyncStatus.ERROR),
+        ],
+    )
+    def test_status_refresh_updates_the_dialog(
+        self,
+        dialog_mock: Mock,
+        mocker: MockerFixture,
+        state_attribute: str,
+        state_value: Any,
+        expected_status: MediaSyncStatus,
+    ):
+        # Set the state explicitly instead of relying on the singleton's current state,
+        # which other tests in the same process can have changed.
+        for attribute, value in (
+            ("_canceling", False),
+            ("_download_in_progress", False),
+            ("_amount_uploads_in_progress", 0),
+            ("_errors", []),
+        ):
+            mocker.patch.object(media_sync, attribute, value)
+        mocker.patch.object(media_sync, state_attribute, state_value)
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+
+        dialog_mock.update_status.assert_called_once_with(expected_status, is_retry=False)
+
+    def test_status_refresh_forwards_the_retry_flag_to_the_dialog(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._refresh_media_download_status_inner(is_retry=True)
+
+        dialog_mock.update_status.assert_called_once_with(MediaSyncStatus.DOWNLOAD, is_retry=True)
+
+    def test_downloaded_file_advances_the_progress(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._on_downloaded_file(future_with_result(None))
+
+        dialog_mock.increment_progress.assert_called_once_with()
+        assert media_sync._errors == []
+
+    def test_failed_download_advances_the_progress_and_records_the_error(
+        self, dialog_mock: Mock, mocker: MockerFixture
+    ):
+        mocker.patch.object(media_sync, "_errors", [])
+        exception = Exception("download failed")
+
+        media_sync._on_downloaded_file(future_with_exception(exception))
+
+        # The file is done, even though it failed, so the progress has to move on.
+        dialog_mock.increment_progress.assert_called_once_with()
+        assert media_sync._errors == [exception]
+
+    def test_uploaded_chunk_advances_the_progress_by_the_amount_of_files(
+        self, dialog_mock: Mock, mocker: MockerFixture
+    ):
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._on_media_chunk_uploaded(future_with_result(3))
+
+        dialog_mock.increment_progress.assert_called_once_with(3)
+        assert media_sync._errors == []
+
+    def test_failed_upload_chunk_records_the_error(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [])
+        exception = Exception("upload failed")
+
+        media_sync._on_media_chunk_uploaded(future_with_exception(exception))
+
+        dialog_mock.increment_progress.assert_not_called()
+        assert media_sync._errors == [exception]
+
+    def test_close_for_profile_resets_the_progress(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_client")
+        refresh_sync_status_mock = mocker.patch.object(media_sync, "refresh_sync_status")
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_stop_background_threads", False)
+
+        media_sync.close_for_profile()
+
+        # The progress of the closed profile shouldn't show up for the next one.
+        dialog_mock.reset_progress.assert_called_once_with(0)
+        assert media_sync._canceling is True
+        refresh_sync_status_mock.assert_called_once_with(False)
 
 
 def test_lowest_level_common_ancestor_deck_name():
