@@ -95,6 +95,7 @@ def widget_for_link(link: AnkiwebLinkIds) -> Callable[[AnkiwebDialog], BaseAnkiw
 def _format_error(exc: Exception) -> str:
     print("_format_error", exc)
     if isinstance(exc, AnkiHubRequestException):
+        LOGGER.info("AnkiWeb request exception", exc_info=exc.original_exception)
         return (
             "Can't reach AnkiWeb. "
             "Check your connection and retry. If it keeps failing, AnkiWeb may be temporarily down."
