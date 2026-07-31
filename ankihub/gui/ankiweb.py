@@ -38,6 +38,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestException
 from ..settings import config
 from ..user_state import add_user_state_refreshed_callback
+from .errors import _error_reporting_enabled, _show_feedback_dialog, report_exception_and_upload_logs
 from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
@@ -45,6 +46,7 @@ EMAIL_INSTRUCTIONS = (
     "Didn't receive an email?<ul><li>Check your spam folder. "
     "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
 )
+ERROR_DIALOG_LINK = "#error-dialog"
 
 
 class AnkiwebLinkIds(Enum):
@@ -92,16 +94,17 @@ def widget_for_link(link: AnkiwebLinkIds) -> Callable[[AnkiwebDialog], BaseAnkiw
         assert_exhaustive(link)
 
 
-def _format_error(exc: Exception) -> str:
-    print("_format_error", exc)
+def _report_and_format_exception(exc: Exception) -> tuple[str, str | None]:
     if isinstance(exc, AnkiHubRequestException):
         LOGGER.info("AnkiWeb request exception", exc_info=exc.original_exception)
+        sentry_event_id = report_exception_and_upload_logs(exc) if _error_reporting_enabled() else None
         return (
             "Can't reach AnkiWeb. "
-            "Check your connection and retry. If it keeps failing, AnkiWeb may be temporarily down."
-        )
+            "Check your connection and retry. If it keeps failing, AnkiWeb may be temporarily down. "
+            + html_link(ERROR_DIALOG_LINK, "See error details.", False)
+        ), sentry_event_id
     else:
-        return str(exc)
+        return str(exc), None
 
 
 def destroy_timer(timer: QTimer | None) -> None:
@@ -152,8 +155,15 @@ class CancelButton(Button):
 
 
 class LabelWithLink(QLabel):
-    def __init__(self, text: str, dialog: AnkiwebDialog, parent: QWidget | None = None):
+    def __init__(
+        self,
+        text: str,
+        dialog: AnkiwebDialog,
+        link_handler: Callable[[str], bool] | None = None,
+        parent: QWidget | None = None,
+    ):
         self._dialog = dialog
+        self._link_handler = link_handler
         super().__init__(text=text, parent=parent)
         qconnect(self.linkActivated, self._on_link_activated)
 
@@ -162,7 +172,7 @@ class LabelWithLink(QLabel):
             widget_type = widget_for_link(AnkiwebLinkIds(link))
             widget = widget_type(self._dialog)
             self._dialog.replace_widget(widget)
-        else:
+        elif not self._link_handler(link):
             openLink(link)
 
 
@@ -171,16 +181,19 @@ class ErrorLabel(QWidget):
     # FormWidget's inner content width, given the dialog's fixed 525px width and margins.
     _FALLBACK_MAX_WIDTH = 461
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, dialog: AnkiwebDialog, parent: QWidget | None = None):
+        self._dialog = dialog
         super().__init__(parent)
         self._setup_ui()
+        self._exc: Exception | None = None
+        self._sentry_event_id: str | None = None
 
     def _setup_ui(self) -> None:
         self.setVisible(False)
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(4)
-        self.status = status = QLabel("")
+        self.status = status = LabelWithLink("", dialog=self._dialog, link_handler=self._link_handler)
         status.setWordWrap(True)
         status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = self.font()
@@ -197,10 +210,25 @@ class ErrorLabel(QWidget):
         hbox.addWidget(status)
         self.setLayout(hbox)
 
-    def set_error(self, text: str) -> None:
+    def set_error(self, text: str, clear_exception: bool = True) -> None:
         self.setVisible(bool(text))
         self.status.setText(text)
         self._update_status_width()
+        if clear_exception:
+            self._exc = None
+            self._sentry_event_id = None
+
+    def set_exception(self, exc: Exception) -> None:
+        self._exc = exc
+        error, self._sentry_event_id = _report_and_format_exception(exc)
+        self.set_error(error, clear_exception=False)
+
+    def _link_handler(self, link: str) -> bool:
+        if link == ERROR_DIALOG_LINK:
+            if self._exc:
+                _show_feedback_dialog(self._exc, self._sentry_event_id)
+            return True
+        return False
 
     def _update_status_width(self) -> None:
         # Measure the label's own sizeHint with word wrap temporarily disabled. This
@@ -281,7 +309,7 @@ class FormWidget(QGroupBox):
         vbox.setContentsMargins(12, 12, 12, 12)
         vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.error_label = error_label = ErrorLabel(self)
+        self.error_label = error_label = ErrorLabel(self._dialog, self)
         vbox.addWidget(error_label)
 
         if description:
@@ -578,7 +606,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
 
     def _on_sign_in(self) -> None:
         def task() -> str:
@@ -593,7 +621,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(_format_error(exc))
+                self.form_widget.error_label.set_exception(exc)
                 self.code_input.clear()
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
@@ -648,7 +676,7 @@ class LoginWithPasswordWidget(BaseLoginWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                self.form_widget.error_label.set_error(_format_error(exc))
+                self.form_widget.error_label.set_exception(exc)
 
         run_with_progress(dialog=self._dialog, heading=self.title, status="Signing you in", task=task, on_done=on_done)
 
@@ -753,22 +781,22 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
 
 
 class SignupCodeVerificationWidget(BaseSignupWidget):
-    def __init__(self, email: str, dialog: AnkiwebDialog, error: str = "", remaining_seconds: int = 0):
+    def __init__(self, email: str, dialog: AnkiwebDialog, exc: Exception | None = None, remaining_seconds: int = 0):
         self.email = email
         self._dialog = dialog
         self.remaining_seconds = remaining_seconds
-        self._is_retry = bool(error)
+        self._is_retry = bool(exc)
         super().__init__(
             heading="Email confirmation",
             main_description="",
-            form_widget=self._create_form_widget(error),
+            form_widget=self._create_form_widget(exc),
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
@@ -777,7 +805,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         else:
             self._update_code_button_state()
 
-    def _create_form_widget(self, error: str = "") -> FormWidget:
+    def _create_form_widget(self, exc: Exception | None = None) -> FormWidget:
         self.code_input = code_input = CodeInput()
         qconnect(code_input.textChanged, self._on_code_changed)
         self.code_box = code_box = InputWithButtonHbox(code_input, "Verify code")
@@ -801,7 +829,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         form_widget = FormWidget(
             description=description, rows=rows, dialog=self._dialog, back_to=AnkiwebLinkIds.SIGNUP_CODE
         )
-        form_widget.error_label.set_error(error)
+        form_widget.error_label.set_exception(exc)
 
         return form_widget
 
@@ -854,7 +882,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_error(_format_error(exc))).run_in_background()
+        ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
 
     def _get_email(self) -> str:
         return self.email_input.text() if self._is_retry else self.email
@@ -883,7 +911,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                     SignupCodeVerificationWidget(
                         email=self._get_email(),
                         dialog=self._dialog,
-                        error=_format_error(exc),
+                        exc=exc,
                         remaining_seconds=remaining_seconds,
                     )
                 )
@@ -1001,7 +1029,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 if "An account with this email already exists" in str(exc):
                     self._dialog.replace_widget(SignupErrorWidget(str(exc), self._dialog, self.is_code_signup))
                 else:
-                    self.form_widget.error_label.set_error(_format_error(exc))
+                    self.form_widget.error_label.set_exception(exc)
 
         run_with_progress(
             dialog=self._dialog, heading=self.title, status="Creating account", task=task, on_done=on_done
