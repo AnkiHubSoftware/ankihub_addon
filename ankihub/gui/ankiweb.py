@@ -104,11 +104,17 @@ def timer_is_active(timer: Countdown | None) -> bool:
 
 
 class ResendCooldownTracker:
-    """Tracks per-email magic-code resend cooldowns for the lifetime of the Anki
-    session (i.e. independently of any widget). Widgets only hold the cooldown's
-    remaining time in memory, so closing and reopening the AnkiWeb dialog
-    recreates them from scratch and would otherwise let the user bypass the
-    cooldown the server already enforces for that email.
+    """Remembers each email's magic-code resend cooldown independently of any
+    widget, so that closing and reopening the AnkiWeb dialog within the same
+    Anki session keeps showing the correct remaining countdown instead of
+    resetting it.
+
+    This is a UI convenience only, not an enforcement mechanism: the tracker
+    lives in memory for the current session, so restarting Anki clears it and
+    lets the resend button appear enabled again immediately. That's fine
+    because the actual cooldown is enforced server-side; this class only
+    avoids a redundant request (and confusing UI) in the common case where the
+    dialog is closed and reopened without restarting Anki.
     """
 
     def __init__(self) -> None:
