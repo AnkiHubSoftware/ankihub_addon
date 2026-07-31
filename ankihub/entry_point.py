@@ -12,6 +12,7 @@ from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
+from .ankihub_client import DEFAULT_ANKIWEB_URL
 from .db import ankihub_db
 from .gui import (
     browser,
@@ -191,6 +192,9 @@ def _after_profile_setup() -> None:
     # just a temporary fix for notes that were already manually deleted on the webapp.
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
+
+    if config.ankiweb_url != DEFAULT_ANKIWEB_URL:  # For testing
+        aqt.mw.pm.set_custom_sync_url(config.ankiweb_url)
 
     media_sync.allow_background_threads()
 
