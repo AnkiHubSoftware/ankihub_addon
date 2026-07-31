@@ -523,6 +523,9 @@ class AnkiHubClient(AnkiWebClientMixin):
             for chunk_number, chunk in enumerate(media_path_chunks):
                 if self.should_stop_background_threads:
                     LOGGER.info("Background threads stopped, aborting upload tasks...")
+                    for future in futures:
+                        future.cancel()
+                    return
                 futures.append(
                     executor.submit(
                         self._zip_and_upload_media_chunk,
