@@ -1246,7 +1246,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         # Passing an error makes this a retry widget, which shows an editable
         # email field instead of the original read-only `self.email`.
         widget = SignupCodeVerificationWidget(
-            email="user@example.com", remaining_seconds=300, dialog=dialog, error="Some unknown error"
+            email="user@example.com", remaining_seconds=300, dialog=dialog, exc=Exception("Some unknown error")
         )
         dialog.replace_widget(widget)
         widget.email_input.setText("other@example.com")
