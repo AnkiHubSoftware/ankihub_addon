@@ -981,11 +981,13 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
 
         def task() -> Union[str, int]:
             client = AnkiHubClient()
-            
+
             if not self.is_code_signup and password != repeat_password:
+
                 def update_fields() -> None:
                     self.password_input.set_problem_style(True)
                     self.repeat_password_input.set_problem_style(True)
+
                 aqt.mw.taskman.run_on_main(update_fields)
                 raise ValueError("The passwords do not match")
 
