@@ -964,17 +964,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
 
         button.setEnabled(enabled)
 
-    def _on_terms_toggled(self, checked: bool) -> None:
-        self._update_signup_button_state()
-
-    def _on_email_changed(self, text: str) -> None:
-        self._update_signup_button_state()
-
-    def _on_password_changed(self, text: str) -> None:
-        self._update_mismatch_feedback(False)
-        self._update_signup_button_state()
-
-    def set_password_problem_style(self, state: bool) -> None:
+    def _set_password_problem_style(self, state: bool) -> None:
         def update_fields() -> None:
             self.password_input.set_problem_style(state)
             self.repeat_password_input.set_problem_style(state)
@@ -985,7 +975,17 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         password = self.password_input.text()
         repeat_password = self.repeat_password_input.text()
         mismatch = repeat_password != "" and password != repeat_password
-        self.set_password_problem_style(mismatch)
+        self._set_password_problem_style(mismatch)
+
+    def _on_terms_toggled(self, checked: bool) -> None:
+        self._update_signup_button_state()
+
+    def _on_email_changed(self, text: str) -> None:
+        self._update_signup_button_state()
+
+    def _on_password_changed(self, text: str) -> None:
+        self._update_mismatch_feedback(False)
+        self._update_signup_button_state()
 
     def _on_password_editing_finished(self) -> None:
         self._update_mismatch_feedback()
@@ -999,7 +999,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             client = AnkiHubClient()
 
             if not self.is_code_signup and password != repeat_password:
-                self.set_password_problem_style(True)
+                self._set_password_problem_style(True)
                 raise ValueError("The passwords do not match")
 
             if self.is_code_signup:
