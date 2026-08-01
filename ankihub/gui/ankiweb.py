@@ -984,7 +984,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
 
     def _on_password_changed(self, text: str) -> None:
-        self._update_mismatch_feedback(False)
+        self._set_password_problem_style(False)
         self._update_signup_button_state()
 
     def _on_password_editing_finished(self) -> None:
