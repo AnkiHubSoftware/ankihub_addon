@@ -1177,8 +1177,6 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget = cast(SignupWithCodeWidget, dialog._widget)
         widget.terms_checkbox.setChecked(True)
         widget.email_input.setText("user@example.com")
-        widget.password_input.setText("hunter2")
-        widget.confirm_password_input.setText("hunter2")
 
         widget._on_sign_up()
 

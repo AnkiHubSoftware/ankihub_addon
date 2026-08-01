@@ -992,13 +992,11 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
 
     def _on_sign_up(self) -> None:
         terms = self.terms_checkbox.isChecked()
-        password = self.password_input.text()
-        repeat_password = self.repeat_password_input.text()
 
         def task() -> Union[str, int]:
             client = AnkiHubClient()
 
-            if not self.is_code_signup and password != repeat_password:
+            if not self.is_code_signup and self.password_input.text() != self.repeat_password_input.text():
                 self._set_password_problem_style(True)
                 raise ValueError("The passwords do not match")
 
