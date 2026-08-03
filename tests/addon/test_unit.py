@@ -3841,6 +3841,10 @@ class TestTutorialProductMetrics:
         mock_web.return_value.eval.assert_called_once()
 
 
+# These tests kick off refresh_user_state_in_background, which can still be writing the private
+# config when the test ends and then raises in the Qt event loop once pytest has removed the
+# profile directory.
+@pytest.mark.qt_no_exception_capture
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
