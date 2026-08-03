@@ -3552,6 +3552,85 @@ class TestAnkiHubImporter:
             for card in note.cards():
                 assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
 
+    def _import_updated_note(
+        self,
+        ah_did: uuid.UUID,
+        note_data: NoteInfo,
+        protected_fields: Dict[int, List[str]],
+    ) -> AnkiHubImporter:
+        """Imports note_data as an update to an existing note and returns the importer."""
+        importer = AnkiHubImporter()
+        importer.import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=[note_data],
+            deck_name="test",
+            is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+            note_types={NotetypeId(note_data.mid): ankihub_db.note_type_dict(NotetypeId(note_data.mid))},
+            protected_fields=protected_fields,
+            protected_tags=[],
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
+            suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+        )
+        return importer
+
+    def test_overwritten_local_content_is_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """The tallies behind the overwrite summary log make reports of personal content
+        disappearing after a sync diagnosable from an uploaded log file."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Back"] = "personal content"
+            note.tags = ["Semester-1::Week-1"]
+            aqt.mw.col.update_note(note)
+
+            # The remote version changes Front, has nothing in Back and lacks the personal tag.
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value=""),
+            ]
+            note_data.tags = []
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={})
+
+            assert importer._overwritten_fields.counts == {"Front": 1, "Back": 1}
+            assert importer._overwritten_fields.sample_nids["Back"] == [note.id]
+            # Only Back had its content emptied; Front was replaced by other content.
+            assert importer._cleared_fields.counts == {"Back": 1}
+            assert importer._removed_tags.counts == {"Semester-1::Week-1": 1}
+
+    def test_protected_field_content_is_not_overwritten_or_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Back"] = "personal content"
+            aqt.mw.col.update_note(note)
+
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value=""),
+            ]
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={note.mid: ["Back"]})
+
+            assert aqt.mw.col.get_note(note.id)["Back"] == "personal content"
+            assert "Back" not in importer._overwritten_fields.counts
+            assert note.mid not in importer._overwritten_mids_without_protection
+
     def test_import_deck_and_check_that_values_are_saved_to_databases(
         self,
         anki_session_with_addon_data: AnkiSession,
