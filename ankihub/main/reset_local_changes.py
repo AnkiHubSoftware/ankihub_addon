@@ -9,6 +9,7 @@ import aqt
 from anki.errors import NotFoundError
 from anki.notes import NoteId
 
+from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
@@ -32,6 +33,18 @@ def reset_local_changes_to_notes(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
+
+    # A reset discards local field content and tags, and reverts every note passed in rather
+    # than only the ones that changed remotely, so support needs to be able to tell it apart
+    # from a regular sync when a user reports content loss.
+    LOGGER.info(
+        "Resetting local changes to notes...",
+        ah_did=ah_did,
+        nids_count=len(nids),
+        strip_personal_protect_tags=strip_personal_protect_tags,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
+    )
 
     # Personal-protect tags (AnkiHub_Protect::*) block the importer's
     # `_prepare_fields` from resetting their field. Strip them so Reset actually
@@ -79,6 +92,7 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[
     # so preservation and the importer's reset decisions stay in lockstep even if
     # the cached config is stale.
     changed = []
+    stripped_tag_counts: Dict[str, int] = {}
     for nid in nids:
         try:
             note = aqt.mw.col.get_note(nid)
@@ -87,7 +101,16 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[
         preserved = {protection_tag_for_field(f).lower() for f in protected_fields.get(note.mid, [])}
         new_tags = [t for t in note.tags if not is_protect_tag(t) or t.lower() in preserved]
         if new_tags != note.tags:
+            for tag in set(note.tags) - set(new_tags):
+                stripped_tag_counts[tag] = stripped_tag_counts.get(tag, 0) + 1
             note.tags = new_tags
             changed.append(note)
     if changed:
         aqt.mw.col.update_notes(changed)
+
+    # Deleting a protect tag discards a user setting that nothing else records.
+    LOGGER.info(
+        "Stripped personal-protect tags before reset.",
+        notes_count=len(changed),
+        stripped_tags=dict(sorted(stripped_tag_counts.items(), key=lambda item: item[1], reverse=True)),
+    )

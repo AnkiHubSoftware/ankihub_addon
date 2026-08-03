@@ -6682,47 +6682,46 @@ def test_reset_local_changes_to_notes(
 
 def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
     anki_session_with_addon_data: AnkiSession,
-    install_sample_ah_deck: InstallSampleAHDeck,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
     mock_client_get_note_type: MockClientGetNoteType,
     mocker: MockerFixture,
 ):
     """The database check resets decks to repair add-on data, not because the user asked to
     discard edits, so it must leave personally protected content alone."""
     with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
 
-        _, ah_did = install_sample_ah_deck()
-
-        note = mw.col.get_note(NoteId(1608240029527))
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
         note["Front"] = "changed front"
         note["Back"] = "personal content"
-        note.tags = ["AnkiHub_Protect::Back"]
-        note.flush()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Back"]
+        aqt.mw.col.update_note(note)
 
         mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
         mocker.patch.object(AnkiHubClient, "get_protected_tags")
-        mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
 
-        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
 
         # Back is personally protected: content and tag both survive, even though the field
         # is not globally protected. Front is unprotected and gets reset as usual.
         note.load()
         assert note["Back"] == "personal content"
-        assert "AnkiHub_Protect::Back" in note.tags
-        assert note["Front"] == "This is the front 1"
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" in note.tags
+        assert note["Front"] == note_info.fields[0].value
 
 
 def test_db_check_resets_decks_without_stripping_personal_protect_tags(
     anki_session_with_addon_data: AnkiSession,
-    install_sample_ah_deck: InstallSampleAHDeck,
+    install_ah_deck: InstallAHDeck,
     mocker: MockerFixture,
 ):
     """Pins the wiring the dialog's "Protected fields and tags will not be affected" promise
     depends on; the reset itself is covered by the test above."""
     with anki_session_with_addon_data.profile_loaded():
-        _, ah_did = install_sample_ah_deck()
+        ah_did = install_ah_deck()
 
         reset_mock = mocker.patch("ankihub.gui.operations.db_check.anki_db_check.reset_local_changes_to_notes")
 
