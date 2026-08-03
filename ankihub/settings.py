@@ -67,6 +67,7 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
+TAG_STARTER_NOTES = "#AK_Other::Card_Features::Starter_Cards"
 
 ENABLE_FSRS_LAST_REMINDER_DATE_KEY = "ankihub_enable_fsrs_last_reminder_date"
 
