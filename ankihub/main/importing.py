@@ -57,6 +57,39 @@ from .utils import (
 # How many cards the previous AnKing deck should at least have to be considered the previous deck
 MIN_ANKING_CARDS_FOR_PREVIOUS_DECK = 1000
 
+# How many note ids to keep per key in the summaries of overwritten content
+OVERWRITE_SAMPLE_LIMIT = 10
+
+
+class _OverwriteTally:
+    """Counts overwrites per key (field name or tag root) with a bounded sample of note ids.
+
+    A single import can overwrite content on tens of thousands of notes. The add-on log file
+    is size-capped and rotates, so keeping every note id here would push out the older log
+    history that these summaries exist to preserve.
+    """
+
+    def __init__(self) -> None:
+        self._counts: Dict[str, int] = {}
+        self._sample_nids: Dict[str, List[NoteId]] = {}
+
+    def record(self, key: str, nid: NoteId) -> None:
+        self._counts[key] = self._counts.get(key, 0) + 1
+        sample = self._sample_nids.setdefault(key, [])
+        if len(sample) < OVERWRITE_SAMPLE_LIMIT:
+            sample.append(nid)
+
+    def __bool__(self) -> bool:
+        return bool(self._counts)
+
+    @property
+    def counts(self) -> Dict[str, int]:
+        return dict(sorted(self._counts.items(), key=lambda item: item[1], reverse=True))
+
+    @property
+    def sample_nids(self) -> Dict[str, List[NoteId]]:
+        return self._sample_nids
+
 
 class NoteOperation(Enum):
     CREATE = "create"
@@ -89,6 +122,11 @@ class AnkiHubImporter:
         self._deleted_nids: List[NoteId] = []
         self._marked_as_deleted_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
+
+        self._overwritten_fields = _OverwriteTally()
+        self._cleared_fields = _OverwriteTally()
+        self._removed_tags = _OverwriteTally()
+        self._mids_without_protected_fields: Set[int] = set()
 
         self._ankihub_did: Optional[uuid.UUID] = None
         self._is_first_import_of_deck: Optional[bool] = None
@@ -144,6 +182,10 @@ class AnkiHubImporter:
         self._nids_without_changes = []
         self._deleted_nids = []
         self._skipped_nids = []
+        self._overwritten_fields = _OverwriteTally()
+        self._cleared_fields = _OverwriteTally()
+        self._removed_tags = _OverwriteTally()
+        self._mids_without_protected_fields = set()
 
         self._ankihub_did = ankihub_did
         self._is_first_import_of_deck = is_first_import_of_deck
@@ -377,6 +419,7 @@ class AnkiHubImporter:
         aqt.mw.col.save()
 
         self._log_note_import_summary()
+        self._log_overwritten_content_summary()
 
     def _reset_note_types_of_notes_based_on_notes_data(self, notes_data: Sequence[NoteInfo]) -> None:
         """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
@@ -396,6 +439,34 @@ class AnkiHubImporter:
             marked_as_deleted_notes_truncated=truncated_list(self._marked_as_deleted_nids, limit=3),
             skipped_notes_count=len(self._skipped_nids),
             skipped_notes_list=truncated_list(self._skipped_nids, limit=3),
+        )
+
+    def _log_overwritten_content_summary(self) -> None:
+        """Logs which local field content and tags this import replaced.
+
+        Users report personal content vanishing after a sync and we have never been able to
+        reproduce it (TRIAGE-36). Without this, the log shows how many notes changed but not
+        what was lost, nor which protection was in effect when it happened - so the protection
+        settings are repeated here to keep an excerpt of this line self-contained.
+        Field values are deliberately not logged; note ids are enough to inspect a report.
+        """
+        if not (self._overwritten_fields or self._removed_tags):
+            return
+
+        # Emptying a field the user had content in is the destructive case these reports describe.
+        log = LOGGER.warning if self._cleared_fields else LOGGER.info
+        log(
+            "Overwrote local content during import.",
+            ah_did=self._ankihub_did,
+            overwritten_fields=self._overwritten_fields.counts,
+            overwritten_fields_sample_nids=self._overwritten_fields.sample_nids,
+            cleared_fields=self._cleared_fields.counts,
+            cleared_fields_sample_nids=self._cleared_fields.sample_nids,
+            removed_tag_roots=self._removed_tags.counts,
+            removed_tag_roots_sample_nids=self._removed_tags.sample_nids,
+            protected_fields=self._protected_fields,
+            protected_tags=self._protected_tags,
+            mids_without_protected_fields=sorted(self._mids_without_protected_fields),
         )
 
     def _prepare_notes(
@@ -798,6 +869,13 @@ class AnkiHubImporter:
 
         changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
+        protected_fields_for_model = protected_fields.get(aqt.mw.col.models.get(note.mid)["id"], [])
+        if protected_fields and not protected_fields_for_model:
+            # The deck has protected fields, but none for this note's note type. Recorded
+            # because a note type id that isn't a key of protected_fields silently disables
+            # global protection for the note (see TRIAGE-36).
+            self._mids_without_protected_fields.add(note.mid)
+
         for field_name in note.keys():
             if field_name == settings.ANKIHUB_NOTE_TYPE_FIELD_NAME:
                 continue
@@ -805,7 +883,6 @@ class AnkiHubImporter:
                 (f for f in fields if f.name == field_name),
                 Field(name=field_name, value=""),
             )
-            protected_fields_for_model = protected_fields.get(aqt.mw.col.models.get(note.mid)["id"], [])
             if field.name in protected_fields_for_model:
                 continue
 
@@ -813,9 +890,18 @@ class AnkiHubImporter:
                 continue
 
             if note[field.name] != field.value:
+                if note[field.name]:
+                    self._record_field_overwrite(note, field)
                 note[field.name] = field.value
                 changed = True
         return changed
+
+    def _record_field_overwrite(self, note: Note, field: Field) -> None:
+        """Records that existing local content in a field was replaced by the remote value."""
+        nid = NoteId(note.id)
+        self._overwritten_fields.record(field.name, nid)
+        if not field.value:
+            self._cleared_fields.record(field.name, nid)
 
     def _prepare_tags(
         self,
@@ -828,8 +914,19 @@ class AnkiHubImporter:
         note.tags = _updated_tags(cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags)
         if set(prev_tags) != set(note.tags):
             changed = True
+            self._record_removed_tags(note, removed_tags=set(prev_tags) - set(note.tags))
 
         return changed
+
+    def _record_removed_tags(self, note: Note, removed_tags: Set[str]) -> None:
+        """Records tags the import took off a note, grouped by their top-level component.
+
+        Grouping keeps the tally bounded: protection is configured per top-level tag, and
+        decks like AnKing carry thousands of distinct full tag paths.
+        """
+        nid = NoteId(note.id)
+        for tag_root in {tag.split("::")[0] for tag in removed_tags}:
+            self._removed_tags.record(tag_root, nid)
 
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:

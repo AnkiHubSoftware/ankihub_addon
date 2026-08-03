@@ -183,7 +183,11 @@ from ankihub.gui.utils import (
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
 from ankihub.main.exporting import _prepared_field_html
-from ankihub.main.importing import _updated_tags
+from ankihub.main.importing import (
+    OVERWRITE_SAMPLE_LIMIT,
+    _OverwriteTally,
+    _updated_tags,
+)
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
@@ -715,6 +719,33 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+class TestOverwriteTally:
+    def test_counts_are_sorted_by_frequency(self):
+        tally = _OverwriteTally()
+        tally.record("Front", NoteId(1))
+        tally.record("Back", NoteId(2))
+        tally.record("Back", NoteId(3))
+
+        assert list(tally.counts.items()) == [("Back", 2), ("Front", 1)]
+        assert tally.sample_nids == {"Front": [1], "Back": [2, 3]}
+
+    def test_sample_nids_are_capped_but_counts_are_not(self):
+        tally = _OverwriteTally()
+        nids = [NoteId(nid) for nid in range(OVERWRITE_SAMPLE_LIMIT + 5)]
+        for nid in nids:
+            tally.record("Front", nid)
+
+        assert tally.counts == {"Front": len(nids)}
+        assert tally.sample_nids["Front"] == nids[:OVERWRITE_SAMPLE_LIMIT]
+
+    def test_empty_tally_is_falsy(self):
+        tally = _OverwriteTally()
+        assert not tally
+
+        tally.record("Front", NoteId(1))
+        assert tally
 
 
 def test_mids_of_notes(anki_session: AnkiSession):
