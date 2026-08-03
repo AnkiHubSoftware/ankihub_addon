@@ -6687,7 +6687,7 @@ def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
     mocker: MockerFixture,
 ):
     """The database check resets decks to repair add-on data, not because the user asked to
-    discard edits, so it must leave personally protected content alone (TRIAGE-36)."""
+    discard edits, so it must leave personally protected content alone."""
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
