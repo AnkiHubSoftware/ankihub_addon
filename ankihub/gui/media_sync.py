@@ -50,6 +50,9 @@ from .utils import (
 
 SHOW_MEDIA_PROGRESS_PYCMD = "ankihub_show_media_progress"
 TOOLBAR_BUTTON_ID = "ankihub_media_sync"
+# Gates the media sync progress UI, i.e. the progress dialog and the toolbar button.
+# While it's off, the media sync only reports its status as text on the menu action.
+MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG = "media_sync_progress_ui"
 
 
 class MediaSyncStatus(Enum):
@@ -58,6 +61,10 @@ class MediaSyncStatus(Enum):
     ERROR = "Error"
     CANCELING = "Canceling..."
     IDLE = "Idle"
+
+
+def _progress_ui_enabled() -> bool:
+    return config.get_feature_flags().get(MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG, False)
 
 
 def _is_collection_error(exc: Exception) -> bool:
@@ -156,7 +163,7 @@ class _AnkiHubMediaSync:
         self._last_op_callback = lambda: self.start_media_upload(media_names, ankihub_did, on_success, is_retry=True)
 
         media_paths = self._media_paths_for_media_names(media_names)
-        self._dialog.reset_progress(len(media_paths))
+        self._reset_dialog_progress(len(media_paths))
 
         def on_failure(exception: Exception) -> None:
             self._amount_uploads_in_progress -= 1
@@ -175,7 +182,7 @@ class _AnkiHubMediaSync:
     def _on_media_chunk_uploaded(self, future: Future) -> None:
         try:
             count = future.result()
-            aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress(count))
+            aqt.mw.taskman.run_on_main(lambda: self._increment_dialog_progress(count))
         except Exception as exc:
             self._errors.append(exc)
 
@@ -198,7 +205,7 @@ class _AnkiHubMediaSync:
 
     def close_for_profile(self):
         self.stop_background_threads()
-        self._dialog.reset_progress(0)
+        self._reset_dialog_progress(0)
 
     def refresh_sync_status(self, is_retry: bool):
         """Refresh the status text on the status action and the toolbar button."""
@@ -213,6 +220,32 @@ class _AnkiHubMediaSync:
     @cached_property
     def _dialog(self) -> "MediaSyncProgressDialog":
         return MediaSyncProgressDialog()
+
+    def _dialog_if_enabled(self) -> Optional["MediaSyncProgressDialog"]:
+        """The progress dialog, or None while the progress UI feature flag is off.
+
+        All dialog access goes through here, so that the dialog is never created for users
+        who shouldn't see it.
+        """
+        if not _progress_ui_enabled():
+            return None
+        return self._dialog
+
+    def _show_dialog(self) -> None:
+        if (dialog := self._dialog_if_enabled()) is not None:
+            dialog.show()
+
+    def _update_dialog_status(self, status: MediaSyncStatus, is_retry: bool) -> None:
+        if (dialog := self._dialog_if_enabled()) is not None:
+            dialog.update_status(status, is_retry=is_retry)
+
+    def _reset_dialog_progress(self, maximum: int) -> None:
+        if (dialog := self._dialog_if_enabled()) is not None:
+            dialog.reset_progress(maximum)
+
+    def _increment_dialog_progress(self, increment: int = 1) -> None:
+        if (dialog := self._dialog_if_enabled()) is not None:
+            dialog.increment_progress(increment)
 
     def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
         media_dir_path = Path(collection_or_error().media.dir())
@@ -238,7 +271,8 @@ class _AnkiHubMediaSync:
             self._update_deck_media(ankihub_did=ah_did)
             all_missing.append((ah_did, self._missing_media_for_ah_deck(ah_did)))
 
-        aqt.mw.taskman.run_on_main(lambda: self._dialog.reset_progress(sum(len(m[1]) for m in all_missing)))
+        missing_media_count = sum(len(m[1]) for m in all_missing)
+        aqt.mw.taskman.run_on_main(lambda: self._reset_dialog_progress(missing_media_count))
 
         for ah_did, missing_media_names in all_missing:
             if self._stop_background_threads:
@@ -260,7 +294,7 @@ class _AnkiHubMediaSync:
             future.result()
         except Exception as exc:
             self._errors.append(exc)
-        aqt.mw.taskman.run_on_main(lambda: self._dialog.increment_progress())
+        aqt.mw.taskman.run_on_main(lambda: self._increment_dialog_progress())
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
         """Fetch deck media updates from AnkiHub and update the database and the config.
@@ -364,7 +398,7 @@ class _AnkiHubMediaSync:
         status = self._get_status()
         self._set_status_text(status)
         self._set_toolbar_button_status(status)
-        self._dialog.update_status(status, is_retry=is_retry)
+        self._update_dialog_status(status, is_retry=is_retry)
 
     def _set_status_text(self, status: MediaSyncStatus):
         if self._status_action is None:
@@ -378,7 +412,9 @@ class _AnkiHubMediaSync:
     def _set_toolbar_button_status(self, status: MediaSyncStatus) -> None:
         elem_js = f"document.getElementById({json.dumps(TOOLBAR_BUTTON_ID)})"
         icon = media_sync_error_svg() if status == MediaSyncStatus.ERROR else media_sync_svg()
-        if status == MediaSyncStatus.IDLE:
+        # The button is also removed when the feature flag is off, so that it disappears
+        # for users who lose access to the feature while Anki is running.
+        if status == MediaSyncStatus.IDLE or not _progress_ui_enabled():
             js = """(() => {
                 const toolbarButton = %(elem_js)s;
                 if(toolbarButton) {
@@ -405,11 +441,11 @@ class _AnkiHubMediaSync:
         aqt.mw.toolbar.web.eval(js)
 
     def _on_toolbar_button_clicked(self) -> None:
-        self._dialog.show()
+        self._show_dialog()
 
     def _on_status_action_triggered(self) -> None:
         if self._get_status() != MediaSyncStatus.IDLE:
-            self._dialog.show()
+            self._show_dialog()
 
 
 class FixedDialogLayout(QVBoxLayout):

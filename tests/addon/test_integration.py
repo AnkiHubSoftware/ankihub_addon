@@ -179,7 +179,7 @@ from ankihub.gui.js_message_handling import (
     UNSUSPEND_NOTES_PYCMD,
     _post_message_to_ankihub_js,
 )
-from ankihub.gui.media_sync import media_sync
+from ankihub.gui.media_sync import MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG, media_sync
 from ankihub.gui.menu import (
     AnkiHubLogin,
     _maybe_show_onboarding_tutorial_after_login,
@@ -8298,7 +8298,10 @@ class TestSuggestionsWithMedia:
         mock_client_media_upload: Mock,
         mocker: MockerFixture,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state(MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG)
+
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():

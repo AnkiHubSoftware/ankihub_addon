@@ -141,6 +141,8 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.exceptions import DeckDownloadAndInstallError
 from ankihub.gui.media_sync import (
+    MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG,
+    TOOLBAR_BUTTON_ID,
     MediaSyncProgressDialog,
     MediaSyncStatus,
     media_sync,
@@ -495,21 +497,38 @@ class TestMediaSyncProgressDialog:
         assert dialog.isHidden() is True
 
 
+@pytest.fixture
+def media_sync_dialog_mock() -> Generator[Mock, None, None]:
+    # Assigning into __dict__ instead of using mocker.patch.object, because reading the
+    # _dialog cached_property would construct a real dialog and cache it on the singleton.
+    previous = media_sync.__dict__.get("_dialog")
+    mock = Mock()
+    media_sync.__dict__["_dialog"] = mock
+    yield mock
+    if previous is None:
+        del media_sync.__dict__["_dialog"]
+    else:
+        media_sync.__dict__["_dialog"] = previous
+
+
+def set_media_sync_progress_ui_flag(mocker: MockerFixture, is_active: bool) -> None:
+    mocker.patch.object(
+        config,
+        "get_feature_flags",
+        return_value={MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG: is_active},
+    )
+
+
 class TestMediaSyncProgressDialogUpdates:
     """Covers that the media sync keeps its progress dialog up to date."""
 
     @pytest.fixture
-    def dialog_mock(self) -> Generator[Mock, None, None]:
-        # Assigning into __dict__ instead of using mocker.patch.object, because reading the
-        # _dialog cached_property would construct a real dialog and cache it on the singleton.
-        previous = media_sync.__dict__.get("_dialog")
-        mock = Mock()
-        media_sync.__dict__["_dialog"] = mock
-        yield mock
-        if previous is None:
-            del media_sync.__dict__["_dialog"]
-        else:
-            media_sync.__dict__["_dialog"] = previous
+    def dialog_mock(self, media_sync_dialog_mock: Mock) -> Mock:
+        return media_sync_dialog_mock
+
+    @pytest.fixture(autouse=True)
+    def _enable_progress_ui(self, mocker: MockerFixture) -> None:
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
 
     @pytest.fixture(autouse=True)
     def _mock_toolbar_button_status(self, mocker: MockerFixture) -> None:
@@ -561,7 +580,7 @@ class TestMediaSyncProgressDialogUpdates:
 
         media_sync._on_downloaded_file(future_with_result(None))
 
-        dialog_mock.increment_progress.assert_called_once_with()
+        dialog_mock.increment_progress.assert_called_once_with(1)
         assert media_sync._errors == []
 
     def test_failed_download_advances_the_progress_and_records_the_error(
@@ -573,7 +592,7 @@ class TestMediaSyncProgressDialogUpdates:
         media_sync._on_downloaded_file(future_with_exception(exception))
 
         # The file is done, even though it failed, so the progress has to move on.
-        dialog_mock.increment_progress.assert_called_once_with()
+        dialog_mock.increment_progress.assert_called_once_with(1)
         assert media_sync._errors == [exception]
 
     def test_uploaded_chunk_advances_the_progress_by_the_amount_of_files(
@@ -607,6 +626,95 @@ class TestMediaSyncProgressDialogUpdates:
         dialog_mock.reset_progress.assert_called_once_with(0)
         assert media_sync._canceling is True
         refresh_sync_status_mock.assert_called_once_with(False)
+
+
+class TestMediaSyncProgressUIFeatureFlag:
+    """Covers that the progress dialog and the toolbar button are gated by the feature flag."""
+
+    def test_dialog_is_not_created_while_the_flag_is_off(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+
+        assert media_sync._dialog_if_enabled() is None
+
+    def test_dialog_is_not_updated_while_the_flag_is_off(self, media_sync_dialog_mock: Mock, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        mocker.patch.object(media_sync, "_set_toolbar_button_status")
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+        media_sync._on_downloaded_file(future_with_result(None))
+        media_sync._on_media_chunk_uploaded(future_with_result(3))
+
+        assert media_sync_dialog_mock.method_calls == []
+
+    def test_toolbar_button_click_shows_the_dialog_while_the_flag_is_on(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
+
+        media_sync._on_toolbar_button_clicked()
+
+        media_sync_dialog_mock.show.assert_called_once_with()
+
+    def test_toolbar_button_click_does_not_show_the_dialog_while_the_flag_is_off(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+
+        media_sync._on_toolbar_button_clicked()
+
+        media_sync_dialog_mock.show.assert_not_called()
+
+    def test_status_action_does_not_show_the_dialog_while_the_flag_is_off(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        # A sync has to be in progress, otherwise the action doesn't show the dialog anyway.
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._on_status_action_triggered()
+
+        media_sync_dialog_mock.show.assert_not_called()
+
+    def test_toolbar_button_is_added_while_the_flag_is_on(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
+        mocker.patch.object(media_sync, "_toolbar_link", f'<a id="{TOOLBAR_BUTTON_ID}"></a>', create=True)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+
+        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
+
+        js = toolbar_mock.web.eval.call_args.args[0]
+        assert "insertAdjacentHTML" in js
+        assert TOOLBAR_BUTTON_ID in js
+
+    def test_toolbar_button_is_removed_while_the_flag_is_off(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+
+        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
+
+        # The button is removed instead of inserted, so that it also disappears for users who
+        # lose access to the feature while Anki is running.
+        js = toolbar_mock.web.eval.call_args.args[0]
+        assert "insertAdjacentHTML" not in js
+        assert ".remove()" in js
+
+    def test_status_refresh_before_the_private_config_is_set_up(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        # The toolbar is drawn - and with it the status refreshed - before the private config
+        # of the profile exists, so the flag check must not raise there.
+        mocker.patch.object(config, "_private_config", None)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+
+        # Without feature flags, the progress UI stays hidden.
+        assert media_sync_dialog_mock.method_calls == []
+        assert "insertAdjacentHTML" not in toolbar_mock.web.eval.call_args.args[0]
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -3826,6 +3934,13 @@ class TestFeatureFlags:
         callback = MagicMock()
         add_user_state_refreshed_callback(callback)
         assert callback in _state.user_state_refreshed_callbacks
+
+    def test_feature_flags_are_empty_before_the_private_config_is_set_up(self, mocker: MockerFixture):
+        # Hooks can read feature flags while Anki is still starting up, before the private
+        # config of the profile exists.
+        mocker.patch.object(config, "_private_config", None)
+
+        assert config.get_feature_flags() == {}
 
     def test_offline_scenario_preserves_cached_feature_flags(self, mocker: MockerFixture, qtbot: QtBot):
         """Test that cached feature flags are preserved when server is unreachable."""

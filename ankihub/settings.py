@@ -475,7 +475,12 @@ class _Config:
         self._private_config.show_enable_fsrs_reminder = show_remind
         self._update_private_config()
 
-    def get_feature_flags(self) -> Optional[dict]:
+    def get_feature_flags(self) -> dict:
+        # Feature flags are read from hooks which can run before the private config is set up
+        # for the profile, e.g. while the toolbar is drawn during Anki's startup. Treat flags
+        # as unset in that case instead of raising.
+        if self._private_config is None:
+            return {}
         return self._private_config.feature_flags
 
     def set_user_details(self, user_details: Optional[dict]):
