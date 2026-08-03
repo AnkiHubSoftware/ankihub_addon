@@ -101,11 +101,17 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[
         new_tags = [t for t in note.tags if not is_protect_tag(t) or t.lower() in preserved]
         if new_tags != note.tags:
             for tag in set(note.tags) - set(new_tags):
-                stripped_tag_counts[tag] = stripped_tag_counts.get(tag, 0) + 1
+                # Whether a tag protects a field is decided case-insensitively, so case
+                # variants of one tag have to count as one here too.
+                key = tag.lower()
+                stripped_tag_counts[key] = stripped_tag_counts.get(key, 0) + 1
             note.tags = new_tags
             changed.append(note)
-    if changed:
-        aqt.mw.col.update_notes(changed)
+
+    if not changed:
+        return
+
+    aqt.mw.col.update_notes(changed)
 
     # Deleting a protect tag discards a user setting that nothing else records.
     LOGGER.info(
