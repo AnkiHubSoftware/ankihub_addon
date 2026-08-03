@@ -259,11 +259,20 @@ class BaseInput(QLineEdit):
 
 
 class PasswordInput(BaseInput):
+    _BASE_STYLE = 'QLineEdit[echoMode="2"] { lineedit-password-character: 9733; }'
+    _PROBLEM_STYLE = "QLineEdit { border: 1px solid #cc3333 }"
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setEchoMode(QLineEdit.EchoMode.Password)
-        # Change the mask character to a star
-        self.setStyleSheet('QLineEdit[echoMode="2"] { lineedit-password-character: 9733; }')
+        # Change the mask character to a star.
+        self.set_problem_style(False)
+
+    def set_problem_style(self, problem: bool) -> None:
+        style = self._BASE_STYLE
+        if problem:
+            style += f"\n{self._PROBLEM_STYLE}"
+        self.setStyleSheet(style)
 
 
 class CodeInput(BaseInput):
@@ -956,8 +965,10 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
             qconnect(email_input.textChanged, self._on_email_changed)
             self.password_input = password_input = PasswordInput()
             qconnect(password_input.textChanged, self._on_password_changed)
+            qconnect(password_input.editingFinished, self._on_password_editing_finished)
             self.repeat_password_input = repeat_password_input = PasswordInput()
-            qconnect(repeat_password_input.textChanged, self._on_repeat_password_changed)
+            qconnect(repeat_password_input.textChanged, self._on_password_changed)
+            qconnect(repeat_password_input.editingFinished, self._on_password_editing_finished)
             self.repeat_password_box = repeat_password_box = InputWithButtonHbox(repeat_password_input, "Sign up")
             qconnect(repeat_password_box.button.clicked, self._on_sign_up)
             rows = [
@@ -991,9 +1002,22 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         if not self.is_code_signup:
             password = self.password_input.text()
             repeat_password = self.repeat_password_input.text()
-            enabled &= bool(password) and password == repeat_password
+            enabled &= bool(password) and bool(repeat_password)
 
         button.setEnabled(enabled)
+
+    def _set_password_problem_style(self, state: bool) -> None:
+        def update_fields() -> None:
+            self.password_input.set_problem_style(state)
+            self.repeat_password_input.set_problem_style(state)
+
+        aqt.mw.taskman.run_on_main(update_fields)
+
+    def _update_mismatch_feedback(self) -> None:
+        password = self.password_input.text()
+        repeat_password = self.repeat_password_input.text()
+        mismatch = repeat_password != "" and password != repeat_password
+        self._set_password_problem_style(mismatch)
 
     def _on_terms_toggled(self, checked: bool) -> None:
         self._update_signup_button_state()
@@ -1002,15 +1026,22 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
         self._update_signup_button_state()
 
     def _on_password_changed(self, text: str) -> None:
+        self._set_password_problem_style(False)
         self._update_signup_button_state()
 
-    def _on_repeat_password_changed(self, text: str) -> None:
-        self._update_signup_button_state()
+    def _on_password_editing_finished(self) -> None:
+        self._update_mismatch_feedback()
 
     def _on_sign_up(self) -> None:
+        terms = self.terms_checkbox.isChecked()
+
         def task() -> Union[str, int]:
             client = AnkiHubClient()
-            terms = self.terms_checkbox.isChecked()
+
+            if not self.is_code_signup and self.password_input.text() != self.repeat_password_input.text():
+                self._set_password_problem_style(True)
+                raise ValueError("The passwords do not match")
+
             if self.is_code_signup:
                 return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
             else:
