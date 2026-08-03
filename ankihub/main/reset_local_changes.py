@@ -20,13 +20,15 @@ from .note_conversion import is_protect_tag, protection_tag_for_field
 def reset_local_changes_to_notes(
     nids: Sequence[NoteId],
     ah_did: uuid.UUID,
-    strip_personal_protect_tags: bool = True,
+    *,
+    strip_personal_protect_tags: bool,
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid
     #
-    # Pass strip_personal_protect_tags=False for callers that reset notes to repair add-on
-    # data rather than because the user asked to discard their edits. Those callers must not
-    # touch personally protected content.
+    # strip_personal_protect_tags has no default on purpose: only a reset the user explicitly
+    # asked for may discard their protection settings. A caller that resets notes to repair
+    # add-on data or to drive an add-on flow must pass False, and inheriting either behaviour
+    # by silence is how personally protected content got discarded on startup before.
 
     deck_config = config.deck_config(ah_did)
 

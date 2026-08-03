@@ -6657,7 +6657,7 @@ def test_reset_local_changes_to_notes(
 
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
+        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=True)
 
         # Front: not globally protected → personal-protect tag stripped, field reset.
         # Back: globally protected → field stays edited (importer respects protected_fields)

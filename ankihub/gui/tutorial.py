@@ -1006,7 +1006,9 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         if not self._has_cards_to_review():
             nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-            reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
+            # The tutorial resets the intro deck to have cards to show, not because the user
+            # asked to discard their edits, so their protected content stays untouched.
+            reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
         self._move_to_intro_deck_overview(on_done)
 
