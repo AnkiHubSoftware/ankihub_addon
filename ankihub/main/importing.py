@@ -900,8 +900,9 @@ class AnkiHubImporter:
             if field.name in fields_protected_by_tags:
                 continue
 
-            if note[field.name] != field.value:
-                if note[field.name]:
+            current_value = note[field.name]
+            if current_value != field.value:
+                if current_value:
                     self._record_field_overwrite(note, field, protects_any_field=bool(protected_fields_for_model))
                 note[field.name] = field.value
                 changed = True
@@ -932,11 +933,12 @@ class AnkiHubImporter:
         protected_tags: List[str],
     ) -> bool:
         changed = False
-        prev_tags = note.tags
+        prev_tags = set(note.tags)
         note.tags = _updated_tags(cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags)
-        if set(prev_tags) != set(note.tags):
+        new_tags = set(note.tags)
+        if prev_tags != new_tags:
             changed = True
-            self._record_removed_tags(note, removed_tags=set(prev_tags) - set(note.tags))
+            self._record_removed_tags(note, removed_tags=prev_tags - new_tags)
 
         return changed
 
