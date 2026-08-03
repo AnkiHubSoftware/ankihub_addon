@@ -3635,7 +3635,7 @@ class TestAnkiHubImporter:
 
             assert mw.col.get_note(note.id)["Back"] == "personal content"
             assert "Back" not in ankihub_importer._overwritten_fields.counts
-            assert note.mid not in ankihub_importer._mids_without_protected_fields
+            assert note.mid not in ankihub_importer._overwritten_mids_without_protection
 
     def test_import_deck_and_check_that_values_are_saved_to_databases(
         self,

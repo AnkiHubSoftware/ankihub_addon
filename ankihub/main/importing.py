@@ -126,7 +126,7 @@ class AnkiHubImporter:
         self._overwritten_fields = _OverwriteTally()
         self._cleared_fields = _OverwriteTally()
         self._removed_tags = _OverwriteTally()
-        self._mids_without_protected_fields: Set[int] = set()
+        self._overwritten_mids_without_protection: Set[int] = set()
 
         self._ankihub_did: Optional[uuid.UUID] = None
         self._is_first_import_of_deck: Optional[bool] = None
@@ -185,7 +185,7 @@ class AnkiHubImporter:
         self._overwritten_fields = _OverwriteTally()
         self._cleared_fields = _OverwriteTally()
         self._removed_tags = _OverwriteTally()
-        self._mids_without_protected_fields = set()
+        self._overwritten_mids_without_protection = set()
 
         self._ankihub_did = ankihub_did
         self._is_first_import_of_deck = is_first_import_of_deck
@@ -466,7 +466,7 @@ class AnkiHubImporter:
             removed_tag_roots_sample_nids=self._removed_tags.sample_nids,
             protected_fields=self._protected_fields,
             protected_tags=self._protected_tags,
-            mids_without_protected_fields=sorted(self._mids_without_protected_fields),
+            overwritten_mids_without_protection=sorted(self._overwritten_mids_without_protection),
         )
 
     def _prepare_notes(
@@ -870,11 +870,6 @@ class AnkiHubImporter:
         changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         protected_fields_for_model = protected_fields.get(aqt.mw.col.models.get(note.mid)["id"], [])
-        if protected_fields and not protected_fields_for_model:
-            # The deck has protected fields, but none for this note's note type. Recorded
-            # because a note type id that isn't a key of protected_fields silently disables
-            # global protection for the note.
-            self._mids_without_protected_fields.add(note.mid)
 
         for field_name in note.keys():
             if field_name == settings.ANKIHUB_NOTE_TYPE_FIELD_NAME:
@@ -891,17 +886,28 @@ class AnkiHubImporter:
 
             if note[field.name] != field.value:
                 if note[field.name]:
-                    self._record_field_overwrite(note, field)
+                    self._record_field_overwrite(note, field, protects_any_field=bool(protected_fields_for_model))
                 note[field.name] = field.value
                 changed = True
         return changed
 
-    def _record_field_overwrite(self, note: Note, field: Field) -> None:
-        """Records that existing local content in a field was replaced by the remote value."""
+    def _record_field_overwrite(self, note: Note, field: Field, protects_any_field: bool) -> None:
+        """Notes that a prepared change replaces existing local content in a field.
+
+        Recorded during preparation because that is the last point that still has the old
+        value, but only reported once the prepared notes have been written. The two can't
+        disagree: a note without changes has nothing to record, a new note has no local
+        content to lose, and notes to delete never get their fields prepared.
+        """
         nid = NoteId(note.id)
         self._overwritten_fields.record(field.name, nid)
         if not field.value:
             self._cleared_fields.record(field.name, nid)
+        if self._protected_fields and not protects_any_field:
+            # The deck protects fields, but none for this note's note type, and content was
+            # lost on it. A note type id that isn't a key of protected_fields silently
+            # disables global protection for the note, which looks exactly like this.
+            self._overwritten_mids_without_protection.add(note.mid)
 
     def _prepare_tags(
         self,
