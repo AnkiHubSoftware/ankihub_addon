@@ -104,6 +104,7 @@ aqt-legacy = [
     { name = "pyqtwebengine" },
 ]
 bundle = [
+    { name = "asgiref" },
     { name = "django" },
     { name = "django-cotton" },
     { name = "mashumaro" },
@@ -112,6 +113,7 @@ bundle = [
     { name = "sentry-sdk" },
     { name = "structlog" },
     { name = "tenacity" },
+    { name = "urllib3" },
 ]
 dev = [
     { name = "approvaltests" },
@@ -152,6 +154,7 @@ aqt-legacy = [
     { name = "pyqtwebengine", specifier = "==5.15.2" },
 ]
 bundle = [
+    { name = "asgiref", specifier = "<3.12" },
     { name = "django", specifier = "==4.2.27" },
     { name = "django-cotton", specifier = ">=2.5.1" },
     { name = "mashumaro", git = "https://github.com/AnkiHubSoftware/mashumaro.git?branch=master" },
@@ -160,6 +163,7 @@ bundle = [
     { name = "sentry-sdk", specifier = "==1.6.0" },
     { name = "structlog", specifier = "==24.1.0" },
     { name = "tenacity", specifier = "==8.2.2" },
+    { name = "urllib3", specifier = "<2.7" },
 ]
 dev = [
     { name = "approvaltests", specifier = ">=12.2.0" },
