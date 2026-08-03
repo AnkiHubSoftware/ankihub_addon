@@ -137,6 +137,8 @@ class _AnkiHubDeckUpdater:
             LOGGER.info("User cancelled deck update.")
             return False
 
+        _log_if_protected_fields_shrank(ankihub_did, deck_updates.protected_fields)
+
         note_types = cast(
             Dict[NotetypeId, NotetypeDict],
             self._client.get_note_types_dict_for_deck(ankihub_did),
@@ -293,6 +295,32 @@ class _AnkiHubDeckUpdater:
 
 
 ah_deck_updater = _AnkiHubDeckUpdater()
+
+
+def _log_if_protected_fields_shrank(ah_did: uuid.UUID, new_protected_fields: Dict[int, List[str]]) -> None:
+    """Warns when the deck updates carry less field protection than the previous sync did.
+
+    Whatever this response contains is what the import protects, so a response that drops
+    protection lets the import overwrite the user's personal content. Users also unprotect
+    fields on the website deliberately, so this is a lead to correlate against the overwrite
+    summary, not proof of a bug. Must run before `set_globally_protected_fields` replaces the
+    stored value this compares against.
+    """
+    old_protected_fields = config.globally_protected_fields(ah_did)
+    missing_by_mid = {
+        mid: sorted(missing)
+        for mid, old_names in old_protected_fields.items()
+        if (missing := set(old_names) - set(new_protected_fields.get(mid, [])))
+    }
+    if not missing_by_mid:
+        return
+
+    LOGGER.warning(
+        "Fields protected during the last sync are missing from the deck updates.",
+        ah_did=ah_did,
+        missing_protected_fields=missing_by_mid,
+        protected_fields=new_protected_fields,
+    )
 
 
 def show_tooltip_about_last_deck_updates_results() -> None:

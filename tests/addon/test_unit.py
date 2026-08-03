@@ -185,7 +185,12 @@ from ankihub.gui.utils import (
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
 from ankihub.main.exporting import _prepared_field_html
-from ankihub.main.importing import _updated_tags
+from ankihub.main.importing import (
+    OVERWRITE_KEY_LIMIT,
+    OVERWRITE_SAMPLE_LIMIT,
+    _OverwriteTally,
+    _updated_tags,
+)
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
@@ -823,6 +828,48 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+class TestOverwriteTally:
+    def test_counts_are_sorted_by_frequency(self):
+        tally = _OverwriteTally()
+        tally.record("Front", NoteId(1))
+        tally.record("Back", NoteId(2))
+        tally.record("Back", NoteId(3))
+
+        assert list(tally.counts.items()) == [("Back", 2), ("Front", 1)]
+        assert tally.sample_nids == {"Front": [1], "Back": [2, 3]}
+
+    def test_sample_nids_are_capped_but_counts_are_not(self):
+        tally = _OverwriteTally()
+        nids = [NoteId(nid) for nid in range(OVERWRITE_SAMPLE_LIMIT + 5)]
+        for nid in nids:
+            tally.record("Front", nid)
+
+        assert tally.counts == {"Front": len(nids)}
+        assert tally.sample_nids["Front"] == nids[:OVERWRITE_SAMPLE_LIMIT]
+
+    def test_records_beyond_the_key_limit_are_counted_as_omitted(self):
+        tally = _OverwriteTally()
+        for key in range(OVERWRITE_KEY_LIMIT):
+            tally.record(f"tag_{key}", NoteId(1))
+
+        # A key already being tracked keeps counting; a new one past the limit does not.
+        tally.record("tag_0", NoteId(2))
+        tally.record("one_tag_too_many", NoteId(3))
+        tally.record("another_tag_too_many", NoteId(4))
+
+        assert len(tally.counts) == OVERWRITE_KEY_LIMIT
+        assert tally.counts["tag_0"] == 2
+        assert "one_tag_too_many" not in tally.counts
+        assert tally.omitted_count == 2
+
+    def test_empty_tally_is_falsy(self):
+        tally = _OverwriteTally()
+        assert not tally
+
+        tally.record("Front", NoteId(1))
+        assert tally
 
 
 def test_mids_of_notes(anki_session: AnkiSession):
@@ -3902,6 +3949,10 @@ class TestTutorialProductMetrics:
         mock_web.return_value.eval.assert_called_once()
 
 
+# These tests kick off refresh_user_state_in_background, which can still be writing the private
+# config when the test ends and then raises in the Qt event loop once pytest has removed the
+# profile directory.
+@pytest.mark.qt_no_exception_capture
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -4008,6 +4059,9 @@ class TestFeatureFlags:
         # Assert user details kept cached value (fetch failed)
         assert config.get_user_details() == cached_user_details
 
+    # The background refresh can still be writing the private config when the test ends, which
+    # raises in the Qt event loop once pytest has removed the profile directory.
+    @pytest.mark.qt_no_exception_capture
     def test_logout_clears_caches(self, mocker: MockerFixture, qtbot: QtBot):
         """Test that logging out clears both feature flags and user details caches."""
         # Set up initial cached values (simulating previous login)
