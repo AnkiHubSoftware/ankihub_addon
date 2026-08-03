@@ -464,13 +464,15 @@ class AnkiHubImporter:
         nor which protection was in effect when it happened - so the protection settings are
         repeated here to keep an excerpt of this line self-contained.
         Field values are deliberately not logged; note ids are enough to inspect a report.
+
+        Logged at INFO even when content was emptied: a deck maintainer clearing a field is a
+        normal update, so this reports what happened rather than that something went wrong.
+        `cleared_fields` marks the destructive case for whoever reads the line.
         """
         if not (self._overwritten_fields or self._removed_tags):
             return
 
-        # Emptying a field the user had content in is the destructive case these reports describe.
-        log = LOGGER.warning if self._cleared_fields else LOGGER.info
-        log(
+        LOGGER.info(
             "Overwrote local content during import.",
             ah_did=self._ankihub_did,
             overwritten_fields=self._overwritten_fields.counts,
