@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sys
+import time
 from concurrent.futures import Future
 from enum import Enum
+from math import ceil
 from typing import Any, Callable, NoReturn, Union
 
 import aqt
@@ -115,6 +117,45 @@ def destroy_timer(timer: QTimer | None) -> None:
 
 def timer_is_active(timer: Countdown | None) -> bool:
     return bool(timer) and not sip.isdeleted(timer) and timer.isActive() and timer.remaining_seconds > 0
+
+
+class ResendCooldownTracker:
+    """Remembers each email's magic-code resend cooldown independently of any
+    widget, so that closing and reopening the AnkiWeb dialog within the same
+    Anki session keeps showing the correct remaining countdown instead of
+    resetting it.
+
+    This is a UI convenience only, not an enforcement mechanism: the tracker
+    lives in memory for the current session, so restarting Anki clears it and
+    lets the resend button appear enabled again immediately. That's fine
+    because the actual cooldown is enforced server-side; this class only
+    avoids a redundant request (and confusing UI) in the common case where the
+    dialog is closed and reopened without restarting Anki.
+    """
+
+    def __init__(self) -> None:
+        self._deadlines: dict[tuple[str, str], float] = {}
+
+    def start(self, scope: str, email: str, seconds: int) -> None:
+        key = (scope, email)
+        if seconds > 0:
+            self._deadlines[key] = time.monotonic() + seconds
+        else:
+            self._deadlines.pop(key, None)
+
+    def remaining_seconds(self, scope: str, email: str) -> int:
+        key = (scope, email)
+        deadline = self._deadlines.get(key)
+        if deadline is None:
+            return 0
+        remaining = ceil(deadline - time.monotonic())
+        if remaining <= 0:
+            self._deadlines.pop(key, None)
+            return 0
+        return remaining
+
+
+_resend_cooldowns = ResendCooldownTracker()
 
 
 class Countdown(QTimer):
@@ -556,6 +597,8 @@ class BaseLoginWidget(BaseAnkiwebWidget):
 
 
 class LoginWithCodeWidget(BaseLoginWidget):
+    _COOLDOWN_SCOPE = "login"
+
     def __init__(self, dialog: AnkiwebDialog):
         self._dialog = dialog
         super().__init__(
@@ -565,6 +608,7 @@ class LoginWithCodeWidget(BaseLoginWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.SIGNUP_CODE.value, 'Sign up for a new account')}",
             dialog=dialog,
         )
+        self._sync_state_for_email(self.email_input.text())
 
     def _create_form_widget(self) -> FormWidget:
         self.email_input = email_input = EmailInput()
@@ -587,13 +631,30 @@ class LoginWithCodeWidget(BaseLoginWidget):
         return form_widget
 
     def _on_email_changed(self, text: str) -> None:
-        self.email_box.button.setEnabled(is_email(text))
-        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(text))
+        self._sync_state_for_email(text)
 
     def _on_code_changed(self, text: str) -> None:
         self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and is_email(self.email_input.text()))
 
-    def _on_get_code(self) -> None:
+    def _sync_state_for_email(self, email: str) -> None:
+        """Reflects any cooldown already tracked for `email` (e.g. from a code
+        requested before the dialog was closed and reopened) instead of always
+        allowing a new request whenever the email field shows a valid address.
+        """
+        email_valid = is_email(email)
+        remaining = _resend_cooldowns.remaining_seconds(self._COOLDOWN_SCOPE, email) if email_valid else 0
+        if remaining > 0:
+            self.code_input.setEnabled(True)
+            self._start_cooldown(remaining)
+        else:
+            if timer_is_active(self._timer):
+                destroy_timer(self._timer)
+                self._timer = None
+                self.status_label.setText("")
+            self.email_box.button.setEnabled(email_valid)
+        self.code_box.button.setEnabled(self.code_input.hasAcceptableInput() and email_valid)
+
+    def _start_cooldown(self, remaining_secs: int) -> None:
         def on_timeout(remaining_secs: int) -> None:
             email = self.email_input.text()
             resend_available_status = f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available"
@@ -604,16 +665,20 @@ class LoginWithCodeWidget(BaseLoginWidget):
             if not remaining_secs:
                 self.email_box.button.setEnabled(True)
 
-        def on_success(code_ttl_secs: int) -> None:
-            self.init_timer(on_timeout, code_ttl_secs)
-            self.email_box.button.setEnabled(False)
+        self.init_timer(on_timeout, remaining_secs)
+        self.email_box.button.setEnabled(False)
+
+    def _on_get_code(self) -> None:
+        def on_success(resend_cooldown_secs: int) -> None:
+            _resend_cooldowns.start(self._COOLDOWN_SCOPE, email, resend_cooldown_secs)
+            self._start_cooldown(resend_cooldown_secs)
             self.code_input.setEnabled(True)
             self.form_widget.error_label.set_error("")
 
         email = self.email_input.text()
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).resend_cooldown_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
 
@@ -809,7 +874,7 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
             bottom_label=f"{html_link(AnkiwebLinkIds.LOGIN_CODE.value, 'Have an account? Sign in.')}",
             dialog=dialog,
         )
-        if not self._is_retry or remaining_seconds > 0:
+        if not self._is_retry or self.remaining_seconds > 0:
             self._start_timer()
         else:
             self._update_code_button_state()
@@ -883,14 +948,14 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
         self.email_box.button.setEnabled(is_email(text))
 
     def _on_get_code(self) -> None:
-        def on_success(code_ttl_secs: int) -> None:
-            self.remaining_seconds = code_ttl_secs
+        def on_success(resend_cooldown_secs: int) -> None:
+            self.remaining_seconds = resend_cooldown_secs
             self._start_timer()
 
         email = self._get_email()
         AddonQueryOp(
             parent=self,
-            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).code_ttl_secs,
+            op=lambda _: AnkiHubClient().ankiweb_request_login_code(email).resend_cooldown_secs,
             success=on_success,
         ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
 
@@ -1043,7 +1108,7 @@ class BaseSignupFirstPageWidget(BaseSignupWidget):
                 raise ValueError("The passwords do not match")
 
             if self.is_code_signup:
-                return client.ankiweb_request_signup_code(self.email_input.text(), terms).code_ttl_secs
+                return client.ankiweb_request_signup_code(self.email_input.text(), terms).resend_cooldown_secs
             else:
                 return client.ankiweb_signup(self.email_input.text(), self.password_input.text(), terms).host_key
 
