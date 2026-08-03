@@ -90,7 +90,7 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[
     # `protected_fields` is the same freshly-fetched dict passed to the importer,
     # so preservation and the importer's reset decisions stay in lockstep even if
     # the cached config is stale.
-    changed = []
+    notes_with_stripped_tags = []
     stripped_tag_counts: Dict[str, int] = {}
     for nid in nids:
         try:
@@ -106,16 +106,16 @@ def _strip_personal_protect_tags(nids: Sequence[NoteId], protected_fields: Dict[
                 key = tag.lower()
                 stripped_tag_counts[key] = stripped_tag_counts.get(key, 0) + 1
             note.tags = new_tags
-            changed.append(note)
+            notes_with_stripped_tags.append(note)
 
-    if not changed:
+    if not notes_with_stripped_tags:
         return
 
-    aqt.mw.col.update_notes(changed)
+    aqt.mw.col.update_notes(notes_with_stripped_tags)
 
     # Deleting a protect tag discards a user setting that nothing else records.
     LOGGER.info(
         "Stripped personal-protect tags before reset.",
-        notes_count=len(changed),
+        notes_count=len(notes_with_stripped_tags),
         stripped_tags=dict(sorted(stripped_tag_counts.items(), key=lambda item: item[1], reverse=True)),
     )
