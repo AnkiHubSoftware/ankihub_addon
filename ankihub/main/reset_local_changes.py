@@ -36,9 +36,6 @@ def reset_local_changes_to_notes(
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
 
-    # A reset discards local field content and tags, and reverts every note passed in rather
-    # than only the ones that changed remotely, so support needs to be able to tell it apart
-    # from a regular sync when a user reports content loss.
     LOGGER.info(
         "Resetting local changes to notes...",
         ah_did=ah_did,
