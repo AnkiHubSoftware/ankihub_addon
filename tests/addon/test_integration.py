@@ -6700,7 +6700,7 @@ def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
         aqt.mw.col.update_note(note)
 
         mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
-        mocker.patch.object(AnkiHubClient, "get_protected_tags")
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
         mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
 
         reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
