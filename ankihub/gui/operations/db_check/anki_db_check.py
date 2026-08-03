@@ -45,7 +45,8 @@ def _check_missing_ankihub_nids() -> None:
         text=(
             "AnkiHub has detected that the following deck(s) have missing values:<br>"
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
-            "The add-on needs to reset local changes to these decks. This may take a while.<br><br>"
+            "The add-on needs to reset local changes to these decks, which reverts your edits "
+            "to fields you haven't protected. This may take a while.<br><br>"
             "Protected fields and tags will not be affected.<br><br>"
             "A full sync with AnkiWeb might be necessary after the reset, so it's recommended "
             "to sync changes from other devices before doing this.<br><br>"
@@ -119,7 +120,10 @@ def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
 def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids, ah_did=ah_did)
+        # The importer restores the AnkiHub ID field regardless of any protection, so this
+        # repair doesn't need the personal-protect tags stripped — and stripping them would
+        # break the promise the dialog above makes about protected fields.
+        reset_local_changes_to_notes(nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
 
 def _check_ankihub_update_tags() -> None:

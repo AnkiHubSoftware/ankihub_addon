@@ -19,8 +19,13 @@ from .note_conversion import is_protect_tag, protection_tag_for_field
 def reset_local_changes_to_notes(
     nids: Sequence[NoteId],
     ah_did: uuid.UUID,
+    strip_personal_protect_tags: bool = True,
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid
+    #
+    # Pass strip_personal_protect_tags=False for callers that reset notes to repair add-on
+    # data rather than because the user asked to discard their edits. Those callers must not
+    # touch personally protected content.
 
     deck_config = config.deck_config(ah_did)
 
@@ -36,7 +41,8 @@ def reset_local_changes_to_notes(
     # are preserved — those fields are typically the user's personal content
     # (e.g. Lecture Notes) that should outlive a later removal of global
     # protection; same convention as the browser "Protect Fields" dialog.
-    _strip_personal_protect_tags(nids, protected_fields)
+    if strip_personal_protect_tags:
+        _strip_personal_protect_tags(nids, protected_fields)
 
     notes_data = ankihub_db.notes_data_for_anki_nids(nids)
     note_types = {
