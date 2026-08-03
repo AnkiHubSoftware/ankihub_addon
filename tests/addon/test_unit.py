@@ -3940,6 +3940,9 @@ class TestFeatureFlags:
         # Assert user details kept cached value (fetch failed)
         assert config.get_user_details() == cached_user_details
 
+    # The background refresh can still be writing the private config when the test ends, which
+    # raises in the Qt event loop once pytest has removed the profile directory.
+    @pytest.mark.qt_no_exception_capture
     def test_logout_clears_caches(self, mocker: MockerFixture, qtbot: QtBot):
         """Test that logging out clears both feature flags and user details caches."""
         # Set up initial cached values (simulating previous login)
