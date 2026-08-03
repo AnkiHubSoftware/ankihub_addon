@@ -301,10 +301,10 @@ def _log_if_protected_fields_shrank(ah_did: uuid.UUID, protected_fields: Dict[in
     """Warns when the deck updates carry less field protection than the previous sync did.
 
     Whatever this response contains is what the import protects, so a response that drops
-    protection lets the import overwrite the user's personal content (TRIAGE-36). Users also
-    unprotect fields on the website deliberately, so this is a lead to correlate against the
-    overwrite summary, not proof of a bug. Must run before `set_globally_protected_fields`
-    replaces the stored value this compares against.
+    protection lets the import overwrite the user's personal content. Users also unprotect
+    fields on the website deliberately, so this is a lead to correlate against the overwrite
+    summary, not proof of a bug. Must run before `set_globally_protected_fields` replaces the
+    stored value this compares against.
     """
     missing_by_mid = {
         mid: sorted(missing)

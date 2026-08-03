@@ -445,9 +445,9 @@ class AnkiHubImporter:
         """Logs which local field content and tags this import replaced.
 
         Users report personal content vanishing after a sync and we have never been able to
-        reproduce it (TRIAGE-36). Without this, the log shows how many notes changed but not
-        what was lost, nor which protection was in effect when it happened - so the protection
-        settings are repeated here to keep an excerpt of this line self-contained.
+        reproduce it. Without this, the log shows how many notes changed but not what was lost,
+        nor which protection was in effect when it happened - so the protection settings are
+        repeated here to keep an excerpt of this line self-contained.
         Field values are deliberately not logged; note ids are enough to inspect a report.
         """
         if not (self._overwritten_fields or self._removed_tags):
@@ -873,7 +873,7 @@ class AnkiHubImporter:
         if protected_fields and not protected_fields_for_model:
             # The deck has protected fields, but none for this note's note type. Recorded
             # because a note type id that isn't a key of protected_fields silently disables
-            # global protection for the note (see TRIAGE-36).
+            # global protection for the note.
             self._mids_without_protected_fields.add(note.mid)
 
         for field_name in note.keys():

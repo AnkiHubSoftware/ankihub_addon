@@ -30,8 +30,8 @@ def reset_local_changes_to_notes(
     protected_tags = client.get_protected_tags(ah_did=ah_did)
 
     # A reset discards local field content and tags, so support needs to be able to tell it
-    # apart from a regular sync when a user reports content loss (TRIAGE-36). It is reachable
-    # from the browser, the tutorial and the startup database check.
+    # apart from a regular sync when a user reports content loss. It is reachable from the
+    # browser, the tutorial and the startup database check.
     LOGGER.info(
         "Resetting local changes to notes...",
         ah_did=ah_did,

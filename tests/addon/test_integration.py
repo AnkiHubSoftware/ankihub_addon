@@ -3558,7 +3558,7 @@ class TestAnkiHubImporter:
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
         """The tallies behind the overwrite summary log make reports of personal content
-        disappearing after a sync (TRIAGE-36) diagnosable from an uploaded log file."""
+        disappearing after a sync diagnosable from an uploaded log file."""
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
             anki_did, ah_did = install_sample_ah_deck()
