@@ -3596,7 +3596,7 @@ class TestAnkiHubImporter:
             assert ankihub_importer._overwritten_fields.sample_nids["Back"] == [note.id]
             # Only Back had its content emptied; Front was replaced by other content.
             assert ankihub_importer._cleared_fields.counts == {"Back": 1}
-            assert ankihub_importer._removed_tags.counts == {"Semester-1": 1}
+            assert ankihub_importer._removed_tags.counts == {"Semester-1::Week-1": 1}
 
     def test_protected_field_content_is_not_overwritten_or_tracked(
         self,

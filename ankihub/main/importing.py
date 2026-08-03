@@ -60,20 +60,30 @@ MIN_ANKING_CARDS_FOR_PREVIOUS_DECK = 1000
 # How many note ids to keep per key in the summaries of overwritten content
 OVERWRITE_SAMPLE_LIMIT = 10
 
+# How many distinct keys a summary of overwritten content reports on
+OVERWRITE_KEY_LIMIT = 50
+
 
 class _OverwriteTally:
-    """Counts overwrites per key (field name or tag root) with a bounded sample of note ids.
+    """Counts overwrites per key (a field name or a tag) with a bounded sample of note ids.
 
-    A single import can overwrite content on tens of thousands of notes. The add-on log file
-    is size-capped and rotates, so keeping every note id here would push out the older log
-    history that these summaries exist to preserve.
+    A single import can overwrite content on tens of thousands of notes, and a deck-wide tag
+    reorganisation removes as many distinct tags. The add-on log file is size-capped and
+    rotates, so recording all of that would push out the older log history that these
+    summaries exist to preserve. Records beyond the key limit are counted in `omitted_count`
+    rather than dropped silently.
     """
 
     def __init__(self) -> None:
         self._counts: Dict[str, int] = {}
         self._sample_nids: Dict[str, List[NoteId]] = {}
+        self._omitted_count = 0
 
     def record(self, key: str, nid: NoteId) -> None:
+        if key not in self._counts and len(self._counts) >= OVERWRITE_KEY_LIMIT:
+            self._omitted_count += 1
+            return
+
         self._counts[key] = self._counts.get(key, 0) + 1
         sample = self._sample_nids.setdefault(key, [])
         if len(sample) < OVERWRITE_SAMPLE_LIMIT:
@@ -89,6 +99,11 @@ class _OverwriteTally:
     @property
     def sample_nids(self) -> Dict[str, List[NoteId]]:
         return self._sample_nids
+
+    @property
+    def omitted_count(self) -> int:
+        """How many records fell outside the key limit and aren't represented in `counts`."""
+        return self._omitted_count
 
 
 class NoteOperation(Enum):
@@ -462,8 +477,9 @@ class AnkiHubImporter:
             overwritten_fields_sample_nids=self._overwritten_fields.sample_nids,
             cleared_fields=self._cleared_fields.counts,
             cleared_fields_sample_nids=self._cleared_fields.sample_nids,
-            removed_tag_roots=self._removed_tags.counts,
-            removed_tag_roots_sample_nids=self._removed_tags.sample_nids,
+            removed_tags=self._removed_tags.counts,
+            removed_tags_sample_nids=self._removed_tags.sample_nids,
+            removed_tags_omitted_count=self._removed_tags.omitted_count,
             protected_fields=self._protected_fields,
             protected_tags=self._protected_tags,
             overwritten_mids_without_protection=sorted(self._overwritten_mids_without_protection),
@@ -925,14 +941,16 @@ class AnkiHubImporter:
         return changed
 
     def _record_removed_tags(self, note: Note, removed_tags: Set[str]) -> None:
-        """Records tags the import took off a note, grouped by their top-level component.
+        """Records the tags the import took off a note.
 
-        Grouping keeps the tally bounded: protection is configured per top-level tag, and
-        decks like AnKing carry thousands of distinct full tag paths.
+        Whole tags, not a prefix of them: a protected tag matches any "::"-separated component
+        of a tag, so no single component tells you why a tag went unprotected. Tags that share
+        a top-level component would collapse into one entry as well, hiding which of them the
+        note actually lost.
         """
         nid = NoteId(note.id)
-        for tag_root in {tag.split("::")[0] for tag in removed_tags}:
-            self._removed_tags.record(tag_root, nid)
+        for tag in removed_tags:
+            self._removed_tags.record(tag, nid)
 
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:

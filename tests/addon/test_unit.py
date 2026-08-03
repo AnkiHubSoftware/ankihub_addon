@@ -184,6 +184,7 @@ from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
 from ankihub.main.exporting import _prepared_field_html
 from ankihub.main.importing import (
+    OVERWRITE_KEY_LIMIT,
     OVERWRITE_SAMPLE_LIMIT,
     _OverwriteTally,
     _updated_tags,
@@ -739,6 +740,21 @@ class TestOverwriteTally:
 
         assert tally.counts == {"Front": len(nids)}
         assert tally.sample_nids["Front"] == nids[:OVERWRITE_SAMPLE_LIMIT]
+
+    def test_records_beyond_the_key_limit_are_counted_as_omitted(self):
+        tally = _OverwriteTally()
+        for key in range(OVERWRITE_KEY_LIMIT):
+            tally.record(f"tag_{key}", NoteId(1))
+
+        # A key already being tracked keeps counting; a new one past the limit does not.
+        tally.record("tag_0", NoteId(2))
+        tally.record("one_tag_too_many", NoteId(3))
+        tally.record("another_tag_too_many", NoteId(4))
+
+        assert len(tally.counts) == OVERWRITE_KEY_LIMIT
+        assert tally.counts["tag_0"] == 2
+        assert "one_tag_too_many" not in tally.counts
+        assert tally.omitted_count == 2
 
     def test_empty_tally_is_falsy(self):
         tally = _OverwriteTally()
