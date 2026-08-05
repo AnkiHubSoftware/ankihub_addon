@@ -181,15 +181,6 @@ function renderFlashCardSelectorButtonOnDecks() {
     }
 }
 
-function renderTourPrompt() {
-    if (!document.getElementById("{{ TOUR_PROMPT_TEXT_ID }}")) {
-        const p = document.createElement("p");
-        p.id = "{{ TOUR_PROMPT_TEXT_ID }}";
-        p.innerHTML = `If you have doubts on how to get more cards to study, take our <a href="javascript:pycmd('{{ TOUR_OPEN_PYCMD }}')">tour on how to unsuspend cards</a>.`;
-        document.querySelector(".congrats").appendChild(p);
-    }
-}
-
 function waitForElm(selector) {
     return new Promise(resolve => {
         if (document.querySelector(selector)) {
@@ -219,9 +210,6 @@ if (window.location.href.includes("congrats")) {
         if (flashcardSelectorEnabled) {
             renderFlashCardSelectorButtonOnCongrats();
             document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}").style.display = "flex";
-        }
-        if (tourEnabled) {
-            renderTourPrompt();
         }
     })
 } else if (flashcardSelectorEnabled) {
