@@ -5,9 +5,6 @@ import sys
 lib = (pathlib.Path(__file__).parent / "lib").absolute()
 sys.path.insert(0, str(lib))
 
-lib_other = (pathlib.Path(__file__).parent / "lib/other").absolute()
-sys.path.insert(0, str(lib_other))
-
 
 import structlog
 

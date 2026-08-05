@@ -221,6 +221,9 @@ class API(Enum):
     ANKIWEB = "ankiweb"
 
 
+# The AnkiWeb endpoints speak protobuf, and protobuf-py needs Python 3.10, so below that the
+# methods are absent and gui/ankiweb.py leaves Anki's own login dialog in place. Importing this
+# unconditionally would stop the add-on loading on the Anki versions that still ship 3.9.
 if TYPE_CHECKING or sys.version_info >= (3, 10):
     from .ankiweb_client import AnkiWebClientMixin
 else:
