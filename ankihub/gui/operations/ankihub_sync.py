@@ -2,10 +2,11 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 import aqt
+import aqt.main
 import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
@@ -23,7 +24,12 @@ from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
-from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
+from ...settings import (
+    ANKI_INT_VERSION,
+    ANKI_VERSION_23_10_00,
+    config,
+    get_end_cutoff_date_for_sending_review_summaries,
+)
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import AnkiWebSyncStatusError, FullSyncCancelled
@@ -55,11 +61,11 @@ def get_sync_status(mw: aqt.main.AnkiQt, on_done: Callable[[Future], None]) -> N
             LOGGER.warning("AnkiWeb status error", exc_info=exc)
             on_done(future_with_exception(AnkiWebSyncStatusError(exc)))
 
-    mw.taskman.run_in_background(
-        lambda: mw.col.sync_status(auth),
-        wrapped_on_done,
-        uses_collection=False,
-    )
+    kwargs: Dict[str, Any] = {"task": lambda: mw.col.sync_status(auth), "on_done": wrapped_on_done}
+    if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
+        kwargs["uses_collection"] = False
+
+    mw.taskman.run_in_background(**kwargs)
 
 
 @pass_exceptions_to_on_done
