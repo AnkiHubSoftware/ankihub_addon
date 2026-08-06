@@ -31,6 +31,7 @@ from anki.decks import DeckConfigId, DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.sync import SyncAuth, SyncStatus
 from aqt import AnkiQt, QMenu, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
@@ -135,7 +136,11 @@ from ankihub.common_utils import get_media_names_from_note_field
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
-from ankihub.gui.auto_sync import SYNC_RATE_LIMIT_SECONDS, _setup_ankihub_sync_on_ankiweb_sync
+from ankihub.gui.auto_sync import (
+    SYNC_RATE_LIMIT_SECONDS,
+    _maybe_sync_with_ankihub,
+    _setup_ankihub_sync_on_ankiweb_sync,
+)
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.browser import (
@@ -167,7 +172,12 @@ from ankihub.gui.editor import (
     _on_suggestion_button_press,
 )
 from ankihub.gui.errors import upload_logs_and_data_in_background
-from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.exceptions import (
+    AnkiWebSyncStatusError,
+    DeckDownloadAndInstallError,
+    FullSyncCancelled,
+    RemoteDeckNotFoundError,
+)
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
     ADD_TO_BLOCK_EXAM_SUBDECK,
@@ -7523,6 +7533,256 @@ class TestSyncWithAnkiHub:
                 notes=notes,
             ),
         )
+
+
+def _future_from_callback(callback: Any) -> Future:
+    return callback.kwargs.get("future") or callback.args[0]
+
+
+class TestGetSyncStatus:
+    """Tests for the get_sync_status wrapper which - unlike Anki's version - always calls its callback,
+    reporting AnkiWeb status errors as an AnkiWebSyncStatusError."""
+
+    def test_without_ankiweb_auth(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=None)
+            sync_status_mock = mocker.patch.object(mw.col, "sync_status")
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NO_CHANGES
+
+            # AnkiWeb is not contacted when the user is not logged into it.
+            sync_status_mock.assert_not_called()
+
+    def test_with_successful_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            auth = SyncAuth(hkey="test_hkey")
+            mocker.patch.object(mw.pm, "sync_auth", return_value=auth)
+            sync_status_mock = mocker.patch.object(
+                mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.NORMAL_SYNC)
+            )
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NORMAL_SYNC
+            sync_status_mock.assert_called_once_with(auth)
+
+    def test_with_failing_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            assert raised.__cause__ is exception
+            assert str(raised) == "AnkiWeb is down"
+
+
+@pytest.mark.qt_no_exception_capture
+class TestSyncWithAnkiHubAnkiWebStatusErrors:
+    """Tests for how sync_with_ankihub deals with failures of the AnkiWeb sync status check.
+    Such failures used to make the sync end without ever calling its on_done callback."""
+
+    @pytest.mark.parametrize("report_ankiweb_errors", [True, False])
+    def test_status_error_before_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        report_ankiweb_errors: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback, report_ankiweb_errors=report_ankiweb_errors)
+
+            # The sync ends without an error - the AnkiWeb problem is not an AnkiHub sync failure.
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            # The AnkiHub sync itself is not attempted.
+            get_deck_subscriptions_mock.assert_not_called()
+
+            # The original exception is reported to the user via Anki, unless the caller opted out.
+            if report_ankiweb_errors:
+                handle_sync_error_mock.assert_called_once_with(mw, exception)
+            else:
+                handle_sync_error_mock.assert_not_called()
+
+    def test_status_error_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The first status check requires a full sync, the second one (after the AnkiWeb sync) fails.
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[SyncStatus(required=SyncStatus.FULL_SYNC), exception],
+            )
+            self._mock_ankiweb_sync(mocker)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            # Errors of the status check after the AnkiWeb sync are passed to on_done instead of being
+            # reported to the user, so that the caller can decide what to do with them.
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            handle_sync_error_mock.assert_not_called()
+
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_full_sync_still_required_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The user cancelled the full sync, so a full sync is still required afterwards.
+            mocker.patch.object(mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.FULL_SYNC))
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert isinstance(future.exception(), FullSyncCancelled)
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_sync_continues_after_ankiweb_full_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+
+            # The sync completes here, so prevent the post-sync tasks from running after the test
+            # (and its mocks) are gone.
+            mocker.patch("ankihub.gui.operations.ankihub_sync._schedule_post_sync_tasks")
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[
+                    SyncStatus(required=SyncStatus.FULL_SYNC),
+                    SyncStatus(required=SyncStatus.NO_CHANGES),
+                ],
+            )
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            future.result()  # raises if there is an exception
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_called_once()
+
+    def _mock_ankiweb_sync(self, mocker: MockerFixture) -> Mock:
+        """Mock the AnkiWeb sync so that it immediately calls its callback."""
+        return mocker.patch(
+            "ankihub.gui.operations.ankihub_sync.sync_with_ankiweb",
+            side_effect=lambda on_done: on_done(),
+        )
+
+
+@pytest.mark.qt_no_exception_capture
+class TestMaybeSyncWithAnkiHub:
+    def test_ankiweb_status_errors_are_not_reported_during_auto_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        """AnkiWeb errors are reported by Anki itself when it syncs with AnkiWeb after the AnkiHub sync,
+        so the auto sync must not report them a second time."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(mw.col, "sync_status", side_effect=Exception("AnkiWeb is down"))
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+
+            with qtbot.wait_callback() as callback:
+                _maybe_sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            handle_sync_error_mock.assert_not_called()
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
