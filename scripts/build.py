@@ -28,6 +28,55 @@ WEB_CSS_TARGET = PROJECT_ROOT / "tutorial" / "lib" / "vendor" / "tailwind.css"
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+OLDEST_ANKI_PYTHON = "3.9"
+
+# The oldest Python that any Anki version reaching the modern-only layer can be running.
+OLDEST_MODERN_PYTHON = "3.10"
+
+# Install each layer with the oldest Python that can reach it, so uv refuses a distribution that
+# has dropped support for it. Separate dependency groups, so routing never reads markers.
+BUNDLE_LAYERS = (("bundle", OLDEST_ANKI_PYTHON), ("bundle_modern", OLDEST_MODERN_PYTHON))
+
+
+def locked_group_requirements(group: str) -> str:
+    """A dependency group's exact contents, as recorded in uv.lock.
+
+    Resolving the group at build time instead would pick up whatever versions are current then.
+    """
+    return subprocess.run(
+        [
+            "uv",
+            "export",
+            # Without this, export re-resolves against PyPI and rewrites uv.lock. It also fails
+            # when the lockfile is out of date with pyproject.toml rather than preferring one.
+            "--locked",
+            # Without --color never the export carries ANSI escapes that uv cannot re-parse.
+            "--color",
+            "never",
+            "--only-group",
+            group,
+            "--no-emit-project",
+        ],
+        check=True,
+        stdout=subprocess.PIPE,  # stderr stays on the console so uv explains its own failures
+        text=True,
+        cwd=PROJECT_ROOT,
+    ).stdout
+
+
+def canonical_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def requirement_names(requirements: str) -> "set[str]":
+    names = set()
+    for line in requirements.splitlines():
+        match = re.match(r"[A-Za-z0-9._-]+", line)  # continuation lines are indented
+        if match:
+            names.add(canonical_name(match.group()))
+    return names
+
+
 subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJECT_ROOT)
 
 subprocess.run(
@@ -43,18 +92,48 @@ subprocess.run(
     ],
     check=True,
 )
-subprocess.run(
-    [
-        "uv",
-        "pip",
-        "install",
-        "--target",
-        str(ANKIHUB_LIB_TARGET),
-        "--group",
-        "bundle",
-    ],
-    check=True,
-)
+layer_requirements = {group: locked_group_requirements(group) for group, _ in BUNDLE_LAYERS}
+
+# The layers install into one directory in sequence, so a distribution in both would be
+# overwritten by the later, newer-Python copy.
+shared = set.intersection(*(requirement_names(text) for text in layer_requirements.values()))
+if shared:
+    raise SystemExit(
+        f"{sorted(shared)} are in more than one bundle layer; the later install would overwrite "
+        "the copy resolved for the older Python"
+    )
+
+# uv installs over whatever the target already holds, so distributions removed since an
+# earlier build would otherwise survive into the artifact. Not ignore_errors: a partial delete
+# would leave exactly that behind.
+if ANKIHUB_LIB_TARGET.exists():
+    shutil.rmtree(ANKIHUB_LIB_TARGET)
+subprocess.run(["uv", "python", "install", *dict(BUNDLE_LAYERS).values()], check=True)
+for group, python_version in BUNDLE_LAYERS:
+    subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            python_version,
+            "--no-deps",
+            "--target",
+            str(ANKIHUB_LIB_TARGET),
+            "-r",
+            "-",
+        ],
+        check=True,
+        input=layer_requirements[group],
+        text=True,
+    )
+
+# Drop playhouse's optional C extensions: compiled for whichever interpreter and platform ran this
+# script, so unloadable anywhere else. Nothing imports playhouse, and peewee works without them.
+for pattern in ("*.so", "*.pyd"):
+    for extension in (ANKIHUB_LIB_TARGET / "playhouse").glob(pattern):
+        extension.unlink()
+
 shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
 # Remove large unused files from the Django package
 for path in DJANGO_TARGET.rglob("locale/*"):
@@ -62,6 +141,19 @@ for path in DJANGO_TARGET.rglob("locale/*"):
         shutil.rmtree(path, ignore_errors=True)
 shutil.rmtree(DJANGO_TARGET / "contrib" / "admin" / "static", ignore_errors=True)
 shutil.rmtree(DJANGO_TARGET / "contrib" / "gis", ignore_errors=True)
+
+# Every distribution the lock exported has to have arrived. A requirement whose marker was false for
+# the interpreter or platform building it installs nothing and reports nothing, so its absence here
+# is the only signal there is. This reads dist-info, so it catches a distribution that never
+# installed rather than one whose files a prune above removed while leaving its metadata. It does
+# mean the build host has to be one every exported requirement applies to, which for the current
+# lock means Linux, as every workflow producing an artifact uses.
+missing = set().union(*(requirement_names(text) for text in layer_requirements.values()))
+missing -= {
+    name for path in ANKIHUB_LIB_TARGET.glob("*.dist-info") for name in [canonical_name(path.name.split("-")[0])]
+}
+if missing:
+    raise SystemExit(f"{sorted(missing)} are in the lock but not in the finished bundle")
 
 
 shutil.rmtree(WEB_COMPONENTS_TARGET, ignore_errors=True)
