@@ -55,7 +55,10 @@ def get_sync_status(mw: aqt.main.AnkiQt, on_done: Callable[[Future], None]) -> N
 
     def wrapped_on_done(fut: Future) -> None:
         try:
-            fut.result()
+            status: SyncStatus = fut.result()
+            if new_endpoint := getattr(status, "new_endpoint", None):
+                if hasattr(mw.pm, "set_current_sync_url"):
+                    mw.pm.set_current_sync_url(new_endpoint)
             on_done(fut)
         except Exception as exc:
             LOGGER.warning("AnkiWeb status error", exc_info=exc)
