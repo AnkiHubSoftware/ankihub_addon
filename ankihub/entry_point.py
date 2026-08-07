@@ -33,7 +33,7 @@ from .gui.config_dialog import setup_config_dialog_manager
 from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
-from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
+from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu, setup_preferences_ankihub_auth_patch
 from .gui.operations.ankihub_sync import setup_full_sync_patch
 from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
@@ -45,6 +45,7 @@ from .settings import (
     ankihub_db_path,
     config,
     setup_logger,
+    setup_native_ankihub_token_hook,
     setup_profile_data_folder,
 )
 from .user_state import (
@@ -285,6 +286,13 @@ def _general_setup() -> None:
 
     config.token_change_hook.append(refresh_user_state_in_background)
     LOGGER.info("Set up refreshing of user state on token change.")
+
+    # Bridge Anki Preferences → AnkiHub login/logout into token_change_hook.
+    setup_native_ankihub_token_hook()
+
+    # Preferences → Third-party AnkiHub login must use the add-on (staging-aware)
+    # instead of Anki's production-only dialog.
+    setup_preferences_ankihub_auth_patch()
 
     setup_periodic_user_state_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")

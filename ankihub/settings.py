@@ -835,6 +835,48 @@ def _get_build_config() -> dict:
 
 config = _Config()
 
+_native_ankihub_token_hook_installed = False
+
+
+def setup_native_ankihub_token_hook() -> None:
+    """Fire token_change_hook when Anki Preferences sets the AnkiHub token.
+
+    Preferences → Syncing → AnkiHub login/logout uses ProfileManager.set_ankihub_token,
+    which writes the same profile key as Config.save_token but does not notify the add-on.
+    Without this bridge, feature flags are not refreshed after that login path, so gated
+    behavior (e.g. the AnkiWeb magic-code login dialog) stays inactive until another refresh.
+    """
+    global _native_ankihub_token_hook_installed
+    if _native_ankihub_token_hook_installed:
+        return
+
+    from anki.hooks import wrap
+    from aqt.profiles import ProfileManager
+
+    if not hasattr(ProfileManager, "set_ankihub_token"):
+        LOGGER.info("ProfileManager.set_ankihub_token not available; skipping native token hook.")
+        return
+
+    def _on_set_ankihub_token(*args: Any, **kwargs: Any) -> None:
+        _old = kwargs.pop("_old")
+        pm = args[0]
+        val = args[1] if len(args) > 1 else kwargs.get("val")
+        previous = pm.ankihub_token() if getattr(pm, "profile", None) else None
+        _old(*args, **kwargs)
+        if previous == val:
+            return
+        for func in config.token_change_hook:
+            # Match Config.save_token: run on main so hook exceptions stay isolated.
+            aqt.mw.taskman.run_on_main(func)
+
+    ProfileManager.set_ankihub_token = wrap(  # type: ignore[method-assign]
+        ProfileManager.set_ankihub_token,
+        _on_set_ankihub_token,
+        "around",
+    )
+    _native_ankihub_token_hook_installed = True
+    LOGGER.info("Set up native AnkiHub token change hook.")
+
 
 def setup_profile_data_folder() -> bool:
     """Sets up the profile data folder for the currently open Anki profile.
