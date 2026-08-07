@@ -23,3 +23,12 @@ class FullSyncCancelled(Exception):
     """Raised when a full AnkiWeb sync is cancelled before an AnkiHub sync."""
 
     pass
+
+
+class AnkiWebSyncStatusError(Exception):
+    """Raised when mw.col.sync_status() fails."""
+
+    def __init__(self, original_exception: Exception):
+        super().__init__(str(original_exception))
+        self.original_exception = original_exception
+        self.__cause__ = original_exception
