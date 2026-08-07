@@ -2342,8 +2342,8 @@ class TestNativeAnkiHubTokenHook:
 
 
 class TestPreferencesAnkiHubAuthPatch:
-    """Preferences → Third-party AnkiHub login must use the add-on dialog so staging
-    credentials work and Anki does not reinstall the AnkiWeb add-on package.
+    """Preferences → Third-party AnkiHub auth should use the add-on and stay in sync
+    with menu Sign In / Sign Out.
     """
 
     @pytest.fixture(autouse=True)
@@ -2352,11 +2352,19 @@ class TestPreferencesAnkiHubAuthPatch:
         original_logout = aqt.ankihub.ankihub_logout
         original_prefs_login = aqt.preferences.ankihub_login
         original_prefs_logout = aqt.preferences.ankihub_logout
+        original_reopen = getattr(aqt.preferences.Preferences, "reopen", None)
+        hooks_before = list(config.token_change_hook)
         yield
         aqt.ankihub.ankihub_login = original_login
         aqt.ankihub.ankihub_logout = original_logout
         aqt.preferences.ankihub_login = original_prefs_login
         aqt.preferences.ankihub_logout = original_prefs_logout
+        if original_reopen is None:
+            if hasattr(aqt.preferences.Preferences, "reopen"):
+                delattr(aqt.preferences.Preferences, "reopen")
+        else:
+            aqt.preferences.Preferences.reopen = original_reopen
+        config.token_change_hook[:] = hooks_before
 
     def test_preferences_login_opens_addon_login_dialog(self, mocker: MockerFixture):
         display_login = mocker.patch.object(AnkiHubLogin, "display_login")
@@ -2381,6 +2389,26 @@ class TestPreferencesAnkiHubAuthPatch:
 
         sign_out.assert_called_once_with()
         on_success.assert_called_once_with()
+
+    def test_preferences_reopen_refreshes_ankihub_login_status(self, mocker: MockerFixture):
+        setup_preferences_ankihub_auth_patch()
+
+        assert callable(getattr(aqt.preferences.Preferences, "reopen", None))
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs)
+        prefs.update_login_status.assert_called_once_with()
+
+    def test_token_change_refreshes_open_preferences(self, mocker: MockerFixture):
+        mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
+        setup_preferences_ankihub_auth_patch()
+        prefs = Mock()
+        mocker.patch.object(aqt.dialogs, "_dialogs", {"Preferences": [aqt.preferences.Preferences, prefs]})
+
+        # Simulate menu Sign In writing the token via Config.save_token
+        config.save_token("menu-login-token")
+
+        prefs.update_login_status.assert_called_with()
+        config.save_token("")  # cleanup
 
     def test_display_login_invokes_on_success_after_login(self, mocker: MockerFixture, qtbot: QtBot):
         mocker.patch("ankihub.gui.menu.AnkiHubClient.login", return_value="staging-token")

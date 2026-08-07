@@ -240,10 +240,13 @@ class AnkiHubLogin(QWidget):
 def setup_preferences_ankihub_auth_patch() -> None:
     """Route Preferences → Third-party AnkiHub login/logout through the add-on.
 
-    Anki's native dialog always authenticates against production AnkiHub and then
-    installs the AnkiWeb add-on package. That breaks staging (invalid token → no
-    feature flags → magic-code AnkiWeb login patch stays off) and reinstalls a
-    duplicate add-on next to the development symlink.
+    Anki's native dialog does not go through Config.save_token, so feature flags are
+    not refreshed and the magic-code AnkiWeb login patch stays off. It also tries to
+    install the AnkiWeb add-on package, which can collide with a local install.
+
+    Also keep the Preferences AnkiHub login/logout buttons in sync when the user signs
+    in from the AnkiHub menu: Anki's DialogManager may reuse a cached Preferences
+    window, so we implement reopen() and refresh on token_change_hook.
     """
 
     def patched_ankihub_login(
@@ -268,11 +271,23 @@ def setup_preferences_ankihub_auth_patch() -> None:
         _sign_out_action()
         on_success()
 
+    def reopen_preferences(self: aqt.preferences.Preferences, *args, **kwargs) -> None:
+        # DialogManager reuses Preferences without recreating it; refresh auth UI.
+        self.update_login_status()
+
+    def refresh_preferences_ankihub_login_status() -> None:
+        prefs = aqt.dialogs._dialogs.get("Preferences", [None, None])[1]
+        if prefs is not None:
+            prefs.update_login_status()
+
     aqt.ankihub.ankihub_login = patched_ankihub_login
     aqt.ankihub.ankihub_logout = patched_ankihub_logout
     # preferences.py does `from aqt.ankihub import ankihub_login`, so patch both bindings.
     aqt.preferences.ankihub_login = patched_ankihub_login
     aqt.preferences.ankihub_logout = patched_ankihub_logout
+    aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign]
+    if refresh_preferences_ankihub_login_status not in config.token_change_hook:
+        config.token_change_hook.append(refresh_preferences_ankihub_login_status)
     LOGGER.info("Set up Preferences AnkiHub auth patch.")
 
 
