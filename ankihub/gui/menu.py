@@ -3,9 +3,11 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import aqt
+import aqt.ankihub
+import aqt.preferences
 from aqt import (
     AnkiApp,
     QHBoxLayout,
@@ -84,6 +86,7 @@ class AnkiHubLogin(QWidget):
 
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
+        self._on_success: Optional[Callable[[], None]] = None
         self.results = None
         self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
@@ -209,14 +212,18 @@ class AnkiHubLogin(QWidget):
         from ..user_state import add_user_state_refreshed_callback
 
         add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+        on_success = self._on_success
+        self._on_success = None
         self.close()
+        if on_success:
+            on_success()
 
     def clear_fields(self):
         self.username_or_email_box_text.setText("")
         self.password_box_text.setText("")
 
     @classmethod
-    def display_login(cls):
+    def display_login(cls, on_success: Optional[Callable[[], None]] = None):
         if cls._window is None:
             cls._window = cls()
         else:
@@ -225,8 +232,48 @@ class AnkiHubLogin(QWidget):
             cls._window.raise_()
             cls._window.show()
 
+        cls._window._on_success = on_success
         LOGGER.info("Showed AnkiHub login dialog.")
         return cls._window
+
+
+def setup_preferences_ankihub_auth_patch() -> None:
+    """Route Preferences → Third-party AnkiHub login/logout through the add-on.
+
+    Anki's native dialog always authenticates against production AnkiHub and then
+    installs the AnkiWeb add-on package. That breaks staging (invalid token → no
+    feature flags → magic-code AnkiWeb login patch stays off) and reinstalls a
+    duplicate add-on next to the development symlink.
+    """
+
+    def patched_ankihub_login(
+        mw: aqt.main.AnkiQt,
+        on_success: Callable[[], None],
+        username: str = "",
+        password: str = "",
+        *args,
+        **kwargs,
+    ) -> None:
+        LOGGER.info("Redirecting Preferences AnkiHub login to add-on login dialog.")
+        AnkiHubLogin.display_login(on_success=on_success)
+
+    def patched_ankihub_logout(
+        mw: aqt.main.AnkiQt,
+        on_success: Callable[[], None],
+        token: str,
+        *args,
+        **kwargs,
+    ) -> None:
+        LOGGER.info("Redirecting Preferences AnkiHub logout to add-on sign out.")
+        _sign_out_action()
+        on_success()
+
+    aqt.ankihub.ankihub_login = patched_ankihub_login
+    aqt.ankihub.ankihub_logout = patched_ankihub_logout
+    # preferences.py does `from aqt.ankihub import ankihub_login`, so patch both bindings.
+    aqt.preferences.ankihub_login = patched_ankihub_login
+    aqt.preferences.ankihub_logout = patched_ankihub_logout
+    LOGGER.info("Set up Preferences AnkiHub auth patch.")
 
 
 def _maybe_show_onboarding_tutorial_after_login() -> None:
