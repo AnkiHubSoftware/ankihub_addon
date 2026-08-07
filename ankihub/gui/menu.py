@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import aqt
-import aqt.ankihub
 import aqt.preferences
 from aqt import (
     AnkiApp,
@@ -249,6 +248,14 @@ def setup_preferences_ankihub_auth_patch() -> None:
     window, so we implement reopen() and refresh on token_change_hook.
     """
 
+    try:
+        import aqt.ankihub
+    except ModuleNotFoundError:
+        # Preferences → Third-party AnkiHub login doesn't exist on older Anki versions
+        # (e.g. the aqt==2.1.56 baseline we still support), so there is nothing to patch.
+        LOGGER.info("aqt.ankihub not available; skipping Preferences AnkiHub auth patch.")
+        return
+
     def patched_ankihub_login(
         mw: aqt.main.AnkiQt,
         on_success: Callable[[], None],
@@ -285,7 +292,7 @@ def setup_preferences_ankihub_auth_patch() -> None:
     # preferences.py does `from aqt.ankihub import ankihub_login`, so patch both bindings.
     aqt.preferences.ankihub_login = patched_ankihub_login
     aqt.preferences.ankihub_logout = patched_ankihub_logout
-    aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign]
+    aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign, attr-defined]
     if refresh_preferences_ankihub_login_status not in config.token_change_hook:
         config.token_change_hook.append(refresh_preferences_ankihub_login_status)
     LOGGER.info("Set up Preferences AnkiHub auth patch.")

@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import logging
 import os
@@ -2270,9 +2271,7 @@ class TestNativeAnkiHubTokenHook:
         finally:
             config.token_change_hook.remove(hook)
 
-    def test_unchanged_token_does_not_fire_hook(
-        self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession
-    ):
+    def test_unchanged_token_does_not_fire_hook(self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession):
         mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
         hook = Mock()
         try:
@@ -2341,6 +2340,10 @@ class TestNativeAnkiHubTokenHook:
             remove_user_state_refreshed_callback(_patch_or_revert)
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("aqt.ankihub"),
+    reason="Preferences → Third-party AnkiHub login doesn't exist on this Anki version",
+)
 class TestPreferencesAnkiHubAuthPatch:
     """Preferences → Third-party AnkiHub auth should use the add-on and stay in sync
     with menu Sign In / Sign Out.
@@ -2348,6 +2351,8 @@ class TestPreferencesAnkiHubAuthPatch:
 
     @pytest.fixture(autouse=True)
     def _restore_ankihub_auth(self):
+        import aqt.ankihub
+
         original_login = aqt.ankihub.ankihub_login
         original_logout = aqt.ankihub.ankihub_logout
         original_prefs_login = aqt.preferences.ankihub_login
@@ -2395,7 +2400,7 @@ class TestPreferencesAnkiHubAuthPatch:
 
         assert callable(getattr(aqt.preferences.Preferences, "reopen", None))
         prefs = Mock()
-        aqt.preferences.Preferences.reopen(prefs)
+        aqt.preferences.Preferences.reopen(prefs)  # type: ignore[attr-defined]
         prefs.update_login_status.assert_called_once_with()
 
     def test_token_change_refreshes_open_preferences(self, mocker: MockerFixture):
