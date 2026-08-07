@@ -819,9 +819,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             extra_bottom_button=login_button,
         )
         # Signup already sent the verification email. Shouldn't call resend here.
-        self.description_label.setText(
-            f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>"
-        )
+        self.description_label.setText(f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>")
 
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
