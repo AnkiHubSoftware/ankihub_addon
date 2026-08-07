@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tup
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
+import aqt.profiles
 import pytest
 import requests
 from anki.decks import DeckId
@@ -2236,6 +2237,10 @@ class TestSetupSyncDialogPatchFailure:
         logger_mock.exception.assert_called_once()
 
 
+@pytest.mark.skipif(
+    not hasattr(aqt.profiles.ProfileManager, "set_ankihub_token"),
+    reason="ProfileManager.set_ankihub_token doesn't exist on this Anki version",
+)
 class TestNativeAnkiHubTokenHook:
     """Preferences → Syncing → AnkiHub login uses ProfileManager.set_ankihub_token,
     which must notify the add-on so feature flags (and gated patches) refresh.
