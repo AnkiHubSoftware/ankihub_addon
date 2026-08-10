@@ -12577,3 +12577,100 @@ class TestStepDeckTutorial:
 
             with pytest.raises(AssertionError):
                 StepDeckTutorial()
+
+    def test_hook_browser_startup_does_not_crash_when_browser_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: startup callback should no-op if browser is unavailable."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser = None
+            tutorial._browser_closed_by_us = False
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+
+    def test_hook_browser_startup_does_not_crash_when_step_deck_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: transient missing deck node should not bubble an exception."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            tutorial._browser = Mock(sidebar=sidebar)
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(
+                tutorial,
+                "_find_step_deck_sidebar_item",
+                side_effect=RuntimeError("Sidebar item for Step deck not found"),
+            )
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)

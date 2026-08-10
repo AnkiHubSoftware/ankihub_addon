@@ -1233,6 +1233,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     def _is_step_sidebar_item(self, item: SidebarItem) -> bool:
         return item.id == self._anking_deck_config.anki_id and item.item_type != SidebarItemType.DECK_CURRENT
 
+    def _get_live_browser(self) -> Optional[Browser]:
+        def _is_deleted(obj: Any) -> bool:
+            try:
+                return sip.isdeleted(obj)
+            except TypeError:
+                return False
+
+        browser = self._browser
+        if browser and not _is_deleted(browser):
+            return browser
+
+        dialog = aqt.dialogs._dialogs.get("Browser")
+        if dialog is None:
+            return None
+
+        browser = cast(Optional[Browser], dialog[1])
+        if browser and not _is_deleted(browser):
+            self._browser = browser
+            return browser
+
+        return None
+
     def _find_step_deck_sidebar_item(self, root: SidebarItem) -> SidebarItem:
         for child in root.children:
             if child.item_type == SidebarItemType.DECK_ROOT:
@@ -1241,10 +1263,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                         grandchild.search(self._anking_deck_config.name)
                         return grandchild
 
+        def _find_recursive(item: SidebarItem) -> Optional[SidebarItem]:
+            if self._is_step_sidebar_item(item):
+                return item
+            for child in item.children:
+                found = _find_recursive(child)
+                if found:
+                    return found
+            return None
+
+        for child in root.children:
+            found = _find_recursive(child)
+            if found:
+                found.search(self._anking_deck_config.name)
+                return found
+
         raise RuntimeError("Sidebar item for Step deck not found")
 
     def _get_step_deck_sidebar_item_rect(self) -> OverlayTarget:
-        sidebar = self._browser.sidebar
+        browser = self._get_live_browser()
+        if not browser:
+            raise RuntimeError("Browser is not available")
+        sidebar = browser.sidebar
         model = sidebar.model()
         step_sidebar_item = self._find_step_deck_sidebar_item(model.root)
         idx = model.index_for_item(step_sidebar_item)
@@ -1252,7 +1292,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         return OverlayTarget(sidebar.viewport(), rect)
 
     def _get_tags_sidebar_item(self) -> OverlayTarget:
-        sidebar = self._browser.sidebar
+        browser = self._get_live_browser()
+        if not browser:
+            raise RuntimeError("Browser is not available")
+        sidebar = browser.sidebar
         model = sidebar.model()
         for child in model.root.children:
             if child.item_type == SidebarItemType.TAG_ROOT:
@@ -1276,11 +1319,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         is_startup = False
 
         def wrapped_on_done(root: SidebarItem) -> None:
-            self._browser.sidebar.search_for(self._anking_deck_config.name)
-            self._clear_sidebar_highlight(self._browser.sidebar.model().root)
-            step_sidebar_item = self._find_step_deck_sidebar_item(root)
+            if active_tutorial is not self:
+                return
+
+            browser = self._get_live_browser()
+            if not browser:
+                LOGGER.debug("Skipping tutorial browser startup callback as browser is unavailable")
+                return
+
+            model = browser.sidebar.model()
+            if not model:
+                LOGGER.debug("Skipping tutorial browser startup callback as sidebar model is unavailable")
+                return
+
+            browser.sidebar.search_for(self._anking_deck_config.name)
+            self._clear_sidebar_highlight(model.root)
+            try:
+                step_sidebar_item = self._find_step_deck_sidebar_item(root)
+            except RuntimeError:
+                LOGGER.debug("Skipping tutorial browser startup callback as Step Deck sidebar item is unavailable")
+                return
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
-            self._browser.search_for(search)
+            browser.search_for(search)
             nonlocal is_startup
             if is_startup:
                 on_done()
@@ -1294,7 +1354,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             _old: Callable[..., None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
             _old(*args, **kwargs, root=root)
-            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._browser, root))
+            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._get_live_browser() or aqt.mw, root))
 
         def before_setup_table(browser: Browser) -> None:
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
@@ -1334,7 +1394,9 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _close_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         self._browser_closed_by_us = True
-        self._browser.close()
+        browser = self._get_live_browser()
+        if browser:
+            browser.close()
         self.next()
 
     def _steps(self) -> list[TutorialStep]:
