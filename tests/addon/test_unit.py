@@ -2402,6 +2402,30 @@ class TestPreferencesAnkiHubAuthPatch:
         aqt.preferences.Preferences.reopen(prefs)  # type: ignore[attr-defined]
         prefs.update_login_status.assert_called_once_with()
 
+    def test_preferences_reopen_calls_through_to_native_reopen_if_present(self):
+        """If a future Anki version defines Preferences.reopen, our patch must call
+        through to it instead of clobbering it (see PR discussion with @abdnh).
+
+        anki.hooks.wrap()'s "around" mode requires the wrapped callable to be
+        introspectable (it needs __name__/__qualname__/a real signature), so a
+        plain function is used here to simulate the native reopen rather than
+        a Mock.
+        """
+        native_reopen_calls = []
+
+        def native_reopen(self, *args, **kwargs):
+            native_reopen_calls.append((self, args, kwargs))
+
+        aqt.preferences.Preferences.reopen = native_reopen  # type: ignore[method-assign, attr-defined]
+
+        setup_preferences_ankihub_auth_patch()
+
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs, "arg", kw="kwarg")  # type: ignore[attr-defined]
+
+        assert native_reopen_calls == [(prefs, ("arg",), {"kw": "kwarg"})]
+        prefs.update_login_status.assert_called_once_with()
+
     def test_token_change_refreshes_open_preferences(self, mocker: MockerFixture):
         mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
         setup_preferences_ankihub_auth_patch()

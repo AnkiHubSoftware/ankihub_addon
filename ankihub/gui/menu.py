@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 import aqt
 import aqt.preferences
+from anki.hooks import wrap
 from aqt import (
     AnkiApp,
     QHBoxLayout,
@@ -280,6 +281,9 @@ def setup_preferences_ankihub_auth_patch() -> None:
 
     def reopen_preferences(self: aqt.preferences.Preferences, *args, **kwargs) -> None:
         # DialogManager reuses Preferences without recreating it; refresh auth UI.
+        _old = kwargs.pop("_old", None)
+        if _old is not None:
+            _old(self, *args, **kwargs)
         self.update_login_status()
 
     def refresh_preferences_ankihub_login_status() -> None:
@@ -292,7 +296,16 @@ def setup_preferences_ankihub_auth_patch() -> None:
     # preferences.py does `from aqt.ankihub import ankihub_login`, so patch both bindings.
     aqt.preferences.ankihub_login = patched_ankihub_login
     aqt.preferences.ankihub_logout = patched_ankihub_logout
-    aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign, attr-defined]
+    if hasattr(aqt.preferences.Preferences, "reopen"):
+        # Call through to Anki's native reopen() instead of clobbering it, in case
+        # a future Anki version defines one.
+        aqt.preferences.Preferences.reopen = wrap(  # type: ignore[method-assign]
+            aqt.preferences.Preferences.reopen,
+            reopen_preferences,
+            "around",
+        )
+    else:
+        aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign, attr-defined]
     if refresh_preferences_ankihub_login_status not in config.token_change_hook:
         config.token_change_hook.append(refresh_preferences_ankihub_login_status)
     LOGGER.info("Set up Preferences AnkiHub auth patch.")
