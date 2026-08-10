@@ -2259,6 +2259,23 @@ class TestNativeAnkiHubTokenHook:
         ProfileManager.set_ankihub_token = original
         settings._native_ankihub_token_hook_installed = original_flag
 
+    def test_setup_is_noop_without_set_ankihub_token(
+        self, monkeypatch: MonkeyPatch, anki_session_with_addon_data: AnkiSession
+    ):
+        """Guards the hasattr() branch in setup_native_ankihub_token_hook: on Anki
+        versions without ProfileManager.set_ankihub_token (e.g. the legacy aqt==2.1.56
+        baseline), setup must no-op instead of raising or installing anything."""
+        from aqt.profiles import ProfileManager
+
+        from ankihub import settings
+
+        monkeypatch.delattr(ProfileManager, "set_ankihub_token", raising=False)
+
+        with anki_session_with_addon_data.profile_loaded():
+            setup_native_ankihub_token_hook()  # must not raise
+
+            assert not settings._native_ankihub_token_hook_installed
+
     def test_set_ankihub_token_fires_token_change_hook(self, anki_session_with_addon_data: AnkiSession):
         hook = Mock()
         config.token_change_hook.append(hook)
