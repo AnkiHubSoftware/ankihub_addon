@@ -2259,14 +2259,11 @@ class TestNativeAnkiHubTokenHook:
         ProfileManager.set_ankihub_token = original
         settings._native_ankihub_token_hook_installed = original_flag
 
-    def test_set_ankihub_token_fires_token_change_hook(
-        self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession
-    ):
+    def test_set_ankihub_token_fires_token_change_hook(self, anki_session_with_addon_data: AnkiSession):
         hook = Mock()
         config.token_change_hook.append(hook)
         try:
             with anki_session_with_addon_data.profile_loaded():
-                mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
                 setup_native_ankihub_token_hook()
 
                 aqt.mw.pm.set_ankihub_token("preferences-login-token")
@@ -2276,11 +2273,10 @@ class TestNativeAnkiHubTokenHook:
         finally:
             config.token_change_hook.remove(hook)
 
-    def test_unchanged_token_does_not_fire_hook(self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession):
+    def test_unchanged_token_does_not_fire_hook(self, anki_session_with_addon_data: AnkiSession):
         hook = Mock()
         try:
             with anki_session_with_addon_data.profile_loaded():
-                mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
                 aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = "same-token"
                 setup_native_ankihub_token_hook()
                 config.token_change_hook.append(hook)
@@ -2292,12 +2288,11 @@ class TestNativeAnkiHubTokenHook:
             if hook in config.token_change_hook:
                 config.token_change_hook.remove(hook)
 
-    def test_setup_is_idempotent(self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession):
+    def test_setup_is_idempotent(self, anki_session_with_addon_data: AnkiSession):
         hook = Mock()
         config.token_change_hook.append(hook)
         try:
             with anki_session_with_addon_data.profile_loaded():
-                mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
                 setup_native_ankihub_token_hook()
                 setup_native_ankihub_token_hook()
 
@@ -2324,7 +2319,6 @@ class TestNativeAnkiHubTokenHook:
         config.token_change_hook.append(refresh_flags_then_patch)
         try:
             with anki_session_with_addon_data.profile_loaded():
-                mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
                 dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
                 setup_sync_dialog_patch()
                 assert aqt.sync.sync_login is original_sync_login
