@@ -12605,6 +12605,7 @@ class TestStepDeckTutorial:
             tutorial._anking_deck_config = deck_config
             tutorial._browser = None
             tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
 
             captured_wrappers: dict[str, Callable[..., None]] = {}
 
@@ -12648,6 +12649,7 @@ class TestStepDeckTutorial:
             deck_config.anki_id = 123
             tutorial._anking_deck_config = deck_config
             tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
 
             sidebar_model = Mock(root=Mock(children=[]))
             sidebar = Mock()
@@ -12686,3 +12688,83 @@ class TestStepDeckTutorial:
             root = Mock(children=[])
             captured_wrappers["_deck_tree"](_old=old, root=root)
             sidebar.search_for.assert_any_call("")
+
+    def test_hook_browser_startup_calls_on_done_for_reused_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: reused Browser should trigger startup completion path."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = True
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            browser = Mock(sidebar=sidebar)
+            tutorial._browser = browser
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            on_done = Mock()
+            step_sidebar_item = Mock(search_node=Mock())
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            mocker.patch.object(tutorial, "_find_step_deck_sidebar_item", return_value=step_sidebar_item)
+
+            tutorial.hook_browser_startup(on_done)
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+
+            on_done.assert_called_once()
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_open_browser_marks_pending_completion_and_refreshes_sidebar(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: opening an already-open Browser should request startup completion."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            tutorial._pending_browser_startup_completion = False
+            browser = Mock(sidebar=Mock())
+
+            mocker.patch.object(tutorial_module.aqt.dialogs, "open")
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=browser)
+
+            tutorial._open_browser_and_move_to_next_step(Mock())
+
+            assert tutorial._pending_browser_startup_completion is True
+            browser.sidebar.refresh.assert_called_once()

@@ -1191,6 +1191,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._deckoptions_saved = False
         self._browser: Optional[Browser] = None
         self._browser_closed_by_us = False
+        self._pending_browser_startup_completion = False
         self._unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
@@ -1202,6 +1203,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         ).run_in_background()
 
     def end(self) -> None:
+        self._pending_browser_startup_completion = False
         self._unhook_browser()
         config.set_step_deck_tutorial_pending(False)
         return super().end()
@@ -1338,12 +1340,14 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
             browser = self._get_live_browser()
             if not browser:
-                LOGGER.exception("Skipping tutorial browser startup callback as browser is unavailable")
+                self._pending_browser_startup_completion = False
+                LOGGER.debug("Skipping tutorial browser startup callback as browser is unavailable")
                 return
 
             model = browser.sidebar.model()
             if not model:
-                LOGGER.exception("Skipping tutorial browser startup callback as sidebar model is unavailable")
+                self._pending_browser_startup_completion = False
+                LOGGER.debug("Skipping tutorial browser startup callback as sidebar model is unavailable")
                 return
 
             browser.sidebar.search_for(self._anking_deck_config.name)
@@ -1353,13 +1357,15 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             except RuntimeError:
                 LOGGER.exception("Step Deck sidebar item unavailable during tutorial browser startup")
                 browser.sidebar.search_for("")
+                self._pending_browser_startup_completion = False
                 return
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
             browser.search_for(search)
             nonlocal is_startup
-            if is_startup:
+            if is_startup or self._pending_browser_startup_completion:
                 on_done()
             is_startup = False
+            self._pending_browser_startup_completion = False
 
         # There can be multiple sidebar refresh events at browser startup,
         # so we need to ensure we only call .next() once
@@ -1386,6 +1392,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             browser.setWindowState(self._browser.windowState() | Qt.WindowState.WindowMaximized)
             nonlocal is_startup
             is_startup = True
+            self._pending_browser_startup_completion = False
 
         unwrap_init = wrap_method(Browser, "__init__", wrapped_init, "around")
         unwrap_close = wrap_method(Browser, "closeEvent", after_close, "after")
@@ -1405,6 +1412,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         aqt.dialogs.open("Browser", aqt.mw)
+        browser = self._get_live_browser()
+        if browser:
+            self._pending_browser_startup_completion = True
+            browser.sidebar.refresh()
         # _on_browser_startup() takes care of moving to the next step after the browser is properly set up
 
     def _close_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
