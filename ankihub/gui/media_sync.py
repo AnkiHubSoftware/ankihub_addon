@@ -10,9 +10,6 @@ from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Set, Tuple
 
 import aqt
-from anki.errors import NotFoundError
-from anki.models import NotetypeId
-from anki.notes import NoteId
 from aqt.gui_hooks import theme_did_change, top_toolbar_did_redraw
 from aqt.qt import (
     QAction,
@@ -36,7 +33,6 @@ from aqt.qt import (
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient, CollectionNotAvailableError, collection_or_error
 from ..ankihub_client.models import DeckMedia
-from ..common_utils import get_media_names_from_note_field, get_media_names_from_note_type
 from ..db import ankihub_db
 from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
@@ -335,34 +331,12 @@ class _AnkiHubMediaSync:
         else:
             LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
-    def _media_referenced_by_notes(self, ah_did: uuid.UUID) -> Set[str]:
-        """Scan all notes in the AnkiHub deck and return the set of referenced media filenames."""
-        anki_nids: List[NoteId] = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-
-        media_names: Set[str] = set()
-        note_type_ids: Set[int] = set()
-        for nid in anki_nids:
-            try:
-                note = collection_or_error().get_note(nid)
-            except NotFoundError:
-                continue
-            note_type_ids.add(note.mid)
-            note_type = note.note_type()
-            for field in note.values():
-                media_names.update(get_media_names_from_note_field(field, note_type))
-        for note_type_id in note_type_ids:
-            note_type = ankihub_db.note_type_dict(NotetypeId(note_type_id))
-            # Guard against notes converted to non-AnkiHub note types
-            if note_type:
-                media_names.update(get_media_names_from_note_type(note_type))
-        return media_names
-
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
         media_list = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)
         if not media_list:
             return []
 
-        referenced_media = self._media_referenced_by_notes(ah_did)
+        referenced_media = ankihub_db.media_names_for_ankihub_deck(ah_did)
         # Filter to only media that is both downloadable AND referenced by notes
         media_list = [m for m in media_list if m.name in referenced_media]
 
