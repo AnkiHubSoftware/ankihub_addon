@@ -1338,6 +1338,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 step_sidebar_item = self._find_step_deck_sidebar_item(root)
             except RuntimeError:
                 LOGGER.debug("Skipping tutorial browser startup callback as Step Deck sidebar item is unavailable")
+                browser.sidebar.search_for("")
                 return
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
             browser.search_for(search)

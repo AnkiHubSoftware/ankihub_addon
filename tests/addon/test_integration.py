@@ -12627,7 +12627,7 @@ class TestStepDeckTutorial:
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """Regression: transient missing deck node should not bubble an exception."""
+        """Regression: transient missing deck node should reset sidebar search and not crash."""
         from ankihub.gui import tutorial as tutorial_module
         from ankihub.gui.tutorial import StepDeckTutorial
 
@@ -12661,6 +12661,7 @@ class TestStepDeckTutorial:
             mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
             mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
             mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
             mocker.patch.object(
                 tutorial,
                 "_find_step_deck_sidebar_item",
@@ -12674,3 +12675,4 @@ class TestStepDeckTutorial:
 
             root = Mock(children=[])
             captured_wrappers["_deck_tree"](_old=old, root=root)
+            sidebar.search_for.assert_any_call("")
