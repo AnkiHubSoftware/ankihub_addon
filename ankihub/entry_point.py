@@ -148,6 +148,8 @@ def _on_profile_did_open() -> None:
 
 
 def _on_profile_will_close() -> None:
+    if tutorial.active_tutorial:
+        tutorial.active_tutorial.end()
     media_sync.close_for_profile()
     LOGGER.info("Profile will close, stopping background threads.")
 

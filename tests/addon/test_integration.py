@@ -577,6 +577,16 @@ class TestEntryPoint:
 
         on_profile_did_open_mock.assert_called_once()
 
+    def test_on_profile_will_close_ends_active_tutorial(self, mocker: MockerFixture):
+        active_tutorial_mock = Mock()
+        mocker.patch.object(entry_point.tutorial, "active_tutorial", active_tutorial_mock)
+        close_for_profile_mock = mocker.patch.object(entry_point.media_sync, "close_for_profile")
+
+        entry_point._on_profile_will_close()
+
+        active_tutorial_mock.end.assert_called_once()
+        close_for_profile_mock.assert_called_once()
+
 
 # The JS in the webviews is flaky if not run in sequential mode
 @pytest.mark.sequential

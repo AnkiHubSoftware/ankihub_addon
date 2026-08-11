@@ -1338,12 +1338,12 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
             browser = self._get_live_browser()
             if not browser:
-                LOGGER.debug("Skipping tutorial browser startup callback as browser is unavailable")
+                LOGGER.exception("Skipping tutorial browser startup callback as browser is unavailable")
                 return
 
             model = browser.sidebar.model()
             if not model:
-                LOGGER.debug("Skipping tutorial browser startup callback as sidebar model is unavailable")
+                LOGGER.exception("Skipping tutorial browser startup callback as sidebar model is unavailable")
                 return
 
             browser.sidebar.search_for(self._anking_deck_config.name)
@@ -1351,7 +1351,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             try:
                 step_sidebar_item = self._find_step_deck_sidebar_item(root)
             except RuntimeError:
-                LOGGER.debug("Skipping tutorial browser startup callback as Step Deck sidebar item is unavailable")
+                LOGGER.exception("Step Deck sidebar item unavailable during tutorial browser startup")
                 browser.sidebar.search_for("")
                 return
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
