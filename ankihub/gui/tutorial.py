@@ -27,6 +27,7 @@ from aqt.qt import (
     QObject,
     QPoint,
     Qt,
+    QTimer,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -171,20 +172,33 @@ class DebouncedDelayedCall:
         self._delay_ms = delay_ms
         self._pending_calls: List[Tuple[int, Tuple[Any], Dict[str, Any]]] = []
         self._next_sequence = 0
+        self._timer: Optional[QTimer] = None
 
     def schedule(self, parent: QObject, *args: Any, **kwargs: Any) -> None:
         self._next_sequence += 1
         my_seq = self._next_sequence
         self._pending_calls.append((my_seq, args, kwargs))
+        timer: Optional[QTimer] = None
+        pending_call = (my_seq, args, kwargs)
+
+        def _cleanup_timer() -> None:
+            if self._timer is timer:
+                self._timer = None
+            if timer and not sip.isdeleted(timer):
+                timer.deleteLater()
 
         def run() -> None:
             if any(seq > my_seq for seq, _, _ in self._pending_calls):
-                self._pending_calls.remove((my_seq, args, kwargs))
+                self._pending_calls.remove(pending_call)
+                _cleanup_timer()
                 return
-            self._pending_calls.remove((my_seq, args, kwargs))
-            self._callback(*args, **kwargs)
 
-        aqt.mw.progress.timer(self._delay_ms, run, repeat=False, parent=parent)
+            self._pending_calls.remove(pending_call)
+            self._callback(*args, **kwargs)
+            _cleanup_timer()
+
+        timer = aqt.mw.progress.timer(self._delay_ms, run, repeat=False, parent=parent)
+        self._timer = timer
 
 
 class TutorialOverlayDialog(OverlayDialog):
