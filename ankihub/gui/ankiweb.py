@@ -48,6 +48,9 @@ EMAIL_INSTRUCTIONS = (
     "Didn't receive an email?<ul><li>Check your spam folder. "
     "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
 )
+# Client-side only; the verification-resend API reports daily throttling via
+# `throttled`, not a per-request cooldown. Matches the web verification-sent page.
+VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS = 60
 ERROR_DIALOG_LINK = "#error-dialog"
 
 
@@ -120,17 +123,19 @@ def timer_is_active(timer: Countdown | None) -> bool:
 
 
 class ResendCooldownTracker:
-    """Remembers each email's magic-code resend cooldown independently of any
-    widget, so that closing and reopening the AnkiWeb dialog within the same
-    Anki session keeps showing the correct remaining countdown instead of
-    resetting it.
+    """Remembers each email's resend cooldown independently of any widget, so
+    that closing and reopening the AnkiWeb dialog within the same Anki session
+    keeps showing the correct remaining countdown instead of resetting it.
+
+    Used for magic-code resends (server provides the TTL) and for password-
+    signup verification emails (fixed client-side TTL).
 
     This is a UI convenience only, not an enforcement mechanism: the tracker
     lives in memory for the current session, so restarting Anki clears it and
     lets the resend button appear enabled again immediately. That's fine
-    because the actual cooldown is enforced server-side; this class only
-    avoids a redundant request (and confusing UI) in the common case where the
-    dialog is closed and reopened without restarting Anki.
+    because abuse limits are enforced server-side; this class only avoids a
+    redundant request (and confusing UI) in the common case where the dialog
+    is closed and reopened without restarting Anki.
     """
 
     def __init__(self) -> None:
@@ -804,6 +809,8 @@ class SignupErrorWidget(BaseSignupWidget):
 
 
 class SignupEmailVerificationWidget(BaseSignupWidget):
+    _COOLDOWN_SCOPE = "signup_verification"
+
     def __init__(self, email: str, host_key: str, dialog: AnkiwebDialog):
         self.email = email
         self.host_key = host_key
@@ -819,7 +826,12 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             extra_bottom_button=login_button,
         )
         # Signup already sent the verification email. Shouldn't call resend here.
-        self.description_label.setText(f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>")
+        # Start the UI cooldown soresend isn't clickable yet (don't call the resend API here).
+        remaining = _resend_cooldowns.remaining_seconds(self._COOLDOWN_SCOPE, email)
+        if remaining <= 0:
+            _resend_cooldowns.start(self._COOLDOWN_SCOPE, email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
+            remaining = VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS
+        self._start_cooldown(remaining)
 
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
@@ -839,24 +851,47 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             dialog=self._dialog,
         )
 
-        return form_widget
+    def _start_cooldown(self, remaining_secs: int) -> None:
+        def on_timeout(remaining_secs: int) -> None:
+            resend_available_status = (
+                f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
+            )
+            self.status_label.setText(
+                f"If {self.email} account exists, we sent a message to its inbox.<br>"
+                + resend_available_status
+            )
+            if not remaining_secs:
+                self.resend_button.setEnabled(True)
+
+        self.init_timer(on_timeout, remaining_secs)
+        self.resend_button.setEnabled(False)
 
     def _resend(self) -> None:
+        # Disable immediately so a second click can't fire while the request is in flight.
+        self.resend_button.setEnabled(False)
+
         def on_success(throttled: bool) -> None:
             if throttled:
                 self.form_widget.error_label.set_error("Sorry, no more emails can be sent to that address today.")
-                self.description_label.setText("")
+                self.status_label.setText("")
             else:
                 # TODO: use /verify-email to get actual status
-                self.description_label.setText(
-                    f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>"
+                self.form_widget.error_label.set_error("")
+                _resend_cooldowns.start(
+                    self._COOLDOWN_SCOPE, self.email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS
                 )
+                self._start_cooldown(VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
+
+        def on_failure(exc: Exception) -> None:
+            self.form_widget.error_label.set_exception(exc)
+            if not timer_is_active(self._timer):
+                self.resend_button.setEnabled(True)
 
         AddonQueryOp(
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
+        ).failure(on_failure).run_in_background()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
