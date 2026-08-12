@@ -1335,17 +1335,23 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         is_startup = False
 
         def wrapped_on_done(root: SidebarItem) -> None:
+            nonlocal is_startup
             if active_tutorial is not self:
+                return
+
+            if not (is_startup or self._pending_browser_startup_completion):
                 return
 
             browser = self._get_live_browser()
             if not browser:
+                is_startup = False
                 self._pending_browser_startup_completion = False
                 LOGGER.debug("Skipping tutorial browser startup callback as browser is unavailable")
                 return
 
             model = browser.sidebar.model()
             if not model:
+                is_startup = False
                 self._pending_browser_startup_completion = False
                 LOGGER.debug("Skipping tutorial browser startup callback as sidebar model is unavailable")
                 return
@@ -1357,11 +1363,12 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             except RuntimeError:
                 LOGGER.exception("Step Deck sidebar item unavailable during tutorial browser startup")
                 browser.sidebar.search_for("")
+                is_startup = False
                 self._pending_browser_startup_completion = False
-                return
+                raise
+
             search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
             browser.search_for(search)
-            nonlocal is_startup
             if is_startup or self._pending_browser_startup_completion:
                 on_done()
             is_startup = False

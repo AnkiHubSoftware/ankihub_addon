@@ -12593,7 +12593,7 @@ class TestStepDeckTutorial:
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """Regression: startup callback should no-op if browser is unavailable."""
+        """Regression: startup callback should stop startup state when browser is unavailable."""
         from ankihub.gui import tutorial as tutorial_module
         from ankihub.gui.tutorial import StepDeckTutorial
 
@@ -12624,6 +12624,8 @@ class TestStepDeckTutorial:
             mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
             mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
             mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
 
             tutorial.hook_browser_startup(Mock())
 
@@ -12632,13 +12634,14 @@ class TestStepDeckTutorial:
 
             root = Mock(children=[])
             captured_wrappers["_deck_tree"](_old=old, root=root)
+            assert tutorial._pending_browser_startup_completion is False
 
     def test_hook_browser_startup_does_not_crash_when_step_deck_missing(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
     ):
-        """Regression: transient missing deck node should reset sidebar search and not crash."""
+        """Regression: transient missing deck node should reset sidebar search and raise."""
         from ankihub.gui import tutorial as tutorial_module
         from ankihub.gui.tutorial import StepDeckTutorial
 
@@ -12674,6 +12677,7 @@ class TestStepDeckTutorial:
             mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
             mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
             mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
             mocker.patch.object(
                 tutorial,
                 "_find_step_deck_sidebar_item",
@@ -12686,8 +12690,10 @@ class TestStepDeckTutorial:
                 return None
 
             root = Mock(children=[])
-            captured_wrappers["_deck_tree"](_old=old, root=root)
+            with pytest.raises(RuntimeError, match="Sidebar item for Step deck not found"):
+                captured_wrappers["_deck_tree"](_old=old, root=root)
             sidebar.search_for.assert_any_call("")
+            assert tutorial._pending_browser_startup_completion is False
 
     def test_hook_browser_startup_calls_on_done_for_reused_browser(
         self,
