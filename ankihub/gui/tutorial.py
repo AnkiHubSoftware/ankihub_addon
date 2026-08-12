@@ -1379,9 +1379,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             )
         )
 
-        smart_search_link = render_link(f'javascript:pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}")', "Smart Search")
         body = (
-            f"Or use our AI {smart_search_link}, "
+            "Or use our AI <b>Smart Search</b>, "
             "a Premium feature that helps you search decks for cards"
             " that match your study materials (lecture notes, PDFs, study aids, and more)."
         )
