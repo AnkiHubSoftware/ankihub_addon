@@ -1771,15 +1771,23 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget._on_verify_or_resend()
 
         # The retry widget resumes the countdown of the failed one instead of
-        # restarting it from the full TTL.
+        # restarting it from the full TTL, so Get code stays blocked until it ends.
         retry_widget = dialog._widget
         assert retry_widget is not widget
         assert isinstance(retry_widget, SignupCodeVerificationWidget)
         assert retry_widget.remaining_seconds == remaining_seconds
+        assert retry_widget.email_box.button.isEnabled() is False
+        assert "Resend available in" in retry_widget.status_label.text()
 
-    def test_signup_code_verification_restarts_timer_when_it_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
+    def test_signup_code_verification_enables_get_code_when_timer_ran_out(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
         resend_cooldown_secs = 3
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_signup_code", side_effect=Exception("some error"))
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=Exception("This code has expired. Request another."),
+        )
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = SignupCodeVerificationWidget(
@@ -1795,13 +1803,60 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget.code_input.setText("123456")
         widget._on_verify_or_resend()
 
-        # There is no countdown left to resume, so the retry widget starts over from
-        # the full TTL instead of inheriting the expired one.
+        # No active cooldown left — do not restart the full TTL. Get code must be
+        # clickable so the user can request another after an expired code.
         retry_widget = dialog._widget
         assert retry_widget is not widget
         assert isinstance(retry_widget, SignupCodeVerificationWidget)
-        assert retry_widget.remaining_seconds == resend_cooldown_secs
-        assert retry_widget._timer.remaining_seconds == resend_cooldown_secs - 1
+        assert retry_widget.remaining_seconds == 0
+        assert retry_widget.email_box.button.isEnabled() is True
+        assert retry_widget._timer is None or retry_widget._timer.remaining_seconds <= 0
+        assert "expired" in retry_widget.form_widget.error_label.status.text()
+        assert "Resend available in" not in retry_widget.status_label.text()
+
+    def test_signup_code_verification_retry_get_code_starts_cooldown(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("This code has expired. Request another."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.email_box.button.isEnabled() is True
+
+        widget._on_get_code()
+
+        assert widget.email_box.button.isEnabled() is False
+        assert widget.remaining_seconds == 120
+        assert "Resend available in" in widget.status_label.text()
+
+    def test_signup_code_verification_retry_with_zero_remaining_does_not_start_timer(
+        self, qtbot: QtBot
+    ):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("Invalid code."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.remaining_seconds == 0
+        assert widget.email_box.button.isEnabled() is True
+        assert widget._timer is None
+        assert widget.status_label.text() == ""
 
     def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
