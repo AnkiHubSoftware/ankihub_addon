@@ -54,6 +54,20 @@ VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS = 60
 ERROR_DIALOG_LINK = "#error-dialog"
 
 
+def fit_wrapped_labels(root: QWidget, fallback_width: int = 437) -> None:
+    """Pin word-wrapped QLabels to their real height at the current width.
+
+    QLabel sizeHint under-reports height for wrapped/rich text (especially
+    lists), which clips the last line(s). Same approach as
+    bulk_suggestion_summary_dialog._fit_to_content.
+    """
+    for label in root.findChildren(QLabel):
+        if not label.wordWrap():
+            continue
+        width = label.width() if label.width() > 0 else fallback_width
+        label.setMinimumHeight(label.heightForWidth(width))
+
+
 class AnkiwebLinkIds(Enum):
     LOGIN_CODE = "#sign-in-code"
     LOGIN_PASSWORD = "#sign-in-password"
@@ -374,6 +388,9 @@ class FormWidget(QGroupBox):
             vbox.addWidget(description_label)
 
         form_layout = QFormLayout()
+        # Bare QWidgets (e.g. multi-line instruction labels) go on the vbox —
+        # QFormLayout often under-reports their height and clips rich text.
+        trailing_widgets: list[QWidget] = []
         for row in rows:
             if isinstance(row, tuple):
                 label_text, field = row
@@ -382,11 +399,16 @@ class FormWidget(QGroupBox):
                 font.setBold(True)
                 label.setFont(font)
                 form_layout.addRow(label, field)
-            else:
+            elif isinstance(row, QLayout):
                 form_layout.addRow(row)
+            else:
+                trailing_widgets.append(row)
         form_layout.setSpacing(8)
         form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        vbox.addLayout(form_layout)
+        if form_layout.rowCount():
+            vbox.addLayout(form_layout)
+        for widget in trailing_widgets:
+            vbox.addWidget(widget)
 
         self.setLayout(vbox)
 
@@ -429,6 +451,7 @@ class AnkiwebDialog(QDialog):
         vbox.setContentsMargins(20, 20, 20, 20)
         self.setLayout(vbox)
         self.setWindowTitle(initial_widget.title)
+        self._schedule_fit_wrapped_labels()
 
     def replace_widget(self, widget: BaseAnkiwebWidget) -> None:
         self.layout().replaceWidget(self._widget, widget)
@@ -437,6 +460,20 @@ class AnkiwebDialog(QDialog):
         self._widget = widget
         self.setWindowTitle(widget.title)
         self.adjustSize()
+        self._schedule_fit_wrapped_labels()
+
+    def _schedule_fit_wrapped_labels(self) -> None:
+        # Defer until after the layout has a real width; sizeHint alone clips
+        # the last line(s) of word-wrapped / rich-text labels.
+        widget = self._widget
+
+        def fit() -> None:
+            if sip.isdeleted(self) or sip.isdeleted(widget):
+                return
+            fit_wrapped_labels(widget)
+            self.adjustSize()
+
+        QTimer.singleShot(0, fit)
 
     def show_progress(self, widget: InlineProgressWidget) -> None:
         self._widget.setVisible(False)
@@ -839,21 +876,34 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         self._start_cooldown(remaining)
 
     def _create_form_widget(self) -> FormWidget:
-        self.description_label = description_label = QLabel("")
-        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        description_label.setWordWrap(True)
         self.resend_button = resend_button = QPushButton("Resend verification email")
         qconnect(resend_button.clicked, self._resend)
-        instructions_label = QLabel(EMAIL_INSTRUCTIONS)
-        instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        form_widget = FormWidget(
-            description="",
-            rows=[
-                description_label,
-                resend_button,
-                instructions_label,
-            ],
+        # Separate plain labels: a single QLabel with <ul> under-reports height
+        # and clips the last bullet even with wordWrap enabled.
+        instructions = QWidget()
+        instructions_layout = QVBoxLayout(instructions)
+        instructions_layout.setContentsMargins(0, 0, 0, 0)
+        instructions_layout.setSpacing(4)
+        heading = QLabel("Didn't receive an e-mail?")
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        instructions_layout.addWidget(heading)
+        for text in (
+            "Check the spam folder. E-mails can end up there.",
+            "Resend the e-mail when the countdown ends.",
+        ):
+            item = QLabel(f"• {text}")
+            item.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            instructions_layout.addWidget(item)
+        description = (
+            f"📮 We sent a verification link to <b>{self.email}</b>. "
+            f"<br/>If the email is not correct, "
+            f"{html_link(AnkiwebLinkIds.SIGNUP_PASSWORD.value, 'please change it')}."
+        )
+        return FormWidget(
+            description=description,
+            rows=[resend_button, instructions],
             dialog=self._dialog,
+            back_to=AnkiwebLinkIds.SIGNUP_PASSWORD,
         )
 
     def _start_cooldown(self, remaining_secs: int) -> None:
