@@ -45,8 +45,8 @@ from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
 EMAIL_INSTRUCTIONS = (
-    "Didn't receive an email?<ul><li>Check your spam folder. "
-    "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
+    "Didn't receive an e-mail?<ul><li>Check the spam folder. "
+    "E-mails can end up there.</li><li>Resend the e-mail when the countdown ends.</li></ul>"
 )
 # Client-side only; the verification-resend API reports daily throttling via
 # `throttled`, not a per-request cooldown. Matches the web verification-sent page.
@@ -470,12 +470,13 @@ class BaseAnkiwebWidget(QWidget):
         bottom_label: str,
         dialog: AnkiwebDialog,
         extra_bottom_button: QPushButton | None = None,
+        show_cancel: bool = True,
         parent: QWidget | None = None,
     ):
         self._dialog = dialog
         self._timer: Countdown | None = None
         super().__init__(parent=parent)
-        self._setup_ui(heading, main_description, form_widget, bottom_label, extra_bottom_button)
+        self._setup_ui(heading, main_description, form_widget, bottom_label, extra_bottom_button, show_cancel)
 
     def _setup_ui(
         self,
@@ -484,6 +485,7 @@ class BaseAnkiwebWidget(QWidget):
         form_widget: FormWidget,
         bottom_label: str,
         extra_bottom_button: QPushButton | None,
+        show_cancel: bool,
     ) -> None:
         vbox = QVBoxLayout()
 
@@ -509,7 +511,6 @@ class BaseAnkiwebWidget(QWidget):
             signup_link = LabelWithLink(bottom_label, self._dialog)
             bottom_hbox.addWidget(signup_link)
 
-        cancel_button = CancelButton(self._dialog)
         buttons_hbox = QHBoxLayout()
         buttons_hbox.setAlignment(Qt.AlignmentFlag.AlignRight)
         if form_widget.back_to:
@@ -519,7 +520,8 @@ class BaseAnkiwebWidget(QWidget):
                 lambda: self._dialog.replace_widget(widget_for_link(form_widget.back_to)(self._dialog)),
             )
             buttons_hbox.addWidget(back_button)
-        buttons_hbox.addWidget(cancel_button)
+        if show_cancel:
+            buttons_hbox.addWidget(CancelButton(self._dialog))
         if extra_bottom_button:
             buttons_hbox.addWidget(extra_bottom_button)
         bottom_hbox.addLayout(buttons_hbox)
@@ -771,6 +773,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
         bottom_label: str,
         dialog: AnkiwebDialog,
         extra_bottom_button: QPushButton | None = None,
+        show_cancel: bool = True,
     ):
         super().__init__(
             heading=heading,
@@ -779,6 +782,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
             bottom_label=bottom_label,
             dialog=dialog,
             extra_bottom_button=extra_bottom_button,
+            show_cancel=show_cancel,
         )
 
 
@@ -824,6 +828,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             bottom_label="",
             dialog=dialog,
             extra_bottom_button=login_button,
+            show_cancel=False,
         )
         # Signup already sent the verification email. Shouldn't call resend here.
         # Start the UI cooldown soresend isn't clickable yet (don't call the resend API here).
