@@ -1779,9 +1779,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert retry_widget.email_box.button.isEnabled() is False
         assert "Resend available in" in retry_widget.status_label.text()
 
-    def test_signup_code_verification_enables_get_code_when_timer_ran_out(
-        self, qtbot: QtBot, mocker: MockerFixture
-    ):
+    def test_signup_code_verification_enables_get_code_when_timer_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
         resend_cooldown_secs = 3
         mocker.patch.object(
             AddonAnkiHubClient,
@@ -1814,9 +1812,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "expired" in retry_widget.form_widget.error_label.status.text()
         assert "Resend available in" not in retry_widget.status_label.text()
 
-    def test_signup_code_verification_retry_get_code_starts_cooldown(
-        self, qtbot: QtBot, mocker: MockerFixture
-    ):
+    def test_signup_code_verification_retry_get_code_starts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
         mocker.patch.object(
             AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
         )
@@ -1840,9 +1836,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert widget.remaining_seconds == 120
         assert "Resend available in" in widget.status_label.text()
 
-    def test_signup_code_verification_retry_with_zero_remaining_does_not_start_timer(
-        self, qtbot: QtBot
-    ):
+    def test_signup_code_verification_retry_with_zero_remaining_does_not_start_timer(self, qtbot: QtBot):
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = SignupCodeVerificationWidget(
