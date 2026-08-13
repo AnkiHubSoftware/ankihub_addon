@@ -912,8 +912,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
                 f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
             )
             self.status_label.setText(
-                f"If {self.email} account exists, we sent a message to its inbox.<br>"
-                + resend_available_status
+                f"If {self.email} account exists, we sent a message to its inbox.<br>" + resend_available_status
             )
             if not remaining_secs:
                 self.resend_button.setEnabled(True)
@@ -932,9 +931,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             else:
                 # TODO: use /verify-email to get actual status
                 self.form_widget.error_label.set_error("")
-                _resend_cooldowns.start(
-                    self._COOLDOWN_SCOPE, self.email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS
-                )
+                _resend_cooldowns.start(self._COOLDOWN_SCOPE, self.email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
                 self._start_cooldown(VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
 
         def on_failure(exc: Exception) -> None:

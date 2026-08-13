@@ -1836,9 +1836,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
 
         ankiweb_mod._resend_cooldowns._deadlines.clear()
-        mocker.patch.object(
-            AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=False)
-        )
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=False))
 
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
@@ -1870,15 +1868,11 @@ class TestAnkiwebLoginAndSignupSubmission:
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
 
         ankiweb_mod._resend_cooldowns._deadlines.clear()
-        mocker.patch.object(
-            AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=True)
-        )
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=True))
 
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
-        widget = SignupEmailVerificationWidget(
-            email="throttled@example.com", host_key="hostkey123", dialog=dialog
-        )
+        widget = SignupEmailVerificationWidget(email="throttled@example.com", host_key="hostkey123", dialog=dialog)
         dialog.replace_widget(widget)
 
         for _ in range(widget._timer.remaining_seconds + 1):
