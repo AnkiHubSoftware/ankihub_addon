@@ -716,6 +716,8 @@ class Tutorial:
         return handled
 
     def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
+        if context is None:
+            return
         step = self.steps[self.current_step - 1]
         js = ""
         if context == step.tooltip_context:
