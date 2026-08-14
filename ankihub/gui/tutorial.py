@@ -629,7 +629,7 @@ class Tutorial:
         global active_tutorial
         active_tutorial = None
 
-    def _skip_tutorial(self) -> None:
+    def skip_tutorial(self) -> None:
         self._track_tutorial(event_name="tour_postponed")
         # It copies the end() method because it can be called from the Tutorial children
         self._cleanup_step(all_webviews=True)
@@ -703,7 +703,7 @@ class Tutorial:
             self.end()
             return True, None
         elif message == SKIP_TUTORIAL_PYCMD:
-            self._skip_tutorial()
+            self.skip_tutorial()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
             step = self.steps[self.current_step - 1]

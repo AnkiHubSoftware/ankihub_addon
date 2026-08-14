@@ -594,7 +594,7 @@ class TestEntryPoint:
 
         entry_point._on_profile_will_close()
 
-        active_tutorial_mock._skip_tutorial.assert_called_once()
+        active_tutorial_mock.skip_tutorial.assert_called_once()
         close_for_profile_mock.assert_called_once()
 
 

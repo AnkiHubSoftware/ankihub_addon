@@ -3982,7 +3982,7 @@ class TestTutorialProductMetrics:
         mocker.patch("ankihub.gui.tutorial.gui_hooks")
 
         tutorial = OnboardingTutorial()
-        tutorial._skip_tutorial()
+        tutorial.skip_tutorial()
 
         mock_client.track.assert_called_once_with(
             distinct_id="42",
