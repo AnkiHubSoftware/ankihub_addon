@@ -6406,7 +6406,6 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.delenv("ANKIWEB_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
-        monkeypatch.delenv("INTERCOM_APP_ID", raising=False)
         monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
 
     def test_production_defaults(self):
@@ -6485,11 +6484,75 @@ class TestSetupPublicConfigAndOtherSettings:
         config.setup_public_config_and_other_settings()
         assert config.intro_deck_id == uuid.UUID(custom_id)
 
-    def test_intercom_app_id_env_var_override(self, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("INTERCOM_APP_ID", "env_app_id")
-        config.public_config = {}
-        config.setup_public_config_and_other_settings()
-        assert config.intercom_app_id == "env_app_id"
+
+class TestAuthAppUrlOnServerChange:
+    def test_signs_out_when_auth_app_url_differs_from_current(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            config.set_user_details({"id": 1, "email": "staging@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.app_url = DEFAULT_APP_URL
+            config.setup_private_config()
+
+            assert not config.is_logged_in()
+            assert config.get_user_details() == {}
+            assert config.get_feature_flags() == {}
+            assert config._private_config.auth_app_url is None
+
+    def test_keeps_login_when_auth_app_url_matches(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("prod-token")
+            config.set_user_details({"id": 2, "email": "prod@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "prod-token"
+            assert config.get_user_details() == {"id": 2, "email": "prod@example.com"}
+            assert config.get_feature_flags() == {"intercom_desktop_enabled": True}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_backfills_missing_auth_app_url_without_signing_out(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("legacy-token")
+            config.set_user_details({"id": 3})
+            config._private_config.auth_app_url = None
+            config._update_private_config()
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "legacy-token"
+            assert config.get_user_details() == {"id": 3}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_save_token_stamps_and_clears_auth_app_url(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.save_token("")
+            assert config._private_config.auth_app_url is None
+            assert not config.is_logged_in()
 
 
 class TestIntercom:
@@ -6654,6 +6717,17 @@ class TestIntercom:
         assert "widget.intercom.io/widget/config_app_id" in web_content.body
         assert '"app_id": "config_app_id"' in web_content.body
         assert "from_server" not in web_content.body
+
+    def test_boot_js_shuts_down_and_boots_on_identity_change(self) -> None:
+        from ankihub.gui import intercom
+
+        boot_js = intercom._build_boot_js()
+        assert boot_js is not None
+        assert "identityChanged" in boot_js
+        assert "ic('shutdown')" in boot_js
+        assert "ic('boot',next)" in boot_js
+        assert "prev.app_id!==next.app_id" in boot_js
+        assert "prev.user_id" in boot_js
 
     def test_sync_with_user_preference_shuts_down_when_disabled(self, mocker: MockerFixture) -> None:
         from ankihub.gui import intercom

@@ -25,13 +25,24 @@ from ..settings import config
 
 # Standard Intercom loader snippet (see https://developers.intercom.com/installing-intercom/web/installation).
 # Placeholders are substituted at runtime to avoid str.format/f-string brace escaping.
-# The loader detects an already-booted instance and calls reattach_activator/update
-# instead of loading a second time, so it is safe to inject on every re-render.
+# If Intercom is already loaded with a different app_id or user_id, shut down and boot
+# fresh — Intercom('update') does not switch workspaces or users. Same identity keeps
+# reattach_activator/update so it is safe to inject on every re-render.
 _INTERCOM_LOADER_JS = """
-window.intercomSettings = __SETTINGS__;
 (function(){
-  var w=window;var ic=w.Intercom;
-  if(typeof ic==="function"){
+  var w=window;
+  var next=__SETTINGS__;
+  var prev=w.intercomSettings||{};
+  var ic=w.Intercom;
+  var identityChanged=typeof ic==="function"&&(
+    prev.app_id!==next.app_id||
+    String(prev.user_id||"")!==String(next.user_id||"")
+  );
+  w.intercomSettings=next;
+  if(identityChanged){
+    ic('shutdown');
+    ic('boot',next);
+  }else if(typeof ic==="function"){
     ic('reattach_activator');ic('update',w.intercomSettings);
   }else{
     var d=document;var i=function(){i.c(arguments);};i.q=[];
