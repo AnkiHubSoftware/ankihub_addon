@@ -65,7 +65,9 @@ def fit_wrapped_labels(root: QWidget, fallback_width: int = 437) -> None:
         if not label.wordWrap():
             continue
         width = label.width() if label.width() > 0 else fallback_width
-        label.setMinimumHeight(label.heightForWidth(width))
+        height = label.heightForWidth(width)
+        if height > 0:
+            label.setMinimumHeight(height)
 
 
 class AnkiwebLinkIds(Enum):
@@ -868,7 +870,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             show_cancel=False,
         )
         # Signup already sent the verification email. Shouldn't call resend here.
-        # Start the UI cooldown soresend isn't clickable yet (don't call the resend API here).
+        # Start the UI cooldown so resend isn't clickable yet (don't call the resend API here).
         remaining = _resend_cooldowns.remaining_seconds(self._COOLDOWN_SCOPE, email)
         if remaining <= 0:
             _resend_cooldowns.start(self._COOLDOWN_SCOPE, email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
@@ -876,7 +878,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         self._start_cooldown(remaining)
 
     def _create_form_widget(self) -> FormWidget:
-        self.resend_button = resend_button = QPushButton("Resend verification email")
+        self.resend_button = resend_button = QPushButton("Resend verification e-mail")
         qconnect(resend_button.clicked, self._resend)
         # Separate plain labels: a single QLabel with <ul> under-reports height
         # and clips the last bullet even with wordWrap enabled.
