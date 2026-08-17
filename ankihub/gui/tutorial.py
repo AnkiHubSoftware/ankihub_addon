@@ -1378,7 +1378,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         # There can be multiple sidebar refresh events at browser startup,
         # so we need to ensure we only call .next() once
-        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=1000)
+        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=800)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[..., None] = kwargs.pop("_old")
