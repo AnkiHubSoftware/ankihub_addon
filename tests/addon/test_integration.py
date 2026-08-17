@@ -150,6 +150,8 @@ from ankihub.gui.browser.browser import (
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
     _on_protect_fields_action,
+    _on_reset_deck_action,
+    _on_reset_local_changes_action,
     _on_reset_optional_tags_action,
 )
 from ankihub.gui.browser.custom_search_nodes import (
@@ -6738,8 +6740,7 @@ def test_reset_local_changes_to_notes(
 
         # Edit Front + Back, tag both as personally-protected (mirrors the auto-protect
         # hook's behaviour on real edits), and move the note to a different deck. Back is
-        # also marked as globally protected for this note type — its protect tag should
-        # survive the reset (user-authored intent that should outlast global protection).
+        # also marked as globally protected for this note type.
         basic_note_1["Front"] = "changed front"
         basic_note_1["Back"] = "changed back"
         basic_note_1.tags = ["AnkiHub_Protect::Front", "AnkiHub_Protect::Back"]
@@ -6756,16 +6757,16 @@ def test_reset_local_changes_to_notes(
 
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=True)
+        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
-        # Front: not globally protected → personal-protect tag stripped, field reset.
+        # Front: personally protected → edit and protect tag survive (NRT-897).
         # Back: globally protected → field stays edited (importer respects protected_fields)
         # and the personal-protect tag survives.
         # Note is still in the deck it was moved to (Reset shouldn't move cards between decks).
         basic_note_1.load()
-        assert basic_note_1["Front"] == "This is the front 1"
+        assert basic_note_1["Front"] == "changed front"
         assert basic_note_1["Back"] == "changed back"
-        assert "AnkiHub_Protect::Front" not in basic_note_1.tags
+        assert "AnkiHub_Protect::Front" in basic_note_1.tags
         assert "AnkiHub_Protect::Back" in basic_note_1.tags
         assert basic_note_1.cards()
         for card in basic_note_1.cards():
@@ -6786,8 +6787,7 @@ def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
     mock_client_get_note_type: MockClientGetNoteType,
     mocker: MockerFixture,
 ):
-    """The database check resets decks to repair add-on data, not because the user asked to
-    discard edits, so it must leave personally protected content alone."""
+    """Reset restores unprotected fields and leaves personally protected content alone."""
     with anki_session_with_addon_data.profile_loaded():
         ah_did = install_ah_deck()
         note_info = import_ah_note(ah_did=ah_did)
@@ -6826,6 +6826,39 @@ def test_db_check_resets_decks_without_stripping_personal_protect_tags(
 
         _reset_decks([ah_did])
 
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+
+def _run_taskman_with_progress(*args, **kwargs):
+    task = kwargs.get("task") or args[0]
+    kwargs["on_done"](future_with_result(task()))
+
+
+def test_browser_reset_does_not_strip_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+):
+    """Pins NRT-897: both browser Reset entry points pass strip_personal_protect_tags=False."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+        nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+        reset_mock = mocker.patch("ankihub.gui.browser.browser.reset_local_changes_to_notes")
+        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=_run_taskman_with_progress)
+        mocker.patch("ankihub.gui.browser.browser.tooltip")
+        mocker.patch("ankihub.gui.browser.browser.choose_ankihub_deck", return_value=ah_did)
+        mocker.patch("ankihub.gui.browser.browser.ask_user", return_value=True)
+        mocker.patch.object(aqt.mw, "reset")
+
+        browser = mocker.Mock()
+        _on_reset_local_changes_action(browser, [nid])
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+        reset_mock.reset_mock()
+        _on_reset_deck_action(browser)
         assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
 
 
