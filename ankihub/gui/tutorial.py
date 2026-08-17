@@ -1019,9 +1019,8 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         if not self._has_cards_to_review():
             nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
             # Only reached when notes were deleted locally, since unsuspending and lifting the
-            # daily limits didn't yield enough cards. The importer recreates them, which
-            # doesn't involve protect tags.
-            reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
+            # daily limits didn't yield enough cards. The importer recreates them.
+            reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
 
         self._move_to_intro_deck_overview(on_done)
 
