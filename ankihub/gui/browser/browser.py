@@ -510,7 +510,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     aqt.mw.taskman.with_progress(
-        task=lambda: reset_local_changes_to_notes(filtered_nids, ah_did=ankihub_did, strip_personal_protect_tags=True),
+        task=lambda: reset_local_changes_to_notes(filtered_nids, ah_did=ankihub_did, strip_personal_protect_tags=False),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -597,7 +597,7 @@ def _on_reset_deck_action(browser: Browser):
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
-        lambda: reset_local_changes_to_notes(nids, ah_did=ah_did, strip_personal_protect_tags=True),
+        lambda: reset_local_changes_to_notes(nids, ah_did=ah_did, strip_personal_protect_tags=False),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
