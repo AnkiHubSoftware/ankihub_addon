@@ -8904,6 +8904,12 @@ def mock_load_url_to_show_page(mocker: MockerFixture, body: str, url_substring: 
     mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
 
 
+def _response_with_status(status_code: int) -> Response:
+    response = Response()
+    response.status_code = status_code
+    return response
+
+
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -9237,7 +9243,9 @@ class TestFlashCardSelector:
             pytest.param(True, "trial_ended", True, id="claimed_and_owed"),
             pytest.param(False, "generic_upsell", False, id="claimed_and_not_owed"),
             pytest.param(
-                AnkiHubHTTPError(response=Mock(status_code=500)),
+                # A real Response, not a Mock: the failure handler logs str(exc), and
+                # AnkiHubHTTPError.__str__ reads the response body and headers.
+                AnkiHubHTTPError(response=_response_with_status(500)),
                 "generic_upsell",
                 False,
                 id="claim_failed",
