@@ -1348,6 +1348,19 @@ class AnkiHubClient(AnkiWebClientMixin):
 
         return response.json()
 
+    def claim_trial_ended_message(self) -> bool:
+        """Claim the one-shot "your Premium trial has ended" message.
+
+        The request both reports whether the message was owed and marks it as shown, so it
+        must only be sent when the message is about to be displayed. It is a POST because it
+        has an effect - a retry, prefetch or proxy of a GET would spend the user's only message.
+        """
+        response = self._send_request("POST", API.ANKIHUB, "/users/me/trial-ended-message/claim")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        return bool(response.json()["show_trial_ended_message"])
+
     def owned_deck_ids(self) -> List[uuid.UUID]:
         data = self.get_user_details()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
