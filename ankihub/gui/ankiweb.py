@@ -818,7 +818,8 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             dialog=dialog,
             extra_bottom_button=login_button,
         )
-        self._resend()
+        # Signup already sent the verification email. Shouldn't call resend here.
+        self.description_label.setText(f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>")
 
     def _create_form_widget(self) -> FormWidget:
         self.description_label = description_label = QLabel("")
@@ -978,10 +979,10 @@ class SignupCodeVerificationWidget(BaseSignupWidget):
                 tooltip("Sign-in successful!", parent=aqt.mw)
                 self._dialog._on_success()
             except Exception as exc:
-                if self._timer.remaining_seconds > 0:
-                    remaining_seconds = self._timer.remaining_seconds
-                else:
-                    remaining_seconds = self.remaining_seconds
+                # Only carry over an active cooldown. If it already ran out, leave
+                # Get code enabled — do not restart the full TTL (that should only
+                # begin after a successful Get code / resend request).
+                remaining_seconds = self._timer.remaining_seconds if timer_is_active(self._timer) else 0
                 self._dialog.replace_widget(
                     SignupCodeVerificationWidget(
                         email=self._get_email(),

@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import logging
 import os
@@ -13,6 +14,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tup
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
+import aqt.profiles
 import pytest
 import requests
 from anki.decks import DeckId
@@ -147,7 +149,7 @@ from ankihub.gui.media_sync import (
     MediaSyncStatus,
     media_sync,
 )
-from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
+from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu, setup_preferences_ankihub_auth_patch
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -232,6 +234,7 @@ from ankihub.settings import (
     DatadogLogHandler,
     config,
     log_file_path,
+    setup_native_ankihub_token_hook,
 )
 from ankihub.user_state import (
     _state,
@@ -1768,15 +1771,21 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget._on_verify_or_resend()
 
         # The retry widget resumes the countdown of the failed one instead of
-        # restarting it from the full TTL.
+        # restarting it from the full TTL, so Get code stays blocked until it ends.
         retry_widget = dialog._widget
         assert retry_widget is not widget
         assert isinstance(retry_widget, SignupCodeVerificationWidget)
         assert retry_widget.remaining_seconds == remaining_seconds
+        assert retry_widget.email_box.button.isEnabled() is False
+        assert "Resend available in" in retry_widget.status_label.text()
 
-    def test_signup_code_verification_restarts_timer_when_it_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
+    def test_signup_code_verification_enables_get_code_when_timer_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
         resend_cooldown_secs = 3
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_signup_code", side_effect=Exception("some error"))
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=Exception("This code has expired. Request another."),
+        )
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
         widget = SignupCodeVerificationWidget(
@@ -1792,13 +1801,56 @@ class TestAnkiwebLoginAndSignupSubmission:
         widget.code_input.setText("123456")
         widget._on_verify_or_resend()
 
-        # There is no countdown left to resume, so the retry widget starts over from
-        # the full TTL instead of inheriting the expired one.
+        # No active cooldown left — do not restart the full TTL. Get code must be
+        # clickable so the user can request another after an expired code.
         retry_widget = dialog._widget
         assert retry_widget is not widget
         assert isinstance(retry_widget, SignupCodeVerificationWidget)
-        assert retry_widget.remaining_seconds == resend_cooldown_secs
-        assert retry_widget._timer.remaining_seconds == resend_cooldown_secs - 1
+        assert retry_widget.remaining_seconds == 0
+        assert retry_widget.email_box.button.isEnabled() is True
+        assert retry_widget._timer is None or retry_widget._timer.remaining_seconds <= 0
+        assert "expired" in retry_widget.form_widget.error_label.status.text()
+        assert "Resend available in" not in retry_widget.status_label.text()
+
+    def test_signup_code_verification_retry_get_code_starts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("This code has expired. Request another."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.email_box.button.isEnabled() is True
+
+        widget._on_get_code()
+
+        assert widget.email_box.button.isEnabled() is False
+        assert widget.remaining_seconds == 120
+        assert "Resend available in" in widget.status_label.text()
+
+    def test_signup_code_verification_retry_with_zero_remaining_does_not_start_timer(self, qtbot: QtBot):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("Invalid code."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.remaining_seconds == 0
+        assert widget.email_box.button.isEnabled() is True
+        assert widget._timer is None
+        assert widget.status_label.text() == ""
 
     def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui.ankiweb import SignupEmailVerificationWidget
@@ -2232,6 +2284,241 @@ class TestSetupSyncDialogPatchFailure:
         setup_sync_dialog_patch()  # must not raise
 
         logger_mock.exception.assert_called_once()
+
+
+@pytest.mark.skipif(
+    not hasattr(aqt.profiles.ProfileManager, "set_ankihub_token"),
+    reason="ProfileManager.set_ankihub_token doesn't exist on this Anki version",
+)
+class TestNativeAnkiHubTokenHook:
+    """Preferences → Syncing → AnkiHub login uses ProfileManager.set_ankihub_token,
+    which must notify the add-on so feature flags (and gated patches) refresh.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_set_ankihub_token(self):
+        from aqt.profiles import ProfileManager
+
+        from ankihub import settings
+
+        original = ProfileManager.set_ankihub_token
+        original_flag = settings._native_ankihub_token_hook_installed
+        settings._native_ankihub_token_hook_installed = False
+        yield
+        ProfileManager.set_ankihub_token = original
+        settings._native_ankihub_token_hook_installed = original_flag
+
+    def test_setup_is_noop_without_set_ankihub_token(
+        self, monkeypatch: MonkeyPatch, anki_session_with_addon_data: AnkiSession
+    ):
+        """Guards the hasattr() branch in setup_native_ankihub_token_hook: on Anki
+        versions without ProfileManager.set_ankihub_token (e.g. the legacy aqt==2.1.56
+        baseline), setup must no-op instead of raising or installing anything."""
+        from aqt.profiles import ProfileManager
+
+        from ankihub import settings
+
+        monkeypatch.delattr(ProfileManager, "set_ankihub_token", raising=False)
+
+        with anki_session_with_addon_data.profile_loaded():
+            setup_native_ankihub_token_hook()  # must not raise
+
+            assert not settings._native_ankihub_token_hook_installed
+
+    def test_set_ankihub_token_fires_token_change_hook(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        config.token_change_hook.append(hook)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                setup_native_ankihub_token_hook()
+
+                aqt.mw.pm.set_ankihub_token("preferences-login-token")
+
+                hook.assert_called_once_with()
+                assert aqt.mw.pm.ankihub_token() == "preferences-login-token"
+        finally:
+            config.token_change_hook.remove(hook)
+
+    def test_unchanged_token_does_not_fire_hook(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = "same-token"
+                setup_native_ankihub_token_hook()
+                config.token_change_hook.append(hook)
+
+                aqt.mw.pm.set_ankihub_token("same-token")
+
+                hook.assert_not_called()
+        finally:
+            if hook in config.token_change_hook:
+                config.token_change_hook.remove(hook)
+
+    def test_setup_is_idempotent(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        config.token_change_hook.append(hook)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                setup_native_ankihub_token_hook()
+                setup_native_ankihub_token_hook()
+
+                aqt.mw.pm.set_ankihub_token("once-only")
+
+                hook.assert_called_once_with()
+        finally:
+            config.token_change_hook.remove(hook)
+
+    @pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+    def test_preferences_login_path_enables_magic_code_patch_after_flag_refresh(
+        self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession
+    ):
+        """End-to-end for the bug: Preferences AnkiHub login must be able to activate
+        the AnkiWeb magic-code dialog once feature flags are refreshed."""
+        feature_flags = {"ankiweb_magic_code_login": False}
+        mocker.patch.object(config, "get_feature_flags", side_effect=lambda: feature_flags)
+        original_sync_login = aqt.sync.sync_login
+
+        def refresh_flags_then_patch() -> None:
+            feature_flags["ankiweb_magic_code_login"] = True
+            _patch_or_revert()
+
+        config.token_change_hook.append(refresh_flags_then_patch)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+                setup_sync_dialog_patch()
+                assert aqt.sync.sync_login is original_sync_login
+
+                setup_native_ankihub_token_hook()
+                # Simulate Anki Preferences → Syncing → AnkiHub login
+                aqt.mw.pm.set_ankihub_token("preferences-login-token")
+
+                assert aqt.sync.sync_login is not original_sync_login
+                on_success = Mock()
+                aqt.sync.sync_login(aqt.mw, on_success)
+                dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+        finally:
+            config.token_change_hook.remove(refresh_flags_then_patch)
+            aqt.sync.sync_login = original_sync_login
+            aqt.main.sync_login = original_sync_login
+            aqt.preferences.sync_login = original_sync_login
+            remove_user_state_refreshed_callback(_patch_or_revert)
+
+
+@pytest.mark.skipif(
+    not importlib.util.find_spec("aqt.ankihub"),
+    reason="Preferences → Third-party AnkiHub login doesn't exist on this Anki version",
+)
+class TestPreferencesAnkiHubAuthPatch:
+    """Preferences → Third-party AnkiHub auth should use the add-on and stay in sync
+    with menu Sign In / Sign Out.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_ankihub_auth(self):
+        import aqt.ankihub
+
+        original_login = aqt.ankihub.ankihub_login
+        original_logout = aqt.ankihub.ankihub_logout
+        original_prefs_login = aqt.preferences.ankihub_login
+        original_prefs_logout = aqt.preferences.ankihub_logout
+        original_reopen = getattr(aqt.preferences.Preferences, "reopen", None)
+        hooks_before = list(config.token_change_hook)
+        yield
+        aqt.ankihub.ankihub_login = original_login
+        aqt.ankihub.ankihub_logout = original_logout
+        aqt.preferences.ankihub_login = original_prefs_login
+        aqt.preferences.ankihub_logout = original_prefs_logout
+        if original_reopen is None:
+            if hasattr(aqt.preferences.Preferences, "reopen"):
+                delattr(aqt.preferences.Preferences, "reopen")
+        else:
+            aqt.preferences.Preferences.reopen = original_reopen
+        config.token_change_hook[:] = hooks_before
+
+    def test_preferences_login_opens_addon_login_dialog(self, mocker: MockerFixture):
+        display_login = mocker.patch.object(AnkiHubLogin, "display_login")
+        on_success = Mock()
+
+        setup_preferences_ankihub_auth_patch()
+
+        aqt.preferences.ankihub_login(aqt.mw, on_success)
+        display_login.assert_called_once_with(on_success=on_success)
+
+        display_login.reset_mock()
+        aqt.ankihub.ankihub_login(aqt.mw, on_success, "user", "pass")
+        display_login.assert_called_once_with(on_success=on_success)
+
+    def test_preferences_logout_uses_addon_sign_out(self, mocker: MockerFixture):
+        sign_out = mocker.patch("ankihub.gui.menu._sign_out_action")
+        on_success = Mock()
+
+        setup_preferences_ankihub_auth_patch()
+
+        aqt.preferences.ankihub_logout(aqt.mw, on_success, "token")
+
+        sign_out.assert_called_once_with()
+        on_success.assert_called_once_with()
+
+    def test_preferences_reopen_refreshes_ankihub_login_status(self, mocker: MockerFixture):
+        setup_preferences_ankihub_auth_patch()
+
+        assert callable(getattr(aqt.preferences.Preferences, "reopen", None))
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs)  # type: ignore[attr-defined]
+        prefs.update_login_status.assert_called_once_with()
+
+    def test_preferences_reopen_calls_through_to_native_reopen_if_present(self):
+        """If a future Anki version defines Preferences.reopen, our patch must call
+        through to it instead of clobbering it (see PR discussion with @abdnh).
+
+        anki.hooks.wrap()'s "around" mode requires the wrapped callable to be
+        introspectable (it needs __name__/__qualname__/a real signature), so a
+        plain function is used here to simulate the native reopen rather than
+        a Mock.
+        """
+        native_reopen_calls = []
+
+        def native_reopen(self, *args, **kwargs):
+            native_reopen_calls.append((self, args, kwargs))
+
+        aqt.preferences.Preferences.reopen = native_reopen  # type: ignore[method-assign, attr-defined]
+
+        setup_preferences_ankihub_auth_patch()
+
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs, "arg", kw="kwarg")  # type: ignore[attr-defined]
+
+        assert native_reopen_calls == [(prefs, ("arg",), {"kw": "kwarg"})]
+        prefs.update_login_status.assert_called_once_with()
+
+    def test_token_change_refreshes_open_preferences(self, mocker: MockerFixture):
+        mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
+        setup_preferences_ankihub_auth_patch()
+        prefs = Mock()
+        mocker.patch.object(aqt.dialogs, "_dialogs", {"Preferences": [aqt.preferences.Preferences, prefs]})
+
+        # Simulate menu Sign In writing the token via Config.save_token
+        config.save_token("menu-login-token")
+
+        prefs.update_login_status.assert_called_with()
+        config.save_token("")  # cleanup
+
+    def test_display_login_invokes_on_success_after_login(self, mocker: MockerFixture, qtbot: QtBot):
+        mocker.patch("ankihub.gui.menu.AnkiHubClient.login", return_value="staging-token")
+        mocker.patch("ankihub.gui.menu.tooltip")
+        mocker.patch("ankihub.user_state.add_user_state_refreshed_callback")
+        on_success = Mock()
+
+        AnkiHubLogin.display_login(on_success=on_success)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        window.username_or_email_box_text.setText("staging@example.com")
+        window.password_box_text.setText("secret")
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+        on_success.assert_called_once_with()
+        assert config.token() == "staging-token"
 
 
 class TestSuggestionDialog:
@@ -6119,7 +6406,6 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.delenv("ANKIWEB_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
-        monkeypatch.delenv("INTERCOM_APP_ID", raising=False)
         monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
 
     def test_production_defaults(self):
@@ -6198,11 +6484,75 @@ class TestSetupPublicConfigAndOtherSettings:
         config.setup_public_config_and_other_settings()
         assert config.intro_deck_id == uuid.UUID(custom_id)
 
-    def test_intercom_app_id_env_var_override(self, monkeypatch: MonkeyPatch):
-        monkeypatch.setenv("INTERCOM_APP_ID", "env_app_id")
-        config.public_config = {}
-        config.setup_public_config_and_other_settings()
-        assert config.intercom_app_id == "env_app_id"
+
+class TestAuthAppUrlOnServerChange:
+    def test_signs_out_when_auth_app_url_differs_from_current(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            config.set_user_details({"id": 1, "email": "staging@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.app_url = DEFAULT_APP_URL
+            config.setup_private_config()
+
+            assert not config.is_logged_in()
+            assert config.get_user_details() == {}
+            assert config.get_feature_flags() == {}
+            assert config._private_config.auth_app_url is None
+
+    def test_keeps_login_when_auth_app_url_matches(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("prod-token")
+            config.set_user_details({"id": 2, "email": "prod@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "prod-token"
+            assert config.get_user_details() == {"id": 2, "email": "prod@example.com"}
+            assert config.get_feature_flags() == {"intercom_desktop_enabled": True}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_backfills_missing_auth_app_url_without_signing_out(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("legacy-token")
+            config.set_user_details({"id": 3})
+            config._private_config.auth_app_url = None
+            config._update_private_config()
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "legacy-token"
+            assert config.get_user_details() == {"id": 3}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_save_token_stamps_and_clears_auth_app_url(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.save_token("")
+            assert config._private_config.auth_app_url is None
+            assert not config.is_logged_in()
 
 
 class TestIntercom:
@@ -6367,6 +6717,17 @@ class TestIntercom:
         assert "widget.intercom.io/widget/config_app_id" in web_content.body
         assert '"app_id": "config_app_id"' in web_content.body
         assert "from_server" not in web_content.body
+
+    def test_boot_js_shuts_down_and_boots_on_identity_change(self) -> None:
+        from ankihub.gui import intercom
+
+        boot_js = intercom._build_boot_js()
+        assert boot_js is not None
+        assert "identityChanged" in boot_js
+        assert "ic('shutdown')" in boot_js
+        assert "ic('boot',next)" in boot_js
+        assert "prev.app_id!==next.app_id" in boot_js
+        assert "prev.user_id" in boot_js
 
     def test_sync_with_user_preference_shuts_down_when_disabled(self, mocker: MockerFixture) -> None:
         from ankihub.gui import intercom

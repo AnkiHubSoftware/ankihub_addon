@@ -31,6 +31,7 @@ from anki.decks import DeckConfigId, DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.sync import SyncAuth, SyncStatus
 from aqt import AnkiQt, QMenu, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
@@ -135,7 +136,11 @@ from ankihub.common_utils import get_media_names_from_note_field
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
-from ankihub.gui.auto_sync import SYNC_RATE_LIMIT_SECONDS, _setup_ankihub_sync_on_ankiweb_sync
+from ankihub.gui.auto_sync import (
+    SYNC_RATE_LIMIT_SECONDS,
+    _maybe_sync_with_ankihub,
+    _setup_ankihub_sync_on_ankiweb_sync,
+)
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.browser import (
@@ -145,6 +150,8 @@ from ankihub.gui.browser.browser import (
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
     _on_protect_fields_action,
+    _on_reset_deck_action,
+    _on_reset_local_changes_action,
     _on_reset_optional_tags_action,
 )
 from ankihub.gui.browser.custom_search_nodes import (
@@ -167,7 +174,12 @@ from ankihub.gui.editor import (
     _on_suggestion_button_press,
 )
 from ankihub.gui.errors import upload_logs_and_data_in_background
-from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.exceptions import (
+    AnkiWebSyncStatusError,
+    DeckDownloadAndInstallError,
+    FullSyncCancelled,
+    RemoteDeckNotFoundError,
+)
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
     ADD_TO_BLOCK_EXAM_SUBDECK,
@@ -576,6 +588,16 @@ class TestEntryPoint:
         aqt.mw.maybe_auto_sync_on_open_close(Mock())
 
         on_profile_did_open_mock.assert_called_once()
+
+    def test_on_profile_will_close_ends_active_tutorial(self, mocker: MockerFixture):
+        active_tutorial_mock = Mock()
+        mocker.patch.object(entry_point.tutorial, "active_tutorial", active_tutorial_mock)
+        close_for_profile_mock = mocker.patch.object(entry_point.media_sync, "close_for_profile")
+
+        entry_point._on_profile_will_close()
+
+        active_tutorial_mock.end.assert_called_once()
+        close_for_profile_mock.assert_called_once()
 
 
 # The JS in the webviews is flaky if not run in sequential mode
@@ -6707,6 +6729,7 @@ def test_reset_local_changes_to_notes(
     mock_client_get_note_type: MockClientGetNoteType,
     mocker: MockerFixture,
 ):
+    """User-initiated Reset (strip=False): personal tags and globally protected fields survive."""
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -6716,13 +6739,12 @@ def test_reset_local_changes_to_notes(
         basic_note_1 = mw.col.get_note(NoteId(1608240029527))
         basic_note_2 = mw.col.get_note(NoteId(1608240057545))
 
-        # Edit Front + Back, tag both as personally-protected (mirrors the auto-protect
-        # hook's behaviour on real edits), and move the note to a different deck. Back is
-        # also marked as globally protected for this note type — its protect tag should
-        # survive the reset (user-authored intent that should outlast global protection).
+        # Edit Front + Back and move the note. Front is personally protected (auto-protect).
+        # Back is only globally protected — no personal tag — so a surviving edit proves
+        # the importer honours protected_fields, not AnkiHub_Protect::Back.
         basic_note_1["Front"] = "changed front"
         basic_note_1["Back"] = "changed back"
-        basic_note_1.tags = ["AnkiHub_Protect::Front", "AnkiHub_Protect::Back"]
+        basic_note_1.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front"]
         basic_note_1.flush()
         mw.col.set_deck(basic_note_1.card_ids(), 1)
 
@@ -6734,19 +6756,17 @@ def test_reset_local_changes_to_notes(
         mocker.patch.object(AnkiHubClient, "get_protected_tags")
         mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
 
-        # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=True)
+        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
-        # Front: not globally protected → personal-protect tag stripped, field reset.
-        # Back: globally protected → field stays edited (importer respects protected_fields)
-        # and the personal-protect tag survives.
+        # Front: personally protected → edit and protect tag survive (NRT-897).
+        # Back: globally protected, no personal tag → field stays edited.
         # Note is still in the deck it was moved to (Reset shouldn't move cards between decks).
         basic_note_1.load()
-        assert basic_note_1["Front"] == "This is the front 1"
+        assert basic_note_1["Front"] == "changed front"
         assert basic_note_1["Back"] == "changed back"
-        assert "AnkiHub_Protect::Front" not in basic_note_1.tags
-        assert "AnkiHub_Protect::Back" in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" not in basic_note_1.tags
         assert basic_note_1.cards()
         for card in basic_note_1.cards():
             assert card.did == 1
@@ -6759,15 +6779,45 @@ def test_reset_local_changes_to_notes(
             assert mw.col.decks.name(card.did) == "Testdeck"
 
 
-def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
+def test_reset_local_changes_to_notes_strips_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """True still strips personal protect tags except those matching globally protected fields."""
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        basic_note_1 = mw.col.get_note(NoteId(1608240029527))
+        basic_note_1["Front"] = "changed front"
+        basic_note_1["Back"] = "changed back"
+        basic_note_1.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front", f"{TAG_FOR_PROTECTING_FIELDS}::Back"]
+        basic_note_1.flush()
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={basic_note_1.mid: ["Back"]})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags")
+        mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[basic_note_1.id], ah_did=ah_did, strip_personal_protect_tags=True)
+
+        basic_note_1.load()
+        assert basic_note_1["Front"] == "This is the front 1"
+        assert basic_note_1["Back"] == "changed back"
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" in basic_note_1.tags
+
+
+def test_reset_local_changes_to_notes_keeps_personally_protected_fields(
     anki_session_with_addon_data: AnkiSession,
     install_ah_deck: InstallAHDeck,
     import_ah_note: ImportAHNote,
     mock_client_get_note_type: MockClientGetNoteType,
     mocker: MockerFixture,
 ):
-    """The database check resets decks to repair add-on data, not because the user asked to
-    discard edits, so it must leave personally protected content alone."""
+    """Unprotected fields reset; personally protected fields are left alone even if not globally protected."""
     with anki_session_with_addon_data.profile_loaded():
         ah_did = install_ah_deck()
         note_info = import_ah_note(ah_did=ah_did)
@@ -6784,12 +6834,70 @@ def test_reset_local_changes_to_notes_without_stripping_personal_protect_tags(
 
         reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
 
-        # Back is personally protected: content and tag both survive, even though the field
-        # is not globally protected. Front is unprotected and gets reset as usual.
         note.load()
         assert note["Back"] == "personal content"
         assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" in note.tags
         assert note["Front"] == note_info.fields[0].value
+
+
+def test_reset_local_changes_to_notes_keeps_fields_when_protect_all_tag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """AnkiHub_Protect::All (Protect Fields → all) blocks Reset of every field when strip=False."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+        note["Front"] = "changed front"
+        note["Back"] = "changed back"
+        note.tags = [TAG_FOR_PROTECTING_ALL_FIELDS]
+        aqt.mw.col.update_note(note)
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
+
+        note.load()
+        assert note["Front"] == "changed front"
+        assert note["Back"] == "changed back"
+        assert TAG_FOR_PROTECTING_ALL_FIELDS in note.tags
+
+
+def test_reset_local_changes_to_notes_strips_protect_all_tag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """True strips AnkiHub_Protect::All; it is never treated as a globally protected field tag."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+        note["Front"] = "changed front"
+        note["Back"] = "changed back"
+        note.tags = [TAG_FOR_PROTECTING_ALL_FIELDS]
+        aqt.mw.col.update_note(note)
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=True)
+
+        note.load()
+        assert note["Front"] == note_info.fields[0].value
+        assert note["Back"] == note_info.fields[1].value
+        assert TAG_FOR_PROTECTING_ALL_FIELDS not in note.tags
 
 
 def test_db_check_resets_decks_without_stripping_personal_protect_tags(
@@ -6806,6 +6914,39 @@ def test_db_check_resets_decks_without_stripping_personal_protect_tags(
 
         _reset_decks([ah_did])
 
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+
+def _run_taskman_with_progress(*args, **kwargs):
+    task = kwargs.get("task") or args[0]
+    kwargs["on_done"](future_with_result(task()))
+
+
+def test_browser_reset_does_not_strip_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+):
+    """Pins NRT-897: both browser Reset entry points pass strip_personal_protect_tags=False."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+        nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+        reset_mock = mocker.patch("ankihub.gui.browser.browser.reset_local_changes_to_notes")
+        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=_run_taskman_with_progress)
+        mocker.patch("ankihub.gui.browser.browser.tooltip")
+        mocker.patch("ankihub.gui.browser.browser.choose_ankihub_deck", return_value=ah_did)
+        mocker.patch("ankihub.gui.browser.browser.ask_user", return_value=True)
+        mocker.patch.object(aqt.mw, "reset")
+
+        browser = mocker.Mock()
+        _on_reset_local_changes_action(browser, [nid])
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+        reset_mock.reset_mock()
+        _on_reset_deck_action(browser)
         assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
 
 
@@ -7523,6 +7664,256 @@ class TestSyncWithAnkiHub:
                 notes=notes,
             ),
         )
+
+
+def _future_from_callback(callback: Any) -> Future:
+    return callback.kwargs.get("future") or callback.args[0]
+
+
+class TestGetSyncStatus:
+    """Tests for the get_sync_status wrapper which - unlike Anki's version - always calls its callback,
+    reporting AnkiWeb status errors as an AnkiWebSyncStatusError."""
+
+    def test_without_ankiweb_auth(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=None)
+            sync_status_mock = mocker.patch.object(mw.col, "sync_status")
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NO_CHANGES
+
+            # AnkiWeb is not contacted when the user is not logged into it.
+            sync_status_mock.assert_not_called()
+
+    def test_with_successful_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            auth = SyncAuth(hkey="test_hkey")
+            mocker.patch.object(mw.pm, "sync_auth", return_value=auth)
+            sync_status_mock = mocker.patch.object(
+                mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.NORMAL_SYNC)
+            )
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NORMAL_SYNC
+            sync_status_mock.assert_called_once_with(auth)
+
+    def test_with_failing_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            assert raised.__cause__ is exception
+            assert str(raised) == "AnkiWeb is down"
+
+
+@pytest.mark.qt_no_exception_capture
+class TestSyncWithAnkiHubAnkiWebStatusErrors:
+    """Tests for how sync_with_ankihub deals with failures of the AnkiWeb sync status check.
+    Such failures used to make the sync end without ever calling its on_done callback."""
+
+    @pytest.mark.parametrize("report_ankiweb_errors", [True, False])
+    def test_status_error_before_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        report_ankiweb_errors: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback, report_ankiweb_errors=report_ankiweb_errors)
+
+            # The sync ends without an error - the AnkiWeb problem is not an AnkiHub sync failure.
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            # The AnkiHub sync itself is not attempted.
+            get_deck_subscriptions_mock.assert_not_called()
+
+            # The original exception is reported to the user via Anki, unless the caller opted out.
+            if report_ankiweb_errors:
+                handle_sync_error_mock.assert_called_once_with(mw, exception)
+            else:
+                handle_sync_error_mock.assert_not_called()
+
+    def test_status_error_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The first status check requires a full sync, the second one (after the AnkiWeb sync) fails.
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[SyncStatus(required=SyncStatus.FULL_SYNC), exception],
+            )
+            self._mock_ankiweb_sync(mocker)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            # Errors of the status check after the AnkiWeb sync are passed to on_done instead of being
+            # reported to the user, so that the caller can decide what to do with them.
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            handle_sync_error_mock.assert_not_called()
+
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_full_sync_still_required_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The user cancelled the full sync, so a full sync is still required afterwards.
+            mocker.patch.object(mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.FULL_SYNC))
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert isinstance(future.exception(), FullSyncCancelled)
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_sync_continues_after_ankiweb_full_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+
+            # The sync completes here, so prevent the post-sync tasks from running after the test
+            # (and its mocks) are gone.
+            mocker.patch("ankihub.gui.operations.ankihub_sync._schedule_post_sync_tasks")
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[
+                    SyncStatus(required=SyncStatus.FULL_SYNC),
+                    SyncStatus(required=SyncStatus.NO_CHANGES),
+                ],
+            )
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            future.result()  # raises if there is an exception
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_called_once()
+
+    def _mock_ankiweb_sync(self, mocker: MockerFixture) -> Mock:
+        """Mock the AnkiWeb sync so that it immediately calls its callback."""
+        return mocker.patch(
+            "ankihub.gui.operations.ankihub_sync.sync_with_ankiweb",
+            side_effect=lambda on_done: on_done(),
+        )
+
+
+@pytest.mark.qt_no_exception_capture
+class TestMaybeSyncWithAnkiHub:
+    def test_ankiweb_status_errors_are_not_reported_during_auto_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        """AnkiWeb errors are reported by Anki itself when it syncs with AnkiWeb after the AnkiHub sync,
+        so the auto sync must not report them a second time."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(mw.col, "sync_status", side_effect=Exception("AnkiWeb is down"))
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+
+            with qtbot.wait_callback() as callback:
+                _maybe_sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            handle_sync_error_mock.assert_not_called()
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
@@ -12580,3 +12971,190 @@ class TestStepDeckTutorial:
 
             with pytest.raises(AssertionError):
                 StepDeckTutorial()
+
+    def test_hook_browser_startup_does_not_crash_when_browser_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: startup callback should stop startup state when browser is unavailable."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser = None
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_hook_browser_startup_does_not_crash_when_step_deck_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: transient missing deck node should reset sidebar search and raise."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            tutorial._browser = Mock(sidebar=sidebar)
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
+            mocker.patch.object(
+                tutorial,
+                "_find_step_deck_sidebar_item",
+                side_effect=RuntimeError("Sidebar item for Step deck not found"),
+            )
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            with pytest.raises(RuntimeError, match="Sidebar item for Step deck not found"):
+                captured_wrappers["_deck_tree"](_old=old, root=root)
+            sidebar.search_for.assert_any_call("")
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_hook_browser_startup_calls_on_done_for_reused_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: reused Browser should trigger startup completion path."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = True
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            browser = Mock(sidebar=sidebar)
+            tutorial._browser = browser
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            on_done = Mock()
+            step_sidebar_item = Mock(search_node=Mock())
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            mocker.patch.object(tutorial, "_find_step_deck_sidebar_item", return_value=step_sidebar_item)
+
+            tutorial.hook_browser_startup(on_done)
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+
+            on_done.assert_called_once()
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_open_browser_marks_pending_completion_and_refreshes_sidebar(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: opening an already-open Browser should request startup completion."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            tutorial._pending_browser_startup_completion = False
+            browser = Mock(sidebar=Mock())
+
+            mocker.patch.object(tutorial_module.aqt.dialogs, "open")
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=browser)
+
+            tutorial._open_browser_and_move_to_next_step(Mock())
+
+            assert tutorial._pending_browser_startup_completion is True
+            browser.sidebar.refresh.assert_called_once()
