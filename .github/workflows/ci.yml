@@ -53,6 +53,13 @@ jobs:
           aqt_dependency_group: ${{ matrix.aqt_dependency_group }}
           qt_package: ${{ matrix.qt_package }}
 
+      # Only this lane has an Anki-on-3.9 environment. Its own process, because under pytest the
+      # bundle is shadowed by the development environment - see scripts/check_addon_import.py.
+      - name: Check the built add-on imports inside Anki on Python 3.9
+        if: ${{ matrix.python_version == '3.9' }}
+        run: |
+          xvfb-run -a uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} python scripts/check_addon_import.py
+
       - name: Run pytest with coverage
         run: |
           xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml
