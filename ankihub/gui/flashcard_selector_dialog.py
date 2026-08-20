@@ -70,11 +70,10 @@ UPSELL_SOURCE_TRIAL_ENDED = "trial_ended"
 UPSELL_SOURCE_GENERIC = "generic_upsell"
 
 # Third value in the web's `surface` taxonomy, alongside `web_app` (browser) and
-# `anki_webview` (webview hosted in Anki), which are set in _analytics_state.html:17.
-# Note that Smart Search's webview is also served inside the add-on and reports
-# `anki_webview`, so this value means specifically the add-on's native Qt layer.
-# Both surfaces open the same plans page with no marker of their own, so this property
-# is the only thing preventing double-counting.
+# `anki_webview` (webview hosted in Anki). Smart Search's webview is also served inside
+# the add-on and reports `anki_webview`, so this value means specifically the add-on's
+# native Qt layer. Both surfaces open the same plans page with no marker of their own,
+# so this property is the only thing preventing double-counting.
 UPSELL_SURFACE = "anki_addon"
 
 
@@ -95,8 +94,8 @@ def _track_upsell_event(event_name: str, source: str) -> None:
                 distinct_id=user_id,
                 event_name=event_name,
                 properties={
-                    # Key and values mirror the web upsell's taxonomy so the two channels can
-                    # be reconciled later (ModalUpsellContent.html:40,47 emits `source`).
+                    # `source` and `surface` mirror the web upsell's taxonomy so the two
+                    # channels can be reconciled later.
                     "source": source,
                     "surface": UPSELL_SURFACE,
                     "user": user_id,
@@ -142,7 +141,7 @@ learning experience with Premium. 🌟"
     _track_upsell_event("upgrade_cta_viewed", source)
 
 
-def _show_upsell(user_details: dict, parent=aqt.mw) -> None:
+def _show_upsell(parent=aqt.mw) -> None:
     """Claim the one-shot trial-ended message, then show the upsell with the matching copy.
 
     The claim is what marks the message as shown, so it is sent here - at display time - and
@@ -179,5 +178,5 @@ def show_flashcard_selector(ah_did: UUID, parent=aqt.mw) -> None:
     check_user_feature_access(
         feature_key="has_flashcard_selector_access",
         on_access_granted=on_access_granted,
-        on_access_denied=lambda user_details: _show_upsell(user_details, parent),
+        on_access_denied=lambda _: _show_upsell(parent),
     )
