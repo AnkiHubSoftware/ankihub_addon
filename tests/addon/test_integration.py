@@ -47,7 +47,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QToolButton, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -12971,6 +12971,46 @@ class TestStepDeckTutorial:
 
             with pytest.raises(AssertionError):
                 StepDeckTutorial()
+
+    def test_get_smart_search_button_target_returns_none_when_button_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Regression: tutorial target helper should handle missing Smart Search button."""
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            browser = Mock(sidebar=Mock())
+            browser.findChild.return_value = None
+            tutorial._browser = browser
+
+            assert tutorial._get_smart_search_button_target() is None
+
+    def test_get_smart_search_button_target_uses_live_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: target helper should resolve from the live Browser reference."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.overlay_dialog import OverlayTarget
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            live_browser = Mock(sidebar=Mock())
+            smart_search_button = Mock(spec=QToolButton)
+            live_browser.findChild.return_value = smart_search_button
+            tutorial._browser = None
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=live_browser)
+            mocker.patch.object(tutorial_module.sip, "isdeleted", return_value=False)
+
+            target = tutorial._get_smart_search_button_target()
+
+            assert isinstance(target, OverlayTarget)
+            assert target.parent is live_browser.sidebar
+            assert target.element is smart_search_button
 
     def test_hook_browser_startup_does_not_crash_when_browser_missing(
         self,
