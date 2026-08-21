@@ -45,10 +45,29 @@ from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
 EMAIL_INSTRUCTIONS = (
-    "Didn't receive an email?<ul><li>Check your spam folder. "
+    "Didn't receive an email?<ul><li>Check the spam folder. "
     "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
 )
+# Client-side only; the verification-resend API reports daily throttling via
+# `throttled`, not a per-request cooldown. Matches the web verification-sent page.
+VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS = 60
 ERROR_DIALOG_LINK = "#error-dialog"
+
+
+def fit_wrapped_labels(root: QWidget, fallback_width: int = 437) -> None:
+    """Pin word-wrapped QLabels to their real height at the current width.
+
+    QLabel sizeHint under-reports height for wrapped/rich text (especially
+    lists), which clips the last line(s). Same approach as
+    bulk_suggestion_summary_dialog._fit_to_content.
+    """
+    for label in root.findChildren(QLabel):
+        if not label.wordWrap():
+            continue
+        width = label.width() if label.width() > 0 else fallback_width
+        height = label.heightForWidth(width)
+        if height > 0:
+            label.setMinimumHeight(height)
 
 
 class AnkiwebLinkIds(Enum):
@@ -120,17 +139,19 @@ def timer_is_active(timer: Countdown | None) -> bool:
 
 
 class ResendCooldownTracker:
-    """Remembers each email's magic-code resend cooldown independently of any
-    widget, so that closing and reopening the AnkiWeb dialog within the same
-    Anki session keeps showing the correct remaining countdown instead of
-    resetting it.
+    """Remembers each email's resend cooldown independently of any widget, so
+    that closing and reopening the AnkiWeb dialog within the same Anki session
+    keeps showing the correct remaining countdown instead of resetting it.
+
+    Used for magic-code resends (server provides the TTL) and for password-
+    signup verification emails (fixed client-side TTL).
 
     This is a UI convenience only, not an enforcement mechanism: the tracker
     lives in memory for the current session, so restarting Anki clears it and
     lets the resend button appear enabled again immediately. That's fine
-    because the actual cooldown is enforced server-side; this class only
-    avoids a redundant request (and confusing UI) in the common case where the
-    dialog is closed and reopened without restarting Anki.
+    because abuse limits are enforced server-side; this class only avoids a
+    redundant request (and confusing UI) in the common case where the dialog
+    is closed and reopened without restarting Anki.
     """
 
     def __init__(self) -> None:
@@ -369,6 +390,9 @@ class FormWidget(QGroupBox):
             vbox.addWidget(description_label)
 
         form_layout = QFormLayout()
+        # Bare QWidgets (e.g. multi-line instruction labels) go on the vbox —
+        # QFormLayout often under-reports their height and clips rich text.
+        trailing_widgets: list[QWidget] = []
         for row in rows:
             if isinstance(row, tuple):
                 label_text, field = row
@@ -377,11 +401,16 @@ class FormWidget(QGroupBox):
                 font.setBold(True)
                 label.setFont(font)
                 form_layout.addRow(label, field)
-            else:
+            elif isinstance(row, QLayout):
                 form_layout.addRow(row)
+            else:
+                trailing_widgets.append(row)
         form_layout.setSpacing(8)
         form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        vbox.addLayout(form_layout)
+        if form_layout.rowCount():
+            vbox.addLayout(form_layout)
+        for widget in trailing_widgets:
+            vbox.addWidget(widget)
 
         self.setLayout(vbox)
 
@@ -424,6 +453,7 @@ class AnkiwebDialog(QDialog):
         vbox.setContentsMargins(20, 20, 20, 20)
         self.setLayout(vbox)
         self.setWindowTitle(initial_widget.title)
+        self._schedule_fit_wrapped_labels()
 
     def replace_widget(self, widget: BaseAnkiwebWidget) -> None:
         self.layout().replaceWidget(self._widget, widget)
@@ -432,6 +462,20 @@ class AnkiwebDialog(QDialog):
         self._widget = widget
         self.setWindowTitle(widget.title)
         self.adjustSize()
+        self._schedule_fit_wrapped_labels()
+
+    def _schedule_fit_wrapped_labels(self) -> None:
+        # Defer until after the layout has a real width; sizeHint alone clips
+        # the last line(s) of word-wrapped / rich-text labels.
+        widget = self._widget
+
+        def fit() -> None:
+            if sip.isdeleted(self) or sip.isdeleted(widget):
+                return
+            fit_wrapped_labels(widget)
+            self.adjustSize()
+
+        QTimer.singleShot(0, fit)
 
     def show_progress(self, widget: InlineProgressWidget) -> None:
         self._widget.setVisible(False)
@@ -465,12 +509,13 @@ class BaseAnkiwebWidget(QWidget):
         bottom_label: str,
         dialog: AnkiwebDialog,
         extra_bottom_button: QPushButton | None = None,
+        show_cancel: bool = True,
         parent: QWidget | None = None,
     ):
         self._dialog = dialog
         self._timer: Countdown | None = None
         super().__init__(parent=parent)
-        self._setup_ui(heading, main_description, form_widget, bottom_label, extra_bottom_button)
+        self._setup_ui(heading, main_description, form_widget, bottom_label, extra_bottom_button, show_cancel)
 
     def _setup_ui(
         self,
@@ -479,6 +524,7 @@ class BaseAnkiwebWidget(QWidget):
         form_widget: FormWidget,
         bottom_label: str,
         extra_bottom_button: QPushButton | None,
+        show_cancel: bool,
     ) -> None:
         vbox = QVBoxLayout()
 
@@ -504,7 +550,6 @@ class BaseAnkiwebWidget(QWidget):
             signup_link = LabelWithLink(bottom_label, self._dialog)
             bottom_hbox.addWidget(signup_link)
 
-        cancel_button = CancelButton(self._dialog)
         buttons_hbox = QHBoxLayout()
         buttons_hbox.setAlignment(Qt.AlignmentFlag.AlignRight)
         if form_widget.back_to:
@@ -514,7 +559,8 @@ class BaseAnkiwebWidget(QWidget):
                 lambda: self._dialog.replace_widget(widget_for_link(form_widget.back_to)(self._dialog)),
             )
             buttons_hbox.addWidget(back_button)
-        buttons_hbox.addWidget(cancel_button)
+        if show_cancel:
+            buttons_hbox.addWidget(CancelButton(self._dialog))
         if extra_bottom_button:
             buttons_hbox.addWidget(extra_bottom_button)
         bottom_hbox.addLayout(buttons_hbox)
@@ -766,6 +812,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
         bottom_label: str,
         dialog: AnkiwebDialog,
         extra_bottom_button: QPushButton | None = None,
+        show_cancel: bool = True,
     ):
         super().__init__(
             heading=heading,
@@ -774,6 +821,7 @@ class BaseSignupWidget(BaseAnkiwebWidget):
             bottom_label=bottom_label,
             dialog=dialog,
             extra_bottom_button=extra_bottom_button,
+            show_cancel=show_cancel,
         )
 
 
@@ -804,6 +852,8 @@ class SignupErrorWidget(BaseSignupWidget):
 
 
 class SignupEmailVerificationWidget(BaseSignupWidget):
+    _COOLDOWN_SCOPE = "signup_verification"
+
     def __init__(self, email: str, host_key: str, dialog: AnkiwebDialog):
         self.email = email
         self.host_key = host_key
@@ -817,46 +867,85 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
             bottom_label="",
             dialog=dialog,
             extra_bottom_button=login_button,
+            show_cancel=False,
         )
         # Signup already sent the verification email. Shouldn't call resend here.
-        self.description_label.setText(f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>")
+        # Start the UI cooldown so resend isn't clickable yet (don't call the resend API here).
+        remaining = _resend_cooldowns.remaining_seconds(self._COOLDOWN_SCOPE, email)
+        if remaining <= 0:
+            _resend_cooldowns.start(self._COOLDOWN_SCOPE, email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
+            remaining = VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS
+        self._start_cooldown(remaining)
 
     def _create_form_widget(self) -> FormWidget:
-        self.description_label = description_label = QLabel("")
-        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        description_label.setWordWrap(True)
         self.resend_button = resend_button = QPushButton("Resend verification email")
         qconnect(resend_button.clicked, self._resend)
-        instructions_label = QLabel(EMAIL_INSTRUCTIONS)
-        instructions_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        form_widget = FormWidget(
-            description="",
-            rows=[
-                description_label,
-                resend_button,
-                instructions_label,
-            ],
+        # Separate plain labels: a single QLabel with <ul> under-reports height
+        # and clips the last bullet even with wordWrap enabled.
+        instructions = QWidget()
+        instructions_layout = QVBoxLayout(instructions)
+        instructions_layout.setContentsMargins(0, 0, 0, 0)
+        instructions_layout.setSpacing(4)
+        heading = QLabel("Didn't receive an email?")
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        instructions_layout.addWidget(heading)
+        for text in (
+            "Check the spam folder. Emails can end up there.",
+            "Resend the email when the countdown ends.",
+        ):
+            item = QLabel(f"• {text}")
+            item.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            instructions_layout.addWidget(item)
+        description = (
+            f"📮 We sent a verification link to <b>{self.email}</b>. "
+            f"<br/>If the email is not correct, "
+            f"{html_link(AnkiwebLinkIds.SIGNUP_PASSWORD.value, 'please change it')}."
+        )
+        return FormWidget(
+            description=description,
+            rows=[resend_button, instructions],
             dialog=self._dialog,
+            back_to=AnkiwebLinkIds.SIGNUP_PASSWORD,
         )
 
-        return form_widget
+    def _start_cooldown(self, remaining_secs: int) -> None:
+        def on_timeout(remaining_secs: int) -> None:
+            resend_available_status = (
+                f"Resend available in {remaining_secs}s" if remaining_secs else "Resend available."
+            )
+            self.status_label.setText(
+                f"If {self.email} account exists, we sent a message to its inbox.<br>" + resend_available_status
+            )
+            if not remaining_secs:
+                self.resend_button.setEnabled(True)
+
+        self.init_timer(on_timeout, remaining_secs)
+        self.resend_button.setEnabled(False)
 
     def _resend(self) -> None:
+        # Disable immediately so a second click can't fire while the request is in flight.
+        self.resend_button.setEnabled(False)
+
         def on_success(throttled: bool) -> None:
             if throttled:
                 self.form_widget.error_label.set_error("Sorry, no more emails can be sent to that address today.")
-                self.description_label.setText("")
+                self.status_label.setText("")
             else:
                 # TODO: use /verify-email to get actual status
-                self.description_label.setText(
-                    f"📮 If {self.email} exists, we sent a verification link to its inbox.<br>"
-                )
+                self.form_widget.error_label.set_error("")
+                _resend_cooldowns.start(self._COOLDOWN_SCOPE, self.email, VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
+                self._start_cooldown(VERIFICATION_EMAIL_RESEND_COOLDOWN_SECS)
+
+        def on_failure(exc: Exception) -> None:
+            self.form_widget.error_label.set_exception(exc)
+            if not timer_is_active(self._timer):
+                self.resend_button.setEnabled(True)
 
         AddonQueryOp(
             parent=self,
             op=lambda _: AnkiHubClient().ankiweb_resend_verification(self.host_key).throttled,
             success=on_success,
-        ).failure(lambda exc: self.form_widget.error_label.set_exception(exc)).run_in_background()
+        ).failure(on_failure).run_in_background()
 
     def _on_login(self) -> None:
         self._dialog.replace_widget(LoginWithPasswordWidget(self._dialog))
