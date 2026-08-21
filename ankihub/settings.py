@@ -228,6 +228,9 @@ class PrivateConfig(DataClassJSONMixin):
     show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
     user_details: dict = field(default_factory=dict)
+    # App URL the current token/user_details were issued for. Used to detect
+    # staging↔production switches so we do not reuse credentials across servers.
+    auth_app_url: Optional[str] = None
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
     onboarding_tutorial_pending: bool = False
     onboarding_tutorial_show_on_sync: bool = True
@@ -298,9 +301,6 @@ class _Config:
         if intro_deck_id := os.getenv("INTRO_DECK_ID"):
             self.intro_deck_id = uuid.UUID(intro_deck_id)
 
-        if intercom_app_id := os.getenv("INTERCOM_APP_ID"):
-            self.intercom_app_id = intercom_app_id
-
         if override_url := os.getenv("ANKIWEB_URL"):
             override_url = override_url.rstrip("/")
             self.ankiweb_url = override_url
@@ -333,7 +333,39 @@ class _Config:
                 LOGGER.exception("Failed to load private config. Overwriting it.")
                 self._private_config = PrivateConfig()
 
+        self._invalidate_auth_if_server_changed()
         self._update_private_config()
+
+    def _invalidate_auth_if_server_changed(self) -> None:
+        """Clear credentials when the configured AnkiHub server no longer matches auth.
+
+        Tokens and cached /users/me data are not valid across staging and production.
+        Reusing them would boot Intercom (and other features) with the wrong identity.
+        """
+        if not self.is_logged_in():
+            return
+
+        auth_app_url = self._private_config.auth_app_url
+        if auth_app_url is None:
+            # Upgrade path: stamp the current server without signing out.
+            self._private_config.auth_app_url = self.app_url
+            LOGGER.info("Backfilled auth_app_url for existing login.", auth_app_url=self.app_url)
+            return
+
+        if auth_app_url == self.app_url:
+            return
+
+        LOGGER.info(
+            "signed_out_because_ankihub_server_changed",
+            previous_app_url=auth_app_url,
+            current_app_url=self.app_url,
+        )
+        # Clear token without firing token_change_hook yet — profile hooks may not
+        # be fully wired during setup_private_config. Caller persists via _update_private_config.
+        aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = ""
+        self._private_config.user_details = {}
+        self._private_config.feature_flags = {}
+        self._private_config.auth_app_url = None
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
@@ -366,6 +398,10 @@ class _Config:
 
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
+
+        if self._private_config is not None:
+            self._private_config.auth_app_url = self.app_url if token else None
+            self._update_private_config()
 
         if token_changed:
             for func in self.token_change_hook:

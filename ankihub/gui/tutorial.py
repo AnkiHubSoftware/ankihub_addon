@@ -629,7 +629,7 @@ class Tutorial:
         global active_tutorial
         active_tutorial = None
 
-    def _skip_tutorial(self) -> None:
+    def skip_tutorial(self) -> None:
         self._track_tutorial(event_name="tour_postponed")
         # It copies the end() method because it can be called from the Tutorial children
         self._cleanup_step(all_webviews=True)
@@ -703,7 +703,7 @@ class Tutorial:
             self.end()
             return True, None
         elif message == SKIP_TUTORIAL_PYCMD:
-            self._skip_tutorial()
+            self.skip_tutorial()
             return True, None
         elif message == TARGET_CLICK_PYCMD:
             step = self.steps[self.current_step - 1]
@@ -716,6 +716,8 @@ class Tutorial:
         return handled
 
     def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
+        if context is None:
+            return
         step = self.steps[self.current_step - 1]
         js = ""
         if context == step.tooltip_context:
@@ -1376,7 +1378,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         # There can be multiple sidebar refresh events at browser startup,
         # so we need to ensure we only call .next() once
-        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=1000)
+        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=800)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[..., None] = kwargs.pop("_old")
