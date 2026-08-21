@@ -18,7 +18,7 @@ from aqt.qt import (
 
 
 class OverlayTarget:
-    def __init__(self, parent: QWidget, element: Union[QWidget, QRect]) -> None:
+    def __init__(self, parent: QWidget, element: Optional[Union[QWidget, QRect]]) -> None:
         self.parent = parent
         self.element = element
 
@@ -35,7 +35,9 @@ class OverlayTarget:
             return self.element.window()
         return None
 
-    def rect(self) -> QRect:
+    def rect(self) -> Optional[QRect]:
+        if self.element is None:
+            return None
         if isinstance(self.element, QWidget):
             geom = self.element.rect()
             top_left = self.element.mapToGlobal(geom.topLeft())

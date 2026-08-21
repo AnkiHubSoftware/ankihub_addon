@@ -261,6 +261,8 @@ class TutorialOverlayDialog(OverlayDialog):
             return
 
         rect = self.target.rect()
+        if rect is None:
+            return
         webview_top_left = self.web.mapFromGlobal(rect.topLeft())
         webview_bottom_right = self.web.mapFromGlobal(rect.bottomRight())
         top = webview_top_left.y()
@@ -403,7 +405,7 @@ class TutorialStep:
 @dataclass
 class QtTutorialStep(TutorialStep):
     parent_widget: Optional[Union[QWidget, Callable[[], QWidget]]] = None
-    qt_target: Optional[Union[OverlayTarget, Callable[[], OverlayTarget]]] = None
+    qt_target: Optional[Union[OverlayTarget, Callable[[], Optional[OverlayTarget]]]] = None
     target_outline: bool = True
     apply_backdrop: bool = False
 
@@ -534,7 +536,10 @@ class Tutorial:
             overlay.show()
             step.tooltip_context = overlay
             step.target_context = overlay
-            step.target = "#target"
+            # When the Qt target is unavailable (e.g. transient Browser/widget lifecycle race),
+            # render this step as tooltip-only instead of anchoring to a missing target.
+            step.target = "#target" if target is not None else ""
+            step.click_target = step.click_target if target is not None else ""
 
             def close_overlay() -> None:
                 overlay.close()
@@ -1434,6 +1439,21 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             browser.close()
         self.next()
 
+    def _get_smart_search_button_target(self) -> Optional[OverlayTarget]:
+        browser = self._get_live_browser()
+        if not browser:
+            return None
+
+        smart_search_button = browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
+        if smart_search_button is None:
+            LOGGER.debug("Smart Search tutorial target unavailable: button not found")
+            return None
+        if sip.isdeleted(smart_search_button):
+            LOGGER.debug("Smart Search tutorial target unavailable: button deleted")
+            return None
+
+        return OverlayTarget(browser.sidebar, smart_search_button)
+
     def _steps(self) -> list[TutorialStep]:
         steps = []
 
@@ -1484,10 +1504,8 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         steps.append(
             QtTutorialStep(
                 body=body,
-                qt_target=lambda: OverlayTarget(
-                    self._browser.sidebar, self._browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
-                ),
-                parent_widget=lambda: self._browser,
+                qt_target=self._get_smart_search_button_target,
+                parent_widget=lambda: self._get_live_browser(),
             )
         )
 
