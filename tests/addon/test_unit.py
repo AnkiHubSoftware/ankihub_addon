@@ -1878,7 +1878,7 @@ class TestAnkiwebLoginAndSignupSubmission:
         assert "user@example.com" in dialog._widget.status_label.text()
         assert "Resend available in" in dialog._widget.status_label.text()
         assert dialog._widget.form_widget.back_to is not None
-        assert dialog._widget.resend_button.text() == "Resend verification e-mail"
+        assert dialog._widget.resend_button.text() == "Resend verification email"
 
     def test_signup_email_verification_resend_restarts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
         from ankihub.gui import ankiweb as ankiweb_mod

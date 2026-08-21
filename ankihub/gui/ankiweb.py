@@ -45,8 +45,8 @@ from .operations import AddonQueryOp
 from .utils import error_icon, is_email
 
 EMAIL_INSTRUCTIONS = (
-    "Didn't receive an e-mail?<ul><li>Check the spam folder. "
-    "E-mails can end up there.</li><li>Resend the e-mail when the countdown ends.</li></ul>"
+    "Didn't receive an email?<ul><li>Check the spam folder. "
+    "Emails can end up there.</li><li>Resend the email when the countdown ends.</li></ul>"
 )
 # Client-side only; the verification-resend API reports daily throttling via
 # `throttled`, not a per-request cooldown. Matches the web verification-sent page.
@@ -878,7 +878,7 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         self._start_cooldown(remaining)
 
     def _create_form_widget(self) -> FormWidget:
-        self.resend_button = resend_button = QPushButton("Resend verification e-mail")
+        self.resend_button = resend_button = QPushButton("Resend verification email")
         qconnect(resend_button.clicked, self._resend)
         # Separate plain labels: a single QLabel with <ul> under-reports height
         # and clips the last bullet even with wordWrap enabled.
@@ -886,12 +886,12 @@ class SignupEmailVerificationWidget(BaseSignupWidget):
         instructions_layout = QVBoxLayout(instructions)
         instructions_layout.setContentsMargins(0, 0, 0, 0)
         instructions_layout.setSpacing(4)
-        heading = QLabel("Didn't receive an e-mail?")
+        heading = QLabel("Didn't receive an email?")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
         instructions_layout.addWidget(heading)
         for text in (
-            "Check the spam folder. E-mails can end up there.",
-            "Resend the e-mail when the countdown ends.",
+            "Check the spam folder. Emails can end up there.",
+            "Resend the email when the countdown ends.",
         ):
             item = QLabel(f"• {text}")
             item.setAlignment(Qt.AlignmentFlag.AlignCenter)
