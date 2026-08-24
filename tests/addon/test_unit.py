@@ -6864,6 +6864,9 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
             mocker.patch.object(
                 config,
                 "get_feature_flags",
@@ -6909,6 +6912,9 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
             mocker.patch.object(
                 config,
                 "get_feature_flags",
