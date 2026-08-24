@@ -770,9 +770,7 @@ class AnkiHubImporter:
         if is_tag_in_list(TAG_FOR_INSTRUCTION_NOTES, note.tags):
             return []
 
-        if config.get_feature_flags().get("unsuspend_card_by_default", False) and is_tag_in_list(
-            TAG_STARTER_NOTES, note.tags
-        ):
+        if is_tag_in_list(TAG_STARTER_NOTES, note.tags):
             return []
 
         def new_cards() -> List[Card]:
