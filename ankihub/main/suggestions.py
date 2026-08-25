@@ -152,7 +152,7 @@ class BulkSuggestionFilters:
     @classmethod
     def none_selected(cls) -> "BulkSuggestionFilters":
         """Distinct from passing no filters at all, which ships everything."""
-        return cls(fields_to_include_by_mid={})
+        return cls(fields_to_include_by_mid={}, tags_to_add=(), tags_to_remove=())
 
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
         # An absent mid is an empty allowlist, never "no filter": the widget rendered
