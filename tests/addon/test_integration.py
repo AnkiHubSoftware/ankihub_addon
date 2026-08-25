@@ -2513,6 +2513,78 @@ class TestSuggestNotesInBulk:
             # The note with an empty Back ships only Front — no empty field.
             assert [f.name for f in sent_by_nid[note_without_back.id].fields] == ["Front"]
 
+    def test_ah_db_note_readers_agree_about_deleted_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """The media step reads note data through the batched `notes_data_for_anki_nids`
+        rather than a per-note `note_data` loop. That swap is only sound while the two
+        agree about deleted rows; if they diverge the outgoing media-name set changes
+        silently, so pin the agreement here.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+            assert ankihub_db.note_data(nid) is not None
+            assert [note.anki_nid for note in ankihub_db.notes_data_for_anki_nids([nid])] == [nid]
+
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.anki_note_id == nid
+            ).execute()
+
+            assert ankihub_db.note_data(nid) is None
+            assert ankihub_db.notes_data_for_anki_nids([nid]) == []
+
+    def test_bulk_submit_does_not_read_the_ah_db_per_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Submitting reads the AnkiHub DB per batch and per note type, never per note.
+        Asserting the counts don't grow with the note count rather than pinning exact
+        numbers keeps this robust to unrelated changes in the submit path. At the
+        2000-note bulk cap a reintroduced per-note read costs thousands of queries, and
+        no other test would notice.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+            note_data_spy = mocker.spy(ankihub_db, "note_data")
+            note_type_dict_spy = mocker.spy(ankihub_db, "note_type_dict")
+
+            def ah_db_reads_for_submitting(note_count: int) -> Tuple[int, int]:
+                notes = []
+                for i in range(note_count):
+                    note = add_anki_note(note_type=note_type)
+                    note["Front"] = f"front_{len(notes)}_{i}"
+                    aqt.mw.col.update_note(note)
+                    notes.append(note)
+
+                mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(note_count)])
+                note_data_spy.reset_mock()
+                note_type_dict_spy.reset_mock()
+
+                suggest_notes_in_bulk(
+                    ankihub_did=ah_did,
+                    notes=notes,
+                    auto_accept=False,
+                    change_type=SuggestionType.NEW_CONTENT,
+                    comment="test",
+                    media_upload_cb=mocker.stub(),
+                )
+                return note_data_spy.call_count, note_type_dict_spy.call_count
+
+            assert ah_db_reads_for_submitting(2) == ah_db_reads_for_submitting(6)
+
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
         [

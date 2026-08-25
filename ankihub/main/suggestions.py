@@ -151,9 +151,7 @@ class BulkSuggestionFilters:
 
     @classmethod
     def none_selected(cls) -> "BulkSuggestionFilters":
-        """Select nothing, for a submit that carries no field or tag choices (DELETE).
-        Distinct from passing no filters at all, which ships everything.
-        """
+        """Distinct from passing no filters at all, which ships everything."""
         return cls(fields_to_include_by_mid={})
 
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
@@ -215,8 +213,8 @@ def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
         )
 
         if ah_note is None:
-            # New-note candidate: no AH baseline, so "what would ship" is every non-empty
-            # field (new-note suggestions never carry empty fields) and all current tags.
+            # New-note suggestions never carry empty fields, so for a note with no AH
+            # baseline "what would ship" is exactly its non-empty fields.
             changed_fields = [f for f in cur.fields if f.value]
             added_tags = list(cur.tags or [])
             removed_tags: List[str] = []
@@ -794,7 +792,6 @@ def _change_note_suggestion(
     removed_tags: List[str] = []
     fields_that_changed: List[Field] = []
 
-    # DELETE carries no field/tag content, so it ships an empty suggestion.
     if change_type != SuggestionType.DELETE:
         fields_that_changed = _apply_field_allowlist(diff.changed_fields, filters.fields_to_include)
         added_tags = _apply_tag_allowlist(diff.added_tags, filters.tags_to_add)

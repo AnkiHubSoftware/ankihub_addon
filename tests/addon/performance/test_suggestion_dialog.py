@@ -30,7 +30,7 @@ def test_bulk_suggestion_dialog_open_diff_pipeline(
     profile: Profile,
 ):
     """Measures the per-note work that runs synchronously on the UI thread
-    when the user opens the bulk Suggest-a-change dialog at the 500-note cap.
+    when the user opens the bulk Suggest-a-change dialog.
     Exercises `compute_note_diffs` once and feeds its result through the
     bulk-suggestible gate and the media check. The widget's `_populate` is
     explicitly excluded — it's cheap per-note filtering off already-computed
@@ -38,7 +38,9 @@ def test_bulk_suggestion_dialog_open_diff_pipeline(
     """
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
-        notes_amount = 500  # matches the per-bulk-suggestion cap
+        # A quarter of the 2000-note bulk cap (BULK_SUGGESTION_LIMIT), to keep the
+        # test quick; the ceiling below is calibrated to this size, not to the cap.
+        notes_amount = 500
 
         ankihub_did = next_deterministic_uuid()
         importer = AnkiHubImporter()
