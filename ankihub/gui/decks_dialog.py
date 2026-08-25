@@ -53,7 +53,6 @@ from ..main.note_type_management import (
     update_note_type_templates_and_styles,
 )
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..main.suggestions import AUTO_PROTECT_FEATURE_FLAG
 from ..main.utils import (
     all_notes_in_deck,
     get_deck_for_ah_did,
@@ -321,11 +320,8 @@ class DeckManagementDialog(QDialog):
         # Setup "Remove AnkiHub deleted notes from deck"
         self.box_ankihub_deleted_notes_behavior = self._setup_box_ankihub_deleted_notes_behavior(selected_ah_did)
 
-        # Setup "Automatically protect fields when edited" (gated on a server-controlled flag
-        # — the suggestion dialog needs to ship before this option is meaningful to users)
-        auto_protect_enabled = config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
-        if auto_protect_enabled:
-            self.box_auto_protect_fields = self._setup_box_auto_protect_fields_when_edited(selected_ah_did)
+        # Setup "Automatically protect fields when edited"
+        self.box_auto_protect_fields = self._setup_box_auto_protect_fields_when_edited(selected_ah_did)
 
         # Add individual elements to the deck options elements box
         self.box_deck_options_elements = QVBoxLayout()
@@ -336,9 +332,8 @@ class DeckManagementDialog(QDialog):
         self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
         self.box_deck_options_elements.addSpacing(8)
         self.box_deck_options_elements.addLayout(self.box_ankihub_deleted_notes_behavior)
-        if auto_protect_enabled:
-            self.box_deck_options_elements.addSpacing(8)
-            self.box_deck_options_elements.addLayout(self.box_auto_protect_fields)
+        self.box_deck_options_elements.addSpacing(8)
+        self.box_deck_options_elements.addLayout(self.box_auto_protect_fields)
 
         # Add everything to the result layout
         box = QVBoxLayout()

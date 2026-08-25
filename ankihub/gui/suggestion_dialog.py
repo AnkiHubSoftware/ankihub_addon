@@ -55,7 +55,6 @@ from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
-    AUTO_PROTECT_FEATURE_FLAG,
     BulkSuggestionFilters,
     ChangeSuggestionResult,
     NoteDiff,
@@ -114,7 +113,16 @@ class SuggestionMetadata:
     auto_accept: bool = False
     change_type: Optional[SuggestionType] = None
     source: Optional[SuggestionSource] = None
-    filters: BulkSuggestionFilters = field(default_factory=BulkSuggestionFilters)
+    # Defaulting to "select nothing" suits the submits that offer no choices (DELETE);
+    # anything carrying a user selection must pass `filters` or it silently ships nothing.
+    filters: BulkSuggestionFilters = field(default_factory=BulkSuggestionFilters.none_selected)
+
+
+def _has_live_ah_note(diff: NoteDiff) -> bool:
+    """Whether AnkiHub has a note for this one that can still take a change suggestion.
+    A note deleted on AnkiHub is a new-note candidate again, not a change candidate.
+    """
+    return diff.exists_in_ah_db and not diff.is_deleted_on_remote
 
 
 def open_suggestion_dialog_for_single_suggestion(
@@ -136,16 +144,16 @@ def open_suggestion_dialog_for_single_suggestion(
         LOGGER.info("Suggestion cancelled.", note_id=note.id)
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     diffs = compute_note_diffs([note])
     SuggestionDialog(
-        is_new_note_suggestion=ah_nid is None,
+        is_new_note_suggestion=not _has_live_ah_note(diffs[NoteId(note.id)]),
         is_for_anking_deck=ah_did == config.anking_deck_id,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=diffs[NoteId(note.id)].added_new_media,
         callback=lambda suggestion_meta: _on_suggestion_dialog_for_single_suggestion_closed(
             suggestion_meta=suggestion_meta,
             note=note,
+            note_diffs=diffs,
             ah_did=ah_did,
             parent=parent,
         ),
@@ -325,6 +333,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
 def _on_suggestion_dialog_for_single_suggestion_closed(
     suggestion_meta: SuggestionMetadata,
     note: Note,
+    note_diffs: Mapping[NoteId, NoteDiff],
     ah_did: uuid.UUID,
     parent: QWidget,
 ) -> None:
@@ -332,9 +341,9 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
         return
 
     per_note_filters = suggestion_meta.filters.for_mid(NotetypeId(note.mid))
+    diff = note_diffs[NoteId(note.id)]
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    if ah_nid:
+    if _has_live_ah_note(diff):
         try:
             suggestion_result = suggest_note_update(
                 note=note,
@@ -343,6 +352,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 media_upload_cb=media_sync.start_media_upload,
                 auto_accept=suggestion_meta.auto_accept,
                 filters=per_note_filters,
+                diff=diff,
             )
         except AnkiHubHTTPError as e:
             _handle_suggestion_error(e, parent)
@@ -377,6 +387,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 media_upload_cb=media_sync.start_media_upload,
                 auto_accept=suggestion_meta.auto_accept,
                 filters=per_note_filters,
+                diff=diff,
             )
         except AnkiHubHTTPError as e:
             if _maybe_handle_note_already_exists(
@@ -414,9 +425,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 
     diffs = compute_note_diffs(notes)
 
-    if config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False) and not any_suggestible_from_diffs(
-        notes, diffs, preselected_change_type, globally_protected
-    ):
+    if not any_suggestible_from_diffs(notes, diffs, preselected_change_type, globally_protected):
         show_tooltip("No changes to suggest. Try syncing with AnkiHub first.", parent=parent)
         return
 
@@ -428,6 +437,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         callback=lambda suggestion_meta: _on_suggestion_dialog_for_bulk_suggestion_closed(
             suggestion_meta=suggestion_meta,
             notes=notes,
+            note_diffs=diffs,
             ah_did=ah_did,
             parent=parent,
         ),
@@ -443,6 +453,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 def _on_suggestion_dialog_for_bulk_suggestion_closed(
     suggestion_meta: SuggestionMetadata,
     notes: List[Note],
+    note_diffs: Mapping[NoteId, NoteDiff],
     ah_did: uuid.UUID,
     parent: QWidget,
 ) -> None:
@@ -464,6 +475,7 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_upload_cb,
             filters=suggestion_meta.filters,
+            note_diffs=note_diffs,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(
             future,
@@ -597,11 +609,7 @@ class SuggestionDialog(QDialog):
         content_row.setSpacing(16)
         outer_layout.addLayout(content_row, 1)
 
-        if (
-            config.get_feature_flags().get(AUTO_PROTECT_FEATURE_FLAG, False)
-            and self._notes
-            and self._ah_did is not None
-        ):
+        if self._notes and self._ah_did is not None:
             assert self._note_diffs is not None  # paired with `_notes`; see __init__
             self._fields_widget = IncludeInSuggestionWidget(
                 notes=self._notes,
@@ -744,7 +752,11 @@ class SuggestionDialog(QDialog):
         return self._fields_widget is not None and self._fields_widget.isVisible()
 
     def suggestion_meta(self) -> Optional[SuggestionMetadata]:
-        filters = self._fields_widget.suggestion_filters() if self._fields_widget_active() else BulkSuggestionFilters()
+        filters = (
+            self._fields_widget.suggestion_filters()
+            if self._fields_widget_active()
+            else BulkSuggestionFilters.none_selected()
+        )
         return SuggestionMetadata(
             change_type=self._change_type(),
             comment=self._comment(),
@@ -1616,12 +1628,16 @@ class IncludeInSuggestionWidget(QWidget):
             note_type_name_by_mid.setdefault(mid, note.note_type()["name"])
             diff = self._note_diffs[NoteId(note.id)]
             globally_protected = self._globally_protected.get(mid, set())
-            fields = [f for f in diff.edited_fields if f not in globally_protected]
+            fields = [f for f in diff.changed_field_names if f not in globally_protected]
             # `dict.fromkeys(...)` dedupes across notes sharing this mid while preserving
             # first-seen field order so the widget renders fields in note-type definition order.
             fields_by_mid[mid] = list(dict.fromkeys((*fields_by_mid.get(mid, ()), *fields)))
             added_tags.extend(diff.added_tags)
             removed_tags.extend(diff.removed_tags)
+            # Deliberately not `_has_live_ah_note`: a note deleted on AnkiHub is skipped
+            # at submit, but the lock is per note type and renders the field checked and
+            # disabled, so letting one arm the lock would override a deselection the user
+            # made on a live note of the same type and ship its first field.
             if not diff.exists_in_ah_db and mid not in locked_first_field_by_mid:
                 locked_first_field_by_mid[mid] = note.note_type()["flds"][0]["name"]
 
