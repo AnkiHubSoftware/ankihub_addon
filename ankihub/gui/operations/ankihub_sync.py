@@ -2,17 +2,18 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 import aqt
+import aqt.main
 import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput, SyncStatus
 from aqt import QTimer
 from aqt.qt import qconnect
-from aqt.sync import get_sync_status
+from aqt.sync import handle_sync_error
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -23,10 +24,15 @@ from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.exceptions import ChangesRequireFullSyncError
 from ...main.review_data import send_daily_review_summaries, send_review_data
 from ...main.utils import collection_schema
-from ...settings import config, get_end_cutoff_date_for_sending_review_summaries
+from ...settings import (
+    ANKI_INT_VERSION,
+    ANKI_VERSION_23_10_00,
+    config,
+    get_end_cutoff_date_for_sending_review_summaries,
+)
 from ..changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
-from ..exceptions import FullSyncCancelled
+from ..exceptions import AnkiWebSyncStatusError, FullSyncCancelled
 from ..utils import extract_argument, logged_into_ankiweb, sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
@@ -41,8 +47,34 @@ class _SyncState:
 sync_state = _SyncState()
 
 
+def get_sync_status(mw: aqt.main.AnkiQt, on_done: Callable[[Future], None]) -> None:
+    auth = mw.pm.sync_auth()
+    if not auth:
+        on_done(future_with_result(SyncStatus(required=SyncStatus.NO_CHANGES)))
+        return
+
+    def wrapped_on_done(fut: Future) -> None:
+        try:
+            status: SyncStatus = fut.result()
+            if new_endpoint := getattr(status, "new_endpoint", None):
+                if hasattr(mw.pm, "set_current_sync_url"):
+                    mw.pm.set_current_sync_url(new_endpoint)
+            on_done(fut)
+        except Exception as exc:
+            LOGGER.warning("AnkiWeb status error", exc_info=exc)
+            on_done(future_with_exception(AnkiWebSyncStatusError(exc)))
+
+    kwargs: Dict[str, Any] = {"task": lambda: mw.col.sync_status(auth), "on_done": wrapped_on_done}
+    if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
+        kwargs["uses_collection"] = False
+
+    mw.taskman.run_in_background(**kwargs)
+
+
 @pass_exceptions_to_on_done
-def sync_with_ankihub(on_done: Callable[[Future], None], skip_summary: bool = False) -> None:
+def sync_with_ankihub(
+    on_done: Callable[[Future], None], skip_summary: bool = False, report_ankiweb_errors: bool = True
+) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks.
 
@@ -52,8 +84,17 @@ def sync_with_ankihub(on_done: Callable[[Future], None], skip_summary: bool = Fa
     config.log_private_config()
 
     @pass_exceptions_to_on_done
-    def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
-        if out.required == out.FULL_SYNC:
+    def on_sync_status(fut: Future, on_done: Callable[[Future], None]) -> None:
+        try:
+            status: SyncStatus = fut.result()
+        except Exception as exc:
+            if isinstance(exc, AnkiWebSyncStatusError):
+                exc = exc.original_exception
+            if report_ankiweb_errors:
+                handle_sync_error(aqt.mw, exc)
+            on_done(future_with_result(None))
+            return
+        if status.required == status.FULL_SYNC:
             LOGGER.info("Full sync required. Syncing with AnkiWeb first.")
             sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done, skip_summary=skip_summary))
         else:
@@ -66,20 +107,16 @@ def sync_with_ankihub(on_done: Callable[[Future], None], skip_summary: bool = Fa
 @pass_exceptions_to_on_done
 def _after_ankiweb_sync(on_done: Callable[[Future], None], skip_summary: bool) -> None:
     @pass_exceptions_to_on_done
-    def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
-        if out.required == out.FULL_SYNC:
+    def on_sync_status(fut: Future, on_done: Callable[[Future], None]) -> None:
+        status: SyncStatus = fut.result()
+        if status.required == status.FULL_SYNC:
             # Stop here if user cancelled full sync
             LOGGER.info("AnkiWeb full sync cancelled.")
             raise FullSyncCancelled()
 
         _sync_with_ankihub_inner(on_done=on_done, skip_summary=skip_summary)
 
-    @pass_exceptions_to_on_done
-    def after_delay(on_done: Callable[[Future], None]) -> None:
-        get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
-
-    # Delay call to ensure server status is updated.
-    aqt.mw.progress.single_shot(1000, partial(after_delay, on_done=on_done))
+    get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
 
 
 @pass_exceptions_to_on_done
@@ -252,7 +289,7 @@ def _schedule_post_sync_tasks() -> None:
 
 
 def _show_onboarding_prompt_if_first_sync() -> None:
-    if config.last_deck_sync() is None:
+    if config.onboarding_tutorial_show_on_sync() and config.last_deck_sync() is None:
         from ..tutorial import prompt_for_onboarding_tutorial
 
         prompt_for_onboarding_tutorial()

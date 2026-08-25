@@ -31,6 +31,7 @@ from anki.decks import DeckConfigId, DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.sync import SyncAuth, SyncStatus
 from aqt import AnkiQt, QMenu, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
@@ -46,7 +47,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, Qt, QUrl, QWidget
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QToolButton, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -56,6 +57,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.addon_ankihub_client import CollectionNotAvailableError
 from ankihub.gui.block_exam_dialog import BlockExamSubdeckDialog
 from ankihub.gui.enable_fsrs_dialog import ENABLE_FSRS_REMINDER_INTERVAL_DAYS, maybe_show_enable_fsrs_reminder
 from ankihub.gui.optimize_fsrs_dialog import (
@@ -135,26 +137,50 @@ from ankihub.common_utils import get_media_names_from_note_field
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
 from ankihub.gui import decks_dialog, editor, utils
-from ankihub.gui.auto_sync import SYNC_RATE_LIMIT_SECONDS, _setup_ankihub_sync_on_ankiweb_sync
+from ankihub.gui.auto_sync import (
+    SYNC_RATE_LIMIT_SECONDS,
+    _maybe_sync_with_ankihub,
+    _setup_ankihub_sync_on_ankiweb_sync,
+)
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.browser import (
+    ChatbotDialog,
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
     _on_protect_fields_action,
+    _on_reset_deck_action,
+    _on_reset_local_changes_action,
     _on_reset_optional_tags_action,
 )
-from ankihub.gui.browser.custom_search_nodes import AnkiHubNoteSearchNode, UpdatedSinceLastReviewSearchNode
+from ankihub.gui.browser.custom_search_nodes import (
+    AnkiHubNoteSearchNode,
+    AnkiHubNoteTypeSearchNode,
+    UpdatedSinceLastReviewSearchNode,
+)
+from ankihub.gui.browser.rich_tooltip import RichTooltip
+from ankihub.gui.browser.sidebar_tooltip import RICH_TOOLTIP_ATTR
 from ankihub.gui.changes_require_full_sync_dialog import ChangesRequireFullSyncDialog
 from ankihub.gui.config_dialog import get_config_dialog_manager, setup_config_dialog_manager
 from ankihub.gui.deck_options import _backup_fsrs_parameters, _can_revert_from_fsrs_parameters
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import SUGGESTION_BTN_ID, _on_field_unfocus_auto_protect
+from ankihub.gui.editor import (
+    NOTE_DELETED_TOOLTIP,
+    SUGGESTION_BTN_ID,
+    _default_suggestion_button_tooltip,
+    _on_field_unfocus_auto_protect,
+    _on_suggestion_button_press,
+)
 from ankihub.gui.errors import upload_logs_and_data_in_background
-from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.exceptions import (
+    AnkiWebSyncStatusError,
+    DeckDownloadAndInstallError,
+    FullSyncCancelled,
+    RemoteDeckNotFoundError,
+)
 from ankihub.gui.flashcard_selector_dialog import FlashCardSelectorDialog
 from ankihub.gui.js_message_handling import (
     ADD_TO_BLOCK_EXAM_SUBDECK,
@@ -166,23 +192,37 @@ from ankihub.gui.js_message_handling import (
     UNSUSPEND_NOTES_PYCMD,
     _post_message_to_ankihub_js,
 )
-from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
+from ankihub.gui.media_sync import MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG, media_sync
+from ankihub.gui.menu import (
+    AnkiHubLogin,
+    _maybe_show_onboarding_tutorial_after_login,
+    menu_state,
+    refresh_ankihub_menu,
+)
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
+from ankihub.gui.operations.db_check.anki_db_check import _reset_decks
 from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.overview import FLASHCARD_SELECTOR_OPEN_BUTTON_ID, FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD
 from ankihub.gui.suggestion_dialog import (
+    EMPTY_STATE_SUBTITLE,
+    EMPTY_STATE_TITLE,
     IncludeInSuggestionWidget,
     SuggestionDialog,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
 )
-from ankihub.gui.utils import _Dialog, robust_filter
+from ankihub.gui.utils import _Dialog, bring_to_front, robust_filter
+from ankihub.gui.webview import (
+    WEBVIEW_DIALOG_ESCAPE_PYCMD,
+    AnkiHubWebView,
+    AnkiHubWebViewDialog,
+    SheetFilePickerWebPage,
+)
 from ankihub.main.deck_creation import create_ankihub_deck, modified_note_type
 from ankihub.main.deck_options import ANKIHUB_PRESET_NAME, get_fsrs_parameters
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -201,14 +241,18 @@ from ankihub.main.note_type_management import add_note_type, add_note_type_field
 from ankihub.main.reset_local_changes import reset_local_changes_to_notes
 from ankihub.main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ankihub.main.suggestions import (
+    ANKIHUB_DUPLICATE_ANKI_ID_ERROR,
     ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
     ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
     BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
+    ChangeSuggestionResult,
     PerNoteFilters,
     any_suggestible_from_diffs,
     compute_note_diffs,
+    has_empty_first_field,
+    resubmit_new_note_as_change_suggestion,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -264,6 +308,18 @@ skip_test_fsrs_unsupported = pytest.mark.skipif(
     ANKI_INT_VERSION < MIN_ANKI_VERSION_FOR_FSRS_FEATURES,
     reason=(f"FSRS requires Anki ≥{MIN_ANKI_VERSION_FOR_FSRS_FEATURES}; you have {ANKI_INT_VERSION}"),
 )
+
+
+def wait_for_js_truthy(qtbot: QtBot, web: AnkiWebView, js_expr: str) -> None:
+    """Poll the webview until `js_expr` evaluates truthy. Replaces fixed-wait + one-shot
+    DOM checks, which are unreliable when content is injected asynchronously (CI load)."""
+
+    def predicate() -> bool:
+        with qtbot.wait_callback() as callback:
+            web.evalWithCallback(js_expr, callback)
+        return bool(callback.args[0])
+
+    qtbot.wait_until(predicate)
 
 
 class InstallSampleAHDeck(Protocol):
@@ -455,6 +511,8 @@ def create_change_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_me
     Returns the mock for the create_change_note_suggestion method. It can be used to get information
     about the suggestion that was passed to the client."""
 
+    entry_point.run()
+
     create_change_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
         "create_change_note_suggestion",
@@ -486,6 +544,8 @@ def create_new_note_suggestion(qtbot: QtBot, mocker: MockerFixture, mock_client_
     """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
     about the suggestion that was passed to the client."""
+
+    entry_point.run()
 
     create_new_note_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
@@ -529,6 +589,16 @@ class TestEntryPoint:
         aqt.mw.maybe_auto_sync_on_open_close(Mock())
 
         on_profile_did_open_mock.assert_called_once()
+
+    def test_on_profile_will_close_skips_active_tutorial(self, mocker: MockerFixture):
+        active_tutorial_mock = Mock()
+        mocker.patch.object(entry_point.tutorial, "active_tutorial", active_tutorial_mock)
+        close_for_profile_mock = mocker.patch.object(entry_point.media_sync, "close_for_profile")
+
+        entry_point._on_profile_will_close()
+
+        active_tutorial_mock.skip_tutorial.assert_called_once()
+        close_for_profile_mock.assert_called_once()
 
 
 # The JS in the webviews is flaky if not run in sequential mode
@@ -727,6 +797,130 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_button_enabled_for_existing_note_without_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            anki_note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # No edits, but the button stays enabled — clicking opens the dialog,
+            # which renders an empty state and lets the user pick Delete. The
+            # no-changes gating lives in the dialog, not on the editor button.
+            self.assert_suggestion_button_enabled_status(qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=True)
+            # Enabled-state tooltip uses the change-note wording (vs the new-note variant).
+            self.assert_suggestion_button_tooltip(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_tooltip=_default_suggestion_button_tooltip(is_new_note=False),
+            )
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_action_gate_blocks_deleted_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.ankihub_note_id == ah_note.ah_nid
+            ).execute()
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # The button is visually disabled for deleted notes; the hotkey still
+            # fires, so it must short-circuit with the deleted-note tooltip and
+            # never open the dialog.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with(NOTE_DELETED_TOOLTIP)
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
+    def test_new_note_with_empty_first_field_does_not_register_add_callback(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+            anki_note = aqt.mw.col.new_note(ah_note_type)  # empty first field
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            tooltip_mock = mocker.patch("ankihub.gui.editor.tooltip")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+            assert add_cards_dialog.editor.note.id == 0  # sanity: unsaved new note
+
+            # Pressing Suggest on a new note with an empty first field must bail
+            # before add_current_note — otherwise the add fails silently and the
+            # add_cards_did_add_note callback leaks onto an unrelated later note.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            tooltip_mock.assert_called_once_with("The first field is empty.")
+            assert not open_dialog_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("logged_in", [True, False])
+    def test_suggestion_action_gate_no_op_for_non_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+
+            anki_note = add_anki_note()  # non-AnkiHub note type
+
+            open_dialog_mock = mocker.patch("ankihub.gui.editor.open_suggestion_dialog_for_single_suggestion")
+            login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
+
+            add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
+
+            # The button is visually disabled for non-AnkiHub notes; the hotkey
+            # still fires, but it must be a no-op — even when logged out, since
+            # there's no AnkiHub action to authenticate for.
+            _on_suggestion_button_press(add_cards_dialog.editor)
+
+            assert not open_dialog_mock.called
+            assert not login_mock.called
+
+            add_cards_dialog.editor.cleanup()
+
     def test_with_note_deleted_on_ankihub(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -777,6 +971,13 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def _open_addcards(self, anki_note: Note, qtbot: QtBot, mocker: MockerFixture) -> AddCards:
+        """Open AddCards with `anki_note`, then wait for the first button refresh."""
+        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+        add_cards_dialog.editor.set_note(anki_note)
+        self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+        return add_cards_dialog
+
     def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
         qtbot.wait_until(lambda: refresh_buttons_spy.called)
@@ -796,6 +997,14 @@ class TestEditor:
                 callback,
             )
         callback.assert_called_with(not expected_enabled)
+
+    def assert_suggestion_button_tooltip(self, qtbot: QtBot, addcards: AddCards, expected_tooltip: str) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}').title",
+                callback,
+            )
+        callback.assert_called_with(expected_tooltip)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
         addcards.editor.web.eval(f"document.getElementById('{SUGGESTION_BTN_ID}').click()")
@@ -1780,6 +1989,34 @@ class TestFieldsToSuggestFilters:
             assert not front_cb.isEnabled()
             assert "first field is required" in front_cb.toolTip().lower()
 
+    def test_widget_shows_empty_state_when_no_changes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """An existing AnkiHub note with no edits and no tag changes renders the
+        empty state: no field/tag checkboxes, the subtitle switches to the
+        empty-state copy, the warning message shows, the counter reads 0/0, and
+        there's nothing selected (so the dialog's OK button stays disabled)."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
+
+            widget = IncludeInSuggestionWidget(notes=[note], note_diffs=compute_note_diffs([note]))
+
+            assert widget._field_checkboxes == {}
+            assert widget._added_tag_boxes == {}
+            assert widget._removed_tag_boxes == {}
+            assert not widget.has_any_selection()
+            assert widget._subtitle.text() == EMPTY_STATE_SUBTITLE
+            assert widget._counter_label.text() == "0/0"
+            label_texts = [label.text() for label in widget.findChildren(QLabel)]
+            assert EMPTY_STATE_TITLE in label_texts
+            # The empty state renders in the frame, not the (hidden) scroll area —
+            # a word-wrapped label in a resizable scroll area squashes when short.
+            assert widget._scroll.isHidden()
+
     def test_suggest_new_note_bulk_per_mid_filters(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -1988,7 +2225,7 @@ class TestFieldsToSuggestFilters:
 
             # New-note candidate whose only non-empty fields are all globally-protected,
             # with no tags → not suggestible. (Otherwise the dialog would open with an
-            # empty "Include in suggestion" panel that the user can't submit from.)
+            # empty "Select fields to include" panel that the user can't submit from.)
             new_note_protected = add_anki_note(note_type=aqt.mw.col.models.get(NotetypeId(mid)))
             first_field_name = new_note_protected.note_type()["flds"][0]["name"]
             assert not any_suggestible_from_diffs(
@@ -2133,6 +2370,101 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 1
             assert result.change_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 0
+
+    @pytest.mark.parametrize("conflict_is_deleted", [False, True])
+    def test_new_note_already_in_deck_is_surfaced_for_resubmit(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        conflict_is_deleted: bool,
+    ):
+        """A new-note suggestion rejected with the duplicate-anki_id error becomes a
+        resubmittable "already in this deck" entry; a soft-deleted conflict
+        is routed to the deleted-on-AnkiHub category instead."""
+        conflicting_ah_nid = next_deterministic_uuid()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_note = add_anki_note(note_type=note_type)
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "create_suggestions_in_bulk",
+                return_value={
+                    new_note.id: {
+                        "non_field_errors": [ANKIHUB_DUPLICATE_ANKI_ID_ERROR],
+                        "conflicting_ankihub_id": [str(conflicting_ah_nid)],
+                        "conflicting_note_deleted": ["True" if conflict_is_deleted else "False"],
+                    }
+                },
+            )
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[new_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            if conflict_is_deleted:
+                assert result.already_in_deck_by_nid == {}
+                assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(result.errors_by_nid[new_note.id])
+            else:
+                assert set(result.already_in_deck_by_nid) == {new_note.id}
+                conflict = result.already_in_deck_by_nid[new_note.id]
+                assert conflict.conflicting_ah_nid == conflicting_ah_nid
+                assert conflict.new_note_suggestion.anki_nid == new_note.id
+                # the error stays in errors_by_nid so it counts as failed
+                assert new_note.id in result.errors_by_nid
+
+    def test_single_resubmit_uses_db_renamed_media_not_stale_in_memory_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """The failed new-note submit renames media in the DB only (raw SQL), leaving the
+        caller's in-memory note stale. The single resubmit must reload the note so the
+        change suggestion carries the uploaded (hashed) media name, not the original."""
+        conflicting_ah_nid = next_deterministic_uuid()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = add_anki_note(note_type=note_type)
+
+            note.fields[0] = 'Q <img src="original.jpg">'
+            aqt.mw.col.update_note(note)
+
+            # Simulate the failed new-note submit's DB-only media rename.
+            aqt.mw.col.db.execute("UPDATE notes SET flds = REPLACE(flds, ?, ?)", "original.jpg", "hashed.jpg")
+            aqt.mw.col.save()
+            # `note` (in memory) is now stale: it still references original.jpg.
+            assert "original.jpg" in note.fields[0]
+
+            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
+
+            result = resubmit_new_note_as_change_suggestion(
+                note=note,
+                ah_did=ah_did,
+                conflicting_ah_nid=conflicting_ah_nid,
+                change_type=SuggestionType.UPDATED_CONTENT,
+                comment="test",
+            )
+
+            assert result == ChangeSuggestionResult.SUCCESS
+            change_note_suggestion = create_mock.call_args.kwargs["change_note_suggestion"]
+            joined_fields = " ".join(field.value for field in change_note_suggestion.fields)
+            assert "hashed.jpg" in joined_fields
+            assert "original.jpg" not in joined_fields
 
     def test_bulk_new_notes_dont_ship_field_empty_on_that_note(
         self,
@@ -2314,6 +2646,27 @@ class TestSuggestNotesInBulk:
             assert result.new_note_suggestions_count == 0
             assert len(result.errors_by_nid) == 1
             assert ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(result.errors_by_nid[note.id])
+
+    def test_has_empty_first_field(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Markup-only/whitespace first fields count as empty (a plain `.strip()`
+        would miss "<br>"/"&nbsp;"); text or embedded media counts as content."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note = add_anki_note(note_type=import_ah_note_type(ah_did=ah_did))
+
+            for empty_value in ("", "   ", "<br>", "<div></div>", "&nbsp;"):
+                note["Front"] = empty_value
+                assert has_empty_first_field(note), f"expected empty: {empty_value!r}"
+
+            for content_value in ("real content", "x", '<img src="x.jpg">', "[sound:a.mp3]"):
+                note["Front"] = content_value
+                assert not has_empty_first_field(note), f"expected non-empty: {content_value!r}"
 
     def test_suggestion_for_multiple_notes(
         self,
@@ -3222,6 +3575,85 @@ class TestAnkiHubImporter:
             assert note.cards()
             for card in note.cards():
                 assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
+
+    def _import_updated_note(
+        self,
+        ah_did: uuid.UUID,
+        note_data: NoteInfo,
+        protected_fields: Dict[int, List[str]],
+    ) -> AnkiHubImporter:
+        """Imports note_data as an update to an existing note and returns the importer."""
+        importer = AnkiHubImporter()
+        importer.import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=[note_data],
+            deck_name="test",
+            is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+            note_types={NotetypeId(note_data.mid): ankihub_db.note_type_dict(NotetypeId(note_data.mid))},
+            protected_fields=protected_fields,
+            protected_tags=[],
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(ah_did),
+            suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+        )
+        return importer
+
+    def test_overwritten_local_content_is_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """The tallies behind the overwrite summary log make reports of personal content
+        disappearing after a sync diagnosable from an uploaded log file."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Back"] = "personal content"
+            note.tags = ["Semester-1::Week-1"]
+            aqt.mw.col.update_note(note)
+
+            # The remote version changes Front, has nothing in Back and lacks the personal tag.
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value=""),
+            ]
+            note_data.tags = []
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={})
+
+            assert importer._overwritten_fields.counts == {"Front": 1, "Back": 1}
+            assert importer._overwritten_fields.sample_nids["Back"] == [note.id]
+            # Only Back had its content emptied; Front was replaced by other content.
+            assert importer._cleared_fields.counts == {"Back": 1}
+            assert importer._removed_tags.counts == {"Semester-1::Week-1": 1}
+
+    def test_protected_field_content_is_not_overwritten_or_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Back"] = "personal content"
+            aqt.mw.col.update_note(note)
+
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value=""),
+            ]
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={note.mid: ["Back"]})
+
+            assert aqt.mw.col.get_note(note.id)["Back"] == "personal content"
+            assert "Back" not in importer._overwritten_fields.counts
+            assert note.mid not in importer._overwritten_mids_without_protection
 
     def test_import_deck_and_check_that_values_are_saved_to_databases(
         self,
@@ -4607,6 +5039,103 @@ class TestCustomSearchNodes:
             ):
                 AnkiHubNoteSearchNode(browser, "invalid").filter_ids(all_nids)
 
+    def test_AnkiHubNoteTypeSearchNode_yes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            # A note on a non-AnkiHub note type should be excluded.
+            add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_nids) == [ah_note.anki_nid]
+
+    def test_AnkiHubNoteTypeSearchNode_no(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            import_ah_note()
+            note = add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteTypeSearchNode(browser, "no").filter_ids(all_nids) == [note.id]
+
+    def test_AnkiHubNoteTypeSearchNode_invalid_value(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            with pytest.raises(
+                ValueError,
+                match=rf"Invalid value for {AnkiHubNoteTypeSearchNode.parameter_name}.+",
+            ):
+                AnkiHubNoteTypeSearchNode(browser, "invalid").filter_ids(all_nids)
+
+    def test_not_on_ankihub_composed_search(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        # Mirrors the "Not on AnkiHub" sidebar entry, which ANDs ankihub_note_type:yes with
+        # ankihub_note:no. The result should be exactly the notes on a registered AnkiHub note
+        # type that aren't yet in the AnkiHub DB - i.e. the notes the user can suggest as new.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            ah_note_type = aqt.mw.col.models.get(NotetypeId(ah_note.mid))
+
+            # New local note on the registered AnkiHub note type, not yet in the AnkiHub DB.
+            not_on_ankihub_note = add_anki_note(note_type=ah_note_type)
+            # Note on a non-AnkiHub note type - must be excluded (it can't be suggested).
+            add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            type_yes = AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_nids)
+            composed = AnkiHubNoteSearchNode(browser, "no").filter_ids(type_yes)
+            assert composed == [not_on_ankihub_note.id]
+
+    def test_AnkiHubNoteTypeSearchNode_cards_mode(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        # In cards mode the node receives/returns card ids, mapping through notes internally.
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note = import_ah_note()
+            add_anki_note()  # non-AnkiHub note type, excluded
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = False
+
+            all_cids = aqt.mw.col.find_cards("")
+            ah_cids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid = {ah_note.anki_nid}")
+            assert sorted(AnkiHubNoteTypeSearchNode(browser, "yes").filter_ids(all_cids)) == sorted(ah_cids)
+
 
 class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
@@ -4635,8 +5164,8 @@ class TestBrowserTreeView:
             # assert that all children of the ankihub_item exist
             ankihub_child_item_names = [item.name for item in ankihub_item.children]
             assert ankihub_child_item_names == [
-                "With AnkiHub ID",
-                "ID Pending",
+                "On AnkiHub",
+                "Not on AnkiHub ⓘ",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",
@@ -4661,6 +5190,37 @@ class TestBrowserTreeView:
             browser.table.select_all()
             nids = browser.table.get_selected_note_ids()
             assert len(nids) == 3
+
+    # without this mark the test sometime fails on clean-up
+    @pytest.mark.qt_no_exception_capture
+    def test_not_on_ankihub_item_has_interactive_tooltip(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ):
+        config.public_config["sync_on_startup"] = False
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+            install_sample_ah_deck()
+
+            browser: Browser = dialogs.open("Browser", mw)
+            qtbot.wait(500)
+            sidebar: SidebarTreeView = browser.sidebar
+            ankihub_item: SidebarItem = sidebar.model().root.children[0]
+
+            # The "Not on AnkiHub" item opts into the interactive (clickable-link) tooltip.
+            not_on_ankihub_item = ankihub_item.children[1]
+            assert not_on_ankihub_item.name == "Not on AnkiHub ⓘ"
+            tooltip_html = getattr(not_on_ankihub_item, RICH_TOOLTIP_ATTR, None)
+            assert tooltip_html is not None
+            assert "community.ankihub.net/t/how-to-suggest-a-new-note" in tooltip_html
+
+            # The interactive tooltip is installed (idempotently) on the sidebar.
+            tooltip = getattr(sidebar, "_ankihub_tooltip", None)
+            assert isinstance(tooltip, RichTooltip)
 
     # without this mark the test sometime fails on clean-up
     @pytest.mark.qt_no_exception_capture
@@ -4696,8 +5256,8 @@ class TestBrowserTreeView:
             # assert that all children of the ankihub_item exist
             item_names = [item.name for item in ankihub_item.children]
             assert item_names == [
-                "With AnkiHub ID",
-                "ID Pending",
+                "On AnkiHub",
+                "Not on AnkiHub ⓘ",
                 "Modified After Sync",
                 "Not Modified After Sync",
                 "Updated Today",
@@ -6170,6 +6730,7 @@ def test_reset_local_changes_to_notes(
     mock_client_get_note_type: MockClientGetNoteType,
     mocker: MockerFixture,
 ):
+    """User-initiated Reset (strip=False): personal tags and globally protected fields survive."""
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -6179,13 +6740,12 @@ def test_reset_local_changes_to_notes(
         basic_note_1 = mw.col.get_note(NoteId(1608240029527))
         basic_note_2 = mw.col.get_note(NoteId(1608240057545))
 
-        # Edit Front + Back, tag both as personally-protected (mirrors the auto-protect
-        # hook's behaviour on real edits), and move the note to a different deck. Back is
-        # also marked as globally protected for this note type — its protect tag should
-        # survive the reset (user-authored intent that should outlast global protection).
+        # Edit Front + Back and move the note. Front is personally protected (auto-protect).
+        # Back is only globally protected — no personal tag — so a surviving edit proves
+        # the importer honours protected_fields, not AnkiHub_Protect::Back.
         basic_note_1["Front"] = "changed front"
         basic_note_1["Back"] = "changed back"
-        basic_note_1.tags = ["AnkiHub_Protect::Front", "AnkiHub_Protect::Back"]
+        basic_note_1.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front"]
         basic_note_1.flush()
         mw.col.set_deck(basic_note_1.card_ids(), 1)
 
@@ -6197,19 +6757,17 @@ def test_reset_local_changes_to_notes(
         mocker.patch.object(AnkiHubClient, "get_protected_tags")
         mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
 
-        # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
+        reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
-        # Front: not globally protected → personal-protect tag stripped, field reset.
-        # Back: globally protected → field stays edited (importer respects protected_fields)
-        # and the personal-protect tag survives.
+        # Front: personally protected → edit and protect tag survive (NRT-897).
+        # Back: globally protected, no personal tag → field stays edited.
         # Note is still in the deck it was moved to (Reset shouldn't move cards between decks).
         basic_note_1.load()
-        assert basic_note_1["Front"] == "This is the front 1"
+        assert basic_note_1["Front"] == "changed front"
         assert basic_note_1["Back"] == "changed back"
-        assert "AnkiHub_Protect::Front" not in basic_note_1.tags
-        assert "AnkiHub_Protect::Back" in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" not in basic_note_1.tags
         assert basic_note_1.cards()
         for card in basic_note_1.cards():
             assert card.did == 1
@@ -6220,6 +6778,177 @@ def test_reset_local_changes_to_notes(
         assert basic_note_2.cards()
         for card in basic_note_2.cards():
             assert mw.col.decks.name(card.did) == "Testdeck"
+
+
+def test_reset_local_changes_to_notes_strips_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """True still strips personal protect tags except those matching globally protected fields."""
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        basic_note_1 = mw.col.get_note(NoteId(1608240029527))
+        basic_note_1["Front"] = "changed front"
+        basic_note_1["Back"] = "changed back"
+        basic_note_1.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front", f"{TAG_FOR_PROTECTING_FIELDS}::Back"]
+        basic_note_1.flush()
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={basic_note_1.mid: ["Back"]})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags")
+        mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[basic_note_1.id], ah_did=ah_did, strip_personal_protect_tags=True)
+
+        basic_note_1.load()
+        assert basic_note_1["Front"] == "This is the front 1"
+        assert basic_note_1["Back"] == "changed back"
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Front" not in basic_note_1.tags
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" in basic_note_1.tags
+
+
+def test_reset_local_changes_to_notes_keeps_personally_protected_fields(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """Unprotected fields reset; personally protected fields are left alone even if not globally protected."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+        note["Front"] = "changed front"
+        note["Back"] = "personal content"
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Back"]
+        aqt.mw.col.update_note(note)
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
+
+        note.load()
+        assert note["Back"] == "personal content"
+        assert f"{TAG_FOR_PROTECTING_FIELDS}::Back" in note.tags
+        assert note["Front"] == note_info.fields[0].value
+
+
+def test_reset_local_changes_to_notes_keeps_fields_when_protect_all_tag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """AnkiHub_Protect::All (Protect Fields → all) blocks Reset of every field when strip=False."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+        note["Front"] = "changed front"
+        note["Back"] = "changed back"
+        note.tags = [TAG_FOR_PROTECTING_ALL_FIELDS]
+        aqt.mw.col.update_note(note)
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=False)
+
+        note.load()
+        assert note["Front"] == "changed front"
+        assert note["Back"] == "changed back"
+        assert TAG_FOR_PROTECTING_ALL_FIELDS in note.tags
+
+
+def test_reset_local_changes_to_notes_strips_protect_all_tag(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mock_client_get_note_type: MockClientGetNoteType,
+    mocker: MockerFixture,
+):
+    """True strips AnkiHub_Protect::All; it is never treated as a globally protected field tag."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+
+        note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+        note["Front"] = "changed front"
+        note["Back"] = "changed back"
+        note.tags = [TAG_FOR_PROTECTING_ALL_FIELDS]
+        aqt.mw.col.update_note(note)
+
+        mocker.patch.object(AnkiHubClient, "get_protected_fields", return_value={})
+        mocker.patch.object(AnkiHubClient, "get_protected_tags", return_value=[])
+        mock_client_get_note_type([note_type for note_type in aqt.mw.col.models.all()])
+
+        reset_local_changes_to_notes(nids=[note.id], ah_did=ah_did, strip_personal_protect_tags=True)
+
+        note.load()
+        assert note["Front"] == note_info.fields[0].value
+        assert note["Back"] == note_info.fields[1].value
+        assert TAG_FOR_PROTECTING_ALL_FIELDS not in note.tags
+
+
+def test_db_check_resets_decks_without_stripping_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    mocker: MockerFixture,
+):
+    """Pins the wiring the dialog's "Protected fields and tags will not be affected" promise
+    depends on; the reset itself is covered by the test above."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+
+        reset_mock = mocker.patch("ankihub.gui.operations.db_check.anki_db_check.reset_local_changes_to_notes")
+
+        _reset_decks([ah_did])
+
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+
+def _run_taskman_with_progress(*args, **kwargs):
+    task = kwargs.get("task") or args[0]
+    kwargs["on_done"](future_with_result(task()))
+
+
+def test_browser_reset_does_not_strip_personal_protect_tags(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+    mocker: MockerFixture,
+):
+    """Pins NRT-897: both browser Reset entry points pass strip_personal_protect_tags=False."""
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        note_info = import_ah_note(ah_did=ah_did)
+        nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+        reset_mock = mocker.patch("ankihub.gui.browser.browser.reset_local_changes_to_notes")
+        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=_run_taskman_with_progress)
+        mocker.patch("ankihub.gui.browser.browser.tooltip")
+        mocker.patch("ankihub.gui.browser.browser.choose_ankihub_deck", return_value=ah_did)
+        mocker.patch("ankihub.gui.browser.browser.ask_user", return_value=True)
+        mocker.patch.object(aqt.mw, "reset")
+
+        browser = mocker.Mock()
+        _on_reset_local_changes_action(browser, [nid])
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
+
+        reset_mock.reset_mock()
+        _on_reset_deck_action(browser)
+        assert reset_mock.call_args.kwargs["strip_personal_protect_tags"] is False
 
 
 def test_migrate_profile_data_from_old_location(
@@ -6501,6 +7230,83 @@ class TestDeckUpdater:
                 description=deck_extension.description,
                 latest_update=latest_update,
             )
+
+    def test_removes_deck_extension_config_when_no_longer_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # The add-on still has a local config entry for the extension
+            deck_extension = DeckExtensionFactory.create(ah_did=ah_did, tag_group_name="tag_group")
+            config.create_or_update_deck_extension_config(deck_extension)
+            assert config.deck_extension_config(extension_id=deck_extension.id) is not None
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=ah_did),
+            )
+            # The extension is no longer returned by the server (unsubscribed or deleted)
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extensions_by_deck_id",
+                return_value=[],
+            )
+
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
+            )
+
+            # The orphaned config entry is removed
+            assert config.deck_extension_config(extension_id=deck_extension.id) is None
+
+    def test_removing_orphaned_deck_extension_config_is_scoped_to_the_synced_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            synced_ah_did = install_ah_deck()
+            other_ah_did = install_ah_deck()
+
+            # Local config entries for an extension on each deck
+            synced_deck_extension = DeckExtensionFactory.create(ah_did=synced_ah_did, tag_group_name="tag_group_a")
+            other_deck_extension = DeckExtensionFactory.create(ah_did=other_ah_did, tag_group_name="tag_group_b")
+            config.create_or_update_deck_extension_config(synced_deck_extension)
+            config.create_or_update_deck_extension_config(other_deck_extension)
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=synced_ah_did),
+            )
+            # The synced deck no longer has its extension on the server
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extensions_by_deck_id",
+                return_value=[],
+            )
+
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[synced_ah_did],
+                start_media_sync=False,
+                raise_if_full_sync_required=True,
+            )
+
+            # Only the synced deck's orphaned entry is removed; the other deck's entry is left intact
+            assert config.deck_extension_config(extension_id=synced_deck_extension.id) is None
+            assert config.deck_extension_config(extension_id=other_deck_extension.id) is not None
 
     @pytest.mark.parametrize(
         "current_relation, incoming_relation",
@@ -6859,6 +7665,256 @@ class TestSyncWithAnkiHub:
                 notes=notes,
             ),
         )
+
+
+def _future_from_callback(callback: Any) -> Future:
+    return callback.kwargs.get("future") or callback.args[0]
+
+
+class TestGetSyncStatus:
+    """Tests for the get_sync_status wrapper which - unlike Anki's version - always calls its callback,
+    reporting AnkiWeb status errors as an AnkiWebSyncStatusError."""
+
+    def test_without_ankiweb_auth(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=None)
+            sync_status_mock = mocker.patch.object(mw.col, "sync_status")
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NO_CHANGES
+
+            # AnkiWeb is not contacted when the user is not logged into it.
+            sync_status_mock.assert_not_called()
+
+    def test_with_successful_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            auth = SyncAuth(hkey="test_hkey")
+            mocker.patch.object(mw.pm, "sync_auth", return_value=auth)
+            sync_status_mock = mocker.patch.object(
+                mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.NORMAL_SYNC)
+            )
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            assert future.result().required == SyncStatus.NORMAL_SYNC
+            sync_status_mock.assert_called_once_with(auth)
+
+    def test_with_failing_status_check(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.get_sync_status(mw, callback)
+
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            assert raised.__cause__ is exception
+            assert str(raised) == "AnkiWeb is down"
+
+
+@pytest.mark.qt_no_exception_capture
+class TestSyncWithAnkiHubAnkiWebStatusErrors:
+    """Tests for how sync_with_ankihub deals with failures of the AnkiWeb sync status check.
+    Such failures used to make the sync end without ever calling its on_done callback."""
+
+    @pytest.mark.parametrize("report_ankiweb_errors", [True, False])
+    def test_status_error_before_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        report_ankiweb_errors: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(mw.col, "sync_status", side_effect=exception)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback, report_ankiweb_errors=report_ankiweb_errors)
+
+            # The sync ends without an error - the AnkiWeb problem is not an AnkiHub sync failure.
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            # The AnkiHub sync itself is not attempted.
+            get_deck_subscriptions_mock.assert_not_called()
+
+            # The original exception is reported to the user via Anki, unless the caller opted out.
+            if report_ankiweb_errors:
+                handle_sync_error_mock.assert_called_once_with(mw, exception)
+            else:
+                handle_sync_error_mock.assert_not_called()
+
+    def test_status_error_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The first status check requires a full sync, the second one (after the AnkiWeb sync) fails.
+            exception = Exception("AnkiWeb is down")
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[SyncStatus(required=SyncStatus.FULL_SYNC), exception],
+            )
+            self._mock_ankiweb_sync(mocker)
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            # Errors of the status check after the AnkiWeb sync are passed to on_done instead of being
+            # reported to the user, so that the caller can decide what to do with them.
+            future = _future_from_callback(callback)
+            raised = future.exception()
+            assert isinstance(raised, AnkiWebSyncStatusError)
+            assert raised.original_exception is exception
+            handle_sync_error_mock.assert_not_called()
+
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_full_sync_still_required_after_ankiweb_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            # The user cancelled the full sync, so a full sync is still required afterwards.
+            mocker.patch.object(mw.col, "sync_status", return_value=SyncStatus(required=SyncStatus.FULL_SYNC))
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert isinstance(future.exception(), FullSyncCancelled)
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_not_called()
+
+    def test_sync_continues_after_ankiweb_full_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+
+            # The sync completes here, so prevent the post-sync tasks from running after the test
+            # (and its mocks) are gone.
+            mocker.patch("ankihub.gui.operations.ankihub_sync._schedule_post_sync_tasks")
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(
+                mw.col,
+                "sync_status",
+                side_effect=[
+                    SyncStatus(required=SyncStatus.FULL_SYNC),
+                    SyncStatus(required=SyncStatus.NO_CHANGES),
+                ],
+            )
+            sync_with_ankiweb_mock = self._mock_ankiweb_sync(mocker)
+
+            get_deck_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
+
+            with qtbot.wait_callback() as callback:
+                ankihub_sync.sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            future.result()  # raises if there is an exception
+
+            assert sync_with_ankiweb_mock.call_count == 1
+            get_deck_subscriptions_mock.assert_called_once()
+
+    def _mock_ankiweb_sync(self, mocker: MockerFixture) -> Mock:
+        """Mock the AnkiWeb sync so that it immediately calls its callback."""
+        return mocker.patch(
+            "ankihub.gui.operations.ankihub_sync.sync_with_ankiweb",
+            side_effect=lambda on_done: on_done(),
+        )
+
+
+@pytest.mark.qt_no_exception_capture
+class TestMaybeSyncWithAnkiHub:
+    def test_ankiweb_status_errors_are_not_reported_during_auto_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        """AnkiWeb errors are reported by Anki itself when it syncs with AnkiWeb after the AnkiHub sync,
+        so the auto sync must not report them a second time."""
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            config.save_token("test_token")
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            mocker.patch.object(mw.pm, "sync_auth", return_value=SyncAuth(hkey="test_hkey"))
+            mocker.patch.object(mw.col, "sync_status", side_effect=Exception("AnkiWeb is down"))
+
+            handle_sync_error_mock = mocker.patch("ankihub.gui.operations.ankihub_sync.handle_sync_error")
+
+            with qtbot.wait_callback() as callback:
+                _maybe_sync_with_ankihub(on_done=callback)
+
+            future = _future_from_callback(callback)
+            assert future.result() is None
+
+            handle_sync_error_mock.assert_not_called()
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
@@ -7269,7 +8325,9 @@ def test_reset_optional_tags_action(
         note = mw.col.get_note(nid)
         assert note.tags == []
 
-        assert is_logged_in_mock.call_count == 1
+        # At least once from the reset action; Intercom (and other hooks) may also
+        # call is_logged_in when mw.reset() re-renders the deck browser after sync.
+        assert is_logged_in_mock.call_count >= 1
         assert update_decks_and_media_mock.call_count == 1
 
         # the other note should not be affected, because it is in a different deck
@@ -7284,6 +8342,8 @@ class TestMediaSyncMediaDownload:
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -7319,7 +8379,7 @@ class TestMediaSyncMediaDownload:
                 ah_did,
                 since=None,
             )
-            download_media_mock.assert_called_once_with(["image.png"], ah_did)
+            download_media_mock.assert_called_once_with(["image.png"], ah_did, media_sync._on_downloaded_file)
 
             # Assert that the deck media was added to the database
             assert ankihub_db.downloadable_media_for_ankihub_deck(ah_did) == [deck_media]
@@ -7337,6 +8397,8 @@ class TestMediaSyncMediaDownload:
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -7369,6 +8431,9 @@ class TestMediaSyncMediaDownload:
         qtbot: QtBot,
     ):
         """Test that media download now filters by media actually referenced in notes."""
+
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -7413,13 +8478,50 @@ class TestMediaSyncMediaDownload:
             )
 
             # Should only download the referenced media, not the unreferenced one
-            download_media_mock.assert_called_once_with(["referenced_image.png"], ah_did)
+            download_media_mock.assert_called_once_with(
+                ["referenced_image.png"], ah_did, media_sync._on_downloaded_file
+            )
 
             # Assert that both media were added to the database (this happens before filtering)
             db_media = ankihub_db.downloadable_media_for_ankihub_deck(ah_did)
             assert len(db_media) == 2
             media_names = {m.name for m in db_media}
             assert media_names == {"referenced_image.png", "unreferenced_image.png"}
+
+    def test_collection_not_available_exception_is_recorded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, _ = install_sample_ah_deck()
+            latest_media_update = datetime.now()
+            media = DeckMediaFactory.create(
+                name="test.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(media=[media], latest_update=latest_media_update),
+                ],
+            )
+            # Simulate closed collection
+            mocker.patch("aqt.mw.col", None)
+            with qtbot.captureExceptions() as exceptions:
+                media_sync.start_media_download()
+                qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+            # Exception is reported by the dialog but not raised
+            assert len(exceptions) == 0
+            assert isinstance(media_sync._errors[0], CollectionNotAvailableError)
 
 
 @fixture
@@ -7441,13 +8543,19 @@ def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
 
     # Create a temporary media folder and copy the test media files to it.
     # Patch the media folder path to point to the temporary folder.
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    # Clean up with ignore_errors=True rather than TemporaryDirectory's context
+    # manager: background media-sync tasks can still be writing here at teardown,
+    # and a strict rmtree would then race them and fail with "Directory not empty".
+    tmp_dir = tempfile.mkdtemp()
+    try:
         for file in (TEST_DATA_PATH / "media").glob("*"):
             shutil.copy(file, Path(tmp_dir) / file.name)
 
         mocker.patch("anki.media.MediaManager.dir", return_value=tmp_dir)
 
         yield upload_file_to_s3_with_reusable_presigned_url_mock
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 class TestSuggestionsWithMedia:
@@ -7705,6 +8813,45 @@ class TestSuggestionsWithMedia:
 
         assert name_of_uploaded_media == expected_media_name
 
+    def test_collection_not_available_exception_is_recorded(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_client_media_upload: Mock,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        set_feature_flag_state(MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG)
+
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+
+            # Simulate closed collection
+            def close_collection(*args, **kwargs):
+                mocker.patch("aqt.mw.col", None)
+                return {}
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "_get_presigned_url_for_multiple_uploads",
+                side_effect=close_collection,
+            )
+
+            with qtbot.captureExceptions() as exceptions:
+                media_sync.start_media_upload(["testfile_1.jpeg"], ah_did)
+                qtbot.wait_until(lambda: media_sync._amount_uploads_in_progress == 0)
+
+            # Exception is reported by the dialog but not raised
+            assert len(exceptions) == 0
+            assert isinstance(media_sync._errors[0], CollectionNotAvailableError)
+            assert media_sync._dialog.error_label.text() == "Collection is unavailable."
+
+            # Nothing was uploaded to S3
+            assert mock_client_media_upload.call_count == 0
+
 
 class TestAddonInstallAndUpdate:
     def test_install_and_update_addon(
@@ -7863,6 +9010,22 @@ class TestConfigDialog:
             qtbot.wait(500)
 
 
+def mock_load_url_to_show_page(mocker: MockerFixture, body: str, url_substring: str = "flashcard-selector") -> None:
+    """Make AnkiWebView.load_url render `body` instead of fetching the AnkiHub web app page."""
+    original_load_url = aqt.webview.AnkiWebView.load_url
+
+    def new_load_url(self, url: QUrl, *args, **kwargs):
+        self = cast(AnkiWebView, self)
+        # Only intercept the web app page itself - stdHtml relies on other load_url calls
+        # to load the page.
+        if url_substring in url.toString():
+            return self.stdHtml(body)
+        else:
+            return original_load_url(self, url, *args, **kwargs)
+
+    mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+
+
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -7970,15 +9133,12 @@ class TestFlashCardSelector:
 
             aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
 
-            qtbot.wait(500)
-
             overview_web: AnkiWebView = aqt.mw.overview.web
-            with qtbot.wait_callback() as callback:
-                overview_web.evalWithCallback(
-                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
-                    callback,
-                )
-            callback.assert_called_with(True)
+            wait_for_js_truthy(
+                qtbot,
+                overview_web,
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+            )
 
     @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
@@ -8170,7 +9330,7 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token", return_value="test_token")
 
-            self._mock_load_url_to_show_page(mocker, body="Invalid token")
+            mock_load_url_to_show_page(mocker, body="Invalid token")
 
             dialog = FlashCardSelectorDialog.display_for_ah_did(
                 ah_did=next_deterministic_uuid(),
@@ -8202,7 +9362,8 @@ class TestFlashCardSelector:
             dialog.view_in_web_browser_button.click()
 
             openLink_mock.assert_called_once_with(url_flashcard_selector(ah_did))
-            assert not dialog.isVisible()
+            # The dialog stays open so the user doesn't lose their search when they come back.
+            assert dialog.isVisible()
 
     @pytest.mark.sequential
     def test_sync_notes_actions(
@@ -8222,7 +9383,7 @@ class TestFlashCardSelector:
             )
 
             # Mock the page so that it's loaded and we can run javascript on it
-            self._mock_load_url_to_show_page(mocker, body="")
+            mock_load_url_to_show_page(mocker, body="")
 
             ah_did = next_deterministic_uuid()
             dialog = FlashCardSelectorDialog.display_for_ah_did(
@@ -8236,19 +9397,246 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(lambda: fetch_and_apply_pending_notes_actions_for_deck.called)
 
-    def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
-        original_load_url = aqt.webview.AnkiWebView.load_url
+    @pytest.mark.sequential
+    def test_dialog_is_raised_when_browser_opened_from_it_closes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Regression test: closing the browser opened from the dialog activates Anki's main
+        # window, burying the (non-modal) dialog behind it.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
 
-        def new_load_url(self, url: QUrl, *args, **kwargs):
-            self = cast(AnkiWebView, self)
-            # Check if the URL is the flashcard selector page.
-            # This is necessary, because stdHtml relies on other load_url calls to load the page.
-            if "flashcard-selector" in url.toString():
-                return self.stdHtml(body)
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            raise_mock = mocker.patch.object(dialog, "raise_")
+            activate_mock = mocker.patch.object(dialog, "activateWindow")
+
+            browser_will_show_mock = Mock()
+            browser_will_show.append(browser_will_show_mock)
+
+            dialog.web.eval(f"pycmd('{OPEN_BROWSER_PYCMD}')")
+            qtbot.wait_until(lambda: browser_will_show_mock.called)
+
+            # While the browser is still open the dialog must stay where it is -
+            # it is only brought back once the browser goes away.
+            assert not raise_mock.called
+
+            browser: Browser = browser_will_show_mock.call_args[0][0]
+            browser.close()
+
+            qtbot.wait_until(lambda: raise_mock.called)
+            assert activate_mock.called
+
+
+class TestAnkiHubWebViewDialogEscape:
+    """Escape closes the dialog only when nothing in the page consumed the key press."""
+
+    # A page that handles Escape itself, the way an AnkiHub web app modal does.
+    PAGE_CONSUMING_ESCAPE = """
+        <script>
+            window.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                }
+            });
+        </script>
+    """
+
+    @pytest.mark.sequential
+    def test_escape_closes_dialog_when_page_does_not_consume_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            qtbot.wait_until(lambda: not dialog.isVisible())
+
+    @pytest.mark.sequential
+    def test_escape_does_not_close_dialog_when_page_consumes_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body=self.PAGE_CONSUMING_ESCAPE)
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            # Give the deferred check and the resulting pycmd round trip time to happen.
+            qtbot.wait(1000)
+            assert dialog.isVisible()
+
+    @pytest.mark.sequential
+    def test_escape_pycmd_closes_dialog(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            dialog.web.eval(f"pycmd('{WEBVIEW_DIALOG_ESCAPE_PYCMD}')")
+
+            qtbot.wait_until(lambda: not dialog.isVisible())
+
+    @pytest.mark.sequential
+    def test_ankis_own_escape_close_path_is_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Fails loudly if a future Anki bump reworks onEsc(), instead of silently restoring the
+        # old close-everything behaviour.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
+
+            assert isinstance(dialog.web, AnkiHubWebView)
+
+            dialog.web.onEsc()
+
+            qtbot.wait(500)
+            assert dialog.isVisible()
+
+    @pytest.mark.sequential
+    def test_escape_handler_is_installed_once_when_dialog_is_displayed_again(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Displaying the dialog again connects another loadFinished handler, so the snippet is
+        # evaluated more than once per page. It must not stack listeners and close twice.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(mocker, body="")
+
+            ah_did = next_deterministic_uuid()
+            dialog = FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            assert FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw) is dialog
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            close_mock = mocker.patch.object(dialog, "close")
+
+            self._press_escape(dialog)
+
+            qtbot.wait_until(lambda: close_mock.called)
+            qtbot.wait(500)
+            assert close_mock.call_count == 1
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "page_consumes_escape, expected_still_visible",
+        [
+            (False, False),
+            (True, True),
+        ],
+    )
+    def test_escape_in_chatbot_dialog(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        page_consumes_escape: bool,
+        expected_still_visible: bool,
+    ):
+        # The chatbot dialog is application-modal and has no footer, so it is built along a
+        # different path than the flashcard selector.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token", return_value="test_token")
+            mock_load_url_to_show_page(
+                mocker,
+                body=self.PAGE_CONSUMING_ESCAPE if page_consumes_escape else "",
+                url_substring="/ai/chatbot/",
+            )
+
+            dialog = ChatbotDialog.display_for_ah_nid(ah_nid=next_deterministic_uuid(), parent=aqt.mw)
+            assert dialog is not None
+            self._wait_until_escape_handler_installed(dialog, qtbot)
+
+            self._press_escape(dialog)
+
+            if expected_still_visible:
+                qtbot.wait(1000)
+                assert dialog.isVisible()
             else:
-                return original_load_url(self, url, *args, **kwargs)
+                qtbot.wait_until(lambda: not dialog.isVisible())
 
-        mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+    def _press_escape(self, dialog: AnkiHubWebViewDialog) -> None:
+        """Dispatch an Escape keydown in the page, the way a real key press arrives."""
+        dialog.web.eval(
+            """
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {key: "Escape", bubbles: true, cancelable: true})
+            );
+            """
+        )
+
+    def _wait_until_escape_handler_installed(self, dialog: AnkiHubWebViewDialog, qtbot: QtBot) -> None:
+        results: List[Any] = []
+
+        def handler_installed() -> bool:
+            dialog.web.evalWithCallback("window.ankihubEscapeHandlerInstalled === true", results.append)
+            return bool(results) and bool(results[-1])
+
+        qtbot.wait_until(handler_installed)
 
 
 @pytest.mark.qt_no_exception_capture
@@ -9060,6 +10448,118 @@ def test_update_note_type_templates_and_styles(
         )
         assert ankihub_db.note_type_dict(note_type_id).get("tmpls") == db_note_type.get("tmpls")
         assert ankihub_db.note_type_dict(note_type_id).get("css") == db_note_type.get("css")
+
+
+class TestBringToFront:
+    def test_raises_and_activates_the_widget(self, anki_session_with_addon_data: AnkiSession):
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            raise_mock = Mock()
+            activate_mock = Mock()
+            widget.raise_ = raise_mock  # type: ignore[method-assign]
+            widget.activateWindow = activate_mock  # type: ignore[method-assign]
+
+            bring_to_front(widget)
+
+            assert raise_mock.called
+            assert activate_mock.called
+
+    def test_deleted_widget_is_ignored(self, anki_session_with_addon_data: AnkiSession):
+        # Callers fire this from signals (e.g. the browser being destroyed), by which point
+        # the widget may already be gone - touching it then would raise RuntimeError.
+        with anki_session_with_addon_data.profile_loaded():
+            widget = QWidget()
+            sip.delete(widget)
+            assert sip.isdeleted(widget)
+
+            bring_to_front(widget)  # must not raise
+
+
+class TestSheetFilePickerWebPage:
+    # NOTE: the underlying bug is a macOS-only focus steal (dismissing the picker buries the
+    # dialog behind Anki's main window). That is a visual/window-manager behavior with no
+    # automated seam, so these tests lock in the *mechanism* that fixes it - the picker being a
+    # window-modal sheet parented to the dialog - plus the chooseFiles() return-value contract.
+    def _open_dialog(
+        self,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> FlashCardSelectorDialog:
+        mocker.patch.object(config, "token", return_value="test_token")
+        mocker.patch.object(AnkiWebView, "load_url")
+        return FlashCardSelectorDialog.display_for_ah_did(ah_did=next_deterministic_uuid(), parent=aqt.mw)
+
+    def test_dialog_uses_the_sheet_file_picker_page(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert isinstance(dialog.web.page(), SheetFilePickerWebPage)
+
+    def test_choose_files_opens_window_modal_sheet_and_returns_selection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = True
+            picker.selectedFiles.return_value = ["/tmp/deck.csv"]
+            picker_cls = mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], ["text/csv"])
+
+            assert result == ["/tmp/deck.csv"]
+            # Parent + WindowModal is what makes it a sheet, so focus returns to the dialog.
+            picker_cls.assert_called_once_with(dialog)
+            picker.setWindowModality.assert_called_once_with(Qt.WindowModality.WindowModal)
+            picker.setMimeTypeFilters.assert_called_once_with(["text/csv", "application/octet-stream"])
+
+    def test_choose_files_returns_empty_list_on_cancel(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            page = dialog.web.page()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            result = page.chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert result == []
+
+    def test_dialog_stays_open_when_file_picker_is_cancelled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        # Cancelling the file picker must not dismiss the Smart Search dialog - it should
+        # remain open (and, on macOS, in front rather than buried behind the main window).
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = self._open_dialog(mocker, next_deterministic_uuid)
+            assert dialog.isVisible()
+
+            picker = mocker.MagicMock()
+            picker.exec.return_value = False  # user cancelled
+            mocker.patch("ankihub.gui.webview.QFileDialog", return_value=picker)
+
+            dialog.web.page().chooseFiles(QWebEnginePage.FileSelectionMode.FileSelectOpen, [], [])
+
+            assert not sip.isdeleted(dialog)
+            assert dialog.isVisible()
 
 
 @pytest.mark.qt_no_exception_capture
@@ -11122,6 +12622,7 @@ class TestPromptForOnboardingTutorial:
         from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
 
         with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
             mocker.patch.object(config, "last_deck_sync", return_value=None)
             mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
             mock_update = mocker.patch.object(config, "update_last_deck_sync")
@@ -11140,12 +12641,115 @@ class TestPromptForOnboardingTutorial:
         from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
 
         with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
             mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
             mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
 
             _show_onboarding_prompt_if_first_sync()
 
             mock_prompt.assert_not_called()
+
+    def test_show_onboarding_prompt_if_first_sync_skips_when_show_on_sync_false(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Test that _show_onboarding_prompt_if_first_sync does NOT call prompt when already shown after login."""
+        from ankihub.gui.operations.ankihub_sync import _show_onboarding_prompt_if_first_sync
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(False)
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mock_prompt = mocker.patch("ankihub.gui.tutorial.prompt_for_onboarding_tutorial")
+            mock_update = mocker.patch.object(config, "update_last_deck_sync")
+
+            _show_onboarding_prompt_if_first_sync()
+
+            mock_prompt.assert_not_called()
+            mock_update.assert_not_called()
+
+    def test_maybe_show_onboarding_tutorial_after_login_calls_prompt_and_disables_sync_prompt(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """After login, prompt runs when there was no prior deck sync; sync-time prompt is then disabled."""
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mock_prompt = mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+
+            _maybe_show_onboarding_tutorial_after_login()
+
+            mock_prompt.assert_called_once()
+            assert config.onboarding_tutorial_show_on_sync() is False
+
+    def test_maybe_show_onboarding_tutorial_after_login_skips_when_last_deck_sync_exists(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """If the profile already has a last deck sync time, do not prompt or change sync prompt flag."""
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
+            mocker.patch.object(config, "last_deck_sync", return_value=datetime.now())
+            mock_prompt = mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+
+            _maybe_show_onboarding_tutorial_after_login()
+
+            mock_prompt.assert_not_called()
+            assert config.onboarding_tutorial_show_on_sync() is True
+
+    def test_maybe_show_onboarding_tutorial_after_login_still_disables_sync_prompt_when_tour_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Even when onboarding_tour is off, clear show-on-sync so first sync does not duplicate the prompt."""
+        from ankihub.gui import tutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": False})
+            mocker.patch.object(tutorial, "active_tutorial", None)
+            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
+
+            _maybe_show_onboarding_tutorial_after_login()
+
+            mock_inject.assert_not_called()
+            assert config.onboarding_tutorial_show_on_sync() is False
+
+    def test_maybe_show_onboarding_tutorial_after_login_removes_itself_from_refresh_callbacks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """The callback must fire only once per session so dismissing 'Maybe later' is final.
+
+        Subsequent user-state refreshes (periodic timer, post-sync, etc.) should not
+        re-show the prompt while ``last_deck_sync`` is still ``None``.
+        """
+        from ankihub.user_state import (
+            _state,
+            add_user_state_refreshed_callback,
+            remove_user_state_refreshed_callback,
+        )
+
+        with anki_session_with_addon_data.profile_loaded():
+            config.set_onboarding_tutorial_show_on_sync(True)
+            mocker.patch.object(config, "last_deck_sync", return_value=None)
+            mocker.patch("ankihub.gui.menu.prompt_for_onboarding_tutorial")
+
+            add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+            try:
+                assert _maybe_show_onboarding_tutorial_after_login in _state.user_state_refreshed_callbacks
+
+                _maybe_show_onboarding_tutorial_after_login()
+
+                assert _maybe_show_onboarding_tutorial_after_login not in _state.user_state_refreshed_callbacks
+            finally:
+                remove_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
 
 
 class TestSubscribeToIntroDeck:
@@ -11368,3 +12972,230 @@ class TestStepDeckTutorial:
 
             with pytest.raises(AssertionError):
                 StepDeckTutorial()
+
+    def test_get_smart_search_button_target_returns_none_when_button_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Regression: tutorial target helper should handle missing Smart Search button."""
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            browser = Mock(sidebar=Mock())
+            browser.findChild.return_value = None
+            tutorial._browser = browser
+
+            assert tutorial._get_smart_search_button_target() is None
+
+    def test_get_smart_search_button_target_uses_live_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: target helper should resolve from the live Browser reference."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.overlay_dialog import OverlayTarget
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            live_browser = Mock(sidebar=Mock())
+            smart_search_button = Mock(spec=QToolButton)
+            live_browser.findChild.return_value = smart_search_button
+            tutorial._browser = None
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=live_browser)
+            mocker.patch.object(tutorial_module.sip, "isdeleted", return_value=False)
+
+            target = tutorial._get_smart_search_button_target()
+
+            assert isinstance(target, OverlayTarget)
+            assert target.parent is live_browser.sidebar
+            assert target.element is smart_search_button
+
+    def test_hook_browser_startup_does_not_crash_when_browser_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: startup callback should stop startup state when browser is unavailable."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser = None
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_hook_browser_startup_does_not_crash_when_step_deck_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: transient missing deck node should reset sidebar search and raise."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = False
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            tutorial._browser = Mock(sidebar=sidebar)
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            tutorial._pending_browser_startup_completion = True
+            mocker.patch.object(
+                tutorial,
+                "_find_step_deck_sidebar_item",
+                side_effect=RuntimeError("Sidebar item for Step deck not found"),
+            )
+
+            tutorial.hook_browser_startup(Mock())
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            with pytest.raises(RuntimeError, match="Sidebar item for Step deck not found"):
+                captured_wrappers["_deck_tree"](_old=old, root=root)
+            sidebar.search_for.assert_any_call("")
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_hook_browser_startup_calls_on_done_for_reused_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: reused Browser should trigger startup completion path."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            deck_config = type("DeckConfig", (), {})()
+            deck_config.name = "AnKing"
+            deck_config.anki_id = 123
+            tutorial._anking_deck_config = deck_config
+            tutorial._browser_closed_by_us = False
+            tutorial._pending_browser_startup_completion = True
+
+            sidebar_model = Mock(root=Mock(children=[]))
+            sidebar = Mock()
+            sidebar.model.return_value = sidebar_model
+            browser = Mock(sidebar=sidebar)
+            tutorial._browser = browser
+
+            captured_wrappers: dict[str, Callable[..., None]] = {}
+
+            def fake_wrap_method(klass: Any, method_name: str, new: Any, pos: str = "after") -> Callable[[], None]:
+                captured_wrappers[method_name] = new
+                return lambda: None
+
+            class ImmediateDebouncedCall:
+                def __init__(self, callback: Callable[..., None], delay_ms: int) -> None:
+                    self._callback = callback
+
+                def schedule(self, parent: Any, *args: Any, **kwargs: Any) -> None:
+                    self._callback(*args, **kwargs)
+
+            on_done = Mock()
+            step_sidebar_item = Mock(search_node=Mock())
+
+            mocker.patch.object(tutorial_module, "wrap_method", side_effect=fake_wrap_method)
+            mocker.patch.object(tutorial_module, "DebouncedDelayedCall", ImmediateDebouncedCall)
+            mocker.patch.object(tutorial_module.aqt.mw.taskman, "run_on_main", side_effect=lambda cb: cb())
+            mocker.patch.object(tutorial_module.aqt.mw.col, "build_search_string", return_value="deck:AnKing")
+            mocker.patch.object(tutorial_module, "active_tutorial", tutorial)
+            mocker.patch.object(tutorial, "_find_step_deck_sidebar_item", return_value=step_sidebar_item)
+
+            tutorial.hook_browser_startup(on_done)
+
+            def old(*, root: SidebarItem) -> None:
+                return None
+
+            root = Mock(children=[])
+            captured_wrappers["_deck_tree"](_old=old, root=root)
+
+            on_done.assert_called_once()
+            assert tutorial._pending_browser_startup_completion is False
+
+    def test_open_browser_marks_pending_completion_and_refreshes_sidebar(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: opening an already-open Browser should request startup completion."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            tutorial._pending_browser_startup_completion = False
+            browser = Mock(sidebar=Mock())
+
+            mocker.patch.object(tutorial_module.aqt.dialogs, "open")
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=browser)
+
+            tutorial._open_browser_and_move_to_next_step(Mock())
+
+            assert tutorial._pending_browser_startup_completion is True
+            browser.sidebar.refresh.assert_called_once()

@@ -125,7 +125,7 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     if _should_auto_sync_with_ankihub():
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
-        sync_with_ankihub(on_done=on_done)
+        sync_with_ankihub(on_done=on_done, report_ankiweb_errors=False)
     else:
         LOGGER.info("Not syncing with AnkiHub")
         on_done(future_with_result(None))

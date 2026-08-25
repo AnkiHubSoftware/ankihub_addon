@@ -119,7 +119,10 @@ def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
 def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids, ah_did=ah_did)
+        # The importer restores the AnkiHub ID field regardless of any protection, so this
+        # repair doesn't need the personal-protect tags stripped — and stripping them would
+        # break the promise the dialog above makes about protected fields.
+        reset_local_changes_to_notes(nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
 
 def _check_ankihub_update_tags() -> None:

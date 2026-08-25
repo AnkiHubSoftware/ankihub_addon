@@ -1,40 +1,50 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
 
+import math
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import Enum
 from html import escape
 from pprint import pformat
-from typing import Callable, Collection, Dict, List, Mapping, Optional, Sequence, Set, Union
+from typing import Callable, Collection, Dict, List, Mapping, NamedTuple, Optional, Sequence, Set
 
 import aqt
 from anki.models import NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import is_mac
 from aqt.qt import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QEvent,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
+    QPalette,
     QPlainTextEdit,
+    QPointF,
+    QRect,
     QScrollArea,
     QSize,
     QSizePolicy,
     QSpacerItem,
     QStyle,
     QStyleOptionButton,
+    QStylePainter,
     Qt,
+    QTextLayout,
+    QTextOption,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import show_info, showInfo, showText
+from aqt.utils import show_info, showInfo
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -44,29 +54,43 @@ from ..ankihub_client import (
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.suggestions import (
-    ANKIHUB_EMPTY_FIRST_FIELD_ERROR,
     ANKIHUB_NO_CHANGE_ERROR,
-    ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
-    BulkNoteSuggestionsResult,
     BulkSuggestionFilters,
     ChangeSuggestionResult,
     NoteDiff,
     any_suggestible_from_diffs,
     compute_note_diffs,
     get_anki_nid_to_ah_dids_dict,
+    globally_protected_fields_by_mid,
+    has_empty_first_field,
+    parse_duplicate_anki_id_error,
+    resubmit_new_note_as_change_suggestion,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
 from ..main.utils import note_type_name_without_ankihub_modifications
 from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, config
+from .bulk_suggestion_summary_dialog import _on_suggest_notes_in_bulk_done
 from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
+    panel_background_color,
+    panel_line_color,
     show_error_dialog,
     show_tooltip,
+    tinted_pixmap,
+    warning_triangle_icon,
 )
+
+# "Select fields to include" panel copy. The subtitle switches to the EMPTY variant
+# (plus the warning) when the note has no edited fields and no tag changes.
+INCLUDE_TITLE = "Select fields to include"
+INCLUDE_SUBTITLE = "Choose which fields to submit changes for."
+EMPTY_STATE_SUBTITLE = "Edit a note field to create a change suggestion"
+EMPTY_STATE_TITLE = "No changes detected"
+EMPTY_STATE_HINT = "Edit a field to suggest a change, or select Delete on change type."
 
 
 class SourceType(Enum):
@@ -129,9 +153,132 @@ def open_suggestion_dialog_for_single_suggestion(
         note_diffs=diffs,
         ah_did=ah_did,
         preselected_change_type=preselected_change_type,
-        globally_protected_fields_by_mid=_globally_protected_fields_by_mid(ah_did),
+        globally_protected_fields_by_mid=globally_protected_fields_by_mid(ah_did),
         parent=parent,
     )
+
+
+class NoteAlreadyExistsDialog(QDialog):
+    """Shown when a single new-note suggestion is rejected because the note already
+    exists in the deck on AnkiHub. Offers to resubmit the edits as a change
+    suggestion. Non-blocking; `on_send` runs when the user chooses to resubmit and
+    the dialog closes."""
+
+    def __init__(self, on_send: Callable[[], None], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._on_send = on_send
+        self.setWindowTitle("Note already exists in this deck")
+        # Application-modal (not window-modal) so macOS shows it as a normal centered
+        # dialog rather than a sheet sliding out of the parent window's title bar.
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(16)
+
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        icon = QLabel()
+        icon.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation).pixmap(QSize(36, 36)))
+        icon.setAlignment(Qt.AlignmentFlag.AlignTop)
+        body.addWidget(icon)
+        message = QLabel(
+            "This note already exists in the AnkiHub deck. Send your edits as a change "
+            "suggestion instead, they'll go through the normal review process."
+        )
+        message.setWordWrap(True)
+        message.setMinimumWidth(320)
+        body.addWidget(message, 1)
+        layout.addLayout(body)
+
+        button_box = QDialogButtonBox()
+        cancel_button = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        send_button = button_box.addButton("Send as change suggestion", QDialogButtonBox.ButtonRole.AcceptRole)
+        send_button.setDefault(True)
+        qconnect(cancel_button.clicked, self.reject)
+        qconnect(send_button.clicked, self._handle_send)
+        layout.addWidget(button_box)
+
+    def _handle_send(self) -> None:
+        # Close first, then kick off the resubmit; the result surfaces as a toast or
+        # an error dialog.
+        self.accept()
+        self._on_send()
+
+
+def _show_note_already_exists_dialog(
+    note: Note,
+    ah_did: uuid.UUID,
+    conflicting_ah_nid: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> None:
+    LOGGER.info("duplicate_note_error_dialog_shown", note_id=note.id, ah_did=str(ah_did))
+
+    def resubmit() -> ChangeSuggestionResult:
+        # New-note flows carry no change type; resubmit as an "Updated content" change.
+        return resubmit_new_note_as_change_suggestion(
+            note=note,
+            ah_did=ah_did,
+            conflicting_ah_nid=conflicting_ah_nid,
+            change_type=SuggestionType.UPDATED_CONTENT,
+            comment=_comment_with_source(suggestion_meta),
+            auto_accept=suggestion_meta.auto_accept,
+            filters=suggestion_meta.filters.for_mid(NotetypeId(note.mid)),
+        )
+
+    def on_resubmit_done(future: Future) -> None:
+        try:
+            result = future.result()
+        except AnkiHubHTTPError as e:
+            _handle_suggestion_error(e, parent)
+            return
+        if result == ChangeSuggestionResult.SUCCESS:
+            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        elif result == ChangeSuggestionResult.NO_CHANGES:
+            show_tooltip("No changes to suggest.", parent=parent)
+        elif result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+            show_error_dialog(
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                title="Note has been deleted from AnkiHub.",
+                parent=parent,
+            )
+
+    def on_send() -> None:
+        LOGGER.info("duplicate_note_resubmitted_as_update_suggestion", note_id=note.id, ah_did=str(ah_did))
+        aqt.mw.taskman.with_progress(task=resubmit, on_done=on_resubmit_done, parent=parent)
+
+    NoteAlreadyExistsDialog(on_send=on_send, parent=parent).show()
+
+
+def _maybe_handle_note_already_exists(
+    e: AnkiHubHTTPError,
+    note: Note,
+    ah_did: uuid.UUID,
+    suggestion_meta: "SuggestionMetadata",
+    parent: QWidget,
+) -> bool:
+    """If the new-note submit was rejected because the note already exists in the deck,
+    handle it and return True. Returns False to let the generic error
+    handler run (not this error, or the server didn't include the conflicting id)."""
+    if e.response.status_code != 400:
+        return False
+    parsed = parse_duplicate_anki_id_error(e.response.json())
+    if parsed is None:
+        return False
+    conflicting_ah_nid, is_deleted = parsed
+    if is_deleted:
+        show_error_dialog(
+            "This note has been deleted from AnkiHub. No new suggestions can be made.",
+            title="Note has been deleted from AnkiHub.",
+            parent=parent,
+        )
+        return True
+    if conflicting_ah_nid is None:
+        # Older server without the conflicting id — fall back to generic handling.
+        return False
+    _show_note_already_exists_dialog(note, ah_did, conflicting_ah_nid, suggestion_meta, parent)
+    return True
 
 
 def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
@@ -139,13 +286,16 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
         raise e
 
     if e.response.status_code == 400:
-        if non_field_errors := e.response.json().get("non_field_errors", None):
+        non_field_errors = e.response.json().get("non_field_errors") or []
+        if non_field_errors:
             error_message = "\n".join(non_field_errors)
         else:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        all_no_changes_errors = all(ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors)
+        all_no_changes_errors = bool(non_field_errors) and all(
+            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
+        )
         if all_no_changes_errors:
             # The dialog OK button is gated on at least one field/tag change being
             # selected, so this branch should be unreachable in normal use. If it
@@ -218,7 +368,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
             )
     else:
         # Check for empty first field before submitting new note suggestion
-        if not note.fields or not note.fields[0].strip():
+        if has_empty_first_field(note):
             show_tooltip("The first field is required.", parent=parent)
             return
 
@@ -233,6 +383,10 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 diff=diff,
             )
         except AnkiHubHTTPError as e:
+            if _maybe_handle_note_already_exists(
+                e=e, note=note, ah_did=ah_did, suggestion_meta=suggestion_meta, parent=parent
+            ):
+                return
             _handle_suggestion_error(e, parent)
             return
         if submitted:
@@ -260,7 +414,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         return
 
     notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
-    globally_protected = _globally_protected_fields_by_mid(ah_did)
+    globally_protected = globally_protected_fields_by_mid(ah_did)
 
     diffs = compute_note_diffs(notes)
 
@@ -316,7 +470,12 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             filters=suggestion_meta.filters,
             note_diffs=note_diffs,
         ),
-        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(
+            future,
+            parent,
+            ah_did=ah_did,
+            auto_accept=suggestion_meta.auto_accept,
+        ),
         parent=parent,
     )
 
@@ -350,88 +509,12 @@ def _determine_ah_did_for_nids_to_be_suggested(anki_nids: Collection[NoteId], pa
     return ah_did
 
 
-def _globally_protected_fields_by_mid(ah_did: uuid.UUID) -> Dict[NotetypeId, Set[str]]:
-    """Coerce the cached globally-protected fields into the shape the widget expects."""
-    return {NotetypeId(mid): set(names) for mid, names in config.globally_protected_fields(ah_did).items()}
-
-
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
     if suggestion_meta.source and suggestion_meta.source.source_text.strip():
         result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
-
-
-def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
-    try:
-        suggestions_result: BulkNoteSuggestionsResult = future.result()
-    except AnkiHubHTTPError as e:
-        if e.response.status_code == 403:
-            response_data = e.response.json()
-            error_message = response_data.get("detail")
-            if error_message:
-                show_error_dialog(
-                    message=error_message,
-                    parent=parent,
-                    title="Error submitting bulk suggestion :(",
-                )
-                return
-        raise e
-
-    LOGGER.info(
-        "Created note suggestions in bulk.",
-        errors_by_nid=suggestions_result.errors_by_nid,
-    )
-
-    msg_about_created_suggestions = (
-        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n"
-    )
-
-    notes_without_changes = [
-        note for note, errors in suggestions_result.errors_by_nid.items() if ANKIHUB_NO_CHANGE_ERROR in str(errors)
-    ]
-    notes_that_dont_exist_on_ankihub = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(errors)
-    ]
-    notes_with_empty_first_field = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_EMPTY_FIRST_FIELD_ERROR in str(errors)
-    ]
-
-    if suggestions_result.errors_by_nid:
-        category_messages = []
-        if notes_without_changes:
-            category_messages.append(
-                f"Notes without changes ({len(notes_without_changes)}):\n"
-                f"{', '.join(str(nid) for nid in notes_without_changes)}"
-            )
-        if notes_that_dont_exist_on_ankihub:
-            category_messages.append(
-                f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
-                f"{', '.join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}"
-            )
-        if notes_with_empty_first_field:
-            category_messages.append(
-                f"Notes with the first field empty ({len(notes_with_empty_first_field)}):\n"
-                f"{', '.join(str(nid) for nid in notes_with_empty_first_field)}"
-            )
-
-        msg_about_failed_suggestions = (
-            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
-            "All notes with failed suggestions:\n"
-            f"{', '.join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n"
-            + "\n\n".join(category_messages)
-        )
-    else:
-        msg_about_failed_suggestions = ""
-
-    msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
 
 
 class SuggestionDialog(QDialog):
@@ -461,7 +544,7 @@ class SuggestionDialog(QDialog):
         super().__init__(parent)
         # Block input to other Anki windows while the dialog is open — prevents
         # the user from editing the selected notes (or syncing) between dialog
-        # open and submit, which would invalidate the "Include in suggestion"
+        # open and submit, which would invalidate the "Select fields to include"
         # selection.
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self._is_new_note_suggestion = is_new_note_suggestion
@@ -509,6 +592,10 @@ class SuggestionDialog(QDialog):
         # right column's content (e.g. "Submit without review"), not at the
         # bottom of the dialog.
         outer_layout = QVBoxLayout()
+        # Uniform 16px gutter: dialog margins, the gap between the two columns,
+        # and the gap between the content and the button row all match.
+        outer_layout.setContentsMargins(16, 16, 16, 16)
+        outer_layout.setSpacing(16)
         self.setLayout(outer_layout)
 
         content_row = QHBoxLayout()
@@ -524,9 +611,10 @@ class SuggestionDialog(QDialog):
                 globally_protected_fields_by_mid=self._globally_protected_by_mid,
             )
             self._fields_widget.setMinimumWidth(220)
-            # Cap the left column so pathologically long section titles can't
-            # push the dialog wide; the section-title checkbox elides instead.
-            self._fields_widget.setMaximumWidth(360)
+            # No maximum width: the 2:3 stretch factors keep both columns
+            # growing proportionally when the dialog is resized. Long content
+            # can't push the dialog wide — section titles and tag rows elide
+            # (Ignored size policy), and the rest sits inside a scroll area.
             content_row.addWidget(self._fields_widget, 2)
             qconnect(self._fields_widget.selection_changed, self._validate)
 
@@ -539,7 +627,7 @@ class SuggestionDialog(QDialog):
         self.change_type_select = QComboBox()
         if not self._is_new_note_suggestion:
             self.change_type_select.addItems([x.value[1] for x in SuggestionType])
-            right_layout.addWidget(QLabel("Change Type"))
+            right_layout.addWidget(QLabel("<b>Change Type</b>"))
             right_layout.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
@@ -549,22 +637,37 @@ class SuggestionDialog(QDialog):
 
         self.source_widget = SourceWidget()
         self.source_widget_group_box = QGroupBox("Source (Required)")
+        self.source_widget_group_box.setObjectName("sourceGroupBox")
+        # Same neutral panel background as the Include-in-suggestion section.
+        # font-weight on the element (not ::title) overrides Anki's bold-title
+        # default, so "Source" stays regular like in Figma.
+        self.source_widget_group_box.setStyleSheet(
+            f"#sourceGroupBox {{ background-color: {panel_background_color()}; "
+            f"border: none; border-radius: 6px; margin-top: 8px; font-weight: normal; }} "
+            f"#sourceGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; "
+            f"left: 6px; padding: 0 3px; }}"
+        )
+        # Pin the source box to its natural height so it never shrinks below its
+        # (fixed-height) contents — otherwise the combo and link/details fields
+        # overlap when the dialog is short. The rationale editor below absorbs
+        # the column's vertical flex instead.
+        self.source_widget_group_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         right_layout.addWidget(self.source_widget_group_box)
         self.source_widget_group_box_layout = QVBoxLayout()
+        self.source_widget_group_box_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
 
         self.source_widget_group_box_layout.addWidget(self.source_widget)
         qconnect(self.source_widget.validation_signal, self._validate)
         right_layout.addSpacing(10)
 
-        self._refresh_source_widget()
-
-        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes<br>to fields will not be applied.")
+        self.hint_for_note_deletions = QLabel("💡 When deleting a note, any changes to fields will not be applied.")
+        self.hint_for_note_deletions.setWordWrap(True)
         self.hint_for_note_deletions.hide()
         right_layout.addWidget(self.hint_for_note_deletions)
         right_layout.addSpacing(10)
 
-        right_layout.addWidget(QLabel("Rationale for Change (Required)"))
+        right_layout.addWidget(QLabel("<b>Rationale for Change (Required)</b>"))
 
         self.rationale_edit = QPlainTextEdit()
         self.rationale_edit.setPlaceholderText(RATIONALE_FOR_CHANGE_PLACEHOLDER)
@@ -576,6 +679,10 @@ class SuggestionDialog(QDialog):
 
         qconnect(self.rationale_edit.textChanged, limit_length)
         qconnect(self.rationale_edit.textChanged, self._validate)
+
+        # Configure the source widget now that rationale_edit exists — populating
+        # the source-type dropdown re-validates, which reads rationale_edit.
+        self._refresh_source_widget()
 
         right_layout.addSpacing(10)
 
@@ -814,6 +921,31 @@ class SourceWidget(QWidget):
         qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
+        # "Other" needs free-text describing the source — a taller, top-aligned,
+        # line-wrapping box rather than the single-line input the other types use.
+        self.source_multiline_edit = QPlainTextEdit()
+        self.source_multiline_edit.setFixedHeight(60)
+        self.source_multiline_edit.hide()
+        qconnect(self.source_multiline_edit.textChanged, self._validate)
+        self.layout_.addWidget(self.source_multiline_edit)
+
+        # The inputs sit on the panel's neutral fill, which in dark mode is close
+        # to the native input background — a border keeps them legible. Re-assert
+        # background-color so the border stylesheet doesn't drop the themed fill.
+        border = panel_line_color()
+        self.source_edit.setStyleSheet(
+            f"QLineEdit {{ border: 1px solid {border}; border-radius: 4px; "
+            f"padding: 2px 4px; background-color: palette(base); }}"
+        )
+        self.source_multiline_edit.setStyleSheet(
+            f"QPlainTextEdit {{ border: 1px solid {border}; border-radius: 4px; background-color: palette(base); }}"
+        )
+
+    def _source_text(self) -> str:
+        if self._source_type() == SourceType.OTHER:
+            return self.source_multiline_edit.toPlainText()
+        return self.source_edit.text()
+
     def setup_for_change_type(self, change_type: SuggestionType) -> None:
         """Sets up the source widget for the given change type. This method should be called initially
         after the source widget was created and whenever the change type changes."""
@@ -834,7 +966,7 @@ class SourceWidget(QWidget):
 
     def suggestion_source(self) -> SuggestionSource:
         source_type = self._source_type()
-        source = self.source_edit.text()
+        source = self._source_text()
 
         if source_type == SourceType.UWORLD:
             step = self.uworld_step_select.currentText()
@@ -852,8 +984,7 @@ class SourceWidget(QWidget):
         if self._source_type() in source_types_where_input_is_optional:
             return True
 
-        text = self.source_edit.text().strip()
-        return len(text) > 0
+        return len(self._source_text().strip()) > 0
 
     def _validate(self) -> None:
         self.validation_signal.emit(self.is_valid())
@@ -872,6 +1003,9 @@ class SourceWidget(QWidget):
             self.uworld_step_select.hide()
             self.space_after_uworld_step_select.changeSize(0, 0)
             self.layout_.invalidate()
+        # Re-validate: switching to/from "Other" changes which input is read, so
+        # the OK-button gate must refresh even though no text changed.
+        self._validate()
 
     def _refresh_source_input_label(self) -> None:
         source_type = self._source_type()
@@ -879,8 +1013,13 @@ class SourceWidget(QWidget):
         # so the inner field label stays bare to avoid showing "(Required)" twice.
         self.source_input_label.setText(source_type_to_source_label[source_type])
 
+        # "Other" uses the multi-line box; every other source type uses the single-line input.
         place_holder_text = source_type_to_source_place_holder_text.get(source_type, "")
-        self.source_edit.setPlaceholderText(place_holder_text)
+        uses_multiline = source_type == SourceType.OTHER
+        self.source_multiline_edit.setVisible(uses_multiline)
+        self.source_edit.setVisible(not uses_multiline)
+        active_input = self.source_multiline_edit if uses_multiline else self.source_edit
+        active_input.setPlaceholderText(place_holder_text)
 
     def _source_type(self) -> Optional[SourceType]:
         if self.source_type_select.currentText():
@@ -889,124 +1028,285 @@ class SourceWidget(QWidget):
             return None
 
 
-class _TagLabel(QLabel):
-    """A QLabel for tag-name display.
-
-    Centralizes tag rendering: elides long tags to `…::leaf` (or `<head>…` for
-    flat names), injects zero-width spaces after `::` and `_` so `wordWrap`
-    has break points inside identifier-style names, and sets a (rich-text)
-    tooltip with the full tag — only when actually elided. Emits `clicked`
-    on mouse press so a paired checkbox can toggle.
+class _TagLabel:
+    """Tag-name rendering helpers shared by `_WrappingCheckBox`: produce the
+    display candidates for a tag (full name, then progressively shorter `…::`
+    suffixes) and inject zero-width spaces after `::` and `_` so the text has
+    break points inside identifier-style names.
     """
 
-    clicked = pyqtSignal()
+    # How many wrapped lines a tag may occupy before it is elided. This is the
+    # only bound on what a tag shows: the widget renders the longest candidate
+    # that fits this many lines at the current width, so a wider dialog reveals
+    # more — eventually the whole tag — and a narrow one collapses to `…::leaf`.
+    # (Supersedes the old fixed 85-char ceiling: the bound is now space, not a
+    # hardcoded length, per QA feedback on NRT-790 / the NRT-508 spec.)
+    _MAX_LINES = 3
 
-    _MAX_LEN = 85
+    @classmethod
+    def _elision_candidates(cls, tag: str) -> List[str]:
+        """Display candidates for `tag`, longest first: the full tag, then
+        trailing-segment suffixes prefixed with `…::`, dropping one leading
+        segment at a time (`a::b::c::leaf` → [`a::b::c::leaf`, `…::b::c::leaf`,
+        `…::c::leaf`, `…::leaf`]). A flat tag (no `::`) yields just itself.
+        `_WrappingCheckBox` renders the longest candidate that fits `_MAX_LINES`
+        lines at the current width, truncating the last one if even it overflows
+        — so the list need not be length-bounded here.
+        """
+        if "::" not in tag:
+            return [tag]
+        segments = tag.split("::")
+        return [tag] + ["…::" + "::".join(segments[start:]) for start in range(1, len(segments))]
+
+    @staticmethod
+    def _inject_breakpoints(text: str) -> str:
+        """Insert zero-width spaces after `::` and `_` so word-wrap has valid
+        break points inside identifier-style names (`a::b::c_d`).
+        """
+        return text.replace("::", "::​").replace("_", "_​")
+
+
+class _RowCheckBox(QCheckBox):
+    """A QCheckBox whose entire (stretched) width is the click target.
+
+    Qt's default `hitButton` only accepts clicks over the indicator + label,
+    so a full-width checkbox shows the hover cursor across the whole row but
+    only toggles on the text. Accepting the full rect makes the click area
+    match the cursor area.
+
+    `paintEvent` is overridden to suppress the style's focus styling on the
+    label (which the user sees as "weird" after clicking) while keeping the
+    checkbox focus-navigable.
+    """
+
+    def hitButton(self, pos) -> bool:  # noqa: N802 - Qt override
+        return self.rect().contains(pos)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        # Draw the indicator with the native state (so focus is visible on it)
+        # and the label with HasFocus stripped (so its text doesn't pick up the
+        # native focus styling, which reads as "weird" in this dialog).
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        painter = QStylePainter(self)
+        style = self.style()
+        ind_opt = QStyleOptionButton(opt)
+        ind_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, opt, self)
+        painter.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorCheckBox, ind_opt)
+        label_opt = QStyleOptionButton(opt)
+        label_opt.state &= ~QStyle.StateFlag.State_HasFocus
+        # Set the label rect explicitly to the contents area — without it,
+        # some styles (Fusion) draw the label from x=0 and it overlaps the
+        # indicator.
+        label_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self)
+        painter.drawControl(QStyle.ControlElement.CE_CheckBoxLabel, label_opt)
+
+
+class _TagLayout(NamedTuple):
+    """`_WrappingCheckBox`'s per-width memo: the chosen display `text` and its
+    laid-out `layout`, valid for one `content_width`."""
+
+    content_width: int
+    text: str
+    layout: QTextLayout
+
+
+class _WrappingCheckBox(_RowCheckBox):
+    """A full-row-clickable checkbox whose label wraps to multiple lines.
+
+    A plain QCheckBox draws its label on one line, so a long tag overflows the
+    panel. This paints the native indicator on the first text line and the
+    word-wrapped label beside it — giving the indicator/first-line alignment the
+    native style would for a single-line checkbox, on every platform, with no
+    separate label widget to misalign. The checkbox carries no native text; the
+    label is painted manually so wrapping (and `heightForWidth`) is under our
+    control.
+    """
+
+    # Native row height of a checkbox *with* text (an empty checkbox reserves
+    # no row padding). Probed once per class so bulk-suggestion dialogs don't
+    # build a throwaway QCheckBox per tag.
+    _native_row_height: Optional[int] = None
 
     def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        display = self._elide(tag)
-        self.setText(self._inject_breakpoints(display))
-        self.setWordWrap(True)
-        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        # Wrapping a label inside a layout takes both: a horizontal policy that
-        # lets the layout pick the width (else sizeHint is the unwrapped single
-        # line) and `setHeightForWidth(True)` on the policy so the layout asks
-        # the label "how tall do you want to be at this width?" Without the
-        # latter, wordWrap=True wraps the *paint* but vertical sizing stays at
-        # a single line.
+        super().__init__("", parent)
+        self._tag = tag
+        # Display candidates, longest → shortest: the full tag, then `…::`
+        # suffixes. `_layout_for_width` renders the longest that fits the current
+        # width, so a wide dialog shows the whole tag and a narrow one elides. A
+        # flat tag (no `::`) has a single candidate (itself).
+        self._candidates = _TagLabel._elision_candidates(tag)
+        # Memoizes the chosen text + layout for one content width so the
+        # back-to-back heightForWidth + paintEvent at the same width don't
+        # rebuild, and the candidate search runs once per resize step.
+        self._layout_cache: Optional[_TagLayout] = None
+        if _WrappingCheckBox._native_row_height is None:
+            _WrappingCheckBox._native_row_height = QCheckBox("X").sizeHint().height()
+        # Helps screen readers name the otherwise text-less checkbox.
+        self.setAccessibleName(tag)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Ignored width lets the layout pick the column width (so the text wraps
+        # instead of forcing the panel wide); heightForWidth supplies the wrapped
+        # height. Without setHeightForWidth the row would stay one line tall.
         sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
         self.setMinimumWidth(1)
-        if display != tag:
-            self.setToolTip(f"<p>{self._inject_breakpoints(escape(tag))}</p>")
+        self._refresh_tooltip()
 
-    @classmethod
-    def _elide(cls, tag: str) -> str:
-        """Tags shorter than the budget render as-is. Longer hierarchical tags
-        collapse to `…::leaf` (the trailing `::`-segment with an ellipsis
-        prefix). The leaf itself is truncated if it would still exceed the
-        budget. Long flat tags get a plain `…` truncation.
+    def _content_width(self, width: int) -> int:
+        """Width available for the label inside a checkbox of the given overall
+        width, derived the same way `paintEvent` computes its draw rect (the
+        style's `SE_CheckBoxContents` sub-element). Computed fresh per call rather
+        than cached: the style metrics aren't reliable until the widget is
+        polished, and a value cached in `__init__` is too narrow on the left and
+        too wide overall, which made `heightForWidth` under-count wrapped lines
+        and clip the last one. The style call is cheap.
         """
-        if len(tag) <= cls._MAX_LEN:
-            return tag
-        if "::" in tag:
-            leaf = tag.rsplit("::", 1)[-1]
-            leaf_budget = cls._MAX_LEN - 3  # account for "…::" prefix
-            if len(leaf) > leaf_budget:
-                leaf = f"{leaf[: leaf_budget - 1]}…"
-            return f"…::{leaf}"
-        return f"{tag[: cls._MAX_LEN - 1]}…"
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        opt.rect = QRect(0, 0, width, max(self.fontMetrics().height(), 1))
+        return self.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).width()
 
-    @staticmethod
-    def _inject_breakpoints(text: str) -> str:
-        """Insert zero-width spaces after `::` and `_` so QLabel.wordWrap has
-        valid break points inside identifier-style names (`a::b::c_d`).
+    def _vertical_padding(self) -> int:
+        """Vertical space a native single-line checkbox reserves around its text
+        line. We add it so a wrapped row occupies the same box as a native
+        checkbox — keeping inter-row spacing consistent with the field rows.
         """
-        return text.replace("::", "::​").replace("_", "_​")
+        assert self._native_row_height is not None  # set in __init__
+        return max(0, self._native_row_height - self.fontMetrics().height())
 
-    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt override
-        super().mousePressEvent(event)
-        self.clicked.emit()
+    def _build_text_layout(self, wrap_text: str, text_width: int) -> QTextLayout:
+        """Wrap `wrap_text` into `text_width` px with the same QTextLayout engine
+        `paintEvent` draws with, so `heightForWidth` reserves exactly the number
+        of lines that get painted. (`QFontMetrics.boundingRect` is a separate
+        code path that disagrees by a line at wrap boundaries — especially with
+        wrap-anywhere — which is what clipped the last tag segment.)
+        """
+        opt = QTextOption()
+        opt.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        layout = QTextLayout(wrap_text, self.font())
+        layout.setTextOption(opt)
+        layout.beginLayout()
+        y = 0.0
+        while True:
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(max(1, text_width))
+            line.setPosition(QPointF(0, y))
+            y += line.height()
+        layout.endLayout()
+        return layout
 
+    def _layout_for_width(self, content_width: int) -> QTextLayout:
+        """Choose the display text for `content_width` and lay it out. Renders the
+        longest candidate whose wrapped text fits within `_TagLabel._MAX_LINES`
+        lines — so a wide enough dialog shows the full tag and a narrow one
+        collapses to a `…::`-suffix. If even the narrowest candidate (`…::leaf`)
+        overflows the budget, its text is truncated to fit. Memoized per content
+        width so the paired heightForWidth + paintEvent at one width build once.
+        """
+        text_width = max(1, content_width)
+        if self._layout_cache is not None and self._layout_cache.content_width == text_width:
+            return self._layout_cache.layout
+        for candidate in self._candidates:  # longest → shortest; last is the floor
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(candidate), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                chosen_text, chosen_layout = candidate, layout
+                break
+        else:
+            # Even `…::leaf` needs more than the budget — truncate it to fit.
+            chosen_text = self._truncate_to_fit(self._candidates[-1], text_width)
+            chosen_layout = self._build_text_layout(_TagLabel._inject_breakpoints(chosen_text), text_width)
+        self._layout_cache = _TagLayout(text_width, chosen_text, chosen_layout)
+        return chosen_layout
 
-class _TagCheckBox(QWidget):
-    """A QCheckBox-like row pairing a checkbox indicator with a `_TagLabel`
-    whose tag name wraps to multiple lines.
+    def _truncate_to_fit(self, text: str, text_width: int) -> str:
+        """Longest prefix of `text` that, with a trailing `…`, wraps within
+        `_TagLabel._MAX_LINES` lines at `text_width`. Only reached for a single
+        segment too long to fit the line budget at the current width; keeps a
+        pathological tag from ballooning the row to many lines."""
+        # Largest prefix length that fits; the `+ 1` rounds `mid` up so the
+        # `lo = mid` branch makes progress when `hi == lo + 1` (no infinite loop).
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            layout = self._build_text_layout(_TagLabel._inject_breakpoints(f"{text[:mid]}…"), text_width)
+            if layout.lineCount() <= _TagLabel._MAX_LINES:
+                lo = mid
+            else:
+                hi = mid - 1
+        return f"{text[:lo]}…"
 
-    QCheckBox draws its label inline as a single line; long tag names overflow
-    the section width and force a horizontal scrollbar. This widget keeps the
-    same `.isChecked() / .setChecked() / .toggled` API the rest of the code
-    expects but pairs the indicator with a wrappable `_TagLabel`.
-    """
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().resizeEvent(event)
+        # The chosen suffix can change with width; keep the tooltip in sync so it
+        # appears only while text is actually hidden.
+        self._refresh_tooltip()
 
-    toggled = pyqtSignal(bool)
+    def changeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        # A font change re-wraps the text, so the chosen candidate (and thus
+        # whether the text is elided) can change with no resize: drop the
+        # width-keyed memo and refresh the tooltip to match. The `hasattr` guard
+        # covers a FontChange arriving mid-construction, before the subclass
+        # attributes exist. (Style metrics in `_content_width` are recomputed
+        # per call, so a style change needs no handling here.)
+        if event.type() == QEvent.Type.FontChange and hasattr(self, "_candidates"):
+            self._layout_cache = None
+            self._refresh_tooltip()
+        super().changeEvent(event)
 
-    def __init__(self, tag: str, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(6)
-        self.setLayout(row)
+    def _refresh_tooltip(self) -> None:
+        """Show the full tag as a tooltip only while the rendered text is elided."""
+        self._layout_for_width(self._content_width(self.width()))
+        displayed = self._layout_cache.text if self._layout_cache is not None else self._tag
+        if displayed != self._tag:
+            self.setToolTip(f"<p>{_TagLabel._inject_breakpoints(escape(self._tag))}</p>")
+        else:
+            self.setToolTip("")
 
-        self._checkbox = QCheckBox()
-        row.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
-
-        self._label = _TagLabel(tag)
-        qconnect(self._label.clicked, self._checkbox.toggle)
-        row.addWidget(self._label, 1)
-
-        qconnect(self._checkbox.toggled, self.toggled.emit)
-
-    # Propagate heightForWidth from the inner label up to this widget so the
-    # parent QVBoxLayout grows the row vertically when the label wraps.
     def hasHeightForWidth(self) -> bool:  # noqa: N802
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802
-        indicator_w = self._checkbox.sizeHint().width()
-        spacing = self.layout().spacing() if self.layout() else 0
-        label_width = max(1, width - indicator_w - spacing)
-        label_height = self._label.heightForWidth(label_width)
-        # Don't drop below the bare checkbox height (single-line fallback).
-        return max(label_height, self._checkbox.sizeHint().height())
+        layout = self._layout_for_width(self._content_width(width))
+        return math.ceil(layout.boundingRect().height()) + self._vertical_padding()
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        hint_w = self._checkbox.sizeHint().width()  # ignore label's natural width
-        hint_h = self._checkbox.sizeHint().height()
-        return QSize(hint_w, hint_h)
+        assert self._native_row_height is not None
+        return QSize(super().sizeHint().width(), self._native_row_height)
 
-    # QCheckBox-compatible surface used by `_GroupController` and the
-    # `IncludeInSuggestionWidget` accessors.
-    def isChecked(self) -> bool:  # noqa: N802 - Qt-style name
-        return self._checkbox.isChecked()
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        assert self._native_row_height is not None
+        return QSize(1, self._native_row_height)
 
-    def setChecked(self, value: bool) -> None:  # noqa: N802
-        self._checkbox.setChecked(value)
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        painter = QStylePainter(self)
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        style = self.style()
+        top_pad = self._vertical_padding() // 2
+        line_height = self.fontMetrics().height()
+        # Draw the indicator centred on the first text line: hand the style a
+        # one-line-tall rect (offset by the top padding) so a multi-line row
+        # doesn't centre it in the middle.
+        line_opt = QStyleOptionButton(opt)
+        line_opt.rect = QRect(opt.rect.x(), opt.rect.y() + top_pad, opt.rect.width(), line_height)
+        ind_opt = QStyleOptionButton(opt)
+        ind_opt.rect = style.subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, line_opt, self)
+        painter.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorCheckBox, ind_opt)
+        # Word-wrapped label, top-aligned in the contents rect (below the top pad).
+        contents = style.subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, self).adjusted(0, top_pad, 0, 0)
+        # Match the indicator's enabled state so the text greys with it.
+        color_group = QPalette.ColorGroup.Normal if self.isEnabled() else QPalette.ColorGroup.Disabled
+        painter.setPen(self.palette().color(color_group, QPalette.ColorRole.WindowText))
+        # Draw via the same QTextLayout `heightForWidth` measured with, so the
+        # painted line count matches the reserved height exactly (no clipped line).
+        self._layout_for_width(contents.width()).draw(painter, QPointF(contents.x(), contents.y()))
 
 
-class _SelectAllCheckBox(QCheckBox):
+class _SelectAllCheckBox(_RowCheckBox):
     """Displays PartiallyChecked programmatically, but user clicks only toggle
     Checked ↔ Unchecked — Qt's default Unchecked → PartiallyChecked cycle would
     block "select all" from an empty group.
@@ -1054,7 +1354,7 @@ class _SelectAllCheckBox(QCheckBox):
         self.setToolTip(self._full_text if text != self._full_text else "")
 
 
-_Toggleable = Union[QCheckBox, _TagCheckBox]
+_Toggleable = QCheckBox
 
 
 class _GroupController:
@@ -1084,6 +1384,12 @@ class _GroupController:
         # parent tri-state or be touched by Select-all.
         togglable = [c for c in self._children if c.isEnabled()]
         if not togglable:
+            # Nothing for the (full-row clickable) Select-all to toggle; disable
+            # it and show it checked rather than letting it flip with no effect.
+            self._suppress = True
+            self._parent.setCheckState(Qt.CheckState.Checked)
+            self._suppress = False
+            self._parent.setEnabled(False)
             return
         selected = sum(1 for c in togglable if c.isChecked())
         self._suppress = True
@@ -1101,12 +1407,21 @@ class _GroupController:
         # refresh_parent. After a user click, Qt advances the tri-state cycle
         # — interpret anything other than "now Checked" as "set all off".
         target = self._parent.checkState() == Qt.CheckState.Checked
-        self._suppress = True
-        for c in self._children:
-            if c.isEnabled():
-                c.setChecked(target)
-        self._suppress = False
-        self.refresh_parent()
+        # Batch the per-child repaints into a single update — without this,
+        # ticking a section with many children produces a visible cascade.
+        body = self._parent.parentWidget()
+        if body is not None:
+            body.setUpdatesEnabled(False)
+        try:
+            self._suppress = True
+            for c in self._children:
+                if c.isEnabled() and c.isChecked() != target:
+                    c.setChecked(target)
+            self._suppress = False
+            self.refresh_parent()
+        finally:
+            if body is not None:
+                body.setUpdatesEnabled(True)
         self._on_child_toggle()
 
     def _on_child_toggled(self, _checked: bool) -> None:
@@ -1158,11 +1473,10 @@ class IncludeInSuggestionWidget(QWidget):
         self.setLayout(outer)
 
         frame = QFrame()
-        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setFrameShape(QFrame.Shape.NoFrame)
         frame.setObjectName("includeInSuggestionFrame")
         frame.setStyleSheet(
-            "#includeInSuggestionFrame { background-color: palette(alternate-base); "
-            "border: 1px solid palette(mid); border-radius: 6px; }"
+            f"#includeInSuggestionFrame {{ background-color: {panel_background_color()}; border-radius: 6px; }}"
         )
         frame.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         outer.addWidget(frame)
@@ -1173,7 +1487,7 @@ class IncludeInSuggestionWidget(QWidget):
         frame.setLayout(frame_layout)
 
         title_row = QHBoxLayout()
-        self._title_label = QLabel("<b>Include in suggestion</b>")
+        self._title_label = QLabel(f"<b>{INCLUDE_TITLE}</b>")
         self._counter_label = QLabel("")
         counter_font = self._counter_label.font()
         counter_font.setPointSize(max(counter_font.pointSize() - 2, 8))
@@ -1184,10 +1498,10 @@ class IncludeInSuggestionWidget(QWidget):
         title_row.addWidget(self._counter_label)
         frame_layout.addLayout(title_row)
 
-        subtitle = QLabel("Select which fields you want to submit changes for")
-        subtitle.setStyleSheet("color: palette(placeholder-text);")
-        subtitle.setWordWrap(True)
-        frame_layout.addWidget(subtitle)
+        self._subtitle = QLabel(INCLUDE_SUBTITLE)
+        self._subtitle.setStyleSheet("color: palette(placeholder-text);")
+        self._subtitle.setWordWrap(True)
+        frame_layout.addWidget(self._subtitle)
         frame_layout.addSpacing(6)
 
         self._scroll = QScrollArea()
@@ -1207,6 +1521,7 @@ class IncludeInSuggestionWidget(QWidget):
         self._scroll.setWidget(body)
         frame_layout.addWidget(self._scroll)
 
+        self._frame_layout = frame_layout
         self._populate(initial_deselected_by_mid)
         self._refresh_counter()
 
@@ -1216,7 +1531,7 @@ class IncludeInSuggestionWidget(QWidget):
         items: List[str],
         initial_checked: Dict[str, bool],
         lock_first_field: Optional[str] = None,
-        item_widget: Callable[[str], "_Toggleable"] = QCheckBox,
+        item_widget: Callable[[str], "_Toggleable"] = _RowCheckBox,
     ) -> Dict[str, QCheckBox]:
         """Render one section: select-all checkbox (with the section title as
         its label) + one child checkbox per item, then a thin separator below.
@@ -1225,16 +1540,17 @@ class IncludeInSuggestionWidget(QWidget):
         disabled (skipped by Select-all) — used to lock the first field for
         new-note suggestions.
         `item_widget` is a factory that builds the per-item checkbox from the
-        item name. Defaults to plain `QCheckBox`; `_add_tag_section` passes
-        `_TagCheckBox` so tag names wrap and self-tooltip when elided.
+        item name. Defaults to `_RowCheckBox`; `_add_tag_section` passes
+        `_WrappingCheckBox` so long tag names wrap and self-tooltip when elided.
         Returns `item -> checkbox` so the caller can wire up persistence.
         """
         if self._body_layout.count() > 0:
             separator = QFrame()
-            separator.setFrameShape(QFrame.Shape.HLine)
-            separator.setFrameShadow(QFrame.Shadow.Plain)
-            separator.setStyleSheet("color: palette(mid);")
+            separator.setFixedHeight(1)
+            separator.setStyleSheet(f"background-color: {panel_line_color()}; border: none;")
             self._body_layout.addWidget(separator)
+            # Extra breathing room between the divider and the next section title.
+            self._body_layout.addSpacing(4)
 
         # Title sits on the select-all checkbox itself, so clicking the title
         # toggles the section and keeps the label aligned at the same x as the
@@ -1242,8 +1558,22 @@ class IncludeInSuggestionWidget(QWidget):
         # dynamically to fit the checkbox's actual width (tooltip shows the
         # full string when elided).
         select_all = _SelectAllCheckBox(title)
-        select_all.setStyleSheet("QCheckBox { color: palette(placeholder-text); font-weight: bold; }")
-        self._body_layout.addWidget(select_all)
+        # Bold + muted, set via font/palette rather than a stylesheet: a QSS rule
+        # switches the checkbox to box-model rendering and shifts its indicator,
+        # mis-aligning it with the native item checkboxes below.
+        title_font = select_all.font()
+        title_font.setBold(True)
+        select_all.setFont(title_font)
+        title_palette = select_all.palette()
+        title_palette.setColor(QPalette.ColorRole.WindowText, title_palette.color(QPalette.ColorRole.PlaceholderText))
+        select_all.setPalette(title_palette)
+        # Nest the title in its own layout so it gets the same horizontal offset
+        # the (nested) items layout adds — otherwise the section checkbox sits a
+        # couple px left of the item checkboxes on macOS.
+        header_layout = QVBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addWidget(select_all)
+        self._body_layout.addLayout(header_layout)
 
         controller = _GroupController(select_all, self._on_toggle)
         # Anchor the controller to a Qt-owned widget — without this Qt drops
@@ -1253,7 +1583,10 @@ class IncludeInSuggestionWidget(QWidget):
         # No indent — all checkboxes (section select-alls + items) align at the same x.
         items_layout = QVBoxLayout()
         items_layout.setContentsMargins(0, 0, 0, 0)
-        items_layout.setSpacing(2)
+        # Items sit tighter than the section-title gap so each section reads as a
+        # group. The right pixel value differs per platform because native
+        # checkbox rows are taller on macOS.
+        items_layout.setSpacing(10 if is_mac else 2)
         self._body_layout.addLayout(items_layout)
 
         result: Dict[str, QCheckBox] = {}
@@ -1266,6 +1599,9 @@ class IncludeInSuggestionWidget(QWidget):
             else:
                 cb.setChecked(initial_checked.get(item, True))
             controller.add_child(cb)
+            # Full width for every row: `_RowCheckBox` accepts clicks across its
+            # whole width and `_WrappingCheckBox` wraps + is fully clickable, so
+            # the click area matches the hover cursor consistently.
             items_layout.addWidget(cb)
             result[item] = cb  # type: ignore[assignment]
         controller.refresh_parent()
@@ -1315,12 +1651,53 @@ class IncludeInSuggestionWidget(QWidget):
 
         self._body_layout.addStretch()
 
+        if not (self._field_checkboxes or self._added_tag_boxes or self._removed_tag_boxes):
+            # Nothing to suggest -> empty state in the frame, not the scroll area:
+            # a word-wrapped label in a widgetResizable QScrollArea squashes when
+            # the panel is short.
+            self._subtitle.setText(EMPTY_STATE_SUBTITLE)
+            self._scroll.hide()
+            self._frame_layout.addStretch()
+            self._frame_layout.addWidget(self._build_empty_state())
+            self._frame_layout.addStretch()
+
+    def _build_empty_state(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        container.setLayout(layout)
+
+        # Icon and hint share the subtitle's muted, theme-adaptive color. The
+        # triangle is recolored to that palette role; the exclamation is a
+        # transparent cutout in the SVG, so it shows the panel background through
+        # in either theme.
+        muted = self.palette().color(QPalette.ColorRole.PlaceholderText)
+
+        icon_label = QLabel()
+        icon_label.setPixmap(tinted_pixmap(warning_triangle_icon().pixmap(QSize(32, 32)), muted))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(icon_label)
+
+        title = QLabel(EMPTY_STATE_TITLE)
+        title.setStyleSheet("font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        hint = QLabel(EMPTY_STATE_HINT)
+        hint.setStyleSheet("color: palette(placeholder-text);")
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
+
+        return container
+
     def _add_tag_section(self, title: str, tags: List[str]) -> Dict[str, QCheckBox]:
         return self._add_section(
             title=title,
             items=tags,
             initial_checked={t: True for t in tags},
-            item_widget=_TagCheckBox,
+            item_widget=_WrappingCheckBox,
         )
 
     def _on_toggle(self) -> None:
@@ -1339,7 +1716,7 @@ class IncludeInSuggestionWidget(QWidget):
         boxes = self._all_checkboxes()
         total = len(boxes)
         selected = sum(1 for cb in boxes if cb.isChecked())
-        self._counter_label.setText(f"{selected}/{total}" if total else "")
+        self._counter_label.setText(f"{selected}/{total}")
 
     def has_any_selection(self) -> bool:
         return any(cb.isChecked() for cb in self._all_checkboxes())

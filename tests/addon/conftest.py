@@ -102,7 +102,15 @@ def anki_session_with_addon_data(
         config_dict = json.load(f)
     anki_session.create_addon_config(package_name="ankihub", default_config=config_dict)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use a temp dir as the ankihub base path to isolate tests. Clean it up
+    # manually with ignore_errors=True rather than via TemporaryDirectory's
+    # context manager: background tasks (e.g. refresh_user_state_in_background)
+    # can still be writing config/logs into it when the test ends, and a strict
+    # rmtree then races them and fails the test at teardown with
+    # "OSError: [Errno 39] Directory not empty". The dir is disposable, so
+    # tolerating a partial cleanup is fine.
+    tmpdir = tempfile.mkdtemp()
+    try:
         # Change the ankihub base path to a temporary folder to isolate the tests
         os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
@@ -120,6 +128,8 @@ def anki_session_with_addon_data(
         _mock_user_details(requests_mock)
 
         yield anki_session
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def _mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:

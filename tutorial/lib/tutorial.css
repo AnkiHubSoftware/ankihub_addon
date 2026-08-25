@@ -5,6 +5,7 @@
 
 .ah-spotlight-active.ah-with-backdrop {
     backdrop-filter: brightness(2);
-    z-index: 10001 !important;
+    /* Above Intercom (~2147483000) and the tour host (2147483001). */
+    z-index: 2147483002 !important;
     border-radius: 4px;
 }

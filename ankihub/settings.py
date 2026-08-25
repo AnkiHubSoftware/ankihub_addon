@@ -39,17 +39,21 @@ from structlog.typing import Processor
 from . import LOGGER
 from .ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_INTERCOM_APP_ID,
     DEFAULT_S3_BUCKET_URL,
     STAGING_API_URL,
     STAGING_APP_URL,
+    STAGING_INTERCOM_APP_ID,
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
 from .ankihub_client.models import Deck, UserDeckRelation
 from .main.deck_options import get_fsrs_version
 from .private_config_migrations import migrate_private_config
+from .product_metrics_client import DEFAULT_PRODUCT_METRICS_URL, STAGING_PRODUCT_METRICS_URL
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
@@ -63,6 +67,7 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
+TAG_STARTER_NOTES = "#AK_Other::Card_Features::Starter_Cards"
 
 ENABLE_FSRS_LAST_REMINDER_DATE_KEY = "ankihub_enable_fsrs_last_reminder_date"
 
@@ -223,8 +228,12 @@ class PrivateConfig(DataClassJSONMixin):
     show_enable_fsrs_reminder: Optional[bool] = True
     feature_flags: dict = field(default_factory=dict)
     user_details: dict = field(default_factory=dict)
+    # App URL the current token/user_details were issued for. Used to detect
+    # staging↔production switches so we do not reuse credentials across servers.
+    auth_app_url: Optional[str] = None
     block_exams_subdecks: List[BlockExamSubdeckConfig] = field(default_factory=list)
     onboarding_tutorial_pending: bool = False
+    onboarding_tutorial_show_on_sync: bool = True
     step_deck_tutorial_pending: bool = False
     # Show Step Deck tutorial next time the user opens the deck
     show_step_deck_tutorial: bool = False
@@ -241,6 +250,7 @@ class _Config:
         self.s3_bucket_url: Optional[str] = None
         self.anking_deck_id: Optional[uuid.UUID] = None
         self.intro_deck_id: Optional[uuid.UUID] = None
+        self.intercom_app_id: str = ""
 
     def setup_public_config_and_other_settings(self):
         migrate_public_config()
@@ -252,6 +262,8 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
+            self.product_metrics_url = STAGING_PRODUCT_METRICS_URL
+            self.intercom_app_id = STAGING_INTERCOM_APP_ID
             self.anking_deck_id = uuid.UUID(
                 self.public_config.get("staging_anking_deck_id") or "dfe7f548-f66e-4277-932b-c7a63db3223a"
             )
@@ -260,8 +272,13 @@ class _Config:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
+            self.product_metrics_url = DEFAULT_PRODUCT_METRICS_URL
+            self.intercom_app_id = DEFAULT_INTERCOM_APP_ID
             self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
             self.intro_deck_id = uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
+
+        # There's no staging website for AnkiWeb yet
+        self.ankiweb_url = DEFAULT_ANKIWEB_URL
 
         # Priority chain for app_url (lowest to highest):
         # staging/prod (above) < user config (non-null) < build_config.json < env var
@@ -272,6 +289,9 @@ class _Config:
             self.app_url = override_url
             self.api_url = f"{override_url}/api"
 
+        if product_metrics_url := os.getenv("PRODUCT_METRICS_URL"):
+            self.product_metrics_url = product_metrics_url
+
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
 
@@ -280,6 +300,10 @@ class _Config:
 
         if intro_deck_id := os.getenv("INTRO_DECK_ID"):
             self.intro_deck_id = uuid.UUID(intro_deck_id)
+
+        if override_url := os.getenv("ANKIWEB_URL"):
+            override_url = override_url.rstrip("/")
+            self.ankiweb_url = override_url
 
     def ankihub_server(self) -> str:
         """Returns which AnkiHub server the client is configured to connect to.
@@ -309,7 +333,39 @@ class _Config:
                 LOGGER.exception("Failed to load private config. Overwriting it.")
                 self._private_config = PrivateConfig()
 
+        self._invalidate_auth_if_server_changed()
         self._update_private_config()
+
+    def _invalidate_auth_if_server_changed(self) -> None:
+        """Clear credentials when the configured AnkiHub server no longer matches auth.
+
+        Tokens and cached /users/me data are not valid across staging and production.
+        Reusing them would boot Intercom (and other features) with the wrong identity.
+        """
+        if not self.is_logged_in():
+            return
+
+        auth_app_url = self._private_config.auth_app_url
+        if auth_app_url is None:
+            # Upgrade path: stamp the current server without signing out.
+            self._private_config.auth_app_url = self.app_url
+            LOGGER.info("Backfilled auth_app_url for existing login.", auth_app_url=self.app_url)
+            return
+
+        if auth_app_url == self.app_url:
+            return
+
+        LOGGER.info(
+            "signed_out_because_ankihub_server_changed",
+            previous_app_url=auth_app_url,
+            current_app_url=self.app_url,
+        )
+        # Clear token without firing token_change_hook yet — profile hooks may not
+        # be fully wired during setup_private_config. Caller persists via _update_private_config.
+        aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = ""
+        self._private_config.user_details = {}
+        self._private_config.feature_flags = {}
+        self._private_config.auth_app_url = None
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
@@ -343,6 +399,10 @@ class _Config:
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = token
 
+        if self._private_config is not None:
+            self._private_config.auth_app_url = self.app_url if token else None
+            self._update_private_config()
+
         if token_changed:
             for func in self.token_change_hook:
                 # Prevent potential exceptions from being backpropagated to the caller.
@@ -365,6 +425,10 @@ class _Config:
 
     def set_onboarding_tutorial_pending(self, pending: bool):
         self._private_config.onboarding_tutorial_pending = pending
+        self._update_private_config()
+
+    def set_onboarding_tutorial_show_on_sync(self, show_on_sync: bool):
+        self._private_config.onboarding_tutorial_show_on_sync = show_on_sync
         self._update_private_config()
 
     def set_show_step_deck_tutorial(self, show: bool):
@@ -447,7 +511,12 @@ class _Config:
         self._private_config.show_enable_fsrs_reminder = show_remind
         self._update_private_config()
 
-    def get_feature_flags(self) -> Optional[dict]:
+    def get_feature_flags(self) -> dict:
+        # Feature flags are read from hooks which can run before the private config is set up
+        # for the profile, e.g. while the toolbar is drawn during Anki's startup. Treat flags
+        # as unset in that case instead of raising.
+        if self._private_config is None:
+            return {}
         return self._private_config.feature_flags
 
     def set_user_details(self, user_details: Optional[dict]):
@@ -550,11 +619,30 @@ class _Config:
     def user_id(self) -> Optional[int]:
         return self._private_config.user_details.get("id")
 
+    def plan(self) -> Optional[str]:
+        membership = self._private_config.user_details.get("memberships", [])
+        if not membership:
+            return None
+
+        return membership[-1].get("plan")
+
+    def is_staff(self) -> bool:
+        return bool(self._private_config.user_details.get("is_staff"))
+
+    def is_admin(self) -> bool:
+        return bool(self._private_config.user_details.get("is_admin"))
+
+    def is_beta_tester(self) -> bool:
+        return bool(self._private_config.user_details.get("beta_tester"))
+
     def last_deck_sync(self) -> Optional[str]:
         return self._private_config.user_details.get("last_deck_sync")
 
     def onboarding_tutorial_pending(self) -> bool:
         return self._private_config.onboarding_tutorial_pending
+
+    def onboarding_tutorial_show_on_sync(self) -> bool:
+        return self._private_config.onboarding_tutorial_show_on_sync
 
     def show_step_deck_tutorial(self) -> bool:
         return self._private_config.show_step_deck_tutorial
@@ -782,6 +870,48 @@ def _get_build_config() -> dict:
 
 
 config = _Config()
+
+_native_ankihub_token_hook_installed = False
+
+
+def setup_native_ankihub_token_hook() -> None:
+    """Fire token_change_hook when Anki Preferences sets the AnkiHub token.
+
+    Preferences → Syncing → AnkiHub login/logout uses ProfileManager.set_ankihub_token,
+    which writes the same profile key as Config.save_token but does not notify the add-on.
+    Without this bridge, feature flags are not refreshed after that login path, so gated
+    behavior (e.g. the AnkiWeb magic-code login dialog) stays inactive until another refresh.
+    """
+    global _native_ankihub_token_hook_installed
+    if _native_ankihub_token_hook_installed:
+        return
+
+    from anki.hooks import wrap
+    from aqt.profiles import ProfileManager
+
+    if not hasattr(ProfileManager, "set_ankihub_token"):
+        LOGGER.info("ProfileManager.set_ankihub_token not available; skipping native token hook.")
+        return
+
+    def _on_set_ankihub_token(*args: Any, **kwargs: Any) -> None:
+        _old = kwargs.pop("_old")
+        pm = args[0]
+        val = args[1] if len(args) > 1 else kwargs.get("val")
+        previous = pm.ankihub_token() if getattr(pm, "profile", None) else None
+        _old(*args, **kwargs)
+        if previous == val:
+            return
+        for func in config.token_change_hook:
+            # Match Config.save_token: run on main so hook exceptions stay isolated.
+            aqt.mw.taskman.run_on_main(func)
+
+    ProfileManager.set_ankihub_token = wrap(  # type: ignore[method-assign]
+        ProfileManager.set_ankihub_token,
+        _on_set_ankihub_token,
+        "around",
+    )
+    _native_ankihub_token_hook_installed = True
+    LOGGER.info("Set up native AnkiHub token change hook.")
 
 
 def setup_profile_data_folder() -> bool:

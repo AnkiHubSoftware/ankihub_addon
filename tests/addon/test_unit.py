@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import logging
 import os
@@ -5,14 +6,15 @@ import sqlite3
 import tempfile
 import time
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
-from textwrap import dedent
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
+import aqt.profiles
 import pytest
 import requests
 from anki.decks import DeckId
@@ -20,7 +22,18 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from approvaltests.approvals import verify  # type: ignore
 from approvaltests.namer import NamerFactory  # type: ignore
-from aqt.qt import QCheckBox, QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
+from aqt.qt import (
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QLineEdit,
+    QMenu,
+    Qt,
+    QTimer,
+    QValidator,
+    QWidget,
+)
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -76,11 +89,14 @@ from ankihub.ankihub_client import (
     TagGroupValidationResponse,
 )
 from ankihub.ankihub_client.ankihub_client import (
+    DEFAULT_ANKIWEB_URL,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
+    DEFAULT_INTERCOM_APP_ID,
     DEFAULT_S3_BUCKET_URL,
     STAGING_API_URL,
     STAGING_APP_URL,
+    STAGING_INTERCOM_APP_ID,
     STAGING_S3_BUCKET_URL,
     AnkiHubRequestException,
 )
@@ -94,6 +110,27 @@ from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError, MissingValueError
 from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.gui import menu
+from ankihub.gui.ankiweb import (
+    ERROR_DIALOG_LINK,
+    AnkiwebLinkIds,
+    AnkiwebLoginDialog,
+    AnkiwebSignupDialog,
+    ErrorLabel,
+    LabelWithLink,
+    LoginWithCodeWidget,
+    LoginWithPasswordWidget,
+    SignupCodeVerificationWidget,
+    SignupErrorWidget,
+    SignupWithCodeWidget,
+    SignupWithPasswordWidget,
+    _patch_or_revert,
+    setup_sync_dialog_patch,
+)
+from ankihub.gui.bulk_suggestion_summary_dialog import (
+    BulkSuggestionSummaryDialog,
+    _ActionState,
+    _on_suggest_notes_in_bulk_done,
+)
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -105,8 +142,14 @@ from ankihub.gui.errors import (
     upload_logs_in_background,
 )
 from ankihub.gui.exceptions import DeckDownloadAndInstallError
-from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
+from ankihub.gui.media_sync import (
+    MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG,
+    TOOLBAR_BUTTON_ID,
+    MediaSyncProgressDialog,
+    MediaSyncStatus,
+    media_sync,
+)
+from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu, setup_preferences_ankihub_auth_patch
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -123,9 +166,9 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionMetadata,
     SuggestionSource,
     _GroupController,
-    _on_suggest_notes_in_bulk_done,
     _SelectAllCheckBox,
     _TagLabel,
+    _WrappingCheckBox,
     get_anki_nid_to_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
     open_suggestion_dialog_for_single_suggestion,
@@ -136,13 +179,20 @@ from ankihub.gui.utils import (
     ask_user,
     choose_ankihub_deck,
     extract_argument,
+    is_email,
     show_dialog,
     show_error_dialog,
+    using_qt5,
 )
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import DeckCreationResult
 from ankihub.main.exporting import _prepared_field_html
-from ankihub.main.importing import _updated_tags
+from ankihub.main.importing import (
+    OVERWRITE_KEY_LIMIT,
+    OVERWRITE_SAMPLE_LIMIT,
+    _OverwriteTally,
+    _updated_tags,
+)
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
@@ -184,11 +234,13 @@ from ankihub.settings import (
     DatadogLogHandler,
     config,
     log_file_path,
+    setup_native_ankihub_token_hook,
 )
 from ankihub.user_state import (
     _state,
     add_user_state_refreshed_callback,
     refresh_user_state_in_background,
+    remove_user_state_refreshed_callback,
 )
 
 
@@ -238,6 +290,8 @@ class TestUploadMediaForSuggestion:
 
 class TestMediaSyncMediaDownload:
     def test_with_exception(self, mocker: MockerFixture, qtbot: QtBot):
+        entry_point.run()
+
         update_and_download_mock = mocker.patch.object(
             media_sync,
             "_update_deck_media_and_download_missing_media",
@@ -262,6 +316,8 @@ class TestMediaSyncMediaUpload:
         qtbot: QtBot,
         next_deterministic_uuid,
     ):
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             upload_media_mock = mocker.patch.object(
                 media_sync._client,
@@ -277,6 +333,396 @@ class TestMediaSyncMediaUpload:
             assert media_sync._amount_uploads_in_progress == 0
             assert len(exceptions) == 1
             upload_media_mock.assert_called_once()  # sanity check
+
+
+class TestMediaSyncProgressDialog:
+    @pytest.fixture
+    def dialog(self, qtbot: QtBot) -> MediaSyncProgressDialog:
+        # A dialog of its own instead of media_sync._dialog, so that these tests can't
+        # leak dialog state into each other through the media_sync singleton.
+        result = MediaSyncProgressDialog()
+        qtbot.addWidget(result)
+        return result
+
+    def _visible_buttons(self, dialog: MediaSyncProgressDialog) -> set:
+        # isHidden reflects the explicit setVisible flags even though the dialog itself
+        # isn't shown in these tests.
+        return {
+            name
+            for name, button in (
+                ("toggle_log", dialog.toggle_log_button),
+                ("close", dialog.close_button),
+                ("retry", dialog.retry_button),
+                ("cancel", dialog.cancel_button),
+                ("minimize", dialog.minimize_button),
+            )
+            if not button.isHidden()
+        }
+
+    def test_log_starts_collapsed(self, dialog: MediaSyncProgressDialog):
+        assert dialog.toggle_log_button.text() == "Show log"
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.error_log_spacer.isHidden() is False
+
+    def test_toggle_log_button_expands_and_collapses_the_log(self, dialog: MediaSyncProgressDialog):
+        dialog.toggle_log_button.click()
+        assert dialog.toggle_log_button.text() == "Hide log"
+        assert dialog.error_log_area.isHidden() is False
+        assert dialog.error_log_spacer.isHidden() is True
+
+        dialog.toggle_log_button.click()
+        assert dialog.toggle_log_button.text() == "Show log"
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.error_log_spacer.isHidden() is False
+
+    @pytest.mark.parametrize(
+        "status, is_retry, expected_label",
+        [
+            (MediaSyncStatus.DOWNLOAD, False, "Downloading from AnkiHub"),
+            (MediaSyncStatus.DOWNLOAD, True, "Retrying: Downloading from AnkiHub"),
+            (MediaSyncStatus.UPLOAD, False, "Uploading to AnkiHub"),
+            (MediaSyncStatus.UPLOAD, True, "Retrying: Uploading to AnkiHub"),
+        ],
+    )
+    def test_update_status_while_sync_is_in_progress(
+        self,
+        dialog: MediaSyncProgressDialog,
+        status: MediaSyncStatus,
+        is_retry: bool,
+        expected_label: str,
+    ):
+        dialog.update_status(status, is_retry=is_retry)
+
+        assert dialog.status_label.text() == expected_label
+        # The sync can be canceled or left running in the background, but there is
+        # nothing to close, retry or log yet.
+        assert self._visible_buttons(dialog) == {"cancel", "minimize"}
+        assert dialog.progress_bar.isHidden() is False
+        assert dialog.error_label.isHidden() is True
+        assert not dialog.icon_label.pixmap().isNull()
+
+    @pytest.mark.parametrize(
+        "status, expected_label",
+        [
+            (MediaSyncStatus.CANCELING, "Canceling..."),
+            (MediaSyncStatus.IDLE, "Finished"),
+        ],
+    )
+    def test_update_status_when_sync_is_not_in_progress(
+        self, dialog: MediaSyncProgressDialog, status: MediaSyncStatus, expected_label: str
+    ):
+        dialog.update_status(status)
+
+        assert dialog.status_label.text() == expected_label
+        assert self._visible_buttons(dialog) == {"close"}
+        assert dialog.progress_bar.isHidden() is True
+        assert dialog.error_label.isHidden() is True
+
+    def test_update_status_with_single_error(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed")])
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.status_label.text() == "Error! Attention needed."
+        # A single error is shown inline, so the log isn't offered.
+        assert dialog.error_label.text() == "upload failed"
+        assert dialog.error_label.isHidden() is False
+        assert self._visible_buttons(dialog) == {"close", "retry"}
+        assert dialog.progress_bar.isHidden() is True
+
+    def test_update_status_with_multiple_errors(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed"), Exception("download failed")])
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.error_label.text() == "Some errors found. See full log for details."
+        assert dialog.error_log_browser.toPlainText() == "upload failed\ndownload failed"
+        assert self._visible_buttons(dialog) == {"close", "retry", "toggle_log"}
+
+    def test_update_status_collapses_an_expanded_log(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed"), Exception("download failed")])
+        dialog.update_status(MediaSyncStatus.ERROR)
+        dialog.toggle_log_button.click()
+        assert dialog.error_log_area.isHidden() is False  # sanity check
+
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        assert dialog.error_log_area.isHidden() is True
+        assert dialog.toggle_log_button.text() == "Show log"
+
+    def test_progress_is_reset_and_incremented(self, dialog: MediaSyncProgressDialog):
+        dialog.reset_progress(3)
+        assert dialog.progress_bar.value() == 0
+        assert dialog.progress_bar.maximum() == 3
+        assert dialog.count_label.text() == "0/3 files"
+
+        dialog.increment_progress()
+        assert dialog.count_label.text() == "1/3 files"
+
+        # Uploads report progress in chunks of multiple files.
+        dialog.increment_progress(2)
+        assert dialog.progress_bar.value() == 3
+        assert dialog.count_label.text() == "3/3 files"
+
+        # Starting another sync resets the progress instead of continuing from the old value.
+        dialog.reset_progress(1)
+        assert dialog.progress_bar.value() == 0
+        assert dialog.count_label.text() == "0/1 files"
+
+    def test_reset_progress_without_files_clears_the_count_label(self, dialog: MediaSyncProgressDialog):
+        dialog.reset_progress(3)
+
+        dialog.reset_progress(0)
+
+        assert dialog.count_label.text() == ""
+
+    def test_cancel_button_stops_background_threads(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        stop_background_threads_mock = mocker.patch.object(media_sync, "stop_background_threads")
+        dialog.update_status(MediaSyncStatus.DOWNLOAD)
+
+        dialog.cancel_button.click()
+
+        stop_background_threads_mock.assert_called_once()
+
+    def test_retry_button_repeats_the_last_operation(self, dialog: MediaSyncProgressDialog, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [Exception("upload failed")])
+        last_op_callback_mock = mocker.patch.object(media_sync, "_last_op_callback")
+        dialog.update_status(MediaSyncStatus.ERROR)
+
+        dialog.retry_button.click()
+
+        last_op_callback_mock.assert_called_once()
+
+    def test_minimize_and_close_buttons_hide_the_dialog(self, dialog: MediaSyncProgressDialog):
+        dialog.update_status(MediaSyncStatus.DOWNLOAD)
+        dialog.show()
+        dialog.minimize_button.click()
+        assert dialog.isHidden() is True
+
+        dialog.update_status(MediaSyncStatus.IDLE)
+        dialog.show()
+        dialog.close_button.click()
+        assert dialog.isHidden() is True
+
+
+@pytest.fixture
+def media_sync_dialog_mock() -> Generator[Mock, None, None]:
+    # Assigning into __dict__ instead of using mocker.patch.object, because reading the
+    # _dialog cached_property would construct a real dialog and cache it on the singleton.
+    previous = media_sync.__dict__.get("_dialog")
+    mock = Mock()
+    media_sync.__dict__["_dialog"] = mock
+    yield mock
+    if previous is None:
+        del media_sync.__dict__["_dialog"]
+    else:
+        media_sync.__dict__["_dialog"] = previous
+
+
+def set_media_sync_progress_ui_flag(mocker: MockerFixture, is_active: bool) -> None:
+    mocker.patch.object(
+        config,
+        "get_feature_flags",
+        return_value={MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG: is_active},
+    )
+
+
+class TestMediaSyncProgressDialogUpdates:
+    """Covers that the media sync keeps its progress dialog up to date."""
+
+    @pytest.fixture
+    def dialog_mock(self, media_sync_dialog_mock: Mock) -> Mock:
+        return media_sync_dialog_mock
+
+    @pytest.fixture(autouse=True)
+    def _enable_progress_ui(self, mocker: MockerFixture) -> None:
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
+
+    @pytest.fixture(autouse=True)
+    def _mock_toolbar_button_status(self, mocker: MockerFixture) -> None:
+        # Updating the toolbar button needs the toolbar link created in setup_hooks().
+        mocker.patch.object(media_sync, "_set_toolbar_button_status")
+
+    @pytest.mark.parametrize(
+        "state_attribute, state_value, expected_status",
+        [
+            ("_canceling", True, MediaSyncStatus.CANCELING),
+            ("_download_in_progress", True, MediaSyncStatus.DOWNLOAD),
+            ("_amount_uploads_in_progress", 1, MediaSyncStatus.UPLOAD),
+            ("_errors", [Exception("upload failed")], MediaSyncStatus.ERROR),
+        ],
+    )
+    def test_status_refresh_updates_the_dialog(
+        self,
+        dialog_mock: Mock,
+        mocker: MockerFixture,
+        state_attribute: str,
+        state_value: Any,
+        expected_status: MediaSyncStatus,
+    ):
+        # Set the state explicitly instead of relying on the singleton's current state,
+        # which other tests in the same process can have changed.
+        for attribute, value in (
+            ("_canceling", False),
+            ("_download_in_progress", False),
+            ("_amount_uploads_in_progress", 0),
+            ("_errors", []),
+        ):
+            mocker.patch.object(media_sync, attribute, value)
+        mocker.patch.object(media_sync, state_attribute, state_value)
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+
+        dialog_mock.update_status.assert_called_once_with(expected_status, is_retry=False)
+
+    def test_status_refresh_forwards_the_retry_flag_to_the_dialog(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._refresh_media_download_status_inner(is_retry=True)
+
+        dialog_mock.update_status.assert_called_once_with(MediaSyncStatus.DOWNLOAD, is_retry=True)
+
+    def test_downloaded_file_advances_the_progress(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._on_downloaded_file(future_with_result(None))
+
+        dialog_mock.increment_progress.assert_called_once_with(1)
+        assert media_sync._errors == []
+
+    def test_failed_download_advances_the_progress_and_records_the_error(
+        self, dialog_mock: Mock, mocker: MockerFixture
+    ):
+        mocker.patch.object(media_sync, "_errors", [])
+        exception = Exception("download failed")
+
+        media_sync._on_downloaded_file(future_with_exception(exception))
+
+        # The file is done, even though it failed, so the progress has to move on.
+        dialog_mock.increment_progress.assert_called_once_with(1)
+        assert media_sync._errors == [exception]
+
+    def test_uploaded_chunk_advances_the_progress_by_the_amount_of_files(
+        self, dialog_mock: Mock, mocker: MockerFixture
+    ):
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._on_media_chunk_uploaded(future_with_result(3))
+
+        dialog_mock.increment_progress.assert_called_once_with(3)
+        assert media_sync._errors == []
+
+    def test_failed_upload_chunk_records_the_error(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_errors", [])
+        exception = Exception("upload failed")
+
+        media_sync._on_media_chunk_uploaded(future_with_exception(exception))
+
+        dialog_mock.increment_progress.assert_not_called()
+        assert media_sync._errors == [exception]
+
+    def test_close_for_profile_resets_the_progress(self, dialog_mock: Mock, mocker: MockerFixture):
+        mocker.patch.object(media_sync, "_client")
+        refresh_sync_status_mock = mocker.patch.object(media_sync, "refresh_sync_status")
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_stop_background_threads", False)
+
+        media_sync.close_for_profile()
+
+        # The progress of the closed profile shouldn't show up for the next one.
+        dialog_mock.reset_progress.assert_called_once_with(0)
+        assert media_sync._canceling is True
+        refresh_sync_status_mock.assert_called_once_with(False)
+
+
+class TestMediaSyncProgressUIFeatureFlag:
+    """Covers that the progress dialog and the toolbar button are gated by the feature flag."""
+
+    def test_dialog_is_not_created_while_the_flag_is_off(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+
+        assert media_sync._dialog_if_enabled() is None
+
+    def test_dialog_is_not_updated_while_the_flag_is_off(self, media_sync_dialog_mock: Mock, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        mocker.patch.object(media_sync, "_set_toolbar_button_status")
+        mocker.patch.object(media_sync, "_errors", [])
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+        media_sync._on_downloaded_file(future_with_result(None))
+        media_sync._on_media_chunk_uploaded(future_with_result(3))
+
+        assert media_sync_dialog_mock.method_calls == []
+
+    def test_toolbar_button_click_shows_the_dialog_while_the_flag_is_on(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
+
+        media_sync._on_toolbar_button_clicked()
+
+        media_sync_dialog_mock.show.assert_called_once_with()
+
+    def test_toolbar_button_click_does_not_show_the_dialog_while_the_flag_is_off(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+
+        media_sync._on_toolbar_button_clicked()
+
+        media_sync_dialog_mock.show.assert_not_called()
+
+    def test_status_action_does_not_show_the_dialog_while_the_flag_is_off(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        # A sync has to be in progress, otherwise the action doesn't show the dialog anyway.
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._on_status_action_triggered()
+
+        media_sync_dialog_mock.show.assert_not_called()
+
+    def test_toolbar_button_is_added_while_the_flag_is_on(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=True)
+        mocker.patch.object(media_sync, "_toolbar_link", f'<a id="{TOOLBAR_BUTTON_ID}"></a>', create=True)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+
+        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
+
+        js = toolbar_mock.web.eval.call_args.args[0]
+        assert "insertAdjacentHTML" in js
+        assert TOOLBAR_BUTTON_ID in js
+
+    def test_toolbar_button_is_removed_while_the_flag_is_off(self, mocker: MockerFixture):
+        set_media_sync_progress_ui_flag(mocker, is_active=False)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+
+        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
+
+        # The button is removed instead of inserted, so that it also disappears for users who
+        # lose access to the feature while Anki is running.
+        js = toolbar_mock.web.eval.call_args.args[0]
+        assert "insertAdjacentHTML" not in js
+        assert ".remove()" in js
+
+    def test_status_refresh_before_the_private_config_is_set_up(
+        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
+    ):
+        # The toolbar is drawn - and with it the status refreshed - before the private config
+        # of the profile exists, so the flag check must not raise there.
+        mocker.patch.object(config, "_private_config", None)
+        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
+        mocker.patch.object(media_sync, "_canceling", False)
+        mocker.patch.object(media_sync, "_download_in_progress", True)
+
+        media_sync._refresh_media_download_status_inner(is_retry=False)
+
+        # Without feature flags, the progress UI stays hidden.
+        assert media_sync_dialog_mock.method_calls == []
+        assert "insertAdjacentHTML" not in toolbar_mock.web.eval.call_args.args[0]
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -385,6 +831,48 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+class TestOverwriteTally:
+    def test_counts_are_sorted_by_frequency(self):
+        tally = _OverwriteTally()
+        tally.record("Front", NoteId(1))
+        tally.record("Back", NoteId(2))
+        tally.record("Back", NoteId(3))
+
+        assert list(tally.counts.items()) == [("Back", 2), ("Front", 1)]
+        assert tally.sample_nids == {"Front": [1], "Back": [2, 3]}
+
+    def test_sample_nids_are_capped_but_counts_are_not(self):
+        tally = _OverwriteTally()
+        nids = [NoteId(nid) for nid in range(OVERWRITE_SAMPLE_LIMIT + 5)]
+        for nid in nids:
+            tally.record("Front", nid)
+
+        assert tally.counts == {"Front": len(nids)}
+        assert tally.sample_nids["Front"] == nids[:OVERWRITE_SAMPLE_LIMIT]
+
+    def test_records_beyond_the_key_limit_are_counted_as_omitted(self):
+        tally = _OverwriteTally()
+        for key in range(OVERWRITE_KEY_LIMIT):
+            tally.record(f"tag_{key}", NoteId(1))
+
+        # A key already being tracked keeps counting; a new one past the limit does not.
+        tally.record("tag_0", NoteId(2))
+        tally.record("one_tag_too_many", NoteId(3))
+        tally.record("another_tag_too_many", NoteId(4))
+
+        assert len(tally.counts) == OVERWRITE_KEY_LIMIT
+        assert tally.counts["tag_0"] == 2
+        assert "one_tag_too_many" not in tally.counts
+        assert tally.omitted_count == 2
+
+    def test_empty_tally_is_falsy(self):
+        tally = _OverwriteTally()
+        assert not tally
+
+        tally.record("Front", NoteId(1))
+        assert tally
 
 
 def test_mids_of_notes(anki_session: AnkiSession):
@@ -555,31 +1043,159 @@ def test_prepared_field_html():
     assert _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">') == '<img src="foo.jpg">'
 
 
-def test_tag_label_elide():
-    elide = _TagLabel._elide
+def test_tag_label_elision_candidates():
+    candidates = _TagLabel._elision_candidates
 
-    # Short tag → as-is.
-    assert elide("Pathology") == "Pathology"
-    assert elide("Hierarchy::A::B") == "Hierarchy::A::B"
+    # Flat tag (no `::`): a single candidate, itself. The widget truncates to
+    # fit the line budget if needed; the candidate list isn't length-bounded.
+    assert candidates("Pathology") == ["Pathology"]
+    assert candidates("x" * 120) == ["x" * 120]
 
-    # Long hierarchical tag → `…::leaf`.
+    # Hierarchical tag: the full tag, then `…::`-suffixes, longest → shortest,
+    # dropping one leading segment at a time down to `…::leaf`.
+    assert candidates("Hierarchy::A::B") == ["Hierarchy::A::B", "…::A::B", "…::B"]
+
     long_hierarchical = (
-        "AnkiHub::Internal::AnKing::Pharmacology::Antiarrhythmics::Class_III::Amiodarone::Cardiovascular::Specifics"
+        "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
     )
-    assert elide(long_hierarchical) == "…::Specifics"
+    cands = candidates(long_hierarchical)
+    # Full tag is the longest candidate; the rest are `…::`-suffixes ending in the leaf.
+    assert cands[0] == long_hierarchical
+    assert all(c.startswith("…::") for c in cands[1:])
+    assert cands[-1] == "…::VariableRatio"
+    # Strictly shrinking, and each is a `::`-suffix of the original tag.
+    assert [len(c) for c in cands] == sorted((len(c) for c in cands), reverse=True)
+    for c in cands:
+        assert long_hierarchical.endswith(c.removeprefix("…::"))
 
-    # Long flat tag (no `::`) → plain ellipsis at the end.
-    long_flat = "x" * 120
-    flat_result = elide(long_flat)
-    assert flat_result.endswith("…")
-    assert len(flat_result) <= 85
 
-    # Long hierarchical tag whose leaf alone exceeds the budget → leaf truncated too.
-    bulky_leaf = "y" * 120
-    leaf_result = elide(f"Hierarchy::{bulky_leaf}")
-    assert leaf_result.startswith("…::")
-    assert leaf_result.endswith("…")
-    assert len(leaf_result) <= 85
+def test_wrapping_checkbox_reveals_more_segments_when_wider(qtbot: QtBot):
+    """NRT-790 follow-up: a long hierarchical tag reveals more leading segments
+    as the dialog widens — elided to a `…::`-suffix when space is tight, and
+    shown in full once a wide enough window fits it within the line budget."""
+    tag = "#AK_MCAT_v2::Psychology::LearningAndMemory::OperantConditioning::ReinforcementSchedules::VariableRatio"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()  # polish so the content-rect metrics are real
+    qtbot.waitExposed(cb)
+
+    def displayed_at(width: int) -> str:
+        cb.resize(width, cb.heightForWidth(width))
+        cb._layout_for_width(cb._content_width(cb.width()))
+        assert cb._layout_cache is not None
+        return cb._layout_cache.text
+
+    # Tight space: elided to a `…::`-suffix ending in the leaf, with a tooltip
+    # offering the full tag. (Checked before widening, which clears the tooltip.)
+    narrow = displayed_at(150)
+    assert narrow.startswith("…::") and narrow.endswith("VariableRatio")
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+    # Widening reveals strictly more; each wider form is a longer suffix.
+    medium = displayed_at(700)
+    assert len(medium) > len(narrow)
+    assert medium.removeprefix("…::").endswith(narrow.removeprefix("…::"))
+
+    # A wide enough window reveals the whole tag — no `…::` left — and clears the tooltip.
+    very_wide = displayed_at(2400)
+    assert very_wide == tag
+    assert cb.toolTip() == ""
+
+
+def test_wrapping_checkbox_truncates_giant_single_segment(qtbot: QtBot):
+    """A single segment too long to fit the line budget at the current width is
+    truncated with a trailing `…`, so a pathological tag can't balloon the row
+    past `_TagLabel._MAX_LINES` lines."""
+    tag = "Hierarchy::" + ("Supercalifragilistic" * 8)  # 160-char unbreakable leaf
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+    cb.resize(200, cb.heightForWidth(200))
+
+    layout = cb._layout_for_width(cb._content_width(cb.width()))
+    assert layout.lineCount() <= _TagLabel._MAX_LINES
+    assert cb._layout_cache is not None
+    assert cb._layout_cache.text.endswith("…")
+
+
+def test_wrapping_checkbox_tooltip_tracks_font_change(qtbot: QtBot):
+    """NRT-790 review follow-up: a font change can elide a previously-full tag
+    without a resize. The tooltip (offering the full tag) must update on the
+    font change, not stay stale until the next resize."""
+    tag = "#AK_Step2::Clinical::Medicine::Gastroenterology::Pancreatitis"
+    cb = _WrappingCheckBox(tag)
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+
+    # Wide + default font: the whole tag fits, so it's shown in full, no tooltip.
+    cb.resize(700, cb.heightForWidth(700))
+    assert cb._layout_cache is not None and cb._layout_cache.text == tag
+    assert cb.toolTip() == ""
+
+    # A much larger font no longer fits the tag in the line budget at the same
+    # width, so it elides — without any resize. The tooltip must now appear.
+    font = cb.font()
+    font.setPointSize(48)
+    cb.setFont(font)
+    assert cb._layout_cache is not None and cb._layout_cache.text != tag  # now elided
+    assert tag.replace("::", "::​").replace("_", "_​") in cb.toolTip()
+
+
+def test_wrapping_checkbox_reserves_height_for_painted_text(qtbot: QtBot):
+    """Regression (NRT-790): the last line of a long tag checkbox got clipped.
+
+    `heightForWidth` must reserve enough height for what `paintEvent` actually
+    draws. The bug cached the style's content-rect width at `__init__` — before
+    the widget was polished, where it is ~6px wider than the polished value — so
+    `heightForWidth` measured wrapping against too-wide a column, under-counted
+    lines, and clipped the last one. The widget must be SHOWN (polished) for that
+    discrepancy to surface, so this test shows it before measuring.
+
+    Covers a deep hierarchical tag (breaks at `::`) and a long unbreakable leaf
+    (must wrap mid-token rather than overflow), for both vertical clipping (row
+    height covers the painted text) and horizontal clipping (no line is wider
+    than the content rect), across boundary widths and font sizes.
+    """
+
+    def painted_extents(cb: _WrappingCheckBox) -> tuple[float, float, int, int]:
+        """(painted height, widest line, content width, text top offset), via the
+        same `_layout_for_width`/`_content_width` that `paintEvent` draws with."""
+        content_w = cb._content_width(cb.width())
+        layout = cb._layout_for_width(content_w)  # returns a laid-out QTextLayout
+        widest = max(
+            (layout.lineAt(i).naturalTextWidth() for i in range(layout.lineCount())),
+            default=0.0,
+        )
+        return layout.boundingRect().height(), widest, content_w, cb._vertical_padding() // 2
+
+    deep_tag = "#AK_MCAT_v2::MileDown::Behavioral::Cognition"
+    long_leaf_tag = "Hierarchy::" + ("Supercalifragilistic" * 6)
+    for tag in (deep_tag, long_leaf_tag):
+        cb = _WrappingCheckBox(tag)
+        qtbot.addWidget(cb)
+        cb.show()  # polish the widget so the content-rect metrics are the real ones
+        qtbot.waitExposed(cb)
+        for point_size in (None, 13, 16, 20):
+            if point_size is not None:
+                font = cb.font()
+                font.setPointSize(point_size)
+                cb.setFont(font)
+                cb.ensurePolished()
+            for width in range(150, 540, 2):
+                cb.resize(width, cb.heightForWidth(width))
+                painted_h, widest_line, content_w, top_offset = painted_extents(cb)
+                # +0.5 absorbs the float boundingRect height vs. integer row height;
+                # top_offset is where paintEvent starts drawing the text.
+                assert cb.height() + 0.5 >= top_offset + painted_h, (
+                    f"vertical clip: tag={tag!r} pt={point_size} width={width}: row height "
+                    f"{cb.height()} < text top {top_offset} + painted height {painted_h:.0f}"
+                )
+                assert widest_line <= content_w + 1, (
+                    f"horizontal clip: tag={tag!r} pt={point_size} width={width}: "
+                    f"line width {widest_line:.0f} > content width {content_w}"
+                )
 
 
 def test_remove_note_type_name_modifications():
@@ -818,6 +1434,1146 @@ class TestAnkiHubLoginDialog:
             window.recover_password_help_text.text()
             == '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
         )
+
+
+class TestIsEmail:
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("test@example.com", True),
+            ("user.name+tag@sub.example.co.uk", True),
+            ("not-an-email", False),
+            ("", False),
+            ("user@", False),
+            ("@example.com", False),
+            ("user@@example.com", False),
+            ("user name@example.com", False),
+        ],
+    )
+    def test_is_email(self, value: str, expected: bool):
+        assert is_email(value) is expected
+
+
+def _run_in_background_synchronously(task: Callable, on_done: Callable[[Future], None], **kwargs: Any) -> None:
+    """Stand-in for aqt.mw.taskman.run_in_background that runs the task on the
+    calling thread instead of a worker thread, so tests don't need a real event loop.
+    """
+    try:
+        on_done(future_with_result(task()))
+    except Exception as exc:
+        on_done(future_with_exception(exc))
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebLoginWithCodeWidget:
+    def _widget(self, qtbot: QtBot) -> LoginWithCodeWidget:
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        return cast(LoginWithCodeWidget, dialog._widget)
+
+    def test_get_code_button_enabled_only_for_valid_email(self, qtbot: QtBot):
+        widget = self._widget(qtbot)
+        assert widget.email_box.button.isEnabled() is False
+
+        widget.email_input.setText("not-an-email")
+        assert widget.email_box.button.isEnabled() is False
+
+        widget.email_input.setText("user@example.com")
+        assert widget.email_box.button.isEnabled() is True
+
+    def test_sign_in_button_enabled_only_with_code_and_valid_email(self, qtbot: QtBot):
+        widget = self._widget(qtbot)
+        widget.code_input.setText("123456")
+        assert widget.code_box.button.isEnabled() is False
+
+        widget.email_input.setText("user@example.com")
+        assert widget.code_box.button.isEnabled() is True
+
+        widget.code_input.setText("")
+        assert widget.code_box.button.isEnabled() is False
+
+    @pytest.mark.parametrize(
+        "value, expected_state",
+        [
+            ("123456", QValidator.State.Acceptable),
+            ("012345", QValidator.State.Acceptable),
+            ("000000", QValidator.State.Acceptable),
+            ("033563", QValidator.State.Acceptable),
+            ("12345", QValidator.State.Intermediate),
+            ("", QValidator.State.Intermediate),
+            ("12345a", QValidator.State.Invalid),
+            ("1234567", QValidator.State.Invalid),
+        ],
+    )
+    def test_code_input_validator(self, qtbot: QtBot, value: str, expected_state: QValidator.State):
+        widget = self._widget(qtbot)
+        validator = widget.code_input.validator()
+        state, _, _ = validator.validate(value, len(value))
+        assert state == expected_state
+
+    def test_get_code_disables_button_until_countdown_reaches_zero(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=5))
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_get_code()
+
+        assert widget.email_box.button.isEnabled() is False
+        assert "Resend available in 5s" in widget.status_label.text()
+
+        # Drive the countdown callback directly instead of waiting on the real
+        # 1s-interval QTimer, so the test doesn't have to sleep in real time.
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        assert widget.email_box.button.isEnabled() is True
+        assert "Resend available" in widget.status_label.text()
+
+    def test_get_code_cooldown_persists_when_dialog_is_reopened(self, qtbot: QtBot, mocker: MockerFixture):
+        """Closing and reopening the AnkiWeb dialog recreates LoginWithCodeWidget from
+        scratch. The resend cooldown should still be enforced client-side (mirroring
+        what the server already enforces per email), instead of the button coming back
+        enabled with no countdown shown.
+        """
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+        widget._on_get_code()
+        assert widget.email_box.button.isEnabled() is False
+
+        # Simulate closing the dialog and opening a brand new one, which creates a
+        # brand new LoginWithCodeWidget with no memory of the previous instance.
+        new_widget = self._widget(qtbot)
+        new_widget.email_input.setText("user@example.com")
+
+        assert new_widget.email_box.button.isEnabled() is False
+        assert new_widget.code_input.isEnabled() is True
+        assert "Resend available in" in new_widget.status_label.text()
+
+    def test_get_code_cooldown_does_not_apply_to_a_different_email(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        widget = self._widget(qtbot)
+        widget.email_input.setText("user@example.com")
+        widget._on_get_code()
+
+        new_widget = self._widget(qtbot)
+        new_widget.email_input.setText("someone-else@example.com")
+
+        assert new_widget.email_box.button.isEnabled() is True
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebLoginAndSignupSubmission:
+    """Exercises the sign-in/sign-up handlers with the AnkiHubClient's AnkiWeb methods
+    mocked out, since real AnkiWeb requests can't be made in CI.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _patch_run_in_background(self, mocker: MockerFixture):
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+    def test_login_with_code_success_closes_dialog(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_login_code", return_value=Mock(host_key="hostkey123"))
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
+
+    def test_login_with_code_expired_shows_error_and_clears_code(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=Exception("This code has expired. Request another."),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is True
+        assert "expired" in widget.form_widget.error_label.status.text()
+        assert widget.code_input.text() == ""
+
+    def test_login_with_password_incorrect_credentials_shows_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_login",
+            side_effect=Exception("Inserted email and/or password are incorrect."),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        assert "incorrect" in widget.form_widget.error_label.status.text()
+
+    def test_login_with_password_success_persists_credentials_and_closes_dialog(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_login", return_value=Mock(host_key="hostkey123"))
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        dialog.replace_widget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
+
+    def test_signup_with_existing_account_shows_dedicated_error_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_signup_code",
+            side_effect=Exception("An account with this email already exists."),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert isinstance(dialog._widget, SignupErrorWidget)
+        assert "already exists" in dialog._widget.form_widget.error_label.status.text()
+
+    def test_signup_with_code_general_error_shows_inline_error(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_signup_code", side_effect=Exception("Some unknown error")
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        # Not swapped out for SignupErrorWidget: that only happens for the
+        # existing-account case, other errors stay inline on the same widget.
+        assert dialog._widget is widget
+        assert "unknown error" in widget.form_widget.error_label.status.text()
+
+    def test_signup_with_code_success_shows_code_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_signup_code", return_value=Mock(resend_cooldown_secs=300)
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert isinstance(dialog._widget, SignupCodeVerificationWidget)
+
+    def test_signup_code_verification_success_persists_credentials(self, qtbot: QtBot, mocker: MockerFixture):
+        verify_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_verify_signup_code", return_value=Mock(host_key="hostkey123")
+        )
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        tooltip_mock = mocker.patch("ankihub.gui.ankiweb.tooltip")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        dialog.show()
+        # Freshly created (not a retry after an error), so the widget only has
+        # `self.email` and no `email_input` field.
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # Regression check: this used to reference a non-existing `self.email_input`
+        # and crash for a freshly created (non-retry) widget.
+        verify_mock.assert_called_once_with("user@example.com", "123456")
+        persist_mock.assert_called_once_with(email="user@example.com", host_key="hostkey123")
+        assert dialog.isVisible() is False
+        tooltip_mock.assert_called_once()
+
+    def test_signup_code_verification_retry_uses_email_input(self, qtbot: QtBot, mocker: MockerFixture):
+        verify_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_verify_signup_code", return_value=Mock(host_key="hostkey123")
+        )
+        persist_mock = mocker.patch("ankihub.gui.ankiweb.persist_ankiweb_credentials")
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        # Passing an error makes this a retry widget, which shows an editable
+        # email field instead of the original read-only `self.email`.
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com", remaining_seconds=300, dialog=dialog, exc=Exception("Some unknown error")
+        )
+        dialog.replace_widget(widget)
+        widget.email_input.setText("other@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        verify_mock.assert_called_once_with("other@example.com", "123456")
+        persist_mock.assert_called_once_with(email="other@example.com", host_key="hostkey123")
+
+    def test_signup_code_verification_reuses_timer(self, qtbot: QtBot, mocker: MockerFixture):
+        resend_cooldown_secs = 300
+        elapsed_secs = 5
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_verify_signup_code", side_effect=Exception("some error"))
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com", remaining_seconds=resend_cooldown_secs, dialog=dialog
+        )
+        dialog.replace_widget(widget)
+        # Simulate the countdown having run for a few seconds, so the time left is
+        # distinguishable from the full TTL. `Countdown` also counts down once on
+        # construction, hence the extra second.
+        for _ in range(elapsed_secs):
+            widget._timer._on_timeout()
+        remaining_seconds = resend_cooldown_secs - elapsed_secs - 1
+        assert widget._timer.remaining_seconds == remaining_seconds
+
+        widget.code_input.setText("123456")
+        widget._on_verify_or_resend()
+
+        # The retry widget resumes the countdown of the failed one instead of
+        # restarting it from the full TTL, so Get code stays blocked until it ends.
+        retry_widget = dialog._widget
+        assert retry_widget is not widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert retry_widget.remaining_seconds == remaining_seconds
+        assert retry_widget.email_box.button.isEnabled() is False
+        assert "Resend available in" in retry_widget.status_label.text()
+
+    def test_signup_code_verification_enables_get_code_when_timer_ran_out(self, qtbot: QtBot, mocker: MockerFixture):
+        resend_cooldown_secs = 3
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=Exception("This code has expired. Request another."),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com", remaining_seconds=resend_cooldown_secs, dialog=dialog
+        )
+        dialog.replace_widget(widget)
+        # Let the countdown run out. `Countdown` counts down once on construction,
+        # hence one tick less than the TTL.
+        for _ in range(resend_cooldown_secs - 1):
+            widget._timer._on_timeout()
+        assert widget._timer.remaining_seconds == 0
+
+        widget.code_input.setText("123456")
+        widget._on_verify_or_resend()
+
+        # No active cooldown left — do not restart the full TTL. Get code must be
+        # clickable so the user can request another after an expired code.
+        retry_widget = dialog._widget
+        assert retry_widget is not widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert retry_widget.remaining_seconds == 0
+        assert retry_widget.email_box.button.isEnabled() is True
+        assert retry_widget._timer is None or retry_widget._timer.remaining_seconds <= 0
+        assert "expired" in retry_widget.form_widget.error_label.status.text()
+        assert "Resend available in" not in retry_widget.status_label.text()
+
+    def test_signup_code_verification_retry_get_code_starts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_request_login_code", return_value=Mock(resend_cooldown_secs=120)
+        )
+        mocker.patch.object(aqt.mw.taskman, "run_in_background", side_effect=_run_in_background_synchronously)
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("This code has expired. Request another."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.email_box.button.isEnabled() is True
+
+        widget._on_get_code()
+
+        assert widget.email_box.button.isEnabled() is False
+        assert widget.remaining_seconds == 120
+        assert "Resend available in" in widget.status_label.text()
+
+    def test_signup_code_verification_retry_with_zero_remaining_does_not_start_timer(self, qtbot: QtBot):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(
+            email="user@example.com",
+            remaining_seconds=0,
+            dialog=dialog,
+            exc=Exception("Invalid code."),
+        )
+        dialog.replace_widget(widget)
+
+        assert widget.remaining_seconds == 0
+        assert widget.email_box.button.isEnabled() is True
+        assert widget._timer is None
+        assert widget.status_label.text() == ""
+
+    def test_signup_with_password_success_shows_email_verification_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        signup_mock = mocker.patch.object(
+            AddonAnkiHubClient, "ankiweb_signup", return_value=Mock(host_key="hostkey123")
+        )
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupWithPasswordWidget(dialog)
+        dialog.replace_widget(widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("password123")
+        widget.repeat_password_input.setText("password123")
+
+        widget._on_sign_up()
+
+        signup_mock.assert_called_once_with("user@example.com", "password123", True)
+        assert isinstance(dialog._widget, SignupEmailVerificationWidget)
+        assert dialog._widget.host_key == "hostkey123"
+        # Signup already sent the verification email, so resend starts on cooldown.
+        assert dialog._widget.resend_button.isEnabled() is False
+        assert "user@example.com" in dialog._widget.status_label.text()
+        assert "Resend available in" in dialog._widget.status_label.text()
+        assert dialog._widget.form_widget.back_to is not None
+        assert dialog._widget.resend_button.text() == "Resend verification email"
+
+    def test_signup_email_verification_resend_restarts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
+        from ankihub.gui import ankiweb as ankiweb_mod
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        ankiweb_mod._resend_cooldowns._deadlines.clear()
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=False))
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupEmailVerificationWidget(
+            email="resend-cooldown@example.com", host_key="hostkey123", dialog=dialog
+        )
+        dialog.replace_widget(widget)
+
+        # Drain the initial post-signup cooldown so resend becomes clickable.
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+        assert widget.resend_button.isEnabled() is True
+
+        widget._resend()
+
+        assert widget.resend_button.isEnabled() is False
+        assert "Resend available in 60s" in widget.status_label.text()
+
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        assert widget.resend_button.isEnabled() is True
+        assert "Resend available." in widget.status_label.text()
+
+    def test_signup_email_verification_resend_throttled_keeps_button_disabled(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        from ankihub.gui import ankiweb as ankiweb_mod
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        ankiweb_mod._resend_cooldowns._deadlines.clear()
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=True))
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupEmailVerificationWidget(email="throttled@example.com", host_key="hostkey123", dialog=dialog)
+        dialog.replace_widget(widget)
+
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        widget._resend()
+
+        assert widget.resend_button.isEnabled() is False
+        assert "no more emails" in widget.form_widget.error_label.status.text()
+
+    def test_login_with_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_login_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+        widget.code_input.setText("123456")
+
+        widget._on_sign_in()
+
+        assert "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text()
+
+    def test_get_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        # Unlike the sign-in handlers, requesting a code runs as an AddonQueryOp, whose
+        # failure callback feeds the exception into the error label.
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_login_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(LoginWithCodeWidget, dialog._widget)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_get_code()
+
+        qtbot.wait_until(lambda: "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text())
+
+    def test_login_with_password_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_login",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        widget = LoginWithPasswordWidget(dialog)
+        qtbot.addWidget(widget)
+        widget.email_input.setText("user@example.com")
+        widget.password_input.setText("hunter2")
+
+        widget._on_sign_in()
+
+        error_text = widget.form_widget.error_label.status.text()
+        assert "Can't reach AnkiWeb" in error_text
+        # The raw exception isn't surfaced inline, only behind the error details link.
+        assert "connection refused" not in error_text
+
+    def test_signup_with_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_request_signup_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = cast(SignupWithCodeWidget, dialog._widget)
+        widget.terms_checkbox.setChecked(True)
+        widget.email_input.setText("user@example.com")
+
+        widget._on_sign_up()
+
+        assert dialog._widget is widget
+        assert "Can't reach AnkiWeb" in widget.form_widget.error_label.status.text()
+
+    def test_fresh_signup_code_verification_shows_no_error(self, qtbot: QtBot):
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
+        dialog.replace_widget(widget)
+
+        # No exception is passed for a freshly created widget, so the error label stays
+        # empty and hidden instead of showing a placeholder for the missing exception.
+        assert widget.form_widget.error_label.status.text() == ""
+        assert widget.form_widget.error_label.isHidden() is True
+
+    def test_signup_code_verification_retry_shows_generic_message_for_request_exception(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        mocker.patch.object(
+            AddonAnkiHubClient,
+            "ankiweb_verify_signup_code",
+            side_effect=AnkiHubRequestException(original_exception=ConnectionError("connection refused")),
+        )
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupCodeVerificationWidget(email="user@example.com", remaining_seconds=300, dialog=dialog)
+        dialog.replace_widget(widget)
+        widget.code_input.setText("123456")
+
+        widget._on_verify_or_resend()
+
+        # The exception is carried over to the retry widget, which renders it as the
+        # generic connection error message.
+        retry_widget = dialog._widget
+        assert isinstance(retry_widget, SignupCodeVerificationWidget)
+        assert "Can't reach AnkiWeb" in retry_widget.form_widget.error_label.status.text()
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebErrorLabel:
+    """Tests for the inline error label of the AnkiWeb dialogs. Errors reported by AnkiWeb
+    itself are shown as-is, while failures to reach it get a generic message plus a link
+    to the error details dialog.
+    """
+
+    @pytest.fixture
+    def error_label(self, qtbot: QtBot) -> ErrorLabel:
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        error_label = ErrorLabel(dialog)
+        qtbot.addWidget(error_label)
+        return error_label
+
+    def test_generic_exception_is_shown_as_is_and_not_reported(self, error_label: ErrorLabel, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs")
+
+        error_label.set_exception(Exception("This code has expired. Request another."))
+
+        # Errors AnkiWeb responded with are expected, so they are neither rephrased nor
+        # sent to Sentry.
+        assert error_label.status.text() == "This code has expired. Request another."
+        assert error_label.isHidden() is False
+        report_mock.assert_not_called()
+
+    def test_request_exception_shows_generic_message_with_details_link(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs", return_value="event-id")
+        exc = AnkiHubRequestException(original_exception=ConnectionError("connection refused"))
+
+        error_label.set_exception(exc)
+
+        error_text = error_label.status.text()
+        assert "Can't reach AnkiWeb" in error_text
+        assert ERROR_DIALOG_LINK in error_text
+        assert "connection refused" not in error_text
+        report_mock.assert_called_once_with(exc)
+
+    def test_request_exception_is_not_reported_when_error_reporting_is_disabled(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        report_mock = mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs")
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        exc = AnkiHubRequestException(original_exception=ConnectionError())
+
+        error_label.set_exception(exc)
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        report_mock.assert_not_called()
+        assert "Can't reach AnkiWeb" in error_label.status.text()
+        # The details are still available, just without a Sentry event ID.
+        show_dialog_mock.assert_called_once_with(exc, None)
+
+    def test_details_link_opens_error_dialog_with_sentry_event_id(self, error_label: ErrorLabel, mocker: MockerFixture):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=True)
+        mocker.patch("ankihub.gui.ankiweb.report_exception_and_upload_logs", return_value="event-id")
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        exc = AnkiHubRequestException(original_exception=ConnectionError())
+
+        error_label.set_exception(exc)
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        show_dialog_mock.assert_called_once_with(exc, "event-id")
+        # The link is a pseudo link handled by the label itself, so it must not be
+        # opened in a browser.
+        open_link_mock.assert_not_called()
+
+    def test_details_link_does_nothing_after_the_error_was_replaced(
+        self, error_label: ErrorLabel, mocker: MockerFixture
+    ):
+        mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
+        show_dialog_mock = mocker.patch("ankihub.gui.ankiweb._show_feedback_dialog")
+        error_label.set_exception(AnkiHubRequestException(original_exception=ConnectionError()))
+
+        # set_error() drops the exception the details dialog would have been about.
+        error_label.set_error("Sorry, no more emails can be sent to that address today.")
+        error_label.status.linkActivated.emit(ERROR_DIALOG_LINK)
+
+        show_dialog_mock.assert_not_called()
+
+    def test_set_error_with_empty_text_hides_the_label(self, error_label: ErrorLabel):
+        error_label.set_error("some error")
+        assert error_label.isHidden() is False
+
+        error_label.set_error("")
+        assert error_label.isHidden() is True
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestAnkiwebLabelWithLink:
+    def test_widget_link_replaces_the_dialog_widget(self, qtbot: QtBot, mocker: MockerFixture):
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit(AnkiwebLinkIds.LOGIN_PASSWORD.value)
+
+        assert isinstance(dialog._widget, LoginWithPasswordWidget)
+        open_link_mock.assert_not_called()
+
+    def test_external_link_is_opened_without_a_link_handler(self, qtbot: QtBot, mocker: MockerFixture):
+        # Most labels (e.g. "Forgot password?", the terms & conditions) are created
+        # without a link handler, which used to make link activation raise.
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit("https://ankiweb.net/account/reset-password")
+
+        open_link_mock.assert_called_once_with("https://ankiweb.net/account/reset-password")
+
+    def test_external_link_is_opened_when_the_link_handler_declines(self, qtbot: QtBot, mocker: MockerFixture):
+        open_link_mock = mocker.patch("ankihub.gui.ankiweb.openLink")
+        dialog = AnkiwebLoginDialog()
+        qtbot.addWidget(dialog)
+        label = LabelWithLink("", dialog, link_handler=lambda link: False)
+        qtbot.addWidget(label)
+
+        label.linkActivated.emit("https://ankiweb.net/account/reset-password")
+
+        open_link_mock.assert_called_once_with("https://ankiweb.net/account/reset-password")
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestSetupSyncDialogPatch:
+    """Tests for the aqt.sync.sync_login() patch that opens our custom
+    sign-in dialog instead of Anki's password-based dialog.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_sync_login(self):
+        original_sync_login = aqt.sync.sync_login
+        yield
+        aqt.sync.sync_login = original_sync_login
+        aqt.main.sync_login = original_sync_login
+        aqt.preferences.sync_login = original_sync_login
+        remove_user_state_refreshed_callback(_patch_or_revert)
+
+    def test_all_three_entry_points_route_through_the_patch_when_flag_is_on(self, mocker: MockerFixture):
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": True})
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+
+        setup_sync_dialog_patch()
+
+        # aqt.sync, aqt.main and aqt.preferences each bind their own module-level
+        # name to sync_login, so all three have to be reassigned individually.
+        assert aqt.sync.sync_login is aqt.main.sync_login
+        assert aqt.sync.sync_login is aqt.preferences.sync_login
+
+        on_success = Mock()
+        for module in (aqt.sync, aqt.main, aqt.preferences):
+            dialog_mock.reset_mock()
+            module.sync_login(aqt.mw, on_success)
+            dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+
+    @pytest.mark.parametrize(
+        "feature_flags",
+        [
+            {"ankiweb_magic_code_login": False},  # logged-in user outside the flag's target group
+            {},  # logged-out user: cache is cleared to {} elsewhere
+        ],
+    )
+    def test_native_dialog_is_kept_when_flag_is_off(self, mocker: MockerFixture, feature_flags: dict):
+        mocker.patch.object(config, "get_feature_flags", return_value=feature_flags)
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+        get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
+        get_id_and_pass_mock.return_value = ("", "")
+        original_sync_login = aqt.sync.sync_login
+
+        setup_sync_dialog_patch()
+
+        assert aqt.sync.sync_login is original_sync_login
+        assert aqt.main.sync_login is original_sync_login
+        assert aqt.preferences.sync_login is original_sync_login
+
+        on_success = Mock()
+        aqt.main.sync_login(aqt.mw, on_success)
+        get_id_and_pass_mock.assert_called_once()
+        dialog_mock.assert_not_called()
+
+    def test_registers_patch_or_revert_as_a_user_state_refresh_callback(self, mocker: MockerFixture):
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
+        mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+
+        setup_sync_dialog_patch()
+
+        assert _patch_or_revert in _state.user_state_refreshed_callbacks
+
+    def test_flag_flipping_on_toggles_the_patch_on_next_refresh(self, mocker: MockerFixture):
+        """A remote flag change reaches an already-open client the next time feature flags are
+        refreshed (login/logout, post-sync, or the periodic timer), not instantly.
+        """
+        feature_flags = {"ankiweb_magic_code_login": False}
+        mocker.patch.object(config, "get_feature_flags", side_effect=lambda: feature_flags)
+        dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+        original_sync_login = aqt.sync.sync_login
+
+        setup_sync_dialog_patch()
+        assert aqt.sync.sync_login is original_sync_login
+
+        # Simulate the backend turning the flag on for this user and the cache being
+        # refreshed (e.g. by the 60-minute timer in user_state.setup_periodic_user_state_refresh).
+        feature_flags["ankiweb_magic_code_login"] = True
+        _patch_or_revert()
+
+        assert aqt.sync.sync_login is not original_sync_login
+        on_success = Mock()
+        aqt.sync.sync_login(aqt.mw, on_success)
+        dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+
+        # Flipping back off (e.g. the user logs out, clearing the cached flags) reverts it.
+        feature_flags["ankiweb_magic_code_login"] = False
+        _patch_or_revert()
+
+        assert aqt.sync.sync_login is original_sync_login
+
+    def test_does_not_revert_another_addons_patch_when_flag_is_off(self, mocker: MockerFixture):
+        """If some other add-on has already replaced sync_login, we must not clobber it
+        just because our feature flag is off.
+        """
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+
+        def other_addons_sync_login(mw, on_success, *args, **kwargs):
+            pass
+
+        aqt.sync.sync_login = other_addons_sync_login
+        aqt.main.sync_login = other_addons_sync_login
+        aqt.preferences.sync_login = other_addons_sync_login
+
+        setup_sync_dialog_patch()
+
+        assert aqt.sync.sync_login is other_addons_sync_login
+        logger_mock.info.assert_called_once()
+
+
+@pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+class TestSetupSyncDialogPatchFailure:
+    @pytest.fixture(autouse=True)
+    def _restore_sync_login(self):
+        original_sync_login = aqt.sync.sync_login
+        yield
+        aqt.sync.sync_login = original_sync_login
+        aqt.main.sync_login = original_sync_login
+        aqt.preferences.sync_login = original_sync_login
+        remove_user_state_refreshed_callback(_patch_or_revert)
+
+    def test_missing_sync_login_when_reverting_is_logged_and_native_dialog_keeps_working(self, mocker: MockerFixture):
+        """Regression test: reverting when the flag is off must not raise just because
+        aqt.sync.sync_login is unexpectedly missing (e.g. removed by another add-on).
+        """
+        original_sync_login = aqt.sync.sync_login
+        get_id_and_pass_mock = mocker.patch("aqt.sync.get_id_and_pass_from_user")
+        # Older Anki versions call this synchronously and unpack the result as
+        # (username, password)
+        get_id_and_pass_mock.return_value = ("", "")
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": False})
+
+        del aqt.sync.sync_login
+        try:
+            setup_sync_dialog_patch()  # must not raise, even though sync_login is gone
+
+            logger_mock.exception.assert_not_called()
+
+            # aqt.main and aqt.preferences were never reassigned, since reverting was skipped
+            assert aqt.main.sync_login is original_sync_login
+            assert aqt.preferences.sync_login is original_sync_login
+
+            on_success = Mock()
+            aqt.main.sync_login(aqt.mw, on_success)
+            get_id_and_pass_mock.assert_called_once()
+        finally:
+            aqt.sync.sync_login = original_sync_login
+
+    def test_assignment_failure_when_patching_is_logged(self, mocker: MockerFixture):
+        """Regression test: if patching fails partway through (e.g. another add-on made one of the
+        aqt modules reject new attributes), the failure is caught and logged instead of raised.
+        """
+        mocker.patch.object(config, "get_feature_flags", return_value={"ankiweb_magic_code_login": True})
+        logger_mock = mocker.patch("ankihub.gui.ankiweb.LOGGER")
+        # A bare object() rejects arbitrary attribute assignment, forcing the
+        # assignment to aqt.preferences.sync_login to fail.
+        mocker.patch.object(aqt, "preferences", object())
+
+        setup_sync_dialog_patch()  # must not raise
+
+        logger_mock.exception.assert_called_once()
+
+
+@pytest.mark.skipif(
+    not hasattr(aqt.profiles.ProfileManager, "set_ankihub_token"),
+    reason="ProfileManager.set_ankihub_token doesn't exist on this Anki version",
+)
+class TestNativeAnkiHubTokenHook:
+    """Preferences → Syncing → AnkiHub login uses ProfileManager.set_ankihub_token,
+    which must notify the add-on so feature flags (and gated patches) refresh.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_set_ankihub_token(self):
+        from aqt.profiles import ProfileManager
+
+        from ankihub import settings
+
+        original = ProfileManager.set_ankihub_token
+        original_flag = settings._native_ankihub_token_hook_installed
+        settings._native_ankihub_token_hook_installed = False
+        yield
+        ProfileManager.set_ankihub_token = original
+        settings._native_ankihub_token_hook_installed = original_flag
+
+    def test_setup_is_noop_without_set_ankihub_token(
+        self, monkeypatch: MonkeyPatch, anki_session_with_addon_data: AnkiSession
+    ):
+        """Guards the hasattr() branch in setup_native_ankihub_token_hook: on Anki
+        versions without ProfileManager.set_ankihub_token (e.g. the legacy aqt==2.1.56
+        baseline), setup must no-op instead of raising or installing anything."""
+        from aqt.profiles import ProfileManager
+
+        from ankihub import settings
+
+        monkeypatch.delattr(ProfileManager, "set_ankihub_token", raising=False)
+
+        with anki_session_with_addon_data.profile_loaded():
+            setup_native_ankihub_token_hook()  # must not raise
+
+            assert not settings._native_ankihub_token_hook_installed
+
+    def test_set_ankihub_token_fires_token_change_hook(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        config.token_change_hook.append(hook)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                setup_native_ankihub_token_hook()
+
+                aqt.mw.pm.set_ankihub_token("preferences-login-token")
+
+                hook.assert_called_once_with()
+                assert aqt.mw.pm.ankihub_token() == "preferences-login-token"
+        finally:
+            config.token_change_hook.remove(hook)
+
+    def test_unchanged_token_does_not_fire_hook(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                aqt.mw.pm.profile["thirdPartyAnkiHubToken"] = "same-token"
+                setup_native_ankihub_token_hook()
+                config.token_change_hook.append(hook)
+
+                aqt.mw.pm.set_ankihub_token("same-token")
+
+                hook.assert_not_called()
+        finally:
+            if hook in config.token_change_hook:
+                config.token_change_hook.remove(hook)
+
+    def test_setup_is_idempotent(self, anki_session_with_addon_data: AnkiSession):
+        hook = Mock()
+        config.token_change_hook.append(hook)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                setup_native_ankihub_token_hook()
+                setup_native_ankihub_token_hook()
+
+                aqt.mw.pm.set_ankihub_token("once-only")
+
+                hook.assert_called_once_with()
+        finally:
+            config.token_change_hook.remove(hook)
+
+    @pytest.mark.skipif(using_qt5(), reason="AnkiWeb signup screens are not supported on Qt5")
+    def test_preferences_login_path_enables_magic_code_patch_after_flag_refresh(
+        self, mocker: MockerFixture, anki_session_with_addon_data: AnkiSession
+    ):
+        """End-to-end for the bug: Preferences AnkiHub login must be able to activate
+        the AnkiWeb magic-code dialog once feature flags are refreshed."""
+        feature_flags = {"ankiweb_magic_code_login": False}
+        mocker.patch.object(config, "get_feature_flags", side_effect=lambda: feature_flags)
+        original_sync_login = aqt.sync.sync_login
+
+        def refresh_flags_then_patch() -> None:
+            feature_flags["ankiweb_magic_code_login"] = True
+            _patch_or_revert()
+
+        config.token_change_hook.append(refresh_flags_then_patch)
+        try:
+            with anki_session_with_addon_data.profile_loaded():
+                dialog_mock = mocker.patch("ankihub.gui.ankiweb.AnkiwebLoginDialog")
+                setup_sync_dialog_patch()
+                assert aqt.sync.sync_login is original_sync_login
+
+                setup_native_ankihub_token_hook()
+                # Simulate Anki Preferences → Syncing → AnkiHub login
+                aqt.mw.pm.set_ankihub_token("preferences-login-token")
+
+                assert aqt.sync.sync_login is not original_sync_login
+                on_success = Mock()
+                aqt.sync.sync_login(aqt.mw, on_success)
+                dialog_mock.assert_called_once_with(on_success=on_success, parent=aqt.mw)
+        finally:
+            config.token_change_hook.remove(refresh_flags_then_patch)
+            aqt.sync.sync_login = original_sync_login
+            aqt.main.sync_login = original_sync_login
+            aqt.preferences.sync_login = original_sync_login
+            remove_user_state_refreshed_callback(_patch_or_revert)
+
+
+@pytest.mark.skipif(
+    not importlib.util.find_spec("aqt.ankihub"),
+    reason="Preferences → Third-party AnkiHub login doesn't exist on this Anki version",
+)
+class TestPreferencesAnkiHubAuthPatch:
+    """Preferences → Third-party AnkiHub auth should use the add-on and stay in sync
+    with menu Sign In / Sign Out.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_ankihub_auth(self):
+        import aqt.ankihub
+
+        original_login = aqt.ankihub.ankihub_login
+        original_logout = aqt.ankihub.ankihub_logout
+        original_prefs_login = aqt.preferences.ankihub_login
+        original_prefs_logout = aqt.preferences.ankihub_logout
+        original_reopen = getattr(aqt.preferences.Preferences, "reopen", None)
+        hooks_before = list(config.token_change_hook)
+        yield
+        aqt.ankihub.ankihub_login = original_login
+        aqt.ankihub.ankihub_logout = original_logout
+        aqt.preferences.ankihub_login = original_prefs_login
+        aqt.preferences.ankihub_logout = original_prefs_logout
+        if original_reopen is None:
+            if hasattr(aqt.preferences.Preferences, "reopen"):
+                delattr(aqt.preferences.Preferences, "reopen")
+        else:
+            aqt.preferences.Preferences.reopen = original_reopen
+        config.token_change_hook[:] = hooks_before
+
+    def test_preferences_login_opens_addon_login_dialog(self, mocker: MockerFixture):
+        display_login = mocker.patch.object(AnkiHubLogin, "display_login")
+        on_success = Mock()
+
+        setup_preferences_ankihub_auth_patch()
+
+        aqt.preferences.ankihub_login(aqt.mw, on_success)
+        display_login.assert_called_once_with(on_success=on_success)
+
+        display_login.reset_mock()
+        aqt.ankihub.ankihub_login(aqt.mw, on_success, "user", "pass")
+        display_login.assert_called_once_with(on_success=on_success)
+
+    def test_preferences_logout_uses_addon_sign_out(self, mocker: MockerFixture):
+        sign_out = mocker.patch("ankihub.gui.menu._sign_out_action")
+        on_success = Mock()
+
+        setup_preferences_ankihub_auth_patch()
+
+        aqt.preferences.ankihub_logout(aqt.mw, on_success, "token")
+
+        sign_out.assert_called_once_with()
+        on_success.assert_called_once_with()
+
+    def test_preferences_reopen_refreshes_ankihub_login_status(self, mocker: MockerFixture):
+        setup_preferences_ankihub_auth_patch()
+
+        assert callable(getattr(aqt.preferences.Preferences, "reopen", None))
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs)  # type: ignore[attr-defined]
+        prefs.update_login_status.assert_called_once_with()
+
+    def test_preferences_reopen_calls_through_to_native_reopen_if_present(self):
+        """If a future Anki version defines Preferences.reopen, our patch must call
+        through to it instead of clobbering it (see PR discussion with @abdnh).
+
+        anki.hooks.wrap()'s "around" mode requires the wrapped callable to be
+        introspectable (it needs __name__/__qualname__/a real signature), so a
+        plain function is used here to simulate the native reopen rather than
+        a Mock.
+        """
+        native_reopen_calls = []
+
+        def native_reopen(self, *args, **kwargs):
+            native_reopen_calls.append((self, args, kwargs))
+
+        aqt.preferences.Preferences.reopen = native_reopen  # type: ignore[method-assign, attr-defined]
+
+        setup_preferences_ankihub_auth_patch()
+
+        prefs = Mock()
+        aqt.preferences.Preferences.reopen(prefs, "arg", kw="kwarg")  # type: ignore[attr-defined]
+
+        assert native_reopen_calls == [(prefs, ("arg",), {"kw": "kwarg"})]
+        prefs.update_login_status.assert_called_once_with()
+
+    def test_token_change_refreshes_open_preferences(self, mocker: MockerFixture):
+        mocker.patch.object(aqt.mw.taskman, "run_on_main", side_effect=lambda fn: fn())
+        setup_preferences_ankihub_auth_patch()
+        prefs = Mock()
+        mocker.patch.object(aqt.dialogs, "_dialogs", {"Preferences": [aqt.preferences.Preferences, prefs]})
+
+        # Simulate menu Sign In writing the token via Config.save_token
+        config.save_token("menu-login-token")
+
+        prefs.update_login_status.assert_called_with()
+        config.save_token("")  # cleanup
+
+    def test_display_login_invokes_on_success_after_login(self, mocker: MockerFixture, qtbot: QtBot):
+        mocker.patch("ankihub.gui.menu.AnkiHubClient.login", return_value="staging-token")
+        mocker.patch("ankihub.gui.menu.tooltip")
+        mocker.patch("ankihub.user_state.add_user_state_refreshed_callback")
+        on_success = Mock()
+
+        AnkiHubLogin.display_login(on_success=on_success)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        window.username_or_email_box_text.setText("staging@example.com")
+        window.password_box_text.setText("secret")
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+        on_success.assert_called_once_with()
+        assert config.token() == "staging-token"
 
 
 class TestSuggestionDialog:
@@ -1267,117 +3023,395 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 
 
 class TestOnSuggestNotesInBulkDone:
-    def test_correct_message_is_shown(
+    def test_opens_bulk_summary_dialog(
         self,
         mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
-        nid_1 = NoteId(1)
-        nid_2 = NoteId(2)
-        nid_3 = NoteId(3)
-        nid_4 = NoteId(4)
+        dialog_mock = mocker.patch("ankihub.gui.bulk_suggestion_summary_dialog.BulkSuggestionSummaryDialog")
+        ah_did = next_deterministic_uuid()
+        result = suggestions.BulkNoteSuggestionsResult(
+            errors_by_nid={NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR]},
+            change_note_suggestions_count=2,
+            new_note_suggestions_count=0,
+        )
         _on_suggest_notes_in_bulk_done(
-            future=future_with_result(
-                suggestions.BulkNoteSuggestionsResult(
-                    errors_by_nid={
-                        nid_1: ["some error"],
-                        nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
-                        nid_3: ["Note object does not exist"],
-                        nid_4: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
-                    },
-                    change_note_suggestions_count=10,
-                    new_note_suggestions_count=20,
-                )
-            ),
+            future=future_with_result(result),
             parent=aqt.mw,
+            ah_did=ah_did,
+            auto_accept=False,
         )
 
-        _, kwargs = showText_mock.call_args
-        assert (
-            kwargs.get("txt")
-            == dedent(
-                """
-                Submitted 10 change note suggestion(s).
-                Submitted 20 new note suggestion(s).
+        dialog_mock.assert_called_once()
+        _, kwargs = dialog_mock.call_args
+        assert kwargs["result"] is result
+        assert kwargs["ah_did"] == ah_did
 
-                Failed to submit suggestions for 4 note(s).
-                All notes with failed suggestions:
-                1, 2, 3, 4
-
-                Notes without changes (1):
-                2
-
-                Notes that don't exist on AnkiHub (1):
-                3
-
-                Notes with the first field empty (1):
-                4
-                """
-            ).strip()
-        )
-
-    def test_empty_categories_are_not_shown(
-        self,
-        mocker: MockerFixture,
-    ):
-        """Test that only non-empty categories are shown in the message."""
-        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
-        nid_1 = NoteId(1)
-        _on_suggest_notes_in_bulk_done(
-            future=future_with_result(
-                suggestions.BulkNoteSuggestionsResult(
-                    errors_by_nid={
-                        nid_1: [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
-                    },
-                    change_note_suggestions_count=5,
-                    new_note_suggestions_count=3,
-                )
-            ),
-            parent=aqt.mw,
-        )
-
-        _, kwargs = showText_mock.call_args
-        # Only the "empty first field" category should be shown, not the others
-        assert (
-            kwargs.get("txt")
-            == dedent(
-                """
-                Submitted 5 change note suggestion(s).
-                Submitted 3 new note suggestion(s).
-
-                Failed to submit suggestions for 1 note(s).
-                All notes with failed suggestions:
-                1
-
-                Notes with the first field empty (1):
-                1
-                """
-            ).strip()
-        )
-
-    def test_with_exception_in_future(self):
+    def test_with_exception_in_future(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
         with pytest.raises(Exception):
             _on_suggest_notes_in_bulk_done(
                 future=future_with_exception(Exception("test")),
                 parent=aqt.mw,
+                ah_did=next_deterministic_uuid(),
+                auto_accept=False,
             )
 
-    def test_with_http_403_exception_in_future(self, mocker: MockerFixture):
+    def test_with_http_403_exception_in_future(
+        self, mocker: MockerFixture, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
         response = Response()
         response.status_code = 403
         response.json = lambda: {"detail": "test"}  # type: ignore
         exception = AnkiHubHTTPError(response)
 
         show_error_dialog_mock = mocker.patch(
-            "ankihub.gui.suggestion_dialog.show_error_dialog",
+            "ankihub.gui.bulk_suggestion_summary_dialog.show_error_dialog",
         )
 
         _on_suggest_notes_in_bulk_done(
             future=future_with_exception(exception),
             parent=aqt.mw,
+            ah_did=next_deterministic_uuid(),
+            auto_accept=False,
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
+
+
+def _duplicate_anki_id_error(conflicting_ah_nid: uuid.UUID, deleted: bool = False) -> dict:
+    """The list-wrapped/stringified shape the backend returns (DRF normalization)."""
+    return {
+        "non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR],
+        "conflicting_ankihub_id": [str(conflicting_ah_nid)],
+        "conflicting_note_deleted": ["True" if deleted else "False"],
+    }
+
+
+class TestParseDuplicateAnkiIdError:
+    def test_parses_list_wrapped_stringified_payload(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
+        ah_nid = next_deterministic_uuid()
+        parsed = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid))
+        assert parsed == (ah_nid, False)
+
+    def test_deleted_flag_compares_against_literal_true(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
+        ah_nid = next_deterministic_uuid()
+        _, deleted = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid, deleted=True))
+        assert deleted is True
+        # "False" is a truthy string; must not be read as deleted.
+        _, deleted = suggestions.parse_duplicate_anki_id_error(_duplicate_anki_id_error(ah_nid, deleted=False))
+        assert deleted is False
+
+    def test_returns_none_for_unrelated_error(self):
+        assert suggestions.parse_duplicate_anki_id_error({"non_field_errors": ["something else"]}) is None
+        assert suggestions.parse_duplicate_anki_id_error([suggestions.ANKIHUB_NO_CHANGE_ERROR]) is None
+
+    def test_missing_conflicting_id_yields_none_id(self):
+        # Older server: duplicate message without the conflicting id.
+        parsed = suggestions.parse_duplicate_anki_id_error(
+            {"non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR]}
+        )
+        assert parsed == (None, False)
+
+
+class TestNewNoteToChangeSuggestionConverter:
+    def test_reuses_fields_and_tags_and_keys_by_conflicting_id(self, next_deterministic_uuid):
+        from ankihub.ankihub_client import Field, NewNoteSuggestion
+
+        ah_did = next_deterministic_uuid()
+        conflicting_ah_nid = next_deterministic_uuid()
+        new_note_suggestion = NewNoteSuggestion(
+            ah_nid=next_deterministic_uuid(),
+            anki_nid=123,
+            fields=[Field(name="Front", value="a"), Field(name="Back", value="b")],
+            comment="c",
+            ah_did=ah_did,
+            note_type_name="Basic",
+            anki_note_type_id=1,
+            tags=["t1", "t2"],
+            guid="g",
+        )
+
+        change = suggestions._new_note_to_change_suggestion(
+            new_note_suggestion, conflicting_ah_nid, SuggestionType.UPDATED_CONTENT
+        )
+
+        assert change.ah_nid == conflicting_ah_nid
+        assert change.anki_nid == 123
+        assert change.fields == new_note_suggestion.fields
+        assert change.added_tags == ["t1", "t2"]
+        assert change.removed_tags == []
+        assert change.change_type == SuggestionType.UPDATED_CONTENT
+
+
+def _make_already_in_deck_conflict(anki_nid: int, conflicting_ah_nid, next_deterministic_uuid):
+    from ankihub.ankihub_client import Field, NewNoteSuggestion
+
+    new_note_suggestion = NewNoteSuggestion(
+        ah_nid=next_deterministic_uuid(),
+        anki_nid=anki_nid,
+        fields=[Field(name="Front", value="x")],
+        comment="",
+        ah_did=next_deterministic_uuid(),
+        note_type_name="Basic",
+        anki_note_type_id=1,
+        tags=[],
+        guid="g",
+    )
+    return suggestions.AlreadyInDeckConflict(
+        new_note_suggestion=new_note_suggestion, conflicting_ah_nid=conflicting_ah_nid
+    )
+
+
+class TestBulkSuggestionSummaryDialog:
+    def _dialog(self, next_deterministic_uuid, errors_by_nid, already_in_deck_by_nid=None, change_count=1):
+        result = suggestions.BulkNoteSuggestionsResult(
+            errors_by_nid=errors_by_nid,
+            change_note_suggestions_count=change_count,
+            new_note_suggestions_count=0,
+            already_in_deck_by_nid=already_in_deck_by_nid or {},
+        )
+        return BulkSuggestionSummaryDialog(
+            result=result,
+            ah_did=next_deterministic_uuid(),
+            auto_accept=False,
+            parent=aqt.mw,
+        )
+
+    def test_all_success_shows_success_message_and_hides_close(self, next_deterministic_uuid):
+        dialog = self._dialog(next_deterministic_uuid, errors_by_nid={}, change_count=3)
+        assert dialog._is_all_success() is True
+        # Close is redundant in the success case; only OK is shown. (isHidden reflects the
+        # explicit setVisible flag even though the dialog itself isn't shown in the test.)
+        assert dialog._close_button.isHidden() is True
+        assert dialog._ok_button.isEnabled() is True
+
+    def test_skipped_or_failed_keeps_summary_not_success(self, next_deterministic_uuid):
+        # A no-change (skipped) note means it's not a clean success → keep the Summary.
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR]},
+            change_count=2,
+        )
+        assert dialog._is_all_success() is False
+        assert dialog._close_button.isHidden() is False
+
+    def test_categorizes_errors_excluding_already_in_deck(self, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={
+                NoteId(1): [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                NoteId(2): [suggestions.ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR],
+                NoteId(3): [suggestions.ANKIHUB_EMPTY_FIRST_FIELD_ERROR],
+                NoteId(4): ["something unexpected"],
+                NoteId(5): _duplicate_anki_id_error(conflicting),
+            },
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        cats = dialog._issue_categories()
+        # No-change notes are surfaced as "skipped" in the Summary, not as an issue.
+        assert dialog._skipped_nids() == [NoteId(1)]
+        assert "notes_without_changes" not in cats
+        assert cats["notes_deleted"] == [NoteId(2)]
+        assert cats["empty_first_field"] == [NoteId(3)]
+        assert cats["other_errors"] == [NoteId(4)]  # NoteId(5) is in the action box, not Other errors
+        # "failed to submit" excludes the skipped (no-change) note: 2,3,4,5 = 4.
+        assert dialog._failed_count() == 4
+        assert dialog._action_resolved() is False  # action required
+
+    def test_no_action_required_enables_ok(self, next_deterministic_uuid):
+        dialog = self._dialog(next_deterministic_uuid, errors_by_nid={NoteId(1): ["x"]})
+        assert dialog._action_resolved() is True
+        assert dialog._ok_button.isEnabled() is True
+
+    def test_ignore_enables_ok(self, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        assert dialog._action_resolved() is False
+        assert dialog._ok_button.isEnabled() is False
+        dialog._on_ignore()
+        assert dialog._action_state == _ActionState.IGNORED
+        assert dialog._action_resolved() is True
+        assert dialog._ok_button.isEnabled() is True
+        assert dialog._already_in_deck  # still rendered, just resolved
+
+    def test_close_always_enabled_ok_gates_on_action(self, mocker, next_deterministic_uuid):
+        # Close / X (reject) is never gated, so the user can copy IDs and leave; the OK
+        # button is what's gated on the required action being resolved.
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        # OK disabled while the action is required; Close enabled regardless.
+        assert dialog._ok_button.isEnabled() is False
+        assert dialog._close_button.isEnabled() is True
+        # reject() (Close / X / Escape) is not blocked even with the action unresolved.
+        super_reject = mocker.patch("aqt.qt.QDialog.reject")
+        dialog.reject()
+        super_reject.assert_called_once()
+
+    def _patch_resubmit(self, mocker, errors_returned):
+        mocker.patch(
+            "ankihub.gui.bulk_suggestion_summary_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            return_value=errors_returned,
+        )
+        mocker.patch.object(
+            aqt.mw.taskman,
+            "with_progress",
+            side_effect=lambda task, on_done, parent: on_done(future_with_result(task())),
+        )
+
+    def test_resubmit_success_moves_to_submitted(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+            change_count=1,
+        )
+        self._patch_resubmit(mocker, errors_returned={})
+        dialog._on_resubmit()
+
+        assert dialog._change_submitted == 2
+        assert NoteId(5) not in dialog._errors_by_nid
+        assert dialog._already_in_deck == {}
+        assert dialog._action_state == _ActionState.RESOLVED
+        assert dialog._action_resolved() is True
+        assert "change_submitted" in dialog._updated_keys
+        # Everything is submitted now, but a resubmit keeps the Summary (with the
+        # "Updated" badge) rather than the all-success message — that's reserved for a
+        # clean initial (DEFAULT) submit.
+        assert dialog._is_all_success() is False
+
+    def test_resubmit_partial_failure_recategorizes(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+            change_count=1,
+        )
+        self._patch_resubmit(mocker, errors_returned={NoteId(5): [suggestions.ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR]})
+        dialog._on_resubmit()
+
+        assert dialog._change_submitted == 1  # nothing succeeded
+        assert NoteId(5) in dialog._errors_by_nid
+        assert dialog._issue_categories()["notes_deleted"] == [NoteId(5)]
+        assert "notes_deleted" in dialog._updated_keys
+        assert dialog._action_resolved() is True
+
+    def test_hard_resubmit_failure_does_not_trap_user(self, mocker, next_deterministic_uuid):
+        conflicting = next_deterministic_uuid()
+        conflict = _make_already_in_deck_conflict(5, conflicting, next_deterministic_uuid)
+        dialog = self._dialog(
+            next_deterministic_uuid,
+            errors_by_nid={NoteId(5): _duplicate_anki_id_error(conflicting)},
+            already_in_deck_by_nid={NoteId(5): conflict},
+        )
+        mocker.patch("ankihub.gui.bulk_suggestion_summary_dialog.show_error_dialog")
+        mocker.patch(
+            "ankihub.gui.bulk_suggestion_summary_dialog.resubmit_new_notes_as_change_suggestions_in_bulk",
+            side_effect=Exception("network down"),
+        )
+
+        def run_failing(task, on_done, parent):
+            try:
+                on_done(future_with_result(task()))
+            except Exception as exc:
+                on_done(future_with_exception(exc))
+
+        mocker.patch.object(aqt.mw.taskman, "with_progress", side_effect=run_failing)
+        dialog._on_resubmit()
+        assert dialog._action_state == _ActionState.FAILED
+        # Not trapped: Close stays enabled. The action isn't "resolved" though — OK stays
+        # gated so the user can retry (Resubmit) or leave via Close.
+        assert dialog._close_button.isEnabled() is True
+        assert dialog._action_resolved() is False
+        assert dialog._ok_button.isEnabled() is False
+
+
+class TestMaybeHandleNoteAlreadyExists:
+    def _http_error(self, payload, status=400):
+        response = Response()
+        response.status_code = status
+        response.url = "https://app.ankihub.net/api/notes/.../suggestion/"
+        response.json = lambda: payload  # type: ignore
+        return AnkiHubHTTPError(response)
+
+    def test_resubmittable_conflict_shows_dialog(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        show_mock = mocker.patch("ankihub.gui.suggestion_dialog._show_note_already_exists_dialog")
+        ah_nid = next_deterministic_uuid()
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error(_duplicate_anki_id_error(ah_nid)),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is True
+        show_mock.assert_called_once()
+
+    def test_deleted_conflict_shows_deleted_dialog(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        show_error = mocker.patch("ankihub.gui.suggestion_dialog.show_error_dialog")
+        show_dialog = mocker.patch("ankihub.gui.suggestion_dialog._show_note_already_exists_dialog")
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error(_duplicate_anki_id_error(next_deterministic_uuid(), deleted=True)),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is True
+        show_error.assert_called_once()
+        show_dialog.assert_not_called()
+
+    def test_non_duplicate_error_is_not_handled(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error({"non_field_errors": ["unrelated"]}),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is False
+
+    def test_missing_conflicting_id_falls_back(self, mocker, next_deterministic_uuid):
+        from ankihub.gui.suggestion_dialog import _maybe_handle_note_already_exists
+
+        handled = _maybe_handle_note_already_exists(
+            e=self._http_error({"non_field_errors": [suggestions.ANKIHUB_DUPLICATE_ANKI_ID_ERROR]}),
+            note=mocker.Mock(id=1),
+            ah_did=next_deterministic_uuid(),
+            suggestion_meta=mocker.Mock(),
+            parent=aqt.mw,
+        )
+        assert handled is False
+
+    def test_handle_suggestion_error_survives_400_without_non_field_errors(self, mocker):
+        # A 400 whose body has no "non_field_errors" must degrade to showInfo, not raise.
+        from ankihub.gui.suggestion_dialog import _handle_suggestion_error
+
+        mocker.patch("ankihub.gui.suggestion_dialog.report_exception_and_upload_logs")
+        show_info_mock = mocker.patch("ankihub.gui.suggestion_dialog.showInfo")
+        _handle_suggestion_error(self._http_error({"detail": "boom"}), parent=aqt.mw)
+        show_info_mock.assert_called_once()
 
 
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:
@@ -1963,6 +3997,356 @@ def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
     dialog.button_box.button(QDialogButtonBox.StandardButton.No).click()
 
 
+class TestUserDetailsConfig:
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({"memberships": []}, None),
+            ({"memberships": [{"plan": "core"}]}, "core"),
+            ({"memberships": [{"plan": "core"}, {"plan": "Ankihub AI"}]}, "Ankihub AI"),
+        ],
+    )
+    def test_plan(self, user_details: dict, expected: Optional[str]) -> None:
+        config.set_user_details(user_details)
+        assert config.plan() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"is_staff": True}, True),
+            ({"is_staff": False}, False),
+        ],
+    )
+    def test_is_staff(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_staff() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"is_admin": True}, True),
+            ({"is_admin": False}, False),
+        ],
+    )
+    def test_is_admin(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_admin() == expected
+
+    @pytest.mark.parametrize(
+        "user_details,expected",
+        [
+            ({}, False),
+            ({"beta_tester": True}, True),
+            ({"beta_tester": False}, False),
+        ],
+    )
+    def test_is_beta_tester(self, user_details: dict, expected: bool) -> None:
+        config.set_user_details(user_details)
+        assert config.is_beta_tester() == expected
+
+
+class TestTutorialProductMetrics:
+    @pytest.fixture(autouse=True)
+    def enable_tutorial_metrics_tracker(self, mocker: MockerFixture, request: pytest.FixtureRequest) -> None:
+        if request.node.name == "test_track_tutorial_skips_when_feature_flag_disabled":
+            return
+        mocker.patch.object(
+            config,
+            "get_feature_flags",
+            return_value={"tutorial_metrics_tracker": True},
+        )
+
+    def test_track_tutorial_sends_event(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": True})
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=True)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=True)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+
+        Tutorial()._track_tutorial("tutorial_start")
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tutorial_start",
+            properties={
+                "tutorial": "Tutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": True,
+                "beta_tester": True,
+            },
+        )
+
+    def test_track_tutorial_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": False})
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+
+        Tutorial()._track_tutorial("tutorial_start")
+
+        mock_client.track.assert_not_called()
+
+    def test_skip_tutorial_tracks_tour_postponed(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch.object(OnboardingTutorial, "_cleanup_step")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+
+        tutorial = OnboardingTutorial()
+        tutorial.skip_tutorial()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_postponed",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_next_tracks_tour_completed_on_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+        mocker.patch.object(Tutorial, "end")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 2
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", tutorial)
+        tutorial.next()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_completed",
+            properties={
+                "tutorial": "TwoStepTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_end_tracks_tour_abandoned_before_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 1
+        tutorial.end()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_abandoned",
+            properties={
+                "tutorial": "TwoStepTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+                "step_number": 1,
+            },
+        )
+
+    def test_end_does_not_track_tour_abandoned_on_final_step(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial, TutorialStep
+
+        class TwoStepTutorial(Tutorial):
+            @property
+            def steps(self) -> list[TutorialStep]:
+                return [
+                    TutorialStep(body="step 1", tooltip_context=aqt.mw),
+                    TutorialStep(body="step 2", tooltip_context=aqt.mw),
+                ]
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "_cleanup_step")
+
+        tutorial = TwoStepTutorial()
+        tutorial.current_step = 2
+        tutorial.end()
+
+        mock_client.track.assert_not_called()
+
+    def test_start_tracks_tour_reopen_from_help_menu(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import Tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+        mocker.patch.object(Tutorial, "show_current")
+
+        Tutorial().start(reopen=True)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_reopen",
+            properties={
+                "tutorial": "Tutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+
+    def test_dismiss_tutorial_tracks_tour_dismissed(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import DISMISS_TUTORIAL_PYCMD, OnboardingTutorial, prompt_for_tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets")
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", None)
+        mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        message_handlers: list = []
+        mocker.patch(
+            "ankihub.gui.tutorial.gui_hooks.webview_did_receive_js_message.append",
+            side_effect=lambda handler: message_handlers.append(handler),
+        )
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_will_set_content.append")
+        on_dismiss = mocker.Mock()
+
+        prompt_for_tutorial(
+            context_types=(type(aqt.mw.deckBrowser),),
+            contexts=(aqt.mw.deckBrowser,),
+            dialog_context=type(aqt.mw.deckBrowser),
+            dialog_kwargs=dict(title="Tour", body="Take a tour", main_button_label="Take tour"),
+            on_start=mocker.Mock(),
+            on_dismiss=on_dismiss,
+            tutorial_class=OnboardingTutorial,
+        )
+
+        message_handlers[0]((False, None), DISMISS_TUTORIAL_PYCMD, aqt.mw.deckBrowser)
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_dismissed",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+        on_dismiss.assert_called_once()
+
+    def test_prompt_for_tutorial_tracks_tour_shown(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial, prompt_for_tutorial
+
+        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
+        mocker.patch.object(config, "user_id", return_value=42)
+        mocker.patch.object(config, "plan", return_value="core")
+        mocker.patch.object(config, "is_staff", return_value=False)
+        mocker.patch.object(config, "is_admin", return_value=False)
+        mocker.patch.object(config, "is_beta_tester", return_value=False)
+        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
+        mocker.patch("ankihub.gui.tutorial.active_tutorial", None)
+        mock_web = mocker.patch("ankihub.gui.tutorial.webview_for_context", return_value=mocker.Mock())
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_did_receive_js_message.append")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks.webview_will_set_content.append")
+        on_loaded_callbacks: list = []
+
+        def capture_inject(context: Any, on_loaded: Callable[[], None]) -> None:
+            on_loaded_callbacks.append(on_loaded)
+
+        mocker.patch("ankihub.gui.tutorial.inject_tutorial_assets", side_effect=capture_inject)
+
+        prompt_for_tutorial(
+            context_types=(type(aqt.mw.deckBrowser),),
+            contexts=(aqt.mw.deckBrowser,),
+            dialog_context=type(aqt.mw.deckBrowser),
+            dialog_kwargs=dict(title="Tour", body="Take a tour", main_button_label="Take tour"),
+            on_start=mocker.Mock(),
+            on_dismiss=mocker.Mock(),
+            tutorial_class=OnboardingTutorial,
+        )
+
+        for on_loaded in on_loaded_callbacks:
+            on_loaded()
+
+        mock_client.track.assert_called_once_with(
+            distinct_id="42",
+            event_name="tour_shown",
+            properties={
+                "tutorial": "OnboardingTutorial",
+                "user": "42",
+                "plan": "core",
+                "is_staff_or_admin": False,
+                "beta_tester": False,
+            },
+        )
+        mock_web.return_value.eval.assert_called_once()
+
+
+# These tests kick off refresh_user_state_in_background, which can still be writing the private
+# config when the test ends and then raises in the Qt event loop once pytest has removed the
+# profile directory.
+@pytest.mark.qt_no_exception_capture
 class TestFeatureFlags:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -1995,6 +4379,13 @@ class TestFeatureFlags:
         callback = MagicMock()
         add_user_state_refreshed_callback(callback)
         assert callback in _state.user_state_refreshed_callbacks
+
+    def test_feature_flags_are_empty_before_the_private_config_is_set_up(self, mocker: MockerFixture):
+        # Hooks can read feature flags while Anki is still starting up, before the private
+        # config of the profile exists.
+        mocker.patch.object(config, "_private_config", None)
+
+        assert config.get_feature_flags() == {}
 
     def test_offline_scenario_preserves_cached_feature_flags(self, mocker: MockerFixture, qtbot: QtBot):
         """Test that cached feature flags are preserved when server is unreachable."""
@@ -2062,6 +4453,9 @@ class TestFeatureFlags:
         # Assert user details kept cached value (fetch failed)
         assert config.get_user_details() == cached_user_details
 
+    # The background refresh can still be writing the private config when the test ends, which
+    # raises in the Qt event loop once pytest has removed the profile directory.
+    @pytest.mark.qt_no_exception_capture
     def test_logout_clears_caches(self, mocker: MockerFixture, qtbot: QtBot):
         """Test that logging out clears both feature flags and user details caches."""
         # Set up initial cached values (simulating previous login)
@@ -2177,6 +4571,8 @@ class TestCreateCollaborativeDeck:
         mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
         creating_deck_fails: bool,
     ) -> None:
+        entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             # Setup Anki deck with a note.
             deck_name = "test"
@@ -3951,6 +6347,23 @@ class TestSetSubdeckDueDate:
         )
 
 
+@pytest.fixture
+def _reset_reminder_dialog_state():
+    # Real-dialog tests connect dialog.finished → QTimer.singleShot(0,
+    # _show_next_due_date_reminder_dialog). A late timer firing inside a
+    # @patch window otherwise records a call on the mocked dialog class with
+    # the real aqt.mw as parent. Clear state and drain pending callbacks
+    # before/after each test so stray timers hit the empty-queue early-return
+    # instead of acting on residue from another test.
+    _reminder_dialog_state.queue = []
+    _reminder_dialog_state.dialog = None
+    QApplication.processEvents()
+    yield
+    _reminder_dialog_state.queue = []
+    _reminder_dialog_state.dialog = None
+
+
+@pytest.mark.usefixtures("_reset_reminder_dialog_state")
 class TestShowNextDueDateReminderDialog:
     """Tests for _show_next_due_date_reminder_dialog function."""
 
@@ -3992,6 +6405,7 @@ class TestShowNextDueDateReminderDialog:
         assert _reminder_dialog_state.dialog is None
 
 
+@pytest.mark.usefixtures("_reset_reminder_dialog_state")
 class TestShowSubdeckDueDateReminders:
     """Tests for maybe_show_subdeck_due_date_reminders function."""
 
@@ -4050,6 +6464,7 @@ class TestSetupPublicConfigAndOtherSettings:
         monkeypatch.setattr(config, "load_public_config", lambda: None)
         monkeypatch.delenv("ANKIHUB_APP_URL", raising=False)
         monkeypatch.delenv("S3_BUCKET_URL", raising=False)
+        monkeypatch.delenv("ANKIWEB_URL", raising=False)
         monkeypatch.delenv("ANKING_DECK_ID", raising=False)
         monkeypatch.delenv("INTRO_DECK_ID", raising=False)
         monkeypatch.setattr("ankihub.settings._get_build_config", lambda: {})
@@ -4060,6 +6475,8 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == DEFAULT_APP_URL
         assert config.api_url == DEFAULT_API_URL
         assert config.s3_bucket_url == DEFAULT_S3_BUCKET_URL
+        assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
+        assert config.intercom_app_id == DEFAULT_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
         assert config.intro_deck_id == uuid.UUID("2fb041b2-1c29-4a81-a51a-31ee822984c8")
 
@@ -4069,6 +6486,9 @@ class TestSetupPublicConfigAndOtherSettings:
         assert config.app_url == STAGING_APP_URL
         assert config.api_url == STAGING_API_URL
         assert config.s3_bucket_url == STAGING_S3_BUCKET_URL
+        # There's no staging website for AnkiWeb yet, so it stays pointed at production.
+        assert config.ankiweb_url == DEFAULT_ANKIWEB_URL
+        assert config.intercom_app_id == STAGING_INTERCOM_APP_ID
         assert config.anking_deck_id == uuid.UUID("dfe7f548-f66e-4277-932b-c7a63db3223a")
         assert config.intro_deck_id == uuid.UUID("9289bb71-7977-4141-a9c7-643f9e32f572")
 
@@ -4105,6 +6525,12 @@ class TestSetupPublicConfigAndOtherSettings:
         config.setup_public_config_and_other_settings()
         assert config.s3_bucket_url == "https://custom-s3.example.com"
 
+    def test_ankiweb_url_env_var_override(self, monkeypatch: MonkeyPatch):
+        monkeypatch.setenv("ANKIWEB_URL", "https://custom-ankiweb.example.com/")
+        config.public_config = {}
+        config.setup_public_config_and_other_settings()
+        assert config.ankiweb_url == "https://custom-ankiweb.example.com"
+
     def test_anking_deck_id_env_var_override(self, monkeypatch: MonkeyPatch):
         custom_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
         monkeypatch.setenv("ANKING_DECK_ID", custom_id)
@@ -4118,3 +6544,401 @@ class TestSetupPublicConfigAndOtherSettings:
         config.public_config = {}
         config.setup_public_config_and_other_settings()
         assert config.intro_deck_id == uuid.UUID(custom_id)
+
+
+class TestAuthAppUrlOnServerChange:
+    def test_signs_out_when_auth_app_url_differs_from_current(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            config.set_user_details({"id": 1, "email": "staging@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.app_url = DEFAULT_APP_URL
+            config.setup_private_config()
+
+            assert not config.is_logged_in()
+            assert config.get_user_details() == {}
+            assert config.get_feature_flags() == {}
+            assert config._private_config.auth_app_url is None
+
+    def test_keeps_login_when_auth_app_url_matches(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("prod-token")
+            config.set_user_details({"id": 2, "email": "prod@example.com"})
+            config.set_feature_flags({"intercom_desktop_enabled": True})
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "prod-token"
+            assert config.get_user_details() == {"id": 2, "email": "prod@example.com"}
+            assert config.get_feature_flags() == {"intercom_desktop_enabled": True}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_backfills_missing_auth_app_url_without_signing_out(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = DEFAULT_APP_URL
+            config.save_token("legacy-token")
+            config.set_user_details({"id": 3})
+            config._private_config.auth_app_url = None
+            config._update_private_config()
+
+            config.setup_private_config()
+
+            assert config.is_logged_in()
+            assert config.token() == "legacy-token"
+            assert config.get_user_details() == {"id": 3}
+            assert config._private_config.auth_app_url == DEFAULT_APP_URL
+
+    def test_save_token_stamps_and_clears_auth_app_url(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            config.app_url = STAGING_APP_URL
+            config.save_token("staging-token")
+            assert config._private_config.auth_app_url == STAGING_APP_URL
+
+            config.save_token("")
+            assert config._private_config.auth_app_url is None
+            assert not config.is_logged_in()
+
+
+class TestIntercom:
+    @pytest.fixture(autouse=True)
+    def _enable_intercom(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(config, "is_logged_in", return_value=True)
+        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": True})
+        if config.public_config is None:
+            config.public_config = {}
+        config.public_config["ankihub_support_button"] = True
+        mocker.patch.object(config, "intercom_app_id", "test_app_id", create=True)
+        mocker.patch.object(
+            config,
+            "get_user_details",
+            return_value={
+                "id": 42,
+                "name": "Test User",
+                "email": "test@example.com",
+                "intercom_user_hash": "hash123",
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "logged_in, feature_flag, preference, expected",
+        [
+            (True, True, True, True),
+            (False, True, True, False),
+            (True, False, True, False),
+            (True, True, False, False),
+        ],
+    )
+    def test_is_enabled_for_user(
+        self,
+        mocker: MockerFixture,
+        logged_in: bool,
+        feature_flag: bool,
+        preference: bool,
+        expected: bool,
+    ) -> None:
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+        mocker.patch.object(
+            config,
+            "get_feature_flags",
+            return_value={"intercom_desktop_enabled": feature_flag},
+        )
+        config.public_config["ankihub_support_button"] = preference
+
+        assert intercom.is_enabled_for_user() is expected
+
+    def test_inject_intercom_on_deck_browser(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/test_app_id" in web_content.body
+        assert '"app_id": "test_app_id"' in web_content.body
+        assert '"user_id": "42"' in web_content.body
+        assert '"user_hash": "hash123"' in web_content.body
+        assert '"name": "Test User"' in web_content.body
+        assert '"email": "test@example.com"' in web_content.body
+        assert '"source": "anki_desktop"' in web_content.body
+
+    def test_inject_intercom_on_overview(self) -> None:
+        from aqt.overview import Overview
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+        context = Overview.__new__(Overview)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/test_app_id" in web_content.body
+
+    def test_inject_intercom_skips_non_home_contexts(self) -> None:
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        web_content = WebContent()
+        web_content.body = ""
+
+        intercom._inject_intercom(web_content, object())
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_when_preference_disabled(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        config.public_config["ankihub_support_button"] = False
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": False})
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_skips_without_app_id(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "intercom_app_id", "", create=True)
+        mocker.patch.object(config, "get_user_details", return_value={"id": 42})
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert web_content.body == ""
+
+    def test_inject_intercom_uses_app_id_from_config(self, mocker: MockerFixture) -> None:
+        from aqt.deckbrowser import DeckBrowser
+        from aqt.webview import WebContent
+
+        from ankihub.gui import intercom
+
+        mocker.patch.object(config, "intercom_app_id", "config_app_id", create=True)
+        mocker.patch.object(
+            config,
+            "get_user_details",
+            return_value={"id": 42, "intercom_app_id": "from_server"},
+        )
+        web_content = WebContent()
+        web_content.body = ""
+        context = DeckBrowser.__new__(DeckBrowser)
+
+        intercom._inject_intercom(web_content, context)
+
+        assert "widget.intercom.io/widget/config_app_id" in web_content.body
+        assert '"app_id": "config_app_id"' in web_content.body
+        assert "from_server" not in web_content.body
+
+    def test_boot_js_shuts_down_and_boots_on_identity_change(self) -> None:
+        from ankihub.gui import intercom
+
+        boot_js = intercom._build_boot_js()
+        assert boot_js is not None
+        assert "identityChanged" in boot_js
+        assert "ic('shutdown')" in boot_js
+        assert "ic('boot',next)" in boot_js
+        assert "prev.app_id!==next.app_id" in boot_js
+        assert "prev.user_id" in boot_js
+
+    def test_sync_with_user_preference_shuts_down_when_disabled(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        config.public_config["ankihub_support_button"] = False
+        shutdown = mocker.patch.object(intercom, "shutdown")
+        boot = mocker.patch.object(intercom, "_boot_on_current_home_screen")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_called_once()
+        boot.assert_not_called()
+
+    def test_sync_with_user_preference_boots_when_enabled_on_home(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        web = mocker.Mock()
+        mocker.patch.object(aqt.mw, "state", "deckBrowser")
+        mocker.patch.object(aqt.mw, "web", web)
+        shutdown = mocker.patch.object(intercom, "shutdown")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_not_called()
+        web.eval.assert_called_once()
+        assert "widget.intercom.io/widget/test_app_id" in web.eval.call_args[0][0]
+
+    def test_sync_with_user_preference_skips_boot_off_home(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        web = mocker.Mock()
+        mocker.patch.object(aqt.mw, "state", "review")
+        mocker.patch.object(aqt.mw, "web", web)
+        shutdown = mocker.patch.object(intercom, "shutdown")
+
+        intercom.sync_with_user_preference()
+
+        shutdown.assert_not_called()
+        web.eval.assert_not_called()
+
+    def test_setup_registers_user_state_refresh_callback(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        append = mocker.patch.object(aqt.gui_hooks.webview_will_set_content, "append")
+        add_callback = mocker.patch("ankihub.user_state.add_user_state_refreshed_callback")
+
+        intercom.setup()
+
+        append.assert_called_once_with(intercom._inject_intercom)
+        add_callback.assert_called_once_with(intercom.sync_with_user_preference)
+
+    def test_close_messenger_evals_hide(self, mocker: MockerFixture) -> None:
+        from ankihub.gui import intercom
+
+        web = mocker.Mock()
+        mocker.patch.object(aqt.mw, "web", web)
+
+        intercom.close_messenger()
+
+        web.eval.assert_called_once()
+        assert "Intercom('hide')" in web.eval.call_args[0][0]
+
+    def test_tutorial_start_closes_messenger(self, mocker: MockerFixture) -> None:
+        from ankihub.gui.tutorial import OnboardingTutorial
+
+        close_messenger = mocker.patch("ankihub.gui.intercom.close_messenger")
+        mocker.patch.object(OnboardingTutorial, "_track_tutorial")
+        mocker.patch.object(OnboardingTutorial, "show_current")
+        mocker.patch("ankihub.gui.tutorial.gui_hooks")
+
+        OnboardingTutorial().start(reopen=True)
+
+        close_messenger.assert_called_once()
+
+    def test_support_button_checkbox_in_config_when_flag_enabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": True},
+            )
+            setup_config_dialog_manager()
+
+            from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
+            from ankihub.gui.config_dialog import get_config_dialog_manager
+
+            config_dialog_manager: ConfigManager = get_config_dialog_manager()
+            config_window = ConfigWindow(config_dialog_manager)
+            qtbot.addWidget(config_window)
+            for fn in config_dialog_manager.window_open_hook:
+                fn(config_window)
+            config_window.on_open()
+
+            support_checkboxes = [
+                checkbox for checkbox in config_window.findChildren(QCheckBox) if checkbox.text() == "Support button"
+            ]
+            assert len(support_checkboxes) == 1
+
+            # Support button should be the first Feature Preferences checkbox.
+            feature_checkboxes = [
+                checkbox
+                for checkbox in config_window.findChildren(QCheckBox)
+                if checkbox.text()
+                in {
+                    "Support button",
+                    "AnkiHub Smart Search",
+                    "AnkiHub AI Chatbot",
+                    "Boards and Beyond",
+                    "First Aid Forward",
+                    "Monthly FSRS optimization reminder",
+                }
+            ]
+            assert feature_checkboxes[0].text() == "Support button"
+
+    def test_support_button_checkbox_hidden_when_flag_disabled(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
+            mocker.patch.object(
+                config,
+                "get_feature_flags",
+                return_value={"intercom_support_button_anki_preferences": False},
+            )
+            setup_config_dialog_manager()
+
+            from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
+            from ankihub.gui.config_dialog import get_config_dialog_manager
+
+            config_dialog_manager: ConfigManager = get_config_dialog_manager()
+            config_window = ConfigWindow(config_dialog_manager)
+            qtbot.addWidget(config_window)
+            for fn in config_dialog_manager.window_open_hook:
+                fn(config_window)
+            config_window.on_open()
+
+            support_checkboxes = [
+                checkbox for checkbox in config_window.findChildren(QCheckBox) if checkbox.text() == "Support button"
+            ]
+            assert support_checkboxes == []

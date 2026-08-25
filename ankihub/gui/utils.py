@@ -1,4 +1,5 @@
 import inspect
+import re
 import uuid
 from functools import partial, wraps
 from pathlib import Path
@@ -14,6 +15,7 @@ from aqt.progress import ProgressDialog
 from aqt.qt import (
     QAbstractAnimation,
     QApplication,
+    QColor,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -22,18 +24,24 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
+    QModelIndex,
+    QPainter,
+    QPixmap,
     QPropertyAnimation,
     QPushButton,
     QScrollArea,
     QSize,
     QSizePolicy,
     QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     Qt,
     QToolButton,
     QVBoxLayout,
     QWidget,
     pyqtSlot,
     qconnect,
+    sip,
 )
 from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
@@ -62,6 +70,24 @@ def add_button_from_param(button_box: QDialogButtonBox, button_param: ButtonPara
     return button
 
 
+def bring_to_front(widget: QWidget) -> None:
+    """Bring an already-visible window back to the front.
+
+    On macOS, closing a window that was opened from one of our non-modal dialogs (a native
+    file picker, the Anki browser) activates Anki's main window rather than the dialog,
+    burying the dialog behind it. Callers hook whatever signals that closing to call this.
+
+    Does not show the widget - it is for windows that are already open. The deletion guard
+    matters because callers typically fire this from a signal, by which point the window
+    may be gone.
+    """
+    if sip.isdeleted(widget):
+        return
+
+    widget.raise_()
+    widget.activateWindow()
+
+
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
     aqt.mw.taskman.run_on_main(  # type: ignore
         lambda: show_dialog(message, title=title, icon=warning_icon(), *args, **kwargs)  # type: ignore
@@ -87,6 +113,54 @@ def _show_tooltip(message: str, *args, **kwargs) -> None:
             tooltip(message)
         else:
             raise e
+
+
+# Per-item flag (read by _InfoIconDelegate) marking rows that should show a
+# trailing info icon hinting that a tooltip explains the row.
+_INFO_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+class _InfoIconDelegate(QStyledItemDelegate):
+    """Paints a small info icon just after the text of rows flagged with
+    `_INFO_ICON_ROLE`, after the native row (checkbox + text) is drawn."""
+
+    _ICON_SIZE = 16
+    _MARGIN = 6
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._pixmap = tooltip_icon().pixmap(QSize(self._ICON_SIZE, self._ICON_SIZE))
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        if not index.data(_INFO_ICON_ROLE):
+            super().paint(painter, option, index)
+            return
+
+        # Re-init the option: the one Qt hands to paint() lacks the laid-out
+        # sub-element geometry, so subElementRect(...ItemText) would otherwise
+        # report the text starting at x=0 (before the checkbox). Narrow the rect
+        # before super().paint() to reserve room for the icon, so a long field
+        # name elides before the icon instead of being overpainted by it.
+        reserved = self._ICON_SIZE + 2 * self._MARGIN
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        text_area = opt.rect
+        text_area.setRight(text_area.right() - reserved)
+        opt.rect = text_area
+        super().paint(painter, opt, index)
+
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        text_rect = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget)
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        # Qt insets item text from text_rect.left() by this margin (see QCommonStyle
+        # CE_ItemViewItem). It's larger on macOS than on Fusion, so omitting it makes
+        # the icon crowd the text there. Add it so the gap is consistent cross-platform.
+        text_margin = style.pixelMetric(QStyle.PixelMetric.PM_FocusFrameHMargin, opt, opt.widget) + 1
+        text_end = text_rect.left() + text_margin + opt.fontMetrics.horizontalAdvance(text)
+        # Sit just after the text, but never into the reserved gap at the edge.
+        x = min(text_end + self._MARGIN, option.rect.right() - self._ICON_SIZE - self._MARGIN)
+        y = option.rect.top() + (option.rect.height() - self._ICON_SIZE) // 2
+        painter.drawPixmap(x, y, self._pixmap)
 
 
 class _ChooseSubsetDialog(QDialog):
@@ -152,6 +226,7 @@ class _ChooseSubsetDialog(QDialog):
         locked_tooltip: Optional[str],
     ) -> None:
         self._list_widget = CustomListWidget()
+        self._list_widget.setItemDelegate(_InfoIconDelegate(self._list_widget))
         for choice in choices:
             item = QListWidgetItem(choice)
             if choice in locked_set:
@@ -159,6 +234,9 @@ class _ChooseSubsetDialog(QDialog):
                 item.setCheckState(Qt.CheckState.Checked)
                 if locked_tooltip:
                     item.setToolTip(locked_tooltip)
+                    # Flag the row so the delegate paints a trailing info icon —
+                    # a disabled row alone gives no hint the tooltip exists.
+                    item.setData(_INFO_ICON_ROLE, True)
             else:
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)  # type: ignore
                 item.setCheckState(Qt.CheckState.Checked if choice in current else Qt.CheckState.Unchecked)
@@ -651,6 +729,52 @@ def warning_icon() -> QIcon:
     return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
 
 
+def error_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / "error.svg").absolute()))
+
+
+def warning_triangle_icon() -> QIcon:
+    """Flat, muted-gray warning triangle (vs the OS-styled yellow `warning_icon`)."""
+    return QIcon(str((ICONS_PATH / "warning-triangle.svg").absolute()))
+
+
+def _icon_name_for_anki_theme(name: str) -> str:
+    if theme_manager.night_mode:
+        return f"{name}-dark.svg"
+    else:
+        return f"{name}-light.svg"
+
+
+def media_sync_svg() -> str:
+    return (ICONS_PATH / _icon_name_for_anki_theme("media-sync")).read_text(encoding="utf-8")
+
+
+def media_sync_error_svg() -> str:
+    return (ICONS_PATH / _icon_name_for_anki_theme("media-sync-error")).read_text(encoding="utf-8")
+
+
+def media_download_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / _icon_name_for_anki_theme("media-download")).absolute()))
+
+
+def media_upload_icon() -> QIcon:
+    return QIcon(str((ICONS_PATH / _icon_name_for_anki_theme("media-upload")).absolute()))
+
+
+def tinted_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
+    """Recolor a pixmap's opaque pixels to `color`, preserving alpha (so cutouts
+    and antialiased edges stay intact). Used to theme flat single-color icons."""
+    out = QPixmap(pixmap.size())
+    out.setDevicePixelRatio(pixmap.devicePixelRatio())
+    out.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(out)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(out.rect(), color)
+    painter.end()
+    return out
+
+
 def question_icon() -> QIcon:
     return QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
 
@@ -843,6 +967,19 @@ def anki_theme() -> str:
     return "dark" if theme_manager.night_mode else "light"
 
 
+def panel_background_color() -> str:
+    """Background fill for grouped dialog panels (e.g. Include-in-suggestion + Source)."""
+    return "#262626" if theme_manager.night_mode else "#ededed"
+
+
+def panel_line_color() -> str:
+    """Subtle line color (section dividers, input borders) for grouped dialog panels.
+    Light uses the Figma value; dark uses a grey that reads against the dark fill
+    instead of the stark light line.
+    """
+    return "#4d4d4d" if theme_manager.night_mode else "#d1d5db"
+
+
 def active_window_or_mw() -> QWidget:
     """The purpose of this function is to get a suitable parent widget for a dialog.
     By default it returns the active window.
@@ -934,3 +1071,12 @@ def refresh_anki_ui_after_moving_cards() -> None:
     browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
     if browser is not None:
         browser.sidebar.refresh()
+
+
+def is_email(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
+        )
+    )

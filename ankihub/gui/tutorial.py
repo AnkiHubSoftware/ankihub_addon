@@ -3,15 +3,15 @@ import json
 from asyncio.futures import Future
 from dataclasses import dataclass
 from functools import cached_property, partial
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict, Union, cast
 
 import aqt
 from anki.cards import CardId
 from anki.config import Config
-from anki.decks import DeckId
+from anki.decks import DeckId, UpdateDeckConfigs
 from anki.hooks import wrap
-from anki.notes import NoteId
 from anki.scheduler.v3 import Scheduler
+from anki.utils import is_mac
 from aqt import gui_hooks
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem, SidebarItemType
@@ -20,7 +20,6 @@ from aqt.deckoptions import DeckOptionsDialog
 from aqt.editor import Editor
 from aqt.main import AnkiQt, MainWindowState
 from aqt.operations.deck import set_current_deck
-from aqt.operations.scheduling import unsuspend_cards
 from aqt.overview import Overview, OverviewBottomBar
 from aqt.qt import (
     QAbstractItemView,
@@ -28,6 +27,7 @@ from aqt.qt import (
     QObject,
     QPoint,
     Qt,
+    QTimer,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -45,9 +45,13 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..django import render_template, render_template_from_string
 from ..gui.overlay_dialog import OverlayDialog, OverlayTarget
-from ..main.deck_options import DEFAULT_OVERRIDES
 from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.reset_local_changes import reset_local_changes_to_notes
+from ..product_metrics_client import (
+    ProductMetricsClient,
+    ProductMetricsHTTPError,
+    ProductMetricsRequestException,
+)
 from ..settings import config
 from .flashcard_selector_dialog import (
     show_flashcard_selector,
@@ -92,6 +96,7 @@ def render_tour_step(
     total_steps: int,
     back_label: str = "Back",
     on_back: Optional[str] = None,
+    on_continue_later: Optional[str] = None,
     next_label: str = "Next",
     on_next: Optional[str] = None,
     on_close: Optional[str] = None,
@@ -106,6 +111,7 @@ def render_tour_step(
             "total_steps": total_steps,
             "back_label": back_label,
             "on_back": on_back,
+            "on_continue_later": on_continue_later,
             "next_label": next_label,
             "on_next": on_next,
             "on_close": on_close,
@@ -166,20 +172,33 @@ class DebouncedDelayedCall:
         self._delay_ms = delay_ms
         self._pending_calls: List[Tuple[int, Tuple[Any], Dict[str, Any]]] = []
         self._next_sequence = 0
+        self._timer: Optional[QTimer] = None
 
     def schedule(self, parent: QObject, *args: Any, **kwargs: Any) -> None:
         self._next_sequence += 1
         my_seq = self._next_sequence
         self._pending_calls.append((my_seq, args, kwargs))
+        timer: Optional[QTimer] = None
+        pending_call = (my_seq, args, kwargs)
+
+        def _cleanup_timer() -> None:
+            if self._timer is timer:
+                self._timer = None
+            if timer and not sip.isdeleted(timer):
+                timer.deleteLater()
 
         def run() -> None:
             if any(seq > my_seq for seq, _, _ in self._pending_calls):
-                self._pending_calls.remove((my_seq, args, kwargs))
+                self._pending_calls.remove(pending_call)
+                _cleanup_timer()
                 return
-            self._pending_calls.remove((my_seq, args, kwargs))
-            self._callback(*args, **kwargs)
 
-        aqt.mw.progress.timer(self._delay_ms, run, repeat=False, parent=parent)
+            self._pending_calls.remove(pending_call)
+            self._callback(*args, **kwargs)
+            _cleanup_timer()
+
+        timer = aqt.mw.progress.timer(self._delay_ms, run, repeat=False, parent=parent)
+        self._timer = timer
 
 
 class TutorialOverlayDialog(OverlayDialog):
@@ -187,18 +206,42 @@ class TutorialOverlayDialog(OverlayDialog):
         self.target_outline = target_outline
         super().__init__(parent, target)
 
+    def _focus_overlay(self) -> None:
+        if is_mac:
+            return
+        self.web.setFocus()
+
+    def _apply_web_transparency(self) -> None:
+        self.web.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.web.setAutoFillBackground(False)
+        self.web.setStyleSheet("background: transparent; border: 0; outline: none;")
+        self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
+
+    def _cleanup_web(self) -> None:
+        try:
+            gui_hooks.theme_did_change.remove(self._apply_web_transparency)
+        except ValueError:
+            pass
+        self.web.cleanup()
+
     def setup_ui(self) -> None:
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
         self.web = AnkiWebView(self)
+        self._apply_web_transparency()
         self.web.disable_zoom()
         self.web.set_bridge_command(self.on_bridge_cmd, self)
         vbox.addWidget(self.web)
+        gui_hooks.theme_did_change.append(self._apply_web_transparency)
+        # QWebEngine can paint the first frame opaque before the page finishes
+        # loading, so re-apply the transparent background once the load completes.
+        qconnect(self.web.loadFinished, lambda _ok: self._apply_web_transparency())
         self.refresh()
-        qconnect(self.finished, lambda: self.web.cleanup())
+        qconnect(self.finished, self._cleanup_web)
 
     def refresh(self) -> None:
+        self._apply_web_transparency()
         web_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web"
         self.web.stdHtml(
             "<div id=target></div>",
@@ -207,7 +250,6 @@ class TutorialOverlayDialog(OverlayDialog):
             default_css=False,
             context=self,
         )
-        self.web.page().setBackgroundColor(Qt.GlobalColor.transparent)
 
     def on_bridge_cmd(self, cmd: str) -> None:
         if cmd == FLASHCARD_SELECTOR_OPEN_PYCMD:
@@ -219,6 +261,8 @@ class TutorialOverlayDialog(OverlayDialog):
             return
 
         rect = self.target.rect()
+        if rect is None:
+            return
         webview_top_left = self.web.mapFromGlobal(rect.topLeft())
         webview_bottom_right = self.web.mapFromGlobal(rect.bottomRight())
         top = webview_top_left.y()
@@ -361,7 +405,7 @@ class TutorialStep:
 @dataclass
 class QtTutorialStep(TutorialStep):
     parent_widget: Optional[Union[QWidget, Callable[[], QWidget]]] = None
-    qt_target: Optional[Union[OverlayTarget, Callable[[], OverlayTarget]]] = None
+    qt_target: Optional[Union[OverlayTarget, Callable[[], Optional[OverlayTarget]]]] = None
     target_outline: bool = True
     apply_backdrop: bool = False
 
@@ -384,6 +428,7 @@ def ensure_tutorial_active(func: Callable[..., None]) -> Callable[..., None]:
 class Tutorial:
     def __init__(self) -> None:
         self.current_step = 1
+        self.product_metrics = ProductMetricsClient(url=config.product_metrics_url)
 
     @classmethod
     def is_active(cls) -> bool:
@@ -419,6 +464,7 @@ class Tutorial:
             back_label=step.back_label,
             on_back=f"pycmd('{PREV_STEP_PYCMD}')",
             on_next=f"pycmd('{NEXT_STEP_PYCMD}')",
+            on_continue_later=f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
             next_label=step.next_label,
             on_close=f"pycmd('{TUTORIAL_CLOSED_PYCMD}')",
             show_backdrop=step.apply_backdrop,
@@ -490,7 +536,10 @@ class Tutorial:
             overlay.show()
             step.tooltip_context = overlay
             step.target_context = overlay
-            step.target = "#target"
+            # When the Qt target is unavailable (e.g. transient Browser/widget lifecycle race),
+            # render this step as tooltip-only instead of anchoring to a missing target.
+            step.target = "#target" if target is not None else ""
+            step.click_target = step.click_target if target is not None else ""
 
             def close_overlay() -> None:
                 overlay.close()
@@ -520,11 +569,56 @@ class Tutorial:
         for context in contexts:
             inject_tutorial_assets(context, on_script_loaded)
 
-    def start(self) -> None:
+    def _track_tutorial(self, event_name: str) -> None:
+        if not config.get_feature_flags().get("tutorial_metrics_tracker", False):
+            return
+
+        user_id = str(config.user_id())
+        plan = config.plan()
+        is_staff = config.is_staff()
+        is_admin = config.is_admin()
+        is_beta_tester = config.is_beta_tester()
+        tutorial_name = type(self).__name__
+
+        def send_event() -> None:
+            try:
+                properties: Dict[str, Any] = {
+                    "tutorial": tutorial_name,
+                    "user": user_id,
+                    "plan": plan,
+                    "is_staff_or_admin": is_staff or is_admin,
+                    "beta_tester": is_beta_tester,
+                }
+
+                if event_name in ["tour_next", "tour_previous", "tour_abandoned"]:
+                    properties["step_number"] = self.current_step
+
+                self.product_metrics.track(
+                    distinct_id=user_id,
+                    event_name=event_name,
+                    properties=properties,
+                )
+            except (ProductMetricsHTTPError, ProductMetricsRequestException) as exc:
+                LOGGER.warning(
+                    "failed_to_track_tutorial",
+                    tutorial=tutorial_name,
+                    exception=str(exc),
+                )
+
+        aqt.mw.taskman.run_in_background(send_event)
+
+    def start(self, *, reopen: bool = False) -> None:
         global active_tutorial
         active_tutorial = self
+        event_name = "tour_reopen" if reopen else "tutorial_start"
+        self._track_tutorial(event_name=event_name)
         gui_hooks.webview_did_receive_js_message.append(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.append(self._on_webview_will_set_content)
+        from . import intercom
+
+        # Collapse an open Messenger panel so it does not cover the tour;
+        # the launcher itself stays visible behind the backdrop (z-index).
+        intercom.close_messenger()
         self.show_current()
 
     def restart(self) -> None:
@@ -532,6 +626,17 @@ class Tutorial:
         self.show_current()
 
     def end(self) -> None:
+        if self.current_step < len(self.steps):
+            self._track_tutorial(event_name="tour_abandoned")
+        self._cleanup_step(all_webviews=True)
+        gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
+        gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
+        global active_tutorial
+        active_tutorial = None
+
+    def skip_tutorial(self) -> None:
+        self._track_tutorial(event_name="tour_postponed")
+        # It copies the end() method because it can be called from the Tutorial children
         self._cleanup_step(all_webviews=True)
         gui_hooks.webview_did_receive_js_message.remove(self._on_webview_did_receive_js_message)
         gui_hooks.webview_will_set_content.remove(self._on_webview_will_set_content)
@@ -542,6 +647,7 @@ class Tutorial:
         self, handled: tuple[bool, Any], message: str, context: Any
     ) -> tuple[bool, Any]:
         if message == PREV_STEP_PYCMD:
+            self._track_tutorial(event_name="tour_previous")
             step = self.steps[self.current_step - 1]
             if step.back_callback:
                 step.back_callback(self.back if step.auto_advance else lambda: None)
@@ -550,6 +656,7 @@ class Tutorial:
             return True, None
 
         if message == NEXT_STEP_PYCMD:
+            self._track_tutorial(event_name="tour_next")
             step = self.steps[self.current_step - 1]
             if step.next_callback:
                 step.next_callback(self.next if step.auto_advance else lambda: None)
@@ -600,6 +707,9 @@ class Tutorial:
         elif message == TUTORIAL_CLOSED_PYCMD:
             self.end()
             return True, None
+        elif message == SKIP_TUTORIAL_PYCMD:
+            self.skip_tutorial()
+            return True, None
         elif message == TARGET_CLICK_PYCMD:
             step = self.steps[self.current_step - 1]
             if step.next_callback:
@@ -611,6 +721,8 @@ class Tutorial:
         return handled
 
     def _on_webview_will_set_content(self, web_content: WebContent, context: Any) -> None:
+        if context is None:
+            return
         step = self.steps[self.current_step - 1]
         js = ""
         if context == step.tooltip_context:
@@ -657,6 +769,7 @@ class Tutorial:
     @ensure_tutorial_active
     def next(self) -> None:
         if self.current_step >= len(self.steps):
+            self._track_tutorial(event_name="tour_completed")
             self.end()
             return
         self._cleanup_step()
@@ -710,6 +823,7 @@ def prompt_for_tutorial(
     on_start: Callable[[], None],
     on_dismiss: Callable[[], None],
     on_skip: Optional[Callable[[], None]] = None,
+    tutorial_class: type[Tutorial] = Tutorial,
 ) -> None:
     if active_tutorial:
         return
@@ -720,7 +834,8 @@ def prompt_for_tutorial(
                 **dialog_kwargs,
                 "on_main_button_click": f"pycmd('{START_TUTORIAL_PYCMD}')",
                 "on_secondary_button_click": f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
-                "on_close": f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
+                "on_close": f"pycmd('{SKIP_TUTORIAL_PYCMD}')",
+                "on_text_button_click": f"pycmd('{DISMISS_TUTORIAL_PYCMD}')",
             }
             body = render_dialog(**kwargs)
             js = f"AnkiHub.showModal({json.dumps(body)})"
@@ -734,10 +849,12 @@ def prompt_for_tutorial(
             on_start()
             return True, None
         if message == DISMISS_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_dismissed")
             clean_up_webviews()
             on_dismiss()
             return True, None
         if message == SKIP_TUTORIAL_PYCMD:
+            tutorial_class()._track_tutorial(event_name="tour_postponed")
             clean_up_webviews()
             if on_skip:
                 on_skip()
@@ -773,6 +890,8 @@ def prompt_for_tutorial(
             for context in contexts:
                 web = webview_for_context(context)
                 web.eval(js_for_context(context))
+            if any(isinstance(context, dialog_context) for context in contexts):
+                tutorial_class()._track_tutorial(event_name="tour_shown")
 
     for context in contexts:
         inject_tutorial_assets(context, on_script_loaded)
@@ -797,11 +916,13 @@ def prompt_for_onboarding_tutorial() -> None:
             title="📚 First time with Anki?",
             body="Find your way in the app with this <b>onboarding tour</b>.<br>"
             "You can revisit it anytime in AnkiHub's Help menu.",
-            secondary_button_label="Maybe later",
+            secondary_button_label="Not now",
             main_button_label="Take tour",
+            text_button_label="Don't show again",
         ),
         on_start=lambda: OnboardingTutorial().start(),
         on_dismiss=lambda: config.set_onboarding_tutorial_pending(False),
+        tutorial_class=OnboardingTutorial,
     )
 
 
@@ -824,16 +945,18 @@ def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) 
         contexts=contexts,
         dialog_context=DeckBrowser,
         dialog_kwargs=dict(
-            title="📘 Add cards to your study queue",
-            body="When installed, the AnKing Step Deck comes with all cards hidden (suspended). "
-            "Take this tour to learn how to <b>select cards to study</b> and <b>set your daily limits</b>.<br><br>"
+            title="🔍 Search for cards to study",
+            body="When installed, the AnKing Step Deck comes with most of its cards hidden (suspended). "
+            "Take this tour to learn how to <b>select more cards to study</b>.<br><br>"
             "You can revisit this anytime in AnkiHub's Help menu.",
-            secondary_button_label="Skip for now",
+            secondary_button_label="Not now",
             main_button_label="Take tour",
+            text_button_label="Don't show again",
         ),
         on_start=lambda: StepDeckTutorial().start(),
         on_dismiss=lambda: config.set_step_deck_tutorial_pending(False),
         on_skip=on_skip,
+        tutorial_class=StepDeckTutorial,
     )
 
 
@@ -860,8 +983,8 @@ class DeckBrowserOverviewBackdropMixin:
 
 class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
-        return super().start()
+    def start(self, *, reopen: bool = False) -> None:
+        return super().start(reopen=reopen)
 
     def end(self) -> None:
         config.set_onboarding_tutorial_pending(False)
@@ -902,25 +1025,42 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
         if not self._has_cards_to_review():
             nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-            reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
+            # Only reached when notes were deleted locally, since unsuspending and lifting the
+            # daily limits didn't yield enough cards. The importer recreates them, which
+            # doesn't involve protect tags.
+            reset_local_changes_to_notes(nids=nids, ah_did=ah_did, strip_personal_protect_tags=False)
 
         self._move_to_intro_deck_overview(on_done)
 
     def _bump_intro_deck_daily_limits(self, anki_did: DeckId, cids: List[CardId]) -> None:
         """Raise new/review per-day caps so intro cards can enter the queue after daily limits were hit."""
-        deck_config = aqt.mw.col.decks.config_dict_for_deck_id(anki_did)
-        new_sub = deck_config.setdefault("new", {})
-        rev_sub = deck_config.setdefault("rev", {})
-        cur_new = int(new_sub.get("perDay", 0))
-        cur_rev = int(rev_sub.get("perDay", 0))
-        extra = max(len(cids), 30)
-        new_sub["perDay"] = cur_new + extra
-        rev_sub["perDay"] = max(cur_rev + extra, new_sub.get("perDay", DEFAULT_OVERRIDES["review_limit"]) * 10)
-        aqt.mw.col.decks.update_config(deck_config)
+        deck_id = DeckId(anki_did)
+        for_update = aqt.mw.col.decks.get_deck_configs_for_update(deck_id)
+
+        current_config = next(
+            c.config for c in for_update.all_config if c.config.id == for_update.current_deck.config_id
+        )
+
+        limits = for_update.current_deck.limits
+        limits.new = 9999
+        limits.review = 9999
+
+        request = UpdateDeckConfigs(
+            target_deck_id=deck_id,
+            configs=[current_config],
+            limits=limits,
+            mode=0,  # type: ignore[arg-type]
+            card_state_customizer=for_update.card_state_customizer,
+            new_cards_ignore_review_limit=for_update.new_cards_ignore_review_limit,
+            fsrs=for_update.fsrs,
+            apply_all_parent_limits=for_update.apply_all_parent_limits,
+        )
+
+        aqt.mw.col.decks.update_deck_configs(request)
 
     def _has_cards_to_review(self) -> bool:
         assert isinstance(aqt.mw.col.sched, Scheduler)
-        return bool(aqt.mw.col.sched.get_queued_cards().cards)
+        return len(aqt.mw.col.sched.get_queued_cards(fetch_limit=14).cards) >= 14
 
     @cached_property
     def steps(self) -> list[TutorialStep]:
@@ -950,8 +1090,8 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             next_callback = self._move_to_intro_deck_overview
             if not self._has_cards_to_review():
                 body_text = (
-                    "There are no cards available right now. Click on <b>Next</b> and we'll "
-                    "bring the cards back so you can continue with the tour."
+                    "To continue the tour, we need the full deck ready for study. Click <b>Next</b> and we'll "
+                    "make that happen"
                 )
                 next_callback = self._reset_cards_and_move_to_intro_deck_overview
 
@@ -994,9 +1134,9 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                 TutorialStep(
                     body="The <b>Getting Started with Anki</b> deck is not installed, "
                     "but we’ve already subscribed you to it.<br><br>"
-                    "To make a deck you are subscribed to appear here, "
-                    "select Anki menu > AnkiHub > Sync with AnkiHub.<br><br>"
-                    "Right now you can just <b>click the sync button below</b>.",
+                    "<b>Click the sync button below</b> to install the deck.<br><br>"
+                    "To install decks you've subscribed to, you can always follow "
+                    "Anki menu > AnkiHub > Sync with AnkiHub.",
                     target="center table",
                     tooltip_context=aqt.mw.deckBrowser,
                     next_callback=on_sync_with_ankihub_button_clicked,
@@ -1026,11 +1166,10 @@ class OnboardingTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         )
         steps.append(
             TutorialStep(
-                "These daily stats show you:<br><ul>"
+                "These daily stats show you:<br><ul style='list-style: disc; padding-left: 1.25rem;'>"
                 "<li><b class='text-text-information-main'>New</b>: cards that you have downloaded or created yourself,"
                 " but have never studied before</li>"
-                "<li><b class='text-text-destructive-main'>Learning</b>: cards that were seen "
-                "for the first time recently, and are still being learned</li>"
+                "<li><b class='text-text-destructive-main'>Learning</b>: cards that are still being learned</li>"
                 "<li><b class='text-text-confirmation-main'>To Review</b>: cards that you have finished learning. "
                 "They will be shown again after their delay has elapsed</li></ul>",
                 target="td",
@@ -1059,17 +1198,19 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         self._deckoptions_saved = False
         self._browser: Optional[Browser] = None
         self._browser_closed_by_us = False
+        self._pending_browser_startup_completion = False
         self._unhook_browser: Callable[[], None]
 
     @ensure_mw_state("deckBrowser")
-    def start(self) -> None:
+    def start(self, *, reopen: bool = False) -> None:
         self._unhook_browser = self.hook_browser_startup(self._on_browser_startup)
         base_start = super().start
         set_current_deck(parent=aqt.mw, deck_id=self._anking_deck_config.anki_id).success(
-            lambda _: base_start()
+            lambda _: base_start(reopen=reopen)
         ).run_in_background()
 
     def end(self) -> None:
+        self._pending_browser_startup_completion = False
         self._unhook_browser()
         config.set_step_deck_tutorial_pending(False)
         return super().end()
@@ -1115,6 +1256,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     def _is_step_sidebar_item(self, item: SidebarItem) -> bool:
         return item.id == self._anking_deck_config.anki_id and item.item_type != SidebarItemType.DECK_CURRENT
 
+    def _get_live_browser(self) -> Optional[Browser]:
+        def _is_deleted(obj: Any) -> bool:
+            try:
+                return sip.isdeleted(obj)
+            except TypeError:
+                return False
+
+        browser = self._browser
+        if browser and not _is_deleted(browser):
+            return browser
+
+        dialog = aqt.dialogs._dialogs.get("Browser")
+        if dialog is None:
+            return None
+
+        browser = cast(Optional[Browser], dialog[1])
+        if browser and not _is_deleted(browser):
+            self._browser = browser
+            return browser
+
+        return None
+
     def _find_step_deck_sidebar_item(self, root: SidebarItem) -> SidebarItem:
         for child in root.children:
             if child.item_type == SidebarItemType.DECK_ROOT:
@@ -1123,10 +1286,28 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
                         grandchild.search(self._anking_deck_config.name)
                         return grandchild
 
+        def _find_recursive(item: SidebarItem) -> Optional[SidebarItem]:
+            if self._is_step_sidebar_item(item):
+                return item
+            for child in item.children:
+                found = _find_recursive(child)
+                if found:
+                    return found
+            return None
+
+        for child in root.children:
+            found = _find_recursive(child)
+            if found:
+                found.search(self._anking_deck_config.name)
+                return found
+
         raise RuntimeError("Sidebar item for Step deck not found")
 
     def _get_step_deck_sidebar_item_rect(self) -> OverlayTarget:
-        sidebar = self._browser.sidebar
+        browser = self._get_live_browser()
+        if not browser:
+            raise RuntimeError("Browser is not available")
+        sidebar = browser.sidebar
         model = sidebar.model()
         step_sidebar_item = self._find_step_deck_sidebar_item(model.root)
         idx = model.index_for_item(step_sidebar_item)
@@ -1134,7 +1315,10 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         return OverlayTarget(sidebar.viewport(), rect)
 
     def _get_tags_sidebar_item(self) -> OverlayTarget:
-        sidebar = self._browser.sidebar
+        browser = self._get_live_browser()
+        if not browser:
+            raise RuntimeError("Browser is not available")
+        sidebar = browser.sidebar
         model = sidebar.model()
         for child in model.root.children:
             if child.item_type == SidebarItemType.TAG_ROOT:
@@ -1158,25 +1342,54 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
         is_startup = False
 
         def wrapped_on_done(root: SidebarItem) -> None:
-            self._browser.sidebar.search_for(self._anking_deck_config.name)
-            self._clear_sidebar_highlight(self._browser.sidebar.model().root)
-            step_sidebar_item = self._find_step_deck_sidebar_item(root)
-            search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
-            self._browser.search_for(search)
             nonlocal is_startup
-            if is_startup:
+            if active_tutorial is not self:
+                return
+
+            if not (is_startup or self._pending_browser_startup_completion):
+                return
+
+            browser = self._get_live_browser()
+            if not browser:
+                is_startup = False
+                self._pending_browser_startup_completion = False
+                LOGGER.debug("Skipping tutorial browser startup callback as browser is unavailable")
+                return
+
+            model = browser.sidebar.model()
+            if not model:
+                is_startup = False
+                self._pending_browser_startup_completion = False
+                LOGGER.debug("Skipping tutorial browser startup callback as sidebar model is unavailable")
+                return
+
+            browser.sidebar.search_for(self._anking_deck_config.name)
+            self._clear_sidebar_highlight(model.root)
+            try:
+                step_sidebar_item = self._find_step_deck_sidebar_item(root)
+            except RuntimeError:
+                LOGGER.exception("Step Deck sidebar item unavailable during tutorial browser startup")
+                browser.sidebar.search_for("")
+                is_startup = False
+                self._pending_browser_startup_completion = False
+                raise
+
+            search = aqt.mw.col.build_search_string(step_sidebar_item.search_node)
+            browser.search_for(search)
+            if is_startup or self._pending_browser_startup_completion:
                 on_done()
             is_startup = False
+            self._pending_browser_startup_completion = False
 
         # There can be multiple sidebar refresh events at browser startup,
         # so we need to ensure we only call .next() once
-        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=1000)
+        debouncer = DebouncedDelayedCall(wrapped_on_done, delay_ms=800)
 
         def _build_deck_tree(*args: Any, **kwargs: Any) -> None:
             _old: Callable[..., None] = kwargs.pop("_old")
             args, kwargs, root = extract_argument(func=_old, args=args, kwargs=kwargs, arg_name="root")
             _old(*args, **kwargs, root=root)
-            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._browser, root))
+            aqt.mw.taskman.run_on_main(lambda: debouncer.schedule(self._get_live_browser() or aqt.mw, root))
 
         def before_setup_table(browser: Browser) -> None:
             aqt.mw.col.set_config_bool(Config.Bool.BROWSER_TABLE_SHOW_NOTES_MODE, False)
@@ -1193,6 +1406,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             browser.setWindowState(self._browser.windowState() | Qt.WindowState.WindowMaximized)
             nonlocal is_startup
             is_startup = True
+            self._pending_browser_startup_completion = False
 
         unwrap_init = wrap_method(Browser, "__init__", wrapped_init, "around")
         unwrap_close = wrap_method(Browser, "closeEvent", after_close, "after")
@@ -1212,87 +1426,41 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
 
     def _open_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
         aqt.dialogs.open("Browser", aqt.mw)
+        browser = self._get_live_browser()
+        if browser:
+            self._pending_browser_startup_completion = True
+            browser.sidebar.refresh()
         # _on_browser_startup() takes care of moving to the next step after the browser is properly set up
 
-    def _unsuspend_cards_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
-        nids = [
-            1500401546879,
-            1500401591194,
-            1470839334989,
-            1470839322331,
-            1470839316273,
-            1470839294833,
-            1470839280347,
-            1550661266842,
-            1472161006747,
-            1478831098355,
-            1474154340790,
-            1472426521266,
-            1472426529103,
-            1474224658849,
-            1482115345843,
-            1482021715220,
-            1484686747922,
-            1462992514871,
-            1485913667420,
-            1485913618153,
-            1462326105448,
-            1462326951145,
-            1608908268526,
-            1518568098631,
-            1482361493392,
-            1474509558350,
-            1502065388242,
-            1488680344608,
-            1483930816351,
-            1476583175080,
-            1478834028289,
-            1540336057514,
-            1480908234945,
-            1478833957640,
-        ]
-        cids: Set[CardId] = set()
-        for nid in nids:
-            cids.update(aqt.mw.col.card_ids_of_note(NoteId(nid)))
+    def _close_browser_and_move_to_next_step(self, on_done: Callable[[], None]) -> None:
+        self._browser_closed_by_us = True
+        browser = self._get_live_browser()
+        if browser:
+            browser.close()
+        self.next()
 
-        def success(_):
-            self._browser_closed_by_us = True
-            self._browser.close()
-            on_done()
+    def _get_smart_search_button_target(self) -> Optional[OverlayTarget]:
+        browser = self._get_live_browser()
+        if not browser:
+            return None
 
-        unsuspend_cards(parent=self._browser, card_ids=list(cids)).success(success).run_in_background()
+        smart_search_button = browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
+        if smart_search_button is None:
+            LOGGER.debug("Smart Search tutorial target unavailable: button not found")
+            return None
+        if sip.isdeleted(smart_search_button):
+            LOGGER.debug("Smart Search tutorial target unavailable: button deleted")
+            return None
+
+        return OverlayTarget(browser.sidebar, smart_search_button)
 
     def _steps(self) -> list[TutorialStep]:
         steps = []
-        steps.append(
-            TutorialStep(
-                body="Click on the deck’s gear icon and select <b>Options</b>.",
-                target=f"[id='{self._anking_deck_config.anki_id}'] .opts",
-                tooltip_context=aqt.mw.deckBrowser,
-                shown_callback=self._on_gears_icon_step,
-                hidden_callback=self._on_gears_icon_step_hidden,
-            )
-        )
-
-        steps.append(
-            TutorialStep(
-                body="Here, you can set your daily limits.<br><br>"
-                "<b>Recommended:</b><br>"
-                "maximum reviews = 10x new cards.<br><br>"
-                "Ex. If you plan to study 10 new cards daily, set your maximum reviews to 100 per day.<br><br>"
-                "Click <b>Next</b> when you're done.",
-                # NOTE: This assumes Daily Limits is the first section.
-                # We should add section IDs to Anki
-                target=".row",
-                shown_callback=self._on_deckoptions_step,
-                next_callback=self._on_deckoptions_next,
-            )
-        )
 
         steps.append(
             TutorialStep(
                 id="browse_button",
-                body="Now click on <b>Browse</b>.",
+                body="Click on <b>Browse</b>.",
                 target="#browse",
                 tooltip_context=aqt.mw.deckBrowser,
                 target_context=aqt.mw.toolbar,
@@ -1328,51 +1496,43 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
             )
         )
 
-        smart_search_link = render_link(f'javascript:pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}")', "Smart Search")
         body = (
-            f"Or use our AI {smart_search_link}, "
+            "Or use our AI <b>Smart Search</b>, "
             "a Premium feature that helps you search decks for cards"
             " that match your study materials (lecture notes, PDFs, study aids, and more)."
         )
         steps.append(
             QtTutorialStep(
                 body=body,
-                qt_target=lambda: OverlayTarget(
-                    self._browser.sidebar, self._browser.findChild(QToolButton, "AnkiHubSmartSearchButton")
-                ),
-                parent_widget=lambda: self._browser,
+                qt_target=self._get_smart_search_button_target,
+                parent_widget=lambda: self._get_live_browser(),
             )
         )
 
         media_base = f"/_addons/{aqt.mw.addonManager.addonFromModule(__name__)}/gui/web/media"
         steps.append(
             QtTutorialStep(
-                body="<b>Suspended cards</b> won't appear in study sessions. In the Browser, "
-                "they're shown with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
-                "yellow background</span>.<br><br>"
-                "During the tour, you can’t perform actions. Normally, to unsuspend a card, "
-                "you would right-click it and uncheck <b>Toggle Suspend</b>.<br><br>"
-                "Click <b>Next</b> and we'll unsuspend a few cards for you as an example.<br><br>"
+                body="<b>Suspended cards</b> won't appear in study sessions, and in Browse, "
+                "they show with a <span class='bg-[#FFE77E] dark:text-dialog-background'>"
+                "yellow background</span>.<br>"
+                "To unsuspend a card there, you right-click it and uncheck Toggle Suspend.<br><br>"
                 f"<img src='{media_base}/toggle_suspend.png'>",
-                qt_target=lambda: self._browser.form.tableView,
+                qt_target=lambda: OverlayTarget(self._browser, self._browser.form.tableView.viewport()),
                 parent_widget=lambda: self._browser,
-                target_outline=False,
-                next_callback=self._unsuspend_cards_and_move_to_next_step,
+                target_outline=True,
+                next_callback=self._close_browser_and_move_to_next_step,
             )
         )
 
         forum_link = render_link("https://community.ankihub.net/c/support/5", "forum")
         steps.append(
             TutorialStep(
-                body="We've unsuspended some cards for you and they are ready for study. Check them out, "
-                "then try selecting cards on your own!<br><br>"
+                body="These cards are ready for study. Check them out, then try selecting cards on your own!<br><br>"
                 f"<b>Need help?</b> Post in the {forum_link} and our support team will be happy to assist.",
                 target=f"[id='{self._anking_deck_config.anki_id}']",
                 click_target=f"[id='{self._anking_deck_config.anki_id}'] a.deck",
                 tooltip_context=aqt.mw.deckBrowser,
                 next_label="End tour",
-                back_label="Restart tour",
-                back_callback=lambda _: self.restart(),
                 close_button=False,
             )
         )
@@ -1382,7 +1542,7 @@ class StepDeckTutorial(DeckBrowserOverviewBackdropMixin, Tutorial):
     @cached_property
     def steps(self) -> list[TutorialStep]:
         steps = self._steps()
-        # Hide back button for all but the last step
-        for step in steps[:-1]:
+        # Hide back button for all steps
+        for step in steps:
             step.back_label = ""
         return steps

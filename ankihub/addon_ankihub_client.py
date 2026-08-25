@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import aqt
+from anki.collection import Collection
 from requests import Response
 
 from . import LOGGER
@@ -64,14 +65,29 @@ DEFAULT_RESPONSE_HOOKS = [
 ]
 
 
+class CollectionNotAvailableError(Exception):
+    """
+    Raised when the Anki collection is unavailable (profile switched or full sync running)\
+    while a media sync is active.
+    """
+
+
+def collection_or_error() -> Collection:
+    if col := getattr(aqt.mw, "col", None):
+        return col
+    else:
+        raise CollectionNotAvailableError()
+
+
 class AddonAnkiHubClient(AnkiHubClient):
     def __init__(self, hooks=None) -> None:
         super().__init__(
             api_url=config.api_url,
             s3_bucket_url=config.s3_bucket_url,
+            ankiweb_url=config.ankiweb_url,
             response_hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             get_token=lambda: config.token(),
-            local_media_dir_path_cb=lambda: (Path(aqt.mw.col.media.dir()) if aqt.mw.col else None),
+            local_media_dir_path_cb=lambda: (Path(collection_or_error().media.dir())),
         )
 
     def upload_logs(self, file: Path, key: str) -> None:

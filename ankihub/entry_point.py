@@ -1,5 +1,6 @@
 """Code to be run on Anki start up."""
 
+import platform
 import re
 import time
 from pathlib import Path
@@ -11,12 +12,14 @@ from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 from aqt.main import AnkiQt
 
 from . import LOGGER, anki_logger
+from .ankihub_client import DEFAULT_ANKIWEB_URL
 from .db import ankihub_db
 from .gui import (
     browser,
     deck_options,
     deckbrowser,
     editor,
+    intercom,
     js_message_handling,
     overview,
     progress,
@@ -24,12 +27,13 @@ from .gui import (
     tutorial,
 )
 from .gui.addons import setup_addons
+from .gui.ankiweb import setup_sync_dialog_patch
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
 from .gui.enable_fsrs_dialog import maybe_show_enable_fsrs_reminder
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
-from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
+from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu, setup_preferences_ankihub_auth_patch
 from .gui.operations.ankihub_sync import setup_full_sync_patch
 from .gui.optimize_fsrs_dialog import maybe_show_fsrs_optimization_reminder
 from .gui.subdeck_due_date_dialog import maybe_show_subdeck_due_date_reminders
@@ -41,6 +45,7 @@ from .settings import (
     ankihub_db_path,
     config,
     setup_logger,
+    setup_native_ankihub_token_hook,
     setup_profile_data_folder,
 )
 from .user_state import (
@@ -71,6 +76,7 @@ def run() -> None:
         addon_version=ADDON_VERSION,
         anki_version=ANKI_VERSION,
         qt_version=aqt.QT_VERSION_STR,
+        platform=platform.platform(),
         app_url=config.app_url,
         s3_bucket_url=config.s3_bucket_url,
     )
@@ -79,6 +85,10 @@ def run() -> None:
     profile_will_close.append(_on_profile_will_close)
 
     anki_logger.setup()
+
+    # This needs to be set up early before the toolbar is drawn
+    media_sync.setup_hooks()
+    LOGGER.info("Set up media sync hooks.")
 
 
 def _setup_on_profile_did_open() -> None:
@@ -139,7 +149,9 @@ def _on_profile_did_open() -> None:
 
 
 def _on_profile_will_close() -> None:
-    media_sync.stop_background_threads()
+    if tutorial.active_tutorial:
+        tutorial.active_tutorial.skip_tutorial()
+    media_sync.close_for_profile()
     LOGGER.info("Profile will close, stopping background threads.")
 
 
@@ -183,6 +195,9 @@ def _after_profile_setup() -> None:
     # just a temporary fix for notes that were already manually deleted on the webapp.
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
+
+    if config.ankiweb_url != DEFAULT_ANKIWEB_URL:  # For testing
+        aqt.mw.pm.set_custom_sync_url(config.ankiweb_url)
 
     media_sync.allow_background_threads()
 
@@ -252,6 +267,9 @@ def _general_setup() -> None:
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
 
+    intercom.setup()
+    LOGGER.info("Set up Intercom messenger.")
+
     from . import media_export  # type: ignore[attr-defined]  # noqa: F401
 
     LOGGER.info("Loaded media_export.")
@@ -262,11 +280,21 @@ def _general_setup() -> None:
     setup_full_sync_patch()
     LOGGER.info("Set up AnkiWeb full sync patch.")
 
+    setup_sync_dialog_patch()
+    LOGGER.info("Set up AnkiWeb sync dialog patch.")
+
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
 
     config.token_change_hook.append(refresh_user_state_in_background)
     LOGGER.info("Set up refreshing of user state on token change.")
+
+    # Bridge Anki Preferences → AnkiHub login/logout into token_change_hook.
+    setup_native_ankihub_token_hook()
+
+    # Preferences → Third-party AnkiHub login must use the add-on (staging-aware)
+    # instead of Anki's production-only dialog.
+    setup_preferences_ankihub_auth_patch()
 
     setup_periodic_user_state_refresh(interval_minutes=60)
     LOGGER.info("Set up periodic refresh of feature flags and user details.")

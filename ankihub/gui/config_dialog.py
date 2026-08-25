@@ -37,7 +37,7 @@ def _general_tab(conf_window) -> None:
     conf_window = cast(ConfigWindow, conf_window)
 
     # Refresh config when window is closed
-    conf_window.execute_on_close(lambda: config.load_public_config())
+    conf_window.execute_on_close(_on_config_dialog_closed)
 
     tab = conf_window.add_tab("General")
 
@@ -60,6 +60,9 @@ def _general_tab(conf_window) -> None:
     tab.text("Feature Preferences", bold=True)
 
     feature_flags = config.get_feature_flags()
+    if feature_flags.get("intercom_support_button_anki_preferences") and config.is_logged_in():
+        tab.checkbox("ankihub_support_button", "Support button")
+
     if feature_flags.get("show_flashcards_selector_button"):
         tab.checkbox("ankihub_smart_search", "AnkiHub Smart Search")
 
@@ -83,6 +86,13 @@ def _general_tab(conf_window) -> None:
     tab.checkbox("debug_level_logs", "Verbose logs (restart required)")
 
     tab.stretch()
+
+
+def _on_config_dialog_closed() -> None:
+    config.load_public_config()
+    from . import intercom
+
+    intercom.sync_with_user_preference()
 
 
 def add_nested_checkboxes(config_layout, key_prefix: str, description: str) -> None:

@@ -3,7 +3,7 @@ name = "ankihub_addon"
 description = "AnkiHub add-on for Anki"
 readme = "README.md"
 requires-python = ">=3.9"
-version = "2026.05.05.1"
+version = "2026.08.17.1"
 dependencies = []
 
 [tool.setuptools]
@@ -34,6 +34,8 @@ dev = [
   "types-requests>=2.28.9",
   "urllib3>=1.26.14,<2",
   "vcrpy>=4.2.0",
+  "protoc-gen-py; python_version >= '3.10'",
+  "buf-bin; python_version >= '3.10'",
 ]
 bundle = [
   "sentry_sdk==1.6.0",
@@ -41,24 +43,23 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
-  # We cannot use more recent versions because we still need to support Python 3.9
+  # We cannot use more recent versions because we still need to support Python 3.9.
+  # asgiref and urllib3 are transitive dependencies, but they have to be pinned here because
+  # the bundle is resolved with the build machine's Python, which is newer than 3.9.
   "django==4.2.27",
   "django-cotton>=2.5.1",
+  "asgiref<3.12",
+  "urllib3<2.7",
+  "protobuf-py; python_version >= '3.10'",
 ]
-aqt = ["aqt[qt]==25.9.2"]
+aqt = ["aqt[qt]==26.5; python_version >= '3.10'"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
-aqt_25_2_7 = [
-  "aqt==25.2.7",
-  "PyQt6==6.7.*",
-  "PyQt6-WebEngine==6.7.*",
-]
 
 [tool.uv]
 conflicts = [
     [
       { group = "aqt" },
       { group = "aqt_legacy" },
-      { group = "aqt_25_2_7" },
     ],
 ]
 

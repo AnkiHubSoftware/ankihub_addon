@@ -86,6 +86,7 @@ from .custom_columns import (
 )
 from .custom_search_nodes import (
     AnkiHubNoteSearchNode,
+    AnkiHubNoteTypeSearchNode,
     CustomSearchNode,
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -93,6 +94,7 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+from .sidebar_tooltip import RICH_TOOLTIP_ATTR, setup_sidebar_rich_tooltip
 
 
 @dataclass
@@ -439,8 +441,9 @@ def _on_bulk_notes_suggest_action(
     if not filtered_nids:
         showInfo(
             "The selected notes need to have an AnkiHub note type.<br><br>"
-            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
-            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            "You can use <b>AnkiHub -> On AnkiHub</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> Not on AnkiHub</b> (for suggesting new notes) in the left sidebar "
+            "to find notes to suggest.",
             parent=browser,
         )
         return
@@ -449,8 +452,9 @@ def _on_bulk_notes_suggest_action(
         showInfo(
             f"{len(nids) - len(filtered_nids)} of the {len(nids)} selected notes don't have an AnkiHub note type "
             "and will be ignored.<br><br>"
-            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
-            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            "You can use <b>AnkiHub -> On AnkiHub</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> Not on AnkiHub</b> (for suggesting new notes) in the left sidebar "
+            "to find notes to suggest.",
             parent=browser,
         )
 
@@ -506,7 +510,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     aqt.mw.taskman.with_progress(
-        task=lambda: reset_local_changes_to_notes(filtered_nids, ah_did=ankihub_did),
+        task=lambda: reset_local_changes_to_notes(filtered_nids, ah_did=ankihub_did, strip_personal_protect_tags=False),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -593,7 +597,7 @@ def _on_reset_deck_action(browser: Browser):
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
-        lambda: reset_local_changes_to_notes(nids, ah_did=ah_did),
+        lambda: reset_local_changes_to_notes(nids, ah_did=ah_did, strip_personal_protect_tags=False),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -810,6 +814,7 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
 # sidebar
 def _setup_ankihub_sidebar_tree():
     browser_will_build_tree.append(_on_browser_will_build_tree)
+    browser_will_show.append(lambda browser: setup_sidebar_rich_tooltip(browser.sidebar))
 
 
 def _on_browser_will_build_tree(
@@ -911,20 +916,35 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
     result.on_expanded = _set_ah_tree_expanded_in_ui_config
 
     result.add_simple(
-        name="With AnkiHub ID",
+        name="On AnkiHub",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:_*"),
     )
 
-    result.add_simple(
-        name="ID Pending",
+    not_on_ankihub_item = result.add_simple(
+        # Trailing info glyph signals that the item has an explanatory tooltip (shown on hover).
+        name="Not on AnkiHub ⓘ",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
+        # Gate on the note type being registered with an AnkiHub deck (the same check the
+        # suggestion entrypoints use), not on the `ankihub_id` field-name search. This keeps
+        # out notes whose note type merely happens to carry an `ankihub_id` field (e.g. cloned
+        # or import-collision note type variants), which can't actually be suggested.
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:"),
+            SearchNode(parsable_text=f"{AnkiHubNoteTypeSearchNode.parameter_name}:yes"),
             SearchNode(parsable_text=f"{AnkiHubNoteSearchNode.parameter_name}:no"),
         ),
+    )
+    # Interactive tooltip (clickable link) shown via setup_sidebar_rich_tooltip; opt in by
+    # setting RICH_TOOLTIP_ATTR on the item rather than the plain (non-clickable) item.tooltip.
+    setattr(
+        not_on_ankihub_item,
+        RICH_TOOLTIP_ATTR,
+        "These notes use an AnkiHub note type but haven't been added to AnkiHub yet, "
+        "either because they haven't been "
+        '<a href="https://community.ankihub.net/t/how-to-suggest-a-new-note/288684">suggested</a> '
+        "yet, or because a maintainer hasn't approved them yet.",
     )
 
     result.add_simple(

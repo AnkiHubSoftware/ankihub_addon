@@ -103,6 +103,15 @@ def add_user_state_refreshed_callback(callback: Callable[[], None]) -> None:
     _state.user_state_refreshed_callbacks.append(callback)
 
 
+def remove_user_state_refreshed_callback(callback: Callable[[], None]) -> None:
+    """Remove a previously added user state refresh callback.
+
+    Safe to call if the callback is not currently registered.
+    """
+    if callback in _state.user_state_refreshed_callbacks:
+        _state.user_state_refreshed_callbacks.remove(callback)
+
+
 def setup_periodic_user_state_refresh(interval_minutes: int = 60) -> None:
     """Set up periodic refresh of user state during long Anki sessions.
 

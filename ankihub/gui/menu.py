@@ -1,12 +1,13 @@
 """AnkiHub menu on Anki's main window."""
 
-import re
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import aqt
+import aqt.preferences
+from anki.hooks import wrap
 from aqt import (
     AnkiApp,
     QHBoxLayout,
@@ -26,17 +27,19 @@ from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config
+from . import intercom
 from .config_dialog import get_config_dialog_manager
 from .decks_dialog import DeckManagementDialog
 from .errors import upload_logs_and_data_in_background, upload_logs_in_background
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.deck_creation import create_collaborative_deck
-from .tutorial import OnboardingTutorial, StepDeckTutorial
+from .tutorial import OnboardingTutorial, StepDeckTutorial, prompt_for_onboarding_tutorial
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
     choose_ankihub_deck,
+    is_email,
 )
 
 
@@ -83,6 +86,7 @@ class AnkiHubLogin(QWidget):
 
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
+        self._on_success: Optional[Callable[[], None]] = None
         self.results = None
         self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
@@ -179,7 +183,7 @@ class AnkiHubLogin(QWidget):
 
         try:
             credentials = {"password": password}
-            if self._is_email(username_or_email):
+            if is_email(username_or_email):
                 credentials.update({"email": username_or_email})
             else:
                 credentials.update({"username": username_or_email})
@@ -196,27 +200,30 @@ class AnkiHubLogin(QWidget):
 
         config.save_token(token)
         config.save_user_email(username_or_email)
+        aqt.mw.pm.save()
         username = ""
-        if not self._is_email(username_or_email):
+        if not is_email(username_or_email):
             username = username_or_email
         config.save_username(username)
         LOGGER.info("User signed into AnkiHub.", user=username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=aqt.mw)
-        self.close()
+        # Ensure onboarding tutorial logic is wired up whenever user state is refreshed.
+        from ..user_state import add_user_state_refreshed_callback
 
-    def _is_email(self, value):
-        return re.fullmatch(
-            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
-            value,
-        )
+        add_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+        on_success = self._on_success
+        self._on_success = None
+        self.close()
+        if on_success:
+            on_success()
 
     def clear_fields(self):
         self.username_or_email_box_text.setText("")
         self.password_box_text.setText("")
 
     @classmethod
-    def display_login(cls):
+    def display_login(cls, on_success: Optional[Callable[[], None]] = None):
         if cls._window is None:
             cls._window = cls()
         else:
@@ -225,8 +232,107 @@ class AnkiHubLogin(QWidget):
             cls._window.raise_()
             cls._window.show()
 
+        cls._window._on_success = on_success
         LOGGER.info("Showed AnkiHub login dialog.")
         return cls._window
+
+
+def setup_preferences_ankihub_auth_patch() -> None:
+    """Route Preferences → Third-party AnkiHub login/logout through the add-on.
+
+    Anki's native dialog does not go through Config.save_token, so feature flags are
+    not refreshed and the magic-code AnkiWeb login patch stays off. It also tries to
+    install the AnkiWeb add-on package, which can collide with a local install.
+
+    Also keep the Preferences AnkiHub login/logout buttons in sync when the user signs
+    in from the AnkiHub menu: Anki's DialogManager may reuse a cached Preferences
+    window, so we implement reopen() and refresh on token_change_hook.
+    """
+
+    try:
+        import aqt.ankihub
+    except ModuleNotFoundError:
+        # Preferences → Third-party AnkiHub login doesn't exist on older Anki versions
+        # (e.g. the aqt==2.1.56 baseline we still support), so there is nothing to patch.
+        LOGGER.info("aqt.ankihub not available; skipping Preferences AnkiHub auth patch.")
+        return
+
+    def patched_ankihub_login(
+        mw: aqt.main.AnkiQt,
+        on_success: Callable[[], None],
+        username: str = "",
+        password: str = "",
+        *args,
+        **kwargs,
+    ) -> None:
+        LOGGER.info("Redirecting Preferences AnkiHub login to add-on login dialog.")
+        AnkiHubLogin.display_login(on_success=on_success)
+
+    def patched_ankihub_logout(
+        mw: aqt.main.AnkiQt,
+        on_success: Callable[[], None],
+        token: str,
+        *args,
+        **kwargs,
+    ) -> None:
+        LOGGER.info("Redirecting Preferences AnkiHub logout to add-on sign out.")
+        _sign_out_action()
+        on_success()
+
+    def reopen_preferences(self: aqt.preferences.Preferences, *args, **kwargs) -> None:
+        # DialogManager reuses Preferences without recreating it; refresh auth UI.
+        _old = kwargs.pop("_old", None)
+        if _old is not None:
+            _old(self, *args, **kwargs)
+        self.update_login_status()
+
+    def refresh_preferences_ankihub_login_status() -> None:
+        prefs = aqt.dialogs._dialogs.get("Preferences", [None, None])[1]
+        if prefs is not None:
+            prefs.update_login_status()
+
+    aqt.ankihub.ankihub_login = patched_ankihub_login
+    aqt.ankihub.ankihub_logout = patched_ankihub_logout
+    # preferences.py does `from aqt.ankihub import ankihub_login`, so patch both bindings.
+    aqt.preferences.ankihub_login = patched_ankihub_login
+    aqt.preferences.ankihub_logout = patched_ankihub_logout
+    if hasattr(aqt.preferences.Preferences, "reopen"):
+        # Call through to Anki's native reopen() instead of clobbering it, in case
+        # a future Anki version defines one.
+        aqt.preferences.Preferences.reopen = wrap(  # type: ignore[method-assign]
+            aqt.preferences.Preferences.reopen,
+            reopen_preferences,
+            "around",
+        )
+    else:
+        aqt.preferences.Preferences.reopen = reopen_preferences  # type: ignore[method-assign, attr-defined]
+    if refresh_preferences_ankihub_login_status not in config.token_change_hook:
+        config.token_change_hook.append(refresh_preferences_ankihub_login_status)
+    LOGGER.info("Set up Preferences AnkiHub auth patch.")
+
+
+def _maybe_show_onboarding_tutorial_after_login() -> None:
+    """Show the onboarding tutorial after the first successful login on this profile.
+
+    Fires once: removes itself from the user-state refresh callbacks before doing
+    anything else so subsequent refreshes (periodic timer, post-sync, etc.) cannot
+    re-show the prompt after the user dismissed it.
+
+    This triggers when:
+    - The user is logged in
+    - `last_deck_sync` is None (no previous sync/tutorial for this profile)
+    - Feature flags/user details have just been refreshed (so feature flag checks work)
+    """
+    from ..user_state import remove_user_state_refreshed_callback
+
+    remove_user_state_refreshed_callback(_maybe_show_onboarding_tutorial_after_login)
+
+    if config.last_deck_sync() is not None:
+        return
+
+    config.set_onboarding_tutorial_show_on_sync(False)
+
+    prompt_for_onboarding_tutorial()
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
@@ -252,6 +358,8 @@ def _sign_out_action():
     try:
         AnkiHubClient().signout()
     finally:
+        # Clear the Intercom session so the next user starts clean.
+        intercom.shutdown()
         config.save_token("")
         config.set_feature_flags({})
         config.set_user_details({})
@@ -453,7 +561,7 @@ def _ankihub_help_setup(parent: QMenu):
         q_onboarding_action = QAction("Onboarding", tours_submenu)
         qconnect(
             q_onboarding_action.triggered,
-            lambda: OnboardingTutorial().start(),
+            lambda: OnboardingTutorial().start(reopen=True),
         )
         tours_submenu.addAction(q_onboarding_action)
 
@@ -465,7 +573,7 @@ def _ankihub_help_setup(parent: QMenu):
         q_step_tour_action = QAction("AnKing Step Deck", tours_submenu)
         qconnect(
             q_step_tour_action.triggered,
-            lambda: StepDeckTutorial().start(),
+            lambda: StepDeckTutorial().start(reopen=True),
         )
         tours_submenu.addAction(q_step_tour_action)
     if tours_submenu.actions():
@@ -562,4 +670,4 @@ def _media_sync_status_setup(parent: QMenu):
     parent._media_sync_status_action = QAction("", parent)  # type: ignore
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
-    media_sync.refresh_sync_status_text()
+    media_sync.refresh_sync_status(False)

@@ -1,10 +1,12 @@
 from abc import abstractmethod
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any, Callable, Iterable, List, Optional
 
 from aqt import Qt, QWebEnginePage, QWebEngineProfile, pyqtSlot
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QPushButton,
     QUrl,
@@ -16,10 +18,29 @@ from aqt.qt import (
 from aqt.theme import theme_manager
 from aqt.utils import openLink
 from aqt.webview import AnkiWebPage, AnkiWebView
+from jinja2 import Template
 
 from .. import LOGGER
 from ..settings import config
 from .utils import using_qt5
+
+WEBVIEW_DIALOG_ESCAPE_PYCMD = "ankihub_webview_dialog_escape"
+
+WEBVIEW_DIALOG_ESCAPE_JS_PATH = Path(__file__).parent / "web/webview_dialog_escape.js"
+
+
+class AnkiHubWebView(AnkiWebView):
+    """An AnkiWebView that leaves Escape handling to its hosting dialog.
+
+    AnkiWebView closes the nearest parent dialog on any Escape press, without checking whether
+    the page handled the key first. Its injected listener can't be removed from JS and the
+    resulting "close" command is consumed before the webview_did_receive_js_message hook runs,
+    so onEsc() is the only place to intercept it. See webview_dialog_escape.js for the
+    handling that replaces it.
+    """
+
+    def onEsc(self) -> None:
+        LOGGER.debug("Ignored Anki's Escape close request; the dialog decides when to close.")
 
 
 class AnkiHubWebViewDialog(QDialog):
@@ -49,8 +70,14 @@ class AnkiHubWebViewDialog(QDialog):
         return True
 
     def _setup_ui(self) -> None:
-        self.web = AnkiWebView(parent=self)
+        self.web = AnkiHubWebView(parent=self)
         self.web.set_open_links_externally(False)
+
+        # Use a page that opens the file picker as a window-modal sheet attached to this
+        # dialog (see SheetFilePickerWebPage). Otherwise, on macOS, dismissing the picker
+        # activates Anki's main window and buries this non-modal dialog behind it.
+        page = SheetFilePickerWebPage(self.web, self.web.page().profile(), self.web._onBridgeCmd, dialog=self)
+        self.web.setPage(page)
 
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
@@ -134,7 +161,13 @@ class AnkiHubWebViewDialog(QDialog):
             return  # pragma: no cover
 
         self._adjust_web_styling()
+        self._setup_escape_handling()
         self._on_successful_page_load()
+
+    def _setup_escape_handling(self) -> None:
+        """Close this dialog on Escape only when the page didn't consume the key press."""
+        js = Template(WEBVIEW_DIALOG_ESCAPE_JS_PATH.read_text()).render(ESCAPE_PYCMD=WEBVIEW_DIALOG_ESCAPE_PYCMD)
+        self.web.eval(js)
 
     def _handle_auth_failure_if_needed(self) -> None:
         def check_auth_failure_callback(value: str) -> None:
@@ -200,8 +233,9 @@ class AnkiHubWebViewDialog(QDialog):
         self.web.eval(css_code)
 
     def _on_view_in_web_browser_button_clicked(self) -> None:
+        # Leaves the dialog open on purpose: closing it would discard state the external page
+        # can't reproduce, e.g. the user's search results.
         openLink(self._get_non_embed_url())
-        self.close()
 
 
 class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
@@ -246,3 +280,50 @@ class CustomWebPage(AnkiWebPage):
                 feature,
                 QWebEnginePage.PermissionPolicy.PermissionDeniedByUser,
             )
+
+
+class SheetFilePickerWebPage(CustomWebPage):
+    """A web page that opens the file picker as a window-modal sheet on its owning dialog.
+
+    By default, QtWebEngine opens the file picker (triggered by an ``<input type=file>`` in
+    the page) as a top-level window. On macOS, dismissing it - selecting a file or, more
+    visibly, cancelling - hands focus back to Anki's main window rather than to the non-modal
+    dialog the picker was opened from, so the dialog blinks behind the main window.
+
+    Overriding chooseFiles() to show a window-modal QFileDialog parented to the dialog makes
+    the picker a native sheet, so macOS returns focus to the dialog on close and the main
+    window never comes forward.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget,
+        profile: QWebEngineProfile,
+        onBridgeCmd: Callable[[str], Any],
+        dialog: QDialog,
+    ):
+        super().__init__(parent, profile, onBridgeCmd)
+        self._dialog = dialog
+
+    def chooseFiles(
+        self,
+        mode: "QWebEnginePage.FileSelectionMode",
+        oldFiles: Iterable[Optional[str]],
+        acceptedMimeTypes: Iterable[Optional[str]],
+    ) -> List[str]:
+        picker = QFileDialog(self._dialog)
+        # Parent + WindowModal makes this a native sheet on macOS, so focus returns to the
+        # dialog (not Anki's main window) when the picker closes.
+        picker.setWindowModality(Qt.WindowModality.WindowModal)
+        if mode == QWebEnginePage.FileSelectionMode.FileSelectOpenMultiple:
+            picker.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        else:
+            picker.setFileMode(QFileDialog.FileMode.ExistingFile)
+
+        # Preserve the page's `accept` filter where it maps to real MIME types (entries that
+        # are bare extensions or wildcards are ignored, leaving all files selectable).
+        mime_type_filters = [mime for mime in acceptedMimeTypes if mime and "/" in mime and "*" not in mime]
+        if mime_type_filters:
+            picker.setMimeTypeFilters([*mime_type_filters, "application/octet-stream"])
+
+        return picker.selectedFiles() if picker.exec() else []

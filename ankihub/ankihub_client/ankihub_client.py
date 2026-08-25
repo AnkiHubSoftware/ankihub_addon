@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import socket
+import sys
 import threading
 import urllib.parse
 import uuid
@@ -15,6 +16,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -69,10 +71,13 @@ LOGGER = structlog.stdlib.get_logger("ankihub")
 DEFAULT_APP_URL = "https://app.ankihub.net"
 DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
 DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
+DEFAULT_INTERCOM_APP_ID = "vm55jg8j"
+DEFAULT_ANKIWEB_URL = "https://ankiweb.net"
 
 STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
+STAGING_INTERCOM_APP_ID = "dwzv6k4w"
 
 API_VERSION = 24.0
 
@@ -199,12 +204,32 @@ class AnkiHubRequestException(Exception):
         return f"AnkiHub request exception: {self.original_exception}"
 
 
+class AnkiHubMediaDownloadError(AnkiHubHTTPError):
+    """An unexpected HTTP code was returned in response to a media download request."""
+
+    def __init__(self, response: Response, filename: str):
+        super().__init__(response)
+        self.filename = filename
+
+    def __str__(self):
+        return f"Unable to download media file {self.filename}: {self.response.status_code} {self.response.reason}"
+
+
 class API(Enum):
     ANKIHUB = "ankihub"
     S3 = "s3"
+    ANKIWEB = "ankiweb"
 
 
-class AnkiHubClient:
+if TYPE_CHECKING or sys.version_info >= (3, 10):
+    from .ankiweb_client import AnkiWebClientMixin
+else:
+
+    class AnkiWebClientMixin:  # type: ignore[no-redef]
+        pass
+
+
+class AnkiHubClient(AnkiWebClientMixin):
     """Client for interacting with the AnkiHub API."""
 
     def __init__(
@@ -215,6 +240,7 @@ class AnkiHubClient:
         get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
+        ankiweb_url: str = DEFAULT_ANKIWEB_URL,
     ):
         """Create a new AnkiHubClient.
         The token can be set with the token parameter or with the get_token parameter.
@@ -223,6 +249,7 @@ class AnkiHubClient:
         """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
+        self.ankiweb_url = ankiweb_url
         self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
         self.get_token = get_token
@@ -252,6 +279,8 @@ class AnkiHubClient:
             url = f"{self.api_url}{url_suffix}"
         elif api == API.S3:
             url = f"{self.s3_bucket_url}{url_suffix}"
+        elif api == API.ANKIWEB:
+            url = f"{self.ankiweb_url}{url_suffix}"
         else:
             raise ValueError(f"Unknown API: {api}")
 
@@ -300,7 +329,7 @@ class AnkiHubClient:
         If the last request failed because of an exception, that exception is raised.
         """
         timeout: Union[int, Tuple[int, int]]
-        if api == API.ANKIHUB:
+        if api in (API.ANKIHUB, API.ANKIWEB):
             read_timeout = LONG_READ_TIMEOUT if is_long_running else STANDARD_READ_TIMEOUT
             timeout = (CONNECTION_TIMEOUT, read_timeout)
         else:
@@ -456,7 +485,9 @@ class AnkiHubClient:
         ]
         return result
 
-    def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
+    def upload_media(
+        self, media_paths: Set[Path], ah_did: uuid.UUID, on_media_chunk_uploaded: Callable[[Future], None]
+    ) -> None:
         # Create chunks of media paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all media files in that chunk to
         # create chunks of similar size.
@@ -490,6 +521,11 @@ class AnkiHubClient:
         with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             futures: List[Future] = []
             for chunk_number, chunk in enumerate(media_path_chunks):
+                if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting upload tasks...")
+                    for future in futures:
+                        future.cancel()
+                    return
                 futures.append(
                     executor.submit(
                         self._zip_and_upload_media_chunk,
@@ -501,9 +537,13 @@ class AnkiHubClient:
                 )
 
             for future in as_completed(futures):
-                future.result()
-
+                try:
+                    on_media_chunk_uploaded(future)
+                    future.result()
+                except Exception as exc:
+                    LOGGER.warning("Failed to upload media chunk", exc_info=exc)
                 if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting upload tasks...")
                     for future in futures:
                         future.cancel()
                     return
@@ -520,7 +560,10 @@ class AnkiHubClient:
         chunk_number: int,
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
-    ) -> None:
+    ) -> int:
+        if self.should_stop_background_threads:
+            return 0
+
         # Zip the media files found locally
         zip_filepath = Path(self.local_media_dir_path_cb() / f"{ah_did}_{chunk_number}_deck_assets_part.zip")
         LOGGER.debug("Creating zipped media file", zip_filepath=zip_filepath)
@@ -529,20 +572,28 @@ class AnkiHubClient:
                 if media_path.is_file():
                     media_zip.write(media_path, arcname=media_path.name)
 
+        def remove_zip() -> None:
+            # Remove the zip file from the local machine after the upload
+            LOGGER.debug("Removing file from local files", zip_filepath=zip_filepath.name)
+            try:
+                os.remove(zip_filepath)
+            except FileNotFoundError:
+                LOGGER.warning(
+                    "Could not remove file from local files.",
+                    zip_filepath=zip_filepath.name,
+                )
+
+        if self.should_stop_background_threads:
+            remove_zip()
+            return 0
+
         # Upload to S3
         LOGGER.debug("Uploading file to S3", zip_filepath=zip_filepath.name)
         self._upload_file_to_s3_with_reusable_presigned_url(s3_presigned_info=s3_presigned_info, filepath=zip_filepath)
         LOGGER.debug("Successfully uploaded file to S3", zip_filepath=zip_filepath.name)
+        remove_zip()
 
-        # Remove the zip file from the local machine after the upload
-        LOGGER.debug("Removing file from local files", zip_filepath=zip_filepath.name)
-        try:
-            os.remove(zip_filepath)
-        except FileNotFoundError:
-            LOGGER.warning(
-                "Could not remove file from local files.",
-                zip_filepath=zip_filepath.name,
-            )
+        return len(chunk)
 
     def _upload_file_to_s3_with_reusable_presigned_url(self, s3_presigned_info: dict, filepath: Path) -> None:
         """Opens and uploads the file data to S3 using a reusable presigned URL. Useful when uploading
@@ -566,12 +617,19 @@ class AnkiHubClient:
         if s3_response.status_code != 204:
             raise AnkiHubHTTPError(s3_response)
 
-    def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
+    def download_media(
+        self, media_names: List[str], deck_id: uuid.UUID, on_downloaded_file: Callable[[Future], None]
+    ) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
         with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
+                if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting download tasks...")
+                    for future in futures:
+                        future.cancel()
+                    return
                 media_path = media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(media_name)
                 futures.append(executor.submit(self._download_media, media_path, media_remote_path))
@@ -579,13 +637,17 @@ class AnkiHubClient:
             downloaded_media_count = 0
             for future in as_completed(futures):
                 if self.should_stop_background_threads:
+                    LOGGER.info("Background threads stopped, aborting download tasks...")
                     for future in futures:
                         future.cancel()
                     return
-
-                if future.result():
+                try:
+                    on_downloaded_file(future)
+                    future.result()
                     downloaded_media_count += 1
-
+                except Exception as exc:
+                    if not isinstance(exc, AnkiHubMediaDownloadError):
+                        LOGGER.warning("Failed to download media file", exc_info=exc)
         LOGGER.info(
             "Downloaded media from AnkiHub.",
             ah_did=deck_id,
@@ -593,7 +655,7 @@ class AnkiHubClient:
             downloaded_count=downloaded_media_count,
         )
 
-    def _download_media(self, media_file_path: Path, media_remote_path: str) -> bool:
+    def _download_media(self, media_file_path: Path, media_remote_path: str) -> None:
         response = self._send_request("GET", API.S3, media_remote_path, stream=True)
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
@@ -610,14 +672,13 @@ class AnkiHubClient:
                         file.close()
                         media_file_path.unlink()
 
-                return True
         else:
             LOGGER.warning(
                 "Unable to download media file.",
                 media_remote_path=media_remote_path,
                 status_code=response.status_code,
             )
-            return False
+            raise AnkiHubMediaDownloadError(response, media_remote_path)
 
     def stop_background_threads(self) -> None:
         """Can be called to stop all background threads started by this client."""
