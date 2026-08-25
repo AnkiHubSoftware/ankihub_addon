@@ -9042,6 +9042,12 @@ def mock_load_url_to_show_page(mocker: MockerFixture, body: str, url_substring: 
     mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
 
 
+def _response_with_status(status_code: int) -> Response:
+    response = Response()
+    response.status_code = status_code
+    return response
+
+
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -9265,19 +9271,15 @@ class TestFlashCardSelector:
             assert FlashCardSelectorDialog.dialog == dialog
 
     @pytest.mark.sequential
-    @pytest.mark.parametrize(
-        "show_trial_ended_message",
-        [False, True],
-    )
-    def test_shows_flashcard_selector_upsell_if_no_access(
+    def test_does_not_claim_trial_ended_message_if_user_has_access(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         set_feature_flag_state: SetFeatureFlagState,
         mocker: MockerFixture,
-        show_trial_ended_message: bool,
     ):
+        """The message is one-shot, so only the path that actually displays it may claim it."""
         set_feature_flag_state("show_flashcards_selector_button")
 
         entry_point.run()
@@ -9285,10 +9287,7 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
-            install_ah_deck(
-                anki_did=anki_did,
-                has_note_embeddings=True,
-            )
+            install_ah_deck(anki_did=anki_did, has_note_embeddings=True)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -9299,23 +9298,181 @@ class TestFlashCardSelector:
                 AnkiHubClient,
                 "get_user_details",
                 return_value={
-                    "has_flashcard_selector_access": False,
-                    "show_trial_ended_message": show_trial_ended_message,
+                    "has_flashcard_selector_access": True,
                 },
             )
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message")
 
             overview_web: AnkiWebView = aqt.mw.overview.web
             overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
-            def upsell_dialog_opened():
-                dialog: QWidget = aqt.mw.app.activeWindow()
-                if not isinstance(dialog, utils._Dialog):
+            def flashcard_selector_opened() -> bool:
+                if FlashCardSelectorDialog.dialog is None:
                     return False
-                return "Trial" in dialog.windowTitle() if show_trial_ended_message else True
+                return FlashCardSelectorDialog.dialog.isVisible()
 
-            qtbot.wait_until(upsell_dialog_opened)
+            qtbot.wait_until(flashcard_selector_opened)
+
+            claim_mock.assert_not_called()
+
+    def _open_upsell_dialog(
+        self,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        claim_result: Union[bool, Exception],
+    ) -> Tuple[utils._Dialog, Mock, Mock]:
+        """Trigger the upsell path with a mocked claim outcome.
+
+        Returns the opened dialog, the mock for ProductMetricsClient.track and the mock for
+        the claim method.
+        """
+        mocker.patch.object(config, "token", return_value="test_token")
+
+        anki_did = DeckId(1)
+        install_ah_deck(
+            anki_did=anki_did,
+            has_note_embeddings=True,
+        )
+        aqt.mw.deckBrowser.set_current_deck(anki_did)
+
+        qtbot.wait(500)
+
+        mocker.patch.object(AnkiWebView, "load_url")
+
+        # The server no longer sends show_trial_ended_message here - it is claimed separately.
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_user_details",
+            return_value={
+                "has_flashcard_selector_access": False,
+            },
+        )
+
+        if isinstance(claim_result, Exception):
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message", side_effect=claim_result)
+        else:
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message", return_value=claim_result)
+
+        product_metrics_client_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.ProductMetricsClient")
+        track_mock = product_metrics_client_mock.return_value.track
+
+        overview_web: AnkiWebView = aqt.mw.overview.web
+        overview_web.eval(
+            f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
+        )
+
+        def upsell_dialog_opened() -> bool:
+            return isinstance(aqt.mw.app.activeWindow(), utils._Dialog)
+
+        qtbot.wait_until(upsell_dialog_opened)
+
+        return cast(utils._Dialog, aqt.mw.app.activeWindow()), track_mock, claim_mock
+
+    def _tracked_events(self, track_mock: Mock, event_name: str) -> List[Any]:
+        return [call for call in track_mock.call_args_list if call.kwargs["event_name"] == event_name]
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "claim_result, expected_source, expects_trial_ended_title",
+        [
+            pytest.param(True, "trial_ended", True, id="claimed_and_owed"),
+            pytest.param(False, "generic_upsell", False, id="claimed_and_not_owed"),
+            pytest.param(
+                # A real Response, not a Mock: the failure handler logs str(exc), and
+                # AnkiHubHTTPError.__str__ reads the response body and headers.
+                AnkiHubHTTPError(response=_response_with_status(500)),
+                "generic_upsell",
+                False,
+                id="claim_failed",
+            ),
+        ],
+    )
+    def test_shows_flashcard_selector_upsell_if_no_access(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+        claim_result: Union[bool, Exception],
+        expected_source: str,
+        expects_trial_ended_title: bool,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            open_link_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.openLink")
+
+            dialog, track_mock, claim_mock = self._open_upsell_dialog(
+                install_ah_deck=install_ah_deck,
+                qtbot=qtbot,
+                mocker=mocker,
+                claim_result=claim_result,
+            )
+
+            claim_mock.assert_called_once()
+
+            # A failed claim degrades to the generic copy instead of raising an error dialog.
+            if expects_trial_ended_title:
+                assert "Trial" in dialog.windowTitle()
+            else:
+                assert "Trial" not in dialog.windowTitle()
+                assert "Premium" in dialog.windowTitle()
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_viewed")))
+
+            viewed_properties = self._tracked_events(track_mock, "upgrade_cta_viewed")[0].kwargs["properties"]
+            assert viewed_properties["source"] == expected_source
+            assert viewed_properties["surface"] == "anki_addon"
+
+            assert not self._tracked_events(track_mock, "upgrade_cta_clicked")
+
+            learn_more_button = next(button for button in dialog.button_box.buttons() if button.text() == "Learn More")
+            learn_more_button.click()
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_clicked")))
+
+            clicked_properties = self._tracked_events(track_mock, "upgrade_cta_clicked")[0].kwargs["properties"]
+            assert clicked_properties["source"] == expected_source
+            assert clicked_properties["surface"] == "anki_addon"
+
+            open_link_mock.assert_called_once()
+
+    @pytest.mark.sequential
+    def test_dismissing_flashcard_selector_upsell_does_not_track_a_click(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            open_link_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.openLink")
+
+            dialog, track_mock, _ = self._open_upsell_dialog(
+                install_ah_deck=install_ah_deck,
+                qtbot=qtbot,
+                mocker=mocker,
+                claim_result=False,
+            )
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_viewed")))
+
+            not_now_button = next(button for button in dialog.button_box.buttons() if button.text() == "Not Now")
+            not_now_button.click()
+
+            qtbot.wait(500)
+
+            assert not self._tracked_events(track_mock, "upgrade_cta_clicked")
+            open_link_mock.assert_not_called()
 
     def test_with_no_auth_token(
         self,
