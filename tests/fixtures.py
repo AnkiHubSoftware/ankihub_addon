@@ -597,10 +597,10 @@ def bulk_filters_from_diffs(notes: Sequence[Note], note_diffs: Mapping[NoteId, N
     opens the dialog and submits without deselecting anything."""
     fields_by_mid: Dict[NotetypeId, List[str]] = {}
     for note in notes:
-        selected = fields_by_mid.setdefault(NotetypeId(note.mid), [])
-        for name in note_diffs[note.id].changed_field_names:
-            if name not in selected:
-                selected.append(name)
+        mid = NotetypeId(note.mid)
+        names = (*fields_by_mid.get(mid, ()), *note_diffs[note.id].changed_field_names)
+        # `dict.fromkeys` dedupes while preserving first-seen order, as the widget does.
+        fields_by_mid[mid] = list(dict.fromkeys(names))
     return BulkSuggestionFilters(fields_to_include_by_mid=fields_by_mid)
 
 
@@ -634,7 +634,6 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
                 suggestion_metadata = SuggestionMetadata(
                     comment="test",
                     change_type=suggestion_type,
-                    # Mirror the real dialog's default selection from the diffs it was handed.
                     filters=bulk_filters_from_diffs(kwargs.get("notes", ()), kwargs.get("note_diffs") or {}),
                 )
             aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))

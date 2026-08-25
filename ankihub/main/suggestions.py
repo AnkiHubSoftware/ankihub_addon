@@ -159,16 +159,11 @@ class BulkSuggestionFilters:
 
 @dataclass
 class NoteDiff:
-    """Per-note diff data: AH-DB membership, edited fields/tags, media changes.
-
-    Computed once by `compute_note_diffs` so callers needing several pieces
-    can share the per-note conversion work.
-    """
+    """Per-note diff data: AH-DB membership, edited fields/tags, media changes."""
 
     exists_in_ah_db: bool  # AH DB has a row for this note (deleted or not)
     is_deleted_on_remote: bool  # row exists AND is marked deleted
-    local_note: NoteInfo  # local Anki note as NoteInfo (includes empty + protected fields)
-    ah_note: Optional[NoteInfo]  # AH-stored version; None for new-note candidates and deleted notes
+    ah_nid: Optional[uuid.UUID]  # set from the AH DB row, including rows marked deleted
     changed_fields: List[Field]  # fields a suggestion would carry, before the user's allowlist
     added_tags: List[str]
     removed_tags: List[str]
@@ -176,7 +171,6 @@ class NoteDiff:
 
     @property
     def changed_field_names(self) -> List[str]:
-        """Names of `changed_fields` — what the dialog offers and the suggestibility check reads."""
         return [f.name for f in self.changed_fields]
 
 
@@ -232,8 +226,7 @@ def compute_note_diffs(notes: Sequence[Note]) -> Dict[NoteId, NoteDiff]:
         result[nid] = NoteDiff(
             exists_in_ah_db=ah_db_row is not None,
             is_deleted_on_remote=is_deleted_on_remote,
-            local_note=cur,
-            ah_note=ah_note,
+            ah_nid=cur.ah_nid,
             changed_fields=changed_fields,
             added_tags=added_tags,
             removed_tags=removed_tags,
@@ -674,23 +667,19 @@ def _suggestions_for_notes(
             continue
 
         diff = note_diffs[NoteId(note.id)]
-        if diff.exists_in_ah_db:
-            if diff.is_deleted_on_remote:
-                nids_deleted_on_remote.append(note.id)
-            else:
-                notes_for_change_note_suggestions.append(note)
+        if diff.is_deleted_on_remote:
+            nids_deleted_on_remote.append(note.id)
+        elif diff.exists_in_ah_db:
+            notes_for_change_note_suggestions.append(note)
         else:
             notes_for_new_note_suggestions.append(note)
 
-    # Cache per-mid projection across the two loops — same mid → same
-    # PerNoteFilters, so we only need one dict allocation per distinct mid.
+    no_filter = PerNoteFilters()
     per_mid_filters: Dict[NotetypeId, PerNoteFilters] = {}
 
     def _filters_for(note: Note) -> PerNoteFilters:
         if filters is None:
-            # No filter — ship everything the diff detected (same as the
-            # single-note path's `filters=None`).
-            return PerNoteFilters()
+            return no_filter
         mid = NotetypeId(note.mid)
         if mid not in per_mid_filters:
             per_mid_filters[mid] = filters.for_mid(mid)
@@ -738,8 +727,7 @@ def _suggestions_for_notes(
 def _apply_field_allowlist(fields: List[Field], allowlist: Optional[Collection[str]]) -> List[Field]:
     """Drop fields not in the user's allowlist. `allowlist=None` means "no user filter" —
     ships everything the diff detected (only reached when a note is submitted without an
-    explicit selection). Globally-protected fields are excluded by the dialog *before* the
-    user picks; server-side enforcement is the backstop.
+    explicit selection).
     """
     if allowlist is None:
         return fields
@@ -765,7 +753,6 @@ def _new_note_suggestion(
     # to remove tags from.
     filters = filters or PerNoteFilters()
     diff = diff if diff is not None else compute_note_diffs([note])[NoteId(note.id)]
-    # `changed_fields` is already the non-empty fields; tags are all current tags.
     fields = _apply_field_allowlist(diff.changed_fields, filters.fields_to_include)
     tags = _apply_tag_allowlist(diff.added_tags, filters.tags_to_add)
 
@@ -781,7 +768,6 @@ def _new_note_suggestion(
 
     return NewNoteSuggestion(
         ah_did=ah_did,
-        # New notes have no AnkiHub id yet; mint one.
         ah_nid=uuid.uuid4(),
         anki_nid=note.id,
         fields=fields,
@@ -802,7 +788,7 @@ def _change_note_suggestion(
 ) -> Optional[ChangeNoteSuggestion]:
     filters = filters or PerNoteFilters()
     diff = diff if diff is not None else compute_note_diffs([note])[NoteId(note.id)]
-    assert diff.local_note.ah_nid is not None
+    assert diff.ah_nid is not None
 
     added_tags: List[str] = []
     removed_tags: List[str] = []
@@ -818,7 +804,7 @@ def _change_note_suggestion(
             return None
 
     return ChangeNoteSuggestion(
-        ah_nid=diff.local_note.ah_nid,
+        ah_nid=diff.ah_nid,
         anki_nid=note.id,
         fields=fields_that_changed,
         added_tags=added_tags,

@@ -1891,7 +1891,7 @@ class TestFieldsToSuggestFilters:
     compute_note_diffs + the fields_to_include / tags_to_add / tags_to_remove allowlists.
     """
 
-    def test_diff_edited_fields_includes_personally_protected_fields(
+    def test_diff_changed_fields_includes_personally_protected_fields(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -2697,8 +2697,6 @@ class TestSuggestNotesInBulk:
                 note["Front"] = "new front"
                 note.flush()
 
-            # Mirror the dialog: select every edited field per mid, and thread the
-            # open-time diffs through to the submit path.
             notes = new_notes + changed_notes
             note_diffs = compute_note_diffs(notes)
 

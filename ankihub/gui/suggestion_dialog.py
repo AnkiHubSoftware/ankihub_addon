@@ -116,6 +116,13 @@ class SuggestionMetadata:
     filters: BulkSuggestionFilters = field(default_factory=lambda: BulkSuggestionFilters(fields_to_include_by_mid={}))
 
 
+def _has_live_ah_note(diff: NoteDiff) -> bool:
+    """Whether AnkiHub has a note for this one that can still take a change suggestion.
+    A note deleted on AnkiHub is a new-note candidate again, not a change candidate.
+    """
+    return diff.exists_in_ah_db and not diff.is_deleted_on_remote
+
+
 def open_suggestion_dialog_for_single_suggestion(
     note: Note,
     parent: QWidget,
@@ -135,10 +142,9 @@ def open_suggestion_dialog_for_single_suggestion(
         LOGGER.info("Suggestion cancelled.", note_id=note.id)
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     diffs = compute_note_diffs([note])
     SuggestionDialog(
-        is_new_note_suggestion=ah_nid is None,
+        is_new_note_suggestion=not _has_live_ah_note(diffs[NoteId(note.id)]),
         is_for_anking_deck=ah_did == config.anking_deck_id,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=diffs[NoteId(note.id)].added_new_media,
@@ -335,8 +341,7 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
     per_note_filters = suggestion_meta.filters.for_mid(NotetypeId(note.mid))
     diff = note_diffs[NoteId(note.id)]
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    if ah_nid:
+    if _has_live_ah_note(diff):
         try:
             suggestion_result = suggest_note_update(
                 note=note,
