@@ -2546,32 +2546,42 @@ class TestSuggestNotesInBulk:
         install_ah_deck: InstallAHDeck,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         import_ah_note_type: ImportAHNoteType,
+        import_ah_note: ImportAHNote,
         add_anki_note: AddAnkiNote,
     ):
         """Submitting reads the AnkiHub DB per batch and per note type, never per note.
-        Asserting the counts don't grow with the note count rather than pinning exact
-        numbers keeps this robust to unrelated changes in the submit path. At the
-        2000-note bulk cap a reintroduced per-note read costs thousands of queries, and
-        no other test would notice.
+
+        Counts queries at the peewee layer rather than spying on particular reader
+        methods, so a per-note read reintroduced through any helper is caught, not just
+        a return to the specific one this was written against. Asserting the count
+        doesn't grow with the note count rather than pinning an exact number keeps it
+        robust to unrelated changes in the submit path. At the 2000-note bulk cap a
+        per-note read costs thousands of queries and no other test would notice.
         """
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did)
+            mid = NotetypeId(note_type["id"])
             mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
-            note_data_spy = mocker.spy(ankihub_db, "note_data")
-            note_type_dict_spy = mocker.spy(ankihub_db, "note_type_dict")
+            query_spy = mocker.spy(ankihub_db.db, "execute_sql")
 
-            def ah_db_reads_for_submitting(note_count: int) -> Tuple[int, int]:
+            def ah_db_queries_for_submitting(note_count: int) -> int:
+                # Both suggestion kinds: the media step runs over each list separately.
                 notes = []
                 for i in range(note_count):
-                    note = add_anki_note(note_type=note_type)
-                    note["Front"] = f"front_{len(notes)}_{i}"
-                    aqt.mw.col.update_note(note)
-                    notes.append(note)
+                    new_note = add_anki_note(note_type=note_type)
+                    new_note["Front"] = f"new_{note_count}_{i}"
+                    aqt.mw.col.update_note(new_note)
+                    notes.append(new_note)
+
+                    note_info = import_ah_note(ah_did=ah_did, mid=mid)
+                    changed_note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+                    changed_note["Front"] = f"changed_{note_count}_{i}"
+                    aqt.mw.col.update_note(changed_note)
+                    notes.append(changed_note)
 
                 mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(note_count)])
-                note_data_spy.reset_mock()
-                note_type_dict_spy.reset_mock()
+                query_spy.reset_mock()
 
                 suggest_notes_in_bulk(
                     ankihub_did=ah_did,
@@ -2581,9 +2591,9 @@ class TestSuggestNotesInBulk:
                     comment="test",
                     media_upload_cb=mocker.stub(),
                 )
-                return note_data_spy.call_count, note_type_dict_spy.call_count
+                return query_spy.call_count
 
-            assert ah_db_reads_for_submitting(2) == ah_db_reads_for_submitting(6)
+            assert ah_db_queries_for_submitting(2) == ah_db_queries_for_submitting(6)
 
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
