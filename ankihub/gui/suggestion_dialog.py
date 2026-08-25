@@ -113,7 +113,7 @@ class SuggestionMetadata:
     auto_accept: bool = False
     change_type: Optional[SuggestionType] = None
     source: Optional[SuggestionSource] = None
-    filters: BulkSuggestionFilters = field(default_factory=lambda: BulkSuggestionFilters(fields_to_include_by_mid={}))
+    filters: BulkSuggestionFilters = field(default_factory=BulkSuggestionFilters.none_selected)
 
 
 def _has_live_ah_note(diff: NoteDiff) -> bool:
@@ -753,7 +753,7 @@ class SuggestionDialog(QDialog):
         filters = (
             self._fields_widget.suggestion_filters()
             if self._fields_widget_active()
-            else BulkSuggestionFilters(fields_to_include_by_mid={})
+            else BulkSuggestionFilters.none_selected()
         )
         return SuggestionMetadata(
             change_type=self._change_type(),

@@ -121,10 +121,12 @@ class MediaUploadCallback(Protocol):
 @dataclass
 class PerNoteFilters:
     """Allowlists that select what content goes into one note's suggestion.
-    `None` for any list means "no filter for this dimension" — ship everything the
-    diff detected; reached only when a note is submitted without an explicit
-    selection. Globally-protected fields are stripped *before* the dialog renders,
-    so they never enter the allowlist — server-side enforcement is the backstop.
+
+    Each list is three-valued, and the two empty-looking states are opposites:
+    `None` means "no filter for this dimension", so everything the diff detected
+    ships; an empty collection means the user selected nothing, so nothing ships.
+    Globally-protected fields are stripped *before* the dialog renders, so they
+    never enter the allowlist — server-side enforcement is the backstop.
     """
 
     fields_to_include: Optional[Collection[str]] = None
@@ -134,22 +136,29 @@ class PerNoteFilters:
 
 @dataclass
 class BulkSuggestionFilters:
-    """Same as `PerNoteFilters` but keyed by note type for the bulk-suggest
-    path — the dialog groups field selections by mid because the widget has one
-    section per note type. Tag filters apply across all notes. A mid absent from
-    `fields_to_include_by_mid` ships none of its fields (see `for_mid`); the
-    dialog supplies the full per-mid selection.
+    """`PerNoteFilters` for the bulk path: field allowlists keyed by note type, tag
+    allowlists shared across all notes.
+
+    Fields are keyed by note type because that is the granularity the product
+    remembers — `config.last_deselected_fields_per_note_type` persists a user's
+    deselections per deck and note type, and the widget's one-section-per-note-type
+    layout follows from that. Keep the keying if you reshape this.
     """
 
     fields_to_include_by_mid: Mapping[NotetypeId, Collection[str]]
     tags_to_add: Optional[Collection[str]] = None
     tags_to_remove: Optional[Collection[str]] = None
 
+    @classmethod
+    def none_selected(cls) -> "BulkSuggestionFilters":
+        """Select nothing, for a submit that carries no field or tag choices (DELETE).
+        Distinct from passing no filters at all, which ships everything.
+        """
+        return cls(fields_to_include_by_mid={})
+
     def for_mid(self, mid: NotetypeId) -> PerNoteFilters:
-        # A mid missing from the map — the widget rendered no field section for it
-        # (every edit was globally protected), or this is a field-less submit (`{}`).
-        # Treat it as an empty allowlist so the diff can't ship fields the user
-        # never saw or selected.
+        # An absent mid is an empty allowlist, never "no filter": the widget rendered
+        # no section for it, so the user never saw those fields to select them.
         return PerNoteFilters(
             fields_to_include=self.fields_to_include_by_mid.get(mid, ()),
             tags_to_add=self.tags_to_add,
@@ -321,10 +330,8 @@ def suggest_note_update(
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a ChangeSuggestionResult enum value.
 
-    `filters` carries the user's optional allowlists for fields and added/removed
-    tags. `None` for any list means "no filter for that dimension"; the absent
-    `filters` arg is equivalent to no filters at all. `diff` is the note's
-    precomputed `NoteDiff` (the dialog passes its open-time copy); computed when omitted.
+    `diff` is the note's precomputed `NoteDiff`; the dialog passes its open-time copy,
+    which is why the note must not change between opening the dialog and submitting.
     """
 
     # DELETE doesn't carry field content, so the empty-first-field requirement
@@ -371,8 +378,7 @@ def suggest_new_note(
     the user-selected filters left nothing to submit.
 
     `filters.tags_to_remove` is ignored — new notes have no AH baseline to
-    remove tags from. `diff` is the note's precomputed `NoteDiff` (the dialog
-    passes its open-time copy); computed when omitted.
+    remove tags from.
     """
     suggestion = _new_note_suggestion(note, ankihub_did, comment, filters=filters, diff=diff)
     if suggestion is None:
@@ -433,10 +439,8 @@ def suggest_notes_in_bulk(
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date).
 
-    `filters=None` means no filter — ship everything each note's diff detected
-    (the dialog always passes an explicit per-mid selection instead). `note_diffs`
-    is the precomputed `compute_note_diffs` map (the dialog passes its open-time
-    copy); computed here when not supplied.
+    `note_diffs` is the precomputed `compute_note_diffs` map (the dialog passes its
+    open-time copy); computed here when not supplied.
     """
     if note_diffs is None:
         note_diffs = compute_note_diffs(notes)
@@ -725,10 +729,6 @@ def _suggestions_for_notes(
 
 
 def _apply_field_allowlist(fields: List[Field], allowlist: Optional[Collection[str]]) -> List[Field]:
-    """Drop fields not in the user's allowlist. `allowlist=None` means "no user filter" —
-    ships everything the diff detected (only reached when a note is submitted without an
-    explicit selection).
-    """
     if allowlist is None:
         return fields
     allowed = set(allowlist)
@@ -846,16 +846,22 @@ def _rename_and_upload_media_for_suggestions(
     Returns suggestion with updated media names."""
 
     client = AnkiHubClient()
-    original_notes_data = [
-        note_info for suggestion in suggestions if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
-    ]
-    original_media_names: Set[str] = get_media_names_from_notes_data(
-        original_notes_data, lambda mid: ankihub_db.note_type_dict(NotetypeId(mid))
-    )
+    anki_nids = [NoteId(s.anki_nid) for s in suggestions]
 
-    anki_nids = [s.anki_nid for s in suggestions]
+    note_type_dicts: Dict[NotetypeId, NotetypeDict] = {}
+
+    def note_type_dict_for_mid(mid: int) -> NotetypeDict:
+        # The media helpers ask per note, but the answer only varies per note type.
+        key = NotetypeId(mid)
+        if key not in note_type_dicts:
+            note_type_dicts[key] = ankihub_db.note_type_dict(key)
+        return note_type_dicts[key]
+
+    original_notes_data = ankihub_db.notes_data_for_anki_nids(anki_nids)
+    original_media_names: Set[str] = get_media_names_from_notes_data(original_notes_data, note_type_dict_for_mid)
+
     nid_to_note_type = {
-        nid: ankihub_db.note_type_dict(NotetypeId(mid))
+        nid: note_type_dict_for_mid(mid)
         for nid, mid in aqt.mw.col.db.all(f"select id, mid from notes where id in {ids2str(anki_nids)}")
     }
     suggestion_media_names: Set[str] = get_media_names_from_suggestions(
