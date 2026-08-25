@@ -1634,7 +1634,11 @@ class IncludeInSuggestionWidget(QWidget):
             fields_by_mid[mid] = list(dict.fromkeys((*fields_by_mid.get(mid, ()), *fields)))
             added_tags.extend(diff.added_tags)
             removed_tags.extend(diff.removed_tags)
-            if not _has_live_ah_note(diff) and mid not in locked_first_field_by_mid:
+            # Deliberately not `_has_live_ah_note`: a note deleted on AnkiHub is skipped
+            # at submit, but the lock is per note type and renders the field checked and
+            # disabled, so letting one arm the lock would override a deselection the user
+            # made on a live note of the same type and ship its first field.
+            if not diff.exists_in_ah_db and mid not in locked_first_field_by_mid:
                 locked_first_field_by_mid[mid] = note.note_type()["flds"][0]["name"]
 
         for mid, fields in fields_by_mid.items():
