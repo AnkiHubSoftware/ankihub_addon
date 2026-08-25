@@ -2595,6 +2595,49 @@ class TestSuggestNotesInBulk:
 
             assert ah_db_queries_for_submitting(2) == ah_db_queries_for_submitting(6)
 
+    def test_bulk_delete_reports_no_changes_for_notes_not_yet_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """The field-selection widget is hidden for DELETE, so the dialog submits an empty
+        selection. A note not yet on AnkiHub then ships nothing and is reported as having
+        no changes, instead of being submitted as a *new-note* suggestion in answer to a
+        delete request. `is_suggestible` already holds that a new note is not
+        DELETE-suggestible; this pins the submit path to agree.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
+            note_info = import_ah_note(ah_did=ah_did, mid=NotetypeId(note_type["id"]))
+            existing_note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+            new_note = add_anki_note(note_type=note_type)
+            new_note["Front"] = "not on ankihub yet"
+            aqt.mw.col.update_note(new_note)
+
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[existing_note, new_note],
+                auto_accept=False,
+                change_type=SuggestionType.DELETE,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                # What the dialog passes for DELETE, where the widget offers no choices.
+                filters=BulkSuggestionFilters.none_selected(),
+            )
+
+            sent = bulk_mock.call_args.kwargs
+            assert [s.anki_nid for s in sent["change_note_suggestions"]] == [existing_note.id]
+            assert sent["new_note_suggestions"] == []
+            assert ANKIHUB_NO_CHANGE_ERROR in str(result.errors_by_nid[new_note.id])
+
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
         [
