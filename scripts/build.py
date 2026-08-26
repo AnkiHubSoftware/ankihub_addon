@@ -81,11 +81,17 @@ def requirement_names(requirements: str) -> "set[str]":
 
 subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJECT_ROOT)
 
+subprocess.run(["uv", "python", "install", *dict(BUNDLE_LAYERS).values()], check=True)
+
+# media_import's requirements are not in uv.lock - the submodule carries its own requirements.txt -
+# but they ship in the same artifact, so they install with the same oldest interpreter.
 subprocess.run(
     [
         "uv",
         "pip",
         "install",
+        "--python",
+        OLDEST_ANKI_PYTHON,
         "--no-deps",
         "--target",
         str(MEDIA_IMPORT_LIBS),
@@ -114,7 +120,6 @@ if ANKIHUB_LIB_TARGET.is_symlink():
     ANKIHUB_LIB_TARGET.unlink()
 elif ANKIHUB_LIB_TARGET.exists():
     shutil.rmtree(ANKIHUB_LIB_TARGET)
-subprocess.run(["uv", "python", "install", *dict(BUNDLE_LAYERS).values()], check=True)
 for group, python_version in BUNDLE_LAYERS:
     subprocess.run(
         [

@@ -32,8 +32,6 @@ dev = [
   "typeguard>=2.13.3",
   "types-factory-boy>=0.3.1",
   "types-requests>=2.28.9",
-  # One resolution covers every group, so this also caps the urllib3 that ships in the bundle, where
-  # sentry-sdk pulls it in as a transitive and nothing caps it.
   "urllib3>=1.26.14,<2",
   "vcrpy>=4.2.0",
   "protoc-gen-py; python_version >= '3.10'",
@@ -50,6 +48,9 @@ bundle = [
   "django==4.2.30",
   "django-cotton>=2.5.1",
   "asgiref<3.12",
+  # A transitive of sentry-sdk, which is from 2022 and predates urllib3 2.0's API changes. Not the
+  # Python floor the layers already enforce: urllib3 2.x still supports 3.9, so nothing else stops it.
+  "urllib3<2",
   # Django declares tzdata for win32 only, and Windows is the one platform with no system time zone
   # database. Built on Linux and shipped everywhere, that marker drops it for the users who need it.
   "tzdata",

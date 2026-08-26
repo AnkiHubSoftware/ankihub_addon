@@ -113,6 +113,7 @@ bundle = [
     { name = "structlog" },
     { name = "tenacity" },
     { name = "tzdata" },
+    { name = "urllib3" },
 ]
 bundle-modern = [
     { name = "protobuf-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
@@ -165,6 +166,7 @@ bundle = [
     { name = "structlog", specifier = "==24.1.0" },
     { name = "tenacity", specifier = "==8.2.2" },
     { name = "tzdata" },
+    { name = "urllib3", specifier = "<2" },
 ]
 bundle-modern = [{ name = "protobuf-py", marker = "python_full_version >= '3.10'" }]
 dev = [

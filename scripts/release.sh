@@ -1,7 +1,7 @@
+#!/usr/bin/env bash
 set -e
 set -o pipefail
 
-# Every path below is relative to the repository root.
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
@@ -35,7 +35,14 @@ cd "$PROJECT_ROOT"
 # above is caught as well as one in what build.py vendored. They live here because every workflow
 # that produces an artifact runs this script, and so inherits them.
 check_dir="$(mktemp -d)"
-trap 'rm -rf "$check_dir"' EXIT
+# The archive is written before it is checked, so without this a failure below leaves a
+# freshly-timestamped broken one at the repository root to be picked up and installed.
+cleanup() {
+  status=$?
+  rm -rf "$check_dir"
+  [ "$status" -eq 0 ] || rm -f "$PROJECT_ROOT/ankihub.ankiaddon"
+}
+trap cleanup EXIT
 unzip -q ankihub.ankiaddon -d "$check_dir/addon"
 
 for member in manifest.json VERSION __init__.py lib/django lib/peewee.py; do
@@ -51,10 +58,12 @@ done
 # the vendored extension is built for this host.
 "$(uv python find 3.10)" -I -S -c "import sys; sys.path.insert(0, '$check_dir/addon/lib'); import protobuf, protobuf_ext"
 
-# check_addon_import.py parses the bundle too, and much besides, but it needs an Anki running on 3.9
-# and so exists only in the CI lane that has one - while the AnkiWeb and S3 uploads are dispatchable
-# on their own. This narrows that gap rather than closing it: syntax a release started using is
-# caught here, a 3.10-only import is not.
-"$(uv python find 3.9)" -I -S -m compileall -q -x '/(protobuf|protobuf_ext)/' "$check_dir/addon/lib"
+# check_addon_import.py does this and much more, but needs an Anki on 3.9 and so runs only in the CI
+# lane that has one - while the AnkiWeb and S3 uploads are dispatchable on their own. Narrows that
+# gap without closing it: syntax a release started using is caught, a 3.10-only import is not. The
+# exclusion repeats MODERN_ONLY_MODULES; drift surfaces as a SyntaxError naming the package, not this
+# list. media_import/libs comes from the submodule's requirements.txt rather than uv.lock.
+"$(uv python find 3.9)" -I -S -m compileall -q -x '/(protobuf|protobuf_ext)/' \
+  "$check_dir/addon/lib" "$check_dir/addon/media_import/libs"
 
 echo "ankihub.ankiaddon is assembled, parses on Python 3.9, and its Python 3.10 layer loads"

@@ -95,8 +95,7 @@ def unparsable_bundle_modules() -> list:
 def importable_modern_only_modules() -> list:
     """Modern-only modules that turn out to import here after all.
 
-    Skipping something importable would quietly narrow every assertion above, so each skip has to
-    earn itself. Forgetting one needs no check: it gets imported with the rest and fails.
+    A skip that was not warranted would quietly narrow every assertion above.
     """
     problems = []
     for name in MODERN_ONLY_MODULES:
