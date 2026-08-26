@@ -32,14 +32,14 @@ dev = [
   "typeguard>=2.13.3",
   "types-factory-boy>=0.3.1",
   "types-requests>=2.28.9",
+  # One resolution covers every group, so this also caps the urllib3 that ships in the bundle, where
+  # sentry-sdk pulls it in as a transitive and nothing caps it.
   "urllib3>=1.26.14,<2",
   "vcrpy>=4.2.0",
   "protoc-gen-py; python_version >= '3.10'",
   "buf-bin; python_version >= '3.10'",
 ]
 bundle = [
-  # Brings urllib3, which ships too. What holds that at 1.x is the `dev` group's own
-  # `urllib3>=1.26.14,<2` - one resolution covers every group, and nothing here caps it.
   "sentry_sdk==1.6.0",
   "tenacity==8.2.2",
   "structlog==24.1.0",
@@ -50,17 +50,15 @@ bundle = [
   "django==4.2.30",
   "django-cotton>=2.5.1",
   "asgiref<3.12",
-  # Django declares tzdata only for win32, and Windows is the one platform with no system time
-  # zone database. The bundle is built on Linux and shipped to every platform, so that marker
-  # would drop it for exactly the users who need it.
+  # Django declares tzdata for win32 only, and Windows is the one platform with no system time zone
+  # database. Built on Linux and shipped everywhere, that marker drops it for the users who need it.
   "tzdata",
 ]
 # protobuf-py has required Python 3.10 since its first release, so it cannot join `bundle`, which
 # installs with 3.9. It has to ship anyway: above 3.10 ankihub_client imports the AnkiWeb client at
-# module level, so a missing copy stops the add-on loading, while below it the add-on falls back to
-# Anki's own login dialog. Anki's google.protobuf is not an alternative - its version spans 4.21 to
-# 7.x across the Anki versions supported here, and generated code cannot satisfy that whole range.
-# The marker is what lets this be locked at all, given the project supports 3.9.
+# module level, so a missing copy stops the add-on loading. Anki's own google.protobuf is no
+# alternative - it spans 4.21 to 7.x across the Anki versions supported here, and generated code
+# cannot satisfy that whole range. The marker is what lets this be locked at all.
 bundle_modern = ["protobuf-py; python_version >= '3.10'"]
 aqt = ["aqt[qt]==26.5; python_version >= '3.10'"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]

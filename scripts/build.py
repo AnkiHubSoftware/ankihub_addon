@@ -29,28 +29,23 @@ WEB_CSS_TARGET = PROJECT_ROOT / "tutorial" / "lib" / "vendor" / "tailwind.css"
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 OLDEST_ANKI_PYTHON = "3.9"
-
-# The oldest Python that any Anki version reaching the modern-only layer can be running.
 OLDEST_MODERN_PYTHON = "3.10"
 
-# Install each layer with the oldest Python that can reach it, so uv refuses a distribution that
-# has dropped support for it. Separate dependency groups, so routing never reads markers.
+# Each layer installs with the oldest Python that can reach it, so uv refuses a distribution that has
+# dropped support for it. They are separate dependency groups so that routing never reads markers.
 BUNDLE_LAYERS = (("bundle", OLDEST_ANKI_PYTHON), ("bundle_modern", OLDEST_MODERN_PYTHON))
 
 
 def locked_group_requirements(group: str) -> str:
-    """A dependency group's exact contents, as recorded in uv.lock.
-
-    Resolving the group at build time instead would pick up whatever versions are current then.
-    """
+    """Resolving the group at build time instead would pick up whatever versions are current then."""
     return subprocess.run(
         [
             "uv",
             "export",
-            # Without this, export re-resolves against PyPI and rewrites uv.lock. It also fails
-            # when the lockfile is out of date with pyproject.toml rather than preferring one.
+            # Without this, export re-resolves against PyPI and rewrites uv.lock. It also fails on a
+            # lockfile out of date with pyproject.toml rather than silently preferring one.
             "--locked",
-            # Without --color never the export carries ANSI escapes that uv cannot re-parse.
+            # Without it the export carries ANSI escapes that uv cannot re-parse.
             "--color",
             "never",
             "--only-group",
@@ -58,7 +53,7 @@ def locked_group_requirements(group: str) -> str:
             "--no-emit-project",
         ],
         check=True,
-        stdout=subprocess.PIPE,  # stderr stays on the console so uv explains its own failures
+        stdout=subprocess.PIPE,
         text=True,
         cwd=PROJECT_ROOT,
     ).stdout
@@ -72,13 +67,13 @@ def requirement_names(requirements: str) -> "set[str]":
     names = set()
     for line in requirements.splitlines():
         if not line.strip() or line.startswith("#") or line[0].isspace():
-            continue  # blank, a comment, or an indented --hash continuation
+            continue  # an indented line continues the one above it, carrying --hash
         if line.startswith("--"):
-            continue  # --index-url and friends configure the install; they add no distribution
+            continue  # --index-url and friends install nothing of their own
         match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line)
         if not match:
-            # Skipping silently is what makes this worth raising over: an editable (-e ../pkg)
-            # installs something that every check below would then be blind to.
+            # Skipped instead, an editable (-e ../pkg) would install something every check below
+            # is then blind to.
             raise SystemExit(f"cannot read {line!r} as a requirement; check what uv export emitted")
         names.add(canonical_name(match.group()))
     return names
@@ -114,8 +109,8 @@ if shared:
 # earlier build would otherwise survive into the artifact. Not ignore_errors: a partial delete
 # would leave exactly that behind.
 if ANKIHUB_LIB_TARGET.is_symlink():
-    # Worktrees set up for running Anki point this at the main checkout's copy, and installing
-    # through it would write there instead. rmtree refuses a symlink with an errno-less OSError.
+    # Worktrees set up for running Anki point this at the main checkout's copy, which installing
+    # through would write to. rmtree refuses a symlink with an errno-less OSError.
     ANKIHUB_LIB_TARGET.unlink()
 elif ANKIHUB_LIB_TARGET.exists():
     shutil.rmtree(ANKIHUB_LIB_TARGET)
@@ -139,14 +134,11 @@ for group, python_version in BUNDLE_LAYERS:
         text=True,
     )
 
-# A compiled extension is built for one interpreter and one platform, and this one artifact ships to
-# every combination Anki runs on. abi3 answers only the first half: protobuf-py-ext's wheel is
-# cp310-abi3-manylinux_2_17_x86_64, so it still cannot load on Windows, macOS or ARM. What makes an
-# extension safe to vendor is therefore the package treating it as optional, not its tag - and both
-# of these do. protobuf-py catches the failed import and falls back to pure Python, confirmed on
-# macOS arm64, so its extension is kept for the platform it does load on. Nothing imports playhouse
-# at all, so its 2 MB are dropped. Anything else fails the build rather than being kept or deleted
-# on a guess: kept, it breaks every platform but the builder; deleted, it breaks whatever needed it.
+# A compiled extension is built for one interpreter and one platform; this artifact ships to every
+# combination Anki runs on. abi3 covers only the interpreter half - protobuf-py-ext's wheel is
+# cp310-abi3-manylinux_2_17_x86_64, unloadable on Windows, macOS or ARM. So what earns a place is the
+# package falling back without it: protobuf-py catches the failed import, and nothing imports
+# playhouse at all, so its copies are dropped instead of kept.
 KEPT_EXTENSION_PACKAGES = ("protobuf_ext",)
 DROPPED_EXTENSION_PACKAGES = ("playhouse",)
 
@@ -174,12 +166,10 @@ for path in DJANGO_TARGET.rglob("locale/*"):
 shutil.rmtree(DJANGO_TARGET / "contrib" / "admin" / "static", ignore_errors=True)
 shutil.rmtree(DJANGO_TARGET / "contrib" / "gis", ignore_errors=True)
 
-# Every distribution the lock exported has to have arrived. A requirement whose marker was false for
-# the interpreter or platform building it installs nothing and reports nothing, so its absence here
-# is the only signal there is. This reads dist-info, so it catches a distribution that never
-# installed rather than one whose files a prune above removed while leaving its metadata. It does
-# mean the build host has to be one every exported requirement applies to, which for the current
-# lock means Linux, as every workflow producing an artifact uses.
+# A requirement whose marker was false for the interpreter or platform building it installs nothing
+# and reports nothing, so its absence here is the only signal there is. Reading dist-info rather than
+# files catches one that never installed, not one whose files a prune above removed. It does mean the
+# build host has to be one every exported requirement applies to - Linux, for the current lock.
 missing = set().union(*(requirement_names(text) for text in layer_requirements.values()))
 missing -= {
     name for path in ANKIHUB_LIB_TARGET.glob("*.dist-info") for name in [canonical_name(path.name.split("-")[0])]

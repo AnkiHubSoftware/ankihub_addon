@@ -9,9 +9,8 @@ import django, asgiref and urllib3 from the development environment before `impo
 the bundle, so the bundled copies are shadowed there and never exercised.
 
 scripts/build.py installs each layer with the oldest Python that can reach it, so a distribution
-declaring a newer floor cannot be installed at all. What that cannot show is whether the result
-imports: a distribution can declare 3.9 and still use newer syntax, and peewee and sentry_sdk
-declare no floor to check.
+declaring a newer floor cannot be installed at all. That covers declared floors only: a distribution
+can declare 3.9 and still not import on it, and peewee and sentry_sdk declare no floor at all.
 """
 
 import os
@@ -22,10 +21,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 BUNDLE = PROJECT_ROOT / "ankihub" / "lib"
 TARGET_PYTHON = (3, 9)
 
-# Installed for Python 3.10 and above, which is also where the add-on gates its own use of them.
 # Written out rather than derived from the bundle_modern group, because neither way of drifting from
-# it is silent: a module missing from here is imported with the rest and fails, and one that does
-# not belong here is caught by importable_modern_only_modules().
+# it is silent: a module missing from here is imported with the rest and fails, and one that does not
+# belong here is caught by importable_modern_only_modules().
 MODERN_ONLY_MODULES = ("protobuf", "protobuf_ext")
 
 
@@ -34,7 +32,6 @@ def target_python() -> str:
 
 
 def bundle_top_level_modules():
-    """Every name the bundle offers to `import`."""
     for entry in sorted(BUNDLE.iterdir()):
         if entry.name.endswith(".dist-info") or entry.name in ("bin", "__pycache__"):
             continue
@@ -51,10 +48,9 @@ def loaded_top_level_names() -> set:
 def load_addon() -> None:
     """Import the add-on as Anki would, without starting it.
 
-    This is also what puts the bundle within reach: ankihub/__init__.py prepends ankihub/lib to
-    sys.path. Importing entry_point then pulls in the part of the bundle the add-on itself uses,
-    which is how asgiref.sync comes to be loaded. Nothing checked after this means anything
-    without it.
+    This is what puts the bundle within reach at all: ankihub/__init__.py prepends ankihub/lib to
+    sys.path, and importing entry_point pulls in the part of it the add-on uses, which is how
+    asgiref.sync comes to be loaded. Nothing checked after this means anything without it.
     """
     sys.path.insert(0, str(PROJECT_ROOT))
     os.environ["SKIP_INIT"] = "1"  # entry_point.run() needs a running Anki; importing is enough
@@ -80,11 +76,10 @@ def wrong_bundle_module_origins(vendored, from_anki) -> list:
 def unparsable_bundle_modules() -> list:
     """Bundle modules the target Python cannot even parse.
 
-    The checks around this one reach a module only if something imports it, which for most of the
-    bundle means the add-on's own import graph - `asgiref.sync` is covered because Django's template
-    stack happens to pull it in. Parsing reaches every file regardless. It is the weaker signal of
-    the two: it catches syntax a release started using, not the `from typing import ParamSpec` kind
-    of break, which parses on 3.9 and fails on import.
+    The checks around this one reach a module only if something imports it - asgiref.sync is covered
+    because Django's template stack pulls it in, not because asgiref is vendored. Parsing reaches
+    every file, but catches only syntax a release started using: `from typing import ParamSpec`, the
+    break this whole script exists for, parses on 3.9 and fails on import.
     """
     problems = []
     for path in sorted(BUNDLE.rglob("*.py")):
@@ -116,9 +111,8 @@ def importable_modern_only_modules() -> list:
 def django_rendering_problems() -> list:
     """Render through the add-on's own Django setup, rather than a copy of its configuration.
 
-    Importing entry_point configures the template engine, which is what pulls in Django's template
-    stack and with it asgiref.sync. Rendering as well runs django_cotton's compiler over the input.
-    It renders plain HTML, not a component, so the component loader itself is not covered.
+    Rendering runs django_cotton's compiler over the input. It renders plain HTML, not a component,
+    so the component loader itself is not covered.
     """
     from ankihub.django import render_template_from_string
 
@@ -147,7 +141,6 @@ def main() -> int:
 
     from_anki = vendored & loaded_top_level_names()
 
-    # Loads the bundle modules, which is what the checks below inspect.
     load_addon()
 
     failures = (
