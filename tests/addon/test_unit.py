@@ -1858,9 +1858,6 @@ class TestAnkiwebLoginAndSignupSubmission:
         signup_mock = mocker.patch.object(
             AddonAnkiHubClient, "ankiweb_signup", return_value=Mock(host_key="hostkey123")
         )
-        # SignupEmailVerificationWidget kicks off a resend-verification request as soon
-        # as it's constructed, to start the "resend available in Ns" countdown.
-        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification")
 
         dialog = AnkiwebSignupDialog()
         qtbot.addWidget(dialog)
@@ -1876,6 +1873,64 @@ class TestAnkiwebLoginAndSignupSubmission:
         signup_mock.assert_called_once_with("user@example.com", "password123", True)
         assert isinstance(dialog._widget, SignupEmailVerificationWidget)
         assert dialog._widget.host_key == "hostkey123"
+        # Signup already sent the verification email, so resend starts on cooldown.
+        assert dialog._widget.resend_button.isEnabled() is False
+        assert "user@example.com" in dialog._widget.status_label.text()
+        assert "Resend available in" in dialog._widget.status_label.text()
+        assert dialog._widget.form_widget.back_to is not None
+        assert dialog._widget.resend_button.text() == "Resend verification email"
+
+    def test_signup_email_verification_resend_restarts_cooldown(self, qtbot: QtBot, mocker: MockerFixture):
+        from ankihub.gui import ankiweb as ankiweb_mod
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        ankiweb_mod._resend_cooldowns._deadlines.clear()
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=False))
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupEmailVerificationWidget(
+            email="resend-cooldown@example.com", host_key="hostkey123", dialog=dialog
+        )
+        dialog.replace_widget(widget)
+
+        # Drain the initial post-signup cooldown so resend becomes clickable.
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+        assert widget.resend_button.isEnabled() is True
+
+        widget._resend()
+
+        assert widget.resend_button.isEnabled() is False
+        assert "Resend available in 60s" in widget.status_label.text()
+
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        assert widget.resend_button.isEnabled() is True
+        assert "Resend available." in widget.status_label.text()
+
+    def test_signup_email_verification_resend_throttled_keeps_button_disabled(
+        self, qtbot: QtBot, mocker: MockerFixture
+    ):
+        from ankihub.gui import ankiweb as ankiweb_mod
+        from ankihub.gui.ankiweb import SignupEmailVerificationWidget
+
+        ankiweb_mod._resend_cooldowns._deadlines.clear()
+        mocker.patch.object(AddonAnkiHubClient, "ankiweb_resend_verification", return_value=Mock(throttled=True))
+
+        dialog = AnkiwebSignupDialog()
+        qtbot.addWidget(dialog)
+        widget = SignupEmailVerificationWidget(email="throttled@example.com", host_key="hostkey123", dialog=dialog)
+        dialog.replace_widget(widget)
+
+        for _ in range(widget._timer.remaining_seconds + 1):
+            widget._timer._on_timeout()
+
+        widget._resend()
+
+        assert widget.resend_button.isEnabled() is False
+        assert "no more emails" in widget.form_widget.error_label.status.text()
 
     def test_login_with_code_request_exception_shows_generic_message(self, qtbot: QtBot, mocker: MockerFixture):
         mocker.patch("ankihub.gui.ankiweb._error_reporting_enabled", return_value=False)
@@ -2918,6 +2973,12 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
+
+            # Edit the note so it's suggestible — otherwise the dialog's empty-state
+            # gate short-circuits before any suggestion is created.
+            note = aqt.mw.col.get_note(nids[0])
+            note["Front"] = "edited"
+            aqt.mw.col.update_note(note)
 
             suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(user_cancels=user_cancels)
 
@@ -4048,7 +4109,7 @@ class TestTutorialProductMetrics:
         mocker.patch("ankihub.gui.tutorial.gui_hooks")
 
         tutorial = OnboardingTutorial()
-        tutorial._skip_tutorial()
+        tutorial.skip_tutorial()
 
         mock_client.track.assert_called_once_with(
             distinct_id="42",
@@ -6809,6 +6870,9 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
             mocker.patch.object(
                 config,
                 "get_feature_flags",
@@ -6854,6 +6918,9 @@ class TestIntercom:
         qtbot: QtBot,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
+            # Closing ConfigWindow runs execute_on_close hooks. Stub the Intercom sync
+            # side effect so teardown does not depend on webview/event-loop timing.
+            mocker.patch("ankihub.gui.intercom.sync_with_user_preference")
             mocker.patch.object(
                 config,
                 "get_feature_flags",

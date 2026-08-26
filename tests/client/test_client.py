@@ -2029,6 +2029,33 @@ class TestGetUserDetails:
         # This test just makes sure that the method does not throw an exception
 
 
+class TestClaimTrialEndedMessage:
+    # These tests use requests_mock instead of a cassette because the endpoint does not exist
+    # on the server yet. Replace with a VCR test once it is deployed.
+
+    def _mock_claim(self, requests_mock: Mocker, client: AnkiHubClient, **kwargs) -> None:
+        requests_mock.post(f"{client.api_url}/users/me/trial-ended-message/claim", **kwargs)
+
+    def test_message_was_owed(self, requests_mock: Mocker):
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path("."))
+        self._mock_claim(requests_mock, client, json={"show_trial_ended_message": True})
+
+        assert client.claim_trial_ended_message() is True
+
+    def test_message_was_already_spent(self, requests_mock: Mocker):
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path("."))
+        self._mock_claim(requests_mock, client, json={"show_trial_ended_message": False})
+
+        assert client.claim_trial_ended_message() is False
+
+    def test_raises_on_error_response(self, requests_mock: Mocker):
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path("."))
+        self._mock_claim(requests_mock, client, status_code=404, reason="Not Found")
+
+        with pytest.raises(AnkiHubHTTPError):
+            client.claim_trial_ended_message()
+
+
 @pytest.mark.vcr()
 class TestSendCardReviewData:
     def test_basic(

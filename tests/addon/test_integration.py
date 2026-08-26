@@ -47,7 +47,7 @@ from aqt.gui_hooks import (
     overview_will_render_bottom,
 )
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QUrl, QWebEnginePage, QWidget, sip
+from aqt.qt import QAction, QDialog, QEvent, QLabel, Qt, QToolButton, QUrl, QWebEnginePage, QWidget, sip
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -88,6 +88,7 @@ from ..fixtures import (
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     add_field_to_local_note_type,
+    bulk_filters_from_diffs,
     create_anki_deck,
     create_or_get_ah_version_of_note_type,
     make_review_histories,
@@ -589,14 +590,14 @@ class TestEntryPoint:
 
         on_profile_did_open_mock.assert_called_once()
 
-    def test_on_profile_will_close_ends_active_tutorial(self, mocker: MockerFixture):
+    def test_on_profile_will_close_skips_active_tutorial(self, mocker: MockerFixture):
         active_tutorial_mock = Mock()
         mocker.patch.object(entry_point.tutorial, "active_tutorial", active_tutorial_mock)
         close_for_profile_mock = mocker.patch.object(entry_point.media_sync, "close_for_profile")
 
         entry_point._on_profile_will_close()
 
-        active_tutorial_mock.end.assert_called_once()
+        active_tutorial_mock.skip_tutorial.assert_called_once()
         close_for_profile_mock.assert_called_once()
 
 
@@ -808,8 +809,6 @@ class TestEditor:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
             anki_note = aqt.mw.col.get_note(NoteId(import_ah_note(ah_did=ah_did).anki_nid))
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
 
             add_cards_dialog = self._open_addcards(anki_note, qtbot, mocker)
 
@@ -1199,12 +1198,11 @@ def auto_protect_note(
     install_ah_deck: InstallAHDeck,
     import_ah_note: ImportAHNote,
 ):
-    """Yields (ah_did, note) with the auto-protect feature flag and the per-deck
-    setting both on. Use within the yielded `profile_loaded` context."""
+    """Yields (ah_did, note) with the auto-protect per-deck setting on. Use
+    within the yielded `profile_loaded` context."""
     with anki_session_with_addon_data.profile_loaded():
         ah_did = install_ah_deck()
         note_info = import_ah_note(ah_did=ah_did)
-        config.set_feature_flags({"auto_protect_fields_when_edited": True})
         config.set_auto_protect_fields_when_edited(ah_did, True)
         nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
         yield ah_did, aqt.mw.col.get_note(nid)
@@ -1276,7 +1274,6 @@ class TestAutoProtectFieldsWhenEdited:
         add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             note = add_anki_note()
             note["Front"] = "edited value"
 
@@ -1299,16 +1296,6 @@ class TestAutoProtectFieldsWhenEdited:
         ankihub_id_idx = note.keys().index("ankihub_id")
         note["ankihub_id"] = "edited value"
         result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=ankihub_id_idx)
-        assert result is False
-        assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
-
-    def test_hook_is_no_op_when_feature_flag_disabled(self, auto_protect_note):
-        # Per-deck setting is on (from fixture), but the server-side rollout flag is off.
-        _, note = auto_protect_note
-        config.set_feature_flags({"auto_protect_fields_when_edited": False})
-        note["Front"] = "edited value"
-
-        result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
         assert result is False
         assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
@@ -1365,7 +1352,6 @@ class TestAutoProtectFieldsWhenEdited:
                 ),
             )
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_auto_protect_fields_when_edited(ah_did, True)
 
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
@@ -1905,7 +1891,7 @@ class TestFieldsToSuggestFilters:
     compute_note_diffs + the fields_to_include / tags_to_add / tags_to_remove allowlists.
     """
 
-    def test_diff_edited_fields_includes_personally_protected_fields(
+    def test_diff_changed_fields_includes_personally_protected_fields(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -1923,7 +1909,7 @@ class TestFieldsToSuggestFilters:
             aqt.mw.col.update_note(note)
 
             diffs = compute_note_diffs([note])
-            assert "Front" in diffs[note.id].edited_fields
+            assert "Front" in diffs[note.id].changed_field_names
 
     def test_suggest_note_update_user_allowlists_strip_outside_changes(
         self,
@@ -1964,44 +1950,6 @@ class TestFieldsToSuggestFilters:
             assert [f.name for f in sent.fields] == [field_names[0]]
             assert sent.added_tags == ["added_a"]
             assert sent.removed_tags == ["removed_a"]
-
-    def test_protected_fields_stripped_when_feature_flag_off(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
-        mocker: MockerFixture,
-    ):
-        """With the feature flag off, the suggestion path keeps the legacy behavior:
-        fields carrying personal AnkiHub_Protect tags are stripped from the outgoing
-        suggestion. (When on, the dialog filters at the user's direction instead.)
-        """
-        with anki_session_with_addon_data.profile_loaded():
-            _, ah_did = install_sample_ah_deck()
-            nid = aqt.mw.col.find_notes("")[0]
-            note = aqt.mw.col.get_note(nid)
-            ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[to_note_data(note)])
-
-            field_names = list(note.keys())
-            note[field_names[0]] = "front_updated"
-            note[field_names[1]] = "back_updated"
-            note.tags.append(f"{TAG_FOR_PROTECTING_FIELDS}::{field_names[0]}")
-
-            config.set_feature_flags({"auto_protect_fields_when_edited": False})
-
-            create_mock = mocker.patch.object(AnkiHubClient, "create_change_note_suggestion")
-
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-                media_upload_cb=mocker.stub(),
-            )
-
-            sent = create_mock.call_args.kwargs["change_note_suggestion"]
-            sent_field_names = [f.name for f in sent.fields]
-            # Protected field is stripped; the other change still goes out.
-            assert field_names[0] not in sent_field_names
-            assert field_names[1] in sent_field_names
 
     def test_widget_populates_for_new_note_candidates(
         self,
@@ -2177,7 +2125,6 @@ class TestFieldsToSuggestFilters:
             note["Back"] = "back_edit"
             aqt.mw.col.update_note(note)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             config.set_globally_protected_fields(ah_did, {mid: ["Front"]})
 
             dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
@@ -2210,7 +2157,6 @@ class TestFieldsToSuggestFilters:
             note_info = import_ah_note(ah_did=ah_did)
             nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
             toast_mock = mocker.patch("ankihub.gui.suggestion_dialog.show_tooltip")
             dialog_mock = mocker.patch("ankihub.gui.suggestion_dialog.SuggestionDialog")
 
@@ -2334,8 +2280,6 @@ class TestFieldsToSuggestFilters:
             note["Front"] = "edited"
             aqt.mw.col.update_note(note)
 
-            config.set_feature_flags({"auto_protect_fields_when_edited": True})
-
             def build_dialog() -> SuggestionDialog:
                 return SuggestionDialog(
                     is_new_note_suggestion=False,
@@ -2399,6 +2343,8 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                # No filters → suggest everything the diff found. The empty "Back" and the
+                # local "New Field" aren't part of the diff, so only "Front" ships.
             )
 
             assert bulk_suggestions_method_mock.call_count == 1
@@ -2520,6 +2466,178 @@ class TestSuggestNotesInBulk:
             assert "hashed.jpg" in joined_fields
             assert "original.jpg" not in joined_fields
 
+    def test_bulk_new_notes_dont_ship_field_empty_on_that_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Two new notes of the same note type: "Back" is non-empty on the first, so the
+        widget allowlists it for the mid (selections aggregate per note type). It must NOT
+        ship as an empty field on the second note where it's blank — `changed_fields` for a
+        new note is its non-empty fields, so the empty "Back" never ships."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
+            note_with_back = add_anki_note(note_type=note_type)
+            note_with_back["Front"] = "front_1"
+            note_with_back["Back"] = "back_1"
+            note_without_back = add_anki_note(note_type=note_type)
+            note_without_back["Front"] = "front_2"
+            note_without_back["Back"] = ""
+            aqt.mw.col.update_note(note_with_back)
+            aqt.mw.col.update_note(note_without_back)
+
+            mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(2)])
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            # Per-mid allowlist contains both fields (the widget's aggregated selection).
+            suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[note_with_back, note_without_back],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                filters=BulkSuggestionFilters(
+                    fields_to_include_by_mid={NotetypeId(note_type["id"]): ["Front", "Back"]}
+                ),
+            )
+
+            sent_by_nid = {s.anki_nid: s for s in bulk_mock.call_args.kwargs["new_note_suggestions"]}
+            assert [f.name for f in sent_by_nid[note_with_back.id].fields] == ["Front", "Back"]
+            # The note with an empty Back ships only Front — no empty field.
+            assert [f.name for f in sent_by_nid[note_without_back.id].fields] == ["Front"]
+
+    def test_ah_db_note_readers_agree_about_deleted_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """The media step reads note data through the batched `notes_data_for_anki_nids`
+        rather than a per-note `note_data` loop. That swap is only sound while the two
+        agree about deleted rows; if they diverge the outgoing media-name set changes
+        silently, so pin the agreement here.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+            nid = ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid)
+
+            assert ankihub_db.note_data(nid) is not None
+            assert [note.anki_nid for note in ankihub_db.notes_data_for_anki_nids([nid])] == [nid]
+
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.anki_note_id == nid
+            ).execute()
+
+            assert ankihub_db.note_data(nid) is None
+            assert ankihub_db.notes_data_for_anki_nids([nid]) == []
+
+    def test_bulk_submit_does_not_read_the_ah_db_per_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+    ):
+        """Submitting reads the AnkiHub DB per batch and per note type, never per note.
+
+        Counts queries at the peewee layer rather than spying on particular reader
+        methods, so a per-note read reintroduced through any helper is caught, not just
+        a return to the specific one this was written against. Asserting the count
+        doesn't grow with the note count rather than pinning an exact number keeps it
+        robust to unrelated changes in the submit path. At the 2000-note bulk cap a
+        per-note read costs thousands of queries and no other test would notice.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            mid = NotetypeId(note_type["id"])
+            mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+            query_spy = mocker.spy(ankihub_db.db, "execute_sql")
+
+            def ah_db_queries_for_submitting(note_count: int) -> int:
+                # Both suggestion kinds: the media step runs over each list separately.
+                notes = []
+                for i in range(note_count):
+                    new_note = add_anki_note(note_type=note_type)
+                    new_note["Front"] = f"new_{note_count}_{i}"
+                    aqt.mw.col.update_note(new_note)
+                    notes.append(new_note)
+
+                    note_info = import_ah_note(ah_did=ah_did, mid=mid)
+                    changed_note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+                    changed_note["Front"] = f"changed_{note_count}_{i}"
+                    aqt.mw.col.update_note(changed_note)
+                    notes.append(changed_note)
+
+                mocker.patch("uuid.uuid4", side_effect=[next_deterministic_uuid() for _ in range(note_count)])
+                query_spy.reset_mock()
+
+                suggest_notes_in_bulk(
+                    ankihub_did=ah_did,
+                    notes=notes,
+                    auto_accept=False,
+                    change_type=SuggestionType.NEW_CONTENT,
+                    comment="test",
+                    media_upload_cb=mocker.stub(),
+                )
+                return query_spy.call_count
+
+            assert ah_db_queries_for_submitting(2) == ah_db_queries_for_submitting(6)
+
+    def test_bulk_delete_reports_no_changes_for_notes_not_yet_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        """The field-selection widget is hidden for DELETE, so the dialog submits an empty
+        selection. A note not yet on AnkiHub then ships nothing and is reported as having
+        no changes, instead of being submitted as a *new-note* suggestion in answer to a
+        delete request. `is_suggestible` already holds that a new note is not
+        DELETE-suggestible; this pins the submit path to agree.
+        """
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_type = import_ah_note_type(ah_did=ah_did)
+
+            note_info = import_ah_note(ah_did=ah_did, mid=NotetypeId(note_type["id"]))
+            existing_note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_info.ah_nid))
+            new_note = add_anki_note(note_type=note_type)
+            new_note["Front"] = "not on ankihub yet"
+            aqt.mw.col.update_note(new_note)
+
+            bulk_mock = mocker.patch.object(AnkiHubClient, "create_suggestions_in_bulk", return_value={})
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[existing_note, new_note],
+                auto_accept=False,
+                change_type=SuggestionType.DELETE,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+                # What the dialog passes for DELETE, where the widget offers no choices.
+                filters=BulkSuggestionFilters.none_selected(),
+            )
+
+            sent = bulk_mock.call_args.kwargs
+            assert [s.anki_nid for s in sent["change_note_suggestions"]] == [existing_note.id]
+            assert sent["new_note_suggestions"] == []
+            assert ANKIHUB_NO_CHANGE_ERROR in str(result.errors_by_nid[new_note.id])
+
     @pytest.mark.parametrize(
         "note_has_changes, note_is_marked_as_deleted",
         [
@@ -2568,6 +2686,7 @@ class TestSuggestNotesInBulk:
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                # No filters → suggest everything the diff found (local "New Field" isn't on AnkiHub).
             )
 
             if note_has_changes and not note_is_marked_as_deleted:
@@ -2703,13 +2822,18 @@ class TestSuggestNotesInBulk:
                 note["Front"] = "new front"
                 note.flush()
 
+            notes = new_notes + changed_notes
+            note_diffs = compute_note_diffs(notes)
+
             result = suggest_notes_in_bulk(
                 ankihub_did=ah_did,
-                notes=new_notes + changed_notes,
+                notes=notes,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
                 media_upload_cb=mocker.stub(),
+                filters=bulk_filters_from_diffs(notes, note_diffs),
+                note_diffs=note_diffs,
             )
 
             assert bulk_suggestions_method_mock.call_count == 1
@@ -4397,6 +4521,23 @@ def test_keep_notes_with_instructions_tag_unsuspended(
         ah_did = install_ah_deck()
         config.set_suspend_new_cards_of_new_notes(ah_did, True)
         note_info = NoteInfoFactory.create(tags=[settings.TAG_FOR_INSTRUCTION_NOTES])
+        import_ah_note(ah_did=ah_did, note_data=note_info)
+        note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+        new_card = note.cards()[0]
+
+        assert new_card.queue == QUEUE_TYPE_NEW
+
+
+def test_keep_starter_notes_unsuspended(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+):
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+        ah_did = install_ah_deck()
+        config.set_suspend_new_cards_of_new_notes(ah_did, True)
+        note_info = NoteInfoFactory.create(tags=[settings.TAG_STARTER_NOTES])
         import_ah_note(ah_did=ah_did, note_data=note_info)
         note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
         new_card = note.cards()[0]
@@ -9025,6 +9166,12 @@ def mock_load_url_to_show_page(mocker: MockerFixture, body: str, url_substring: 
     mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
 
 
+def _response_with_status(status_code: int) -> Response:
+    response = Response()
+    response.status_code = status_code
+    return response
+
+
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -9248,19 +9395,15 @@ class TestFlashCardSelector:
             assert FlashCardSelectorDialog.dialog == dialog
 
     @pytest.mark.sequential
-    @pytest.mark.parametrize(
-        "show_trial_ended_message",
-        [False, True],
-    )
-    def test_shows_flashcard_selector_upsell_if_no_access(
+    def test_does_not_claim_trial_ended_message_if_user_has_access(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         set_feature_flag_state: SetFeatureFlagState,
         mocker: MockerFixture,
-        show_trial_ended_message: bool,
     ):
+        """The message is one-shot, so only the path that actually displays it may claim it."""
         set_feature_flag_state("show_flashcards_selector_button")
 
         entry_point.run()
@@ -9268,10 +9411,7 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token", return_value="test_token")
 
             anki_did = DeckId(1)
-            install_ah_deck(
-                anki_did=anki_did,
-                has_note_embeddings=True,
-            )
+            install_ah_deck(anki_did=anki_did, has_note_embeddings=True)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -9282,23 +9422,181 @@ class TestFlashCardSelector:
                 AnkiHubClient,
                 "get_user_details",
                 return_value={
-                    "has_flashcard_selector_access": False,
-                    "show_trial_ended_message": show_trial_ended_message,
+                    "has_flashcard_selector_access": True,
                 },
             )
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message")
 
             overview_web: AnkiWebView = aqt.mw.overview.web
             overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
-            def upsell_dialog_opened():
-                dialog: QWidget = aqt.mw.app.activeWindow()
-                if not isinstance(dialog, utils._Dialog):
+            def flashcard_selector_opened() -> bool:
+                if FlashCardSelectorDialog.dialog is None:
                     return False
-                return "Trial" in dialog.windowTitle() if show_trial_ended_message else True
+                return FlashCardSelectorDialog.dialog.isVisible()
 
-            qtbot.wait_until(upsell_dialog_opened)
+            qtbot.wait_until(flashcard_selector_opened)
+
+            claim_mock.assert_not_called()
+
+    def _open_upsell_dialog(
+        self,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        claim_result: Union[bool, Exception],
+    ) -> Tuple[utils._Dialog, Mock, Mock]:
+        """Trigger the upsell path with a mocked claim outcome.
+
+        Returns the opened dialog, the mock for ProductMetricsClient.track and the mock for
+        the claim method.
+        """
+        mocker.patch.object(config, "token", return_value="test_token")
+
+        anki_did = DeckId(1)
+        install_ah_deck(
+            anki_did=anki_did,
+            has_note_embeddings=True,
+        )
+        aqt.mw.deckBrowser.set_current_deck(anki_did)
+
+        qtbot.wait(500)
+
+        mocker.patch.object(AnkiWebView, "load_url")
+
+        # The server no longer sends show_trial_ended_message here - it is claimed separately.
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_user_details",
+            return_value={
+                "has_flashcard_selector_access": False,
+            },
+        )
+
+        if isinstance(claim_result, Exception):
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message", side_effect=claim_result)
+        else:
+            claim_mock = mocker.patch.object(AnkiHubClient, "claim_trial_ended_message", return_value=claim_result)
+
+        product_metrics_client_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.ProductMetricsClient")
+        track_mock = product_metrics_client_mock.return_value.track
+
+        overview_web: AnkiWebView = aqt.mw.overview.web
+        overview_web.eval(
+            f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
+        )
+
+        def upsell_dialog_opened() -> bool:
+            return isinstance(aqt.mw.app.activeWindow(), utils._Dialog)
+
+        qtbot.wait_until(upsell_dialog_opened)
+
+        return cast(utils._Dialog, aqt.mw.app.activeWindow()), track_mock, claim_mock
+
+    def _tracked_events(self, track_mock: Mock, event_name: str) -> List[Any]:
+        return [call for call in track_mock.call_args_list if call.kwargs["event_name"] == event_name]
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "claim_result, expected_source, expects_trial_ended_title",
+        [
+            pytest.param(True, "trial_ended", True, id="claimed_and_owed"),
+            pytest.param(False, "generic_upsell", False, id="claimed_and_not_owed"),
+            pytest.param(
+                # A real Response, not a Mock: the failure handler logs str(exc), and
+                # AnkiHubHTTPError.__str__ reads the response body and headers.
+                AnkiHubHTTPError(response=_response_with_status(500)),
+                "generic_upsell",
+                False,
+                id="claim_failed",
+            ),
+        ],
+    )
+    def test_shows_flashcard_selector_upsell_if_no_access(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+        claim_result: Union[bool, Exception],
+        expected_source: str,
+        expects_trial_ended_title: bool,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            open_link_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.openLink")
+
+            dialog, track_mock, claim_mock = self._open_upsell_dialog(
+                install_ah_deck=install_ah_deck,
+                qtbot=qtbot,
+                mocker=mocker,
+                claim_result=claim_result,
+            )
+
+            claim_mock.assert_called_once()
+
+            # A failed claim degrades to the generic copy instead of raising an error dialog.
+            if expects_trial_ended_title:
+                assert "Trial" in dialog.windowTitle()
+            else:
+                assert "Trial" not in dialog.windowTitle()
+                assert "Premium" in dialog.windowTitle()
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_viewed")))
+
+            viewed_properties = self._tracked_events(track_mock, "upgrade_cta_viewed")[0].kwargs["properties"]
+            assert viewed_properties["source"] == expected_source
+            assert viewed_properties["surface"] == "anki_addon"
+
+            assert not self._tracked_events(track_mock, "upgrade_cta_clicked")
+
+            learn_more_button = next(button for button in dialog.button_box.buttons() if button.text() == "Learn More")
+            learn_more_button.click()
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_clicked")))
+
+            clicked_properties = self._tracked_events(track_mock, "upgrade_cta_clicked")[0].kwargs["properties"]
+            assert clicked_properties["source"] == expected_source
+            assert clicked_properties["surface"] == "anki_addon"
+
+            open_link_mock.assert_called_once()
+
+    @pytest.mark.sequential
+    def test_dismissing_flashcard_selector_upsell_does_not_track_a_click(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            open_link_mock = mocker.patch("ankihub.gui.flashcard_selector_dialog.openLink")
+
+            dialog, track_mock, _ = self._open_upsell_dialog(
+                install_ah_deck=install_ah_deck,
+                qtbot=qtbot,
+                mocker=mocker,
+                claim_result=False,
+            )
+
+            qtbot.wait_until(lambda: bool(self._tracked_events(track_mock, "upgrade_cta_viewed")))
+
+            not_now_button = next(button for button in dialog.button_box.buttons() if button.text() == "Not Now")
+            not_now_button.click()
+
+            qtbot.wait(500)
+
+            assert not self._tracked_events(track_mock, "upgrade_cta_clicked")
+            open_link_mock.assert_not_called()
 
     def test_with_no_auth_token(
         self,
@@ -12971,6 +13269,46 @@ class TestStepDeckTutorial:
 
             with pytest.raises(AssertionError):
                 StepDeckTutorial()
+
+    def test_get_smart_search_button_target_returns_none_when_button_missing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+    ):
+        """Regression: tutorial target helper should handle missing Smart Search button."""
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            browser = Mock(sidebar=Mock())
+            browser.findChild.return_value = None
+            tutorial._browser = browser
+
+            assert tutorial._get_smart_search_button_target() is None
+
+    def test_get_smart_search_button_target_uses_live_browser(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        """Regression: target helper should resolve from the live Browser reference."""
+        from ankihub.gui import tutorial as tutorial_module
+        from ankihub.gui.overlay_dialog import OverlayTarget
+        from ankihub.gui.tutorial import StepDeckTutorial
+
+        with anki_session_with_addon_data.profile_loaded():
+            tutorial = StepDeckTutorial.__new__(StepDeckTutorial)
+            live_browser = Mock(sidebar=Mock())
+            smart_search_button = Mock(spec=QToolButton)
+            live_browser.findChild.return_value = smart_search_button
+            tutorial._browser = None
+            mocker.patch.object(tutorial, "_get_live_browser", return_value=live_browser)
+            mocker.patch.object(tutorial_module.sip, "isdeleted", return_value=False)
+
+            target = tutorial._get_smart_search_button_target()
+
+            assert isinstance(target, OverlayTarget)
+            assert target.parent is live_browser.sidebar
+            assert target.element is smart_search_button
 
     def test_hook_browser_startup_does_not_crash_when_browser_missing(
         self,
