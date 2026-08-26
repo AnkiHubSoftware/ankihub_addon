@@ -71,7 +71,9 @@ def canonical_name(name: str) -> str:
 def requirement_names(requirements: str) -> "set[str]":
     names = set()
     for line in requirements.splitlines():
-        match = re.match(r"[A-Za-z0-9._-]+", line)  # continuation lines are indented
+        # Continuation lines are indented; uv also emits option lines such as --index-url, which a
+        # leading dash would otherwise turn into a requirement named "-index-url".
+        match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line)
         if match:
             names.add(canonical_name(match.group()))
     return names
@@ -106,7 +108,11 @@ if shared:
 # uv installs over whatever the target already holds, so distributions removed since an
 # earlier build would otherwise survive into the artifact. Not ignore_errors: a partial delete
 # would leave exactly that behind.
-if ANKIHUB_LIB_TARGET.exists():
+if ANKIHUB_LIB_TARGET.is_symlink():
+    # Worktrees set up for running Anki point this at the main checkout's copy, and installing
+    # through it would write there instead. rmtree refuses a symlink with an errno-less OSError.
+    ANKIHUB_LIB_TARGET.unlink()
+elif ANKIHUB_LIB_TARGET.exists():
     shutil.rmtree(ANKIHUB_LIB_TARGET)
 subprocess.run(["uv", "python", "install", *dict(BUNDLE_LAYERS).values()], check=True)
 for group, python_version in BUNDLE_LAYERS:
@@ -128,11 +134,28 @@ for group, python_version in BUNDLE_LAYERS:
         text=True,
     )
 
-# Drop playhouse's optional C extensions: compiled for whichever interpreter and platform ran this
-# script, so unloadable anywhere else. Nothing imports playhouse, and peewee works without them.
+# One artifact ships to every interpreter and platform Anki runs on, so an extension compiled for
+# the one that installed it can only load by accident - and that is the layer's Python, 3.9 or 3.10,
+# not the build machine's. An abi3 extension is the exception: it declares an ABI stable across
+# CPython versions, which is how protobuf-py-ext ships. playhouse's are optional, so they are
+# dropped - peewee works without them and nothing imports playhouse. Anything else has to be looked
+# at before it reaches users rather than deleted quietly, since something may need it to import.
+DROPPABLE_EXTENSION_PACKAGES = ("playhouse",)
+
+unloadable = []
 for pattern in ("*.so", "*.pyd"):
-    for extension in (ANKIHUB_LIB_TARGET / "playhouse").glob(pattern):
-        extension.unlink()
+    for extension in ANKIHUB_LIB_TARGET.rglob(pattern):
+        if ".abi3." in extension.name:
+            continue
+        if extension.relative_to(ANKIHUB_LIB_TARGET).parts[0] in DROPPABLE_EXTENSION_PACKAGES:
+            extension.unlink()
+        else:
+            unloadable.append(str(extension.relative_to(ANKIHUB_LIB_TARGET)))
+if unloadable:
+    raise SystemExit(
+        f"{sorted(unloadable)} are compiled for one interpreter and platform, so they cannot load "
+        "on the ones this artifact ships to; vendor an abi3 wheel or drop the extension"
+    )
 
 shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
 # Remove large unused files from the Django package

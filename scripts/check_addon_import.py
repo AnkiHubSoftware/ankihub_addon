@@ -77,6 +77,26 @@ def wrong_bundle_module_origins(vendored, from_anki) -> list:
     return problems
 
 
+def unparsable_bundle_modules() -> list:
+    """Bundle modules the target Python cannot even parse.
+
+    The checks around this one reach a module only if something imports it, which for most of the
+    bundle means the add-on's own import graph - `asgiref.sync` is covered because Django's template
+    stack happens to pull it in. Parsing reaches every file regardless. It is the weaker signal of
+    the two: it catches syntax a release started using, not the `from typing import ParamSpec` kind
+    of break, which parses on 3.9 and fails on import.
+    """
+    problems = []
+    for path in sorted(BUNDLE.rglob("*.py")):
+        if path.relative_to(BUNDLE).parts[0] in MODERN_ONLY_MODULES:
+            continue
+        try:
+            compile(path.read_bytes(), str(path), "exec", dont_inherit=True)
+        except SyntaxError as error:
+            problems.append(f"{path.relative_to(BUNDLE)} does not parse on Python {target_python()}: {error}")
+    return problems
+
+
 def importable_modern_only_modules() -> list:
     """Modern-only modules that turn out to import here after all.
 
@@ -130,7 +150,11 @@ def main() -> int:
     # Loads the bundle modules, which is what the checks below inspect.
     load_addon()
 
-    failures = wrong_bundle_module_origins(vendored, from_anki) + importable_modern_only_modules()
+    failures = (
+        wrong_bundle_module_origins(vendored, from_anki)
+        + importable_modern_only_modules()
+        + unparsable_bundle_modules()
+    )
     if not failures:
         failures += django_rendering_problems()  # only meaningful once the origins are right
 

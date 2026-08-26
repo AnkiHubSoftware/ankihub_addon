@@ -38,6 +38,8 @@ dev = [
   "buf-bin; python_version >= '3.10'",
 ]
 bundle = [
+  # Brings urllib3, which ships too. What holds that at 1.x is the `dev` group's own
+  # `urllib3>=1.26.14,<2` - one resolution covers every group, and nothing here caps it.
   "sentry_sdk==1.6.0",
   "tenacity==8.2.2",
   "structlog==24.1.0",

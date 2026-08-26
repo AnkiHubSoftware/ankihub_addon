@@ -33,7 +33,7 @@ check_dir="$(mktemp -d)"
 trap 'rm -rf "$check_dir"' EXIT
 unzip -q ankihub.ankiaddon -d "$check_dir/addon"
 
-for member in manifest.json __init__.py lib/django lib/peewee.py; do
+for member in manifest.json VERSION __init__.py lib/django lib/peewee.py; do
   if [ ! -e "$check_dir/addon/$member" ]; then
     echo "ankihub.ankiaddon is missing $member" >&2
     exit 1
