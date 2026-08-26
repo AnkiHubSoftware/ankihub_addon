@@ -71,11 +71,16 @@ def canonical_name(name: str) -> str:
 def requirement_names(requirements: str) -> "set[str]":
     names = set()
     for line in requirements.splitlines():
-        # Continuation lines are indented; uv also emits option lines such as --index-url, which a
-        # leading dash would otherwise turn into a requirement named "-index-url".
+        if not line.strip() or line.startswith("#") or line[0].isspace():
+            continue  # blank, a comment, or an indented --hash continuation
+        if line.startswith("--"):
+            continue  # --index-url and friends configure the install; they add no distribution
         match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line)
-        if match:
-            names.add(canonical_name(match.group()))
+        if not match:
+            # Skipping silently is what makes this worth raising over: an editable (-e ../pkg)
+            # installs something that every check below would then be blind to.
+            raise SystemExit(f"cannot read {line!r} as a requirement; check what uv export emitted")
+        names.add(canonical_name(match.group()))
     return names
 
 
@@ -134,27 +139,31 @@ for group, python_version in BUNDLE_LAYERS:
         text=True,
     )
 
-# One artifact ships to every interpreter and platform Anki runs on, so an extension compiled for
-# the one that installed it can only load by accident - and that is the layer's Python, 3.9 or 3.10,
-# not the build machine's. An abi3 extension is the exception: it declares an ABI stable across
-# CPython versions, which is how protobuf-py-ext ships. playhouse's are optional, so they are
-# dropped - peewee works without them and nothing imports playhouse. Anything else has to be looked
-# at before it reaches users rather than deleted quietly, since something may need it to import.
-DROPPABLE_EXTENSION_PACKAGES = ("playhouse",)
+# A compiled extension is built for one interpreter and one platform, and this one artifact ships to
+# every combination Anki runs on. abi3 answers only the first half: protobuf-py-ext's wheel is
+# cp310-abi3-manylinux_2_17_x86_64, so it still cannot load on Windows, macOS or ARM. What makes an
+# extension safe to vendor is therefore the package treating it as optional, not its tag - and both
+# of these do. protobuf-py catches the failed import and falls back to pure Python, confirmed on
+# macOS arm64, so its extension is kept for the platform it does load on. Nothing imports playhouse
+# at all, so its 2 MB are dropped. Anything else fails the build rather than being kept or deleted
+# on a guess: kept, it breaks every platform but the builder; deleted, it breaks whatever needed it.
+KEPT_EXTENSION_PACKAGES = ("protobuf_ext",)
+DROPPED_EXTENSION_PACKAGES = ("playhouse",)
 
-unloadable = []
+unaudited = []
 for pattern in ("*.so", "*.pyd"):
     for extension in ANKIHUB_LIB_TARGET.rglob(pattern):
-        if ".abi3." in extension.name:
+        package = extension.relative_to(ANKIHUB_LIB_TARGET).parts[0]
+        if package in KEPT_EXTENSION_PACKAGES:
             continue
-        if extension.relative_to(ANKIHUB_LIB_TARGET).parts[0] in DROPPABLE_EXTENSION_PACKAGES:
+        if package in DROPPED_EXTENSION_PACKAGES:
             extension.unlink()
         else:
-            unloadable.append(str(extension.relative_to(ANKIHUB_LIB_TARGET)))
-if unloadable:
+            unaudited.append(str(extension.relative_to(ANKIHUB_LIB_TARGET)))
+if unaudited:
     raise SystemExit(
-        f"{sorted(unloadable)} are compiled for one interpreter and platform, so they cannot load "
-        "on the ones this artifact ships to; vendor an abi3 wheel or drop the extension"
+        f"{sorted(unaudited)} are compiled extensions this artifact would ship to platforms they "
+        "cannot load on; confirm the package falls back without them, then list it above"
     )
 
 shutil.rmtree(ANKIHUB_LIB_TARGET / "bin", ignore_errors=True)
