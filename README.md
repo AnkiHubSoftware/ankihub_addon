@@ -20,8 +20,8 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 
 -   Install uv: https://docs.astral.sh/uv/getting-started/installation/
 -   Set up project environment and install dependencies:
-    -   **Default (most systems):** `uv sync --group dev --group aqt --group bundle` or `just install`
-    -   **Legacy Anki (2.1.56):** `uv sync --group dev --group aqt_legacy --group bundle` or `just install aqt_legacy`
+    -   **Default (most systems):** `uv sync --group dev --group aqt --group bundle --group bundle_modern` or `just install`
+    -   **Legacy Anki (2.1.56):** `uv sync --group dev --group aqt_legacy --group bundle --group bundle_modern` or `just install aqt_legacy`
 
     (Requires [just](https://github.com/casey/just) for the `just install` commands)
 -   Open VSCode in this repo: `code .`

@@ -43,15 +43,24 @@ bundle = [
   "structlog==24.1.0",
   "peewee==3.18.2",
   "mashumaro",
-  # We cannot use more recent versions because we still need to support Python 3.9.
-  # asgiref and urllib3 are transitive dependencies, but they have to be pinned here because
-  # the bundle is resolved with the build machine's Python, which is newer than 3.9.
-  "django==4.2.27",
+  # Held below the releases that need Python 3.10: Anki bundles its own interpreter and the builds
+  # before 25.07 ship 3.9. asgiref is a transitive, capped here because nothing else caps it.
+  "django==4.2.30",
   "django-cotton>=2.5.1",
   "asgiref<3.12",
-  "urllib3<2.7",
-  "protobuf-py; python_version >= '3.10'",
+  # A transitive of sentry-sdk, which is from 2022 and predates urllib3 2.0's API changes. Not the
+  # Python floor the layers already enforce: urllib3 2.x still supports 3.9, so nothing else stops it.
+  "urllib3<2",
+  # Django declares tzdata for win32 only, and Windows is the one platform with no system time zone
+  # database. Built on Linux and shipped everywhere, that marker drops it for the users who need it.
+  "tzdata",
 ]
+# protobuf-py has required Python 3.10 since its first release, so it cannot join `bundle`, which
+# installs with 3.9. It has to ship anyway: above 3.10 ankihub_client imports the AnkiWeb client at
+# module level, so a missing copy stops the add-on loading. Anki's own google.protobuf is no
+# alternative - it spans 4.21 to 7.x across the Anki versions supported here, and generated code
+# cannot satisfy that whole range. The marker is what lets this be locked at all.
+bundle_modern = ["protobuf-py; python_version >= '3.10'"]
 aqt = ["aqt[qt]==26.5; python_version >= '3.10'"]
 aqt_legacy = ["aqt==2.1.56", "pyqt5==5.15.2", "pyqtwebengine==5.15.2"]
 

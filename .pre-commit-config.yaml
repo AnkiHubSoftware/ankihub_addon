@@ -19,7 +19,9 @@ repos:
           - id: no_absolute_imports_from_ankihub
             name: no_absolute_imports_from_ankihub
             types: [python]
-            exclude: ^tests/
+            # Anki installs the add-on under its AnkiWeb id, so a module inside it cannot import
+            # itself as `ankihub`. Tests and build scripts are not shipped inside it and can.
+            exclude: ^(tests|scripts)/
             entry: "from ankihub([.]| import )"
             language: pygrep
           - id: no_anki_aqt_imports_in_client

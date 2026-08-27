@@ -16,7 +16,7 @@ runs:
     - name: Install dependencies and detect Qt version
       if: ${{ inputs.install_qt == 'true' }}
       run: |
-        uv sync --group ${{ inputs.aqt_dependency_group }}
+        uv sync --locked --group ${{ inputs.aqt_dependency_group }}
         QT_VERSION=$(uv pip show ${{ inputs.qt_package }} | sed -n 's/^Version: //p')
         echo "QT_VERSION=$QT_VERSION" >> $GITHUB_ENV
         echo "PYTEST_QT_API=${{ inputs.qt_package }}" >> $GITHUB_ENV
@@ -47,7 +47,9 @@ runs:
       run: |
         # force git to use ssh
         git config --global url."git@github.com:".insteadOf "https://github.com/"
-        uv run ./scripts/build.py
+        # --locked, or a stale lockfile is re-locked in passing and these jobs test a bundle built
+        # from a resolution nobody reviewed.
+        uv run --locked ./scripts/build.py
       shell: bash
       env:
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
