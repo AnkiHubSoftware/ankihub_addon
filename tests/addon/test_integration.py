@@ -8479,6 +8479,7 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
@@ -8504,8 +8505,13 @@ class TestMediaSyncMediaDownload:
                 ],
             )
 
-            # Mock the _media_referenced_by_notes method to include the test media
-            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"image.png"})
+            # Add a note to the deck which references the test media
+            import_ah_note(
+                ah_did=ah_did,
+                note_data=NoteInfoFactory.create(
+                    fields=[Field(name="Front", value='<img src="image.png">'), Field(name="Back", value="")],
+                ),
+            )
 
             # Mock the client method for downloading media
             download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
@@ -8567,6 +8573,7 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
@@ -8603,8 +8610,16 @@ class TestMediaSyncMediaDownload:
                 ],
             )
 
-            # Mock the _media_referenced_by_notes method to return only one media file
-            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"referenced_image.png"})
+            # Add a note to the deck which references only one of the media files
+            import_ah_note(
+                ah_did=ah_did,
+                note_data=NoteInfoFactory.create(
+                    fields=[
+                        Field(name="Front", value='<img src="referenced_image.png">'),
+                        Field(name="Back", value=""),
+                    ],
+                ),
+            )
 
             download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
 
