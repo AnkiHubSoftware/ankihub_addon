@@ -336,7 +336,11 @@ class _AnkiHubMediaSync:
             LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
     def _media_referenced_by_notes(self, ah_did: uuid.UUID) -> Set[str]:
-        """Scan all notes in the AnkiHub deck and return the set of referenced media filenames."""
+        """
+        Scan all notes in the AnkiHub deck and return the set of referenced media filenames.
+        This requires scanning the Anki collection rather than the AnkiHub DB
+        to filter out media from emptied protected fields (INTP-338)
+        """
         anki_nids: List[NoteId] = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
 
         media_names: Set[str] = set()
