@@ -50,9 +50,6 @@ from .utils import (
 
 SHOW_MEDIA_PROGRESS_PYCMD = "ankihub_show_media_progress"
 TOOLBAR_BUTTON_ID = "ankihub_media_sync"
-# Gates the media sync progress UI, i.e. the progress dialog and the toolbar button.
-# While it's off, the media sync only reports its status as text on the menu action.
-MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG = "media_sync_progress_ui"
 
 
 class MediaSyncStatus(Enum):
@@ -61,10 +58,6 @@ class MediaSyncStatus(Enum):
     ERROR = "Error"
     CANCELING = "Canceling..."
     IDLE = "Idle"
-
-
-def _progress_ui_enabled() -> bool:
-    return config.get_feature_flags().get(MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG, False)
 
 
 def _is_collection_error(exc: Exception) -> bool:
@@ -221,31 +214,17 @@ class _AnkiHubMediaSync:
     def _dialog(self) -> "MediaSyncProgressDialog":
         return MediaSyncProgressDialog()
 
-    def _dialog_if_enabled(self) -> Optional["MediaSyncProgressDialog"]:
-        """The progress dialog, or None while the progress UI feature flag is off.
-
-        All dialog access goes through here, so that the dialog is never created for users
-        who shouldn't see it.
-        """
-        if not _progress_ui_enabled():
-            return None
-        return self._dialog
-
     def _show_dialog(self) -> None:
-        if (dialog := self._dialog_if_enabled()) is not None:
-            dialog.show()
+        self._dialog.show()
 
     def _update_dialog_status(self, status: MediaSyncStatus, is_retry: bool) -> None:
-        if (dialog := self._dialog_if_enabled()) is not None:
-            dialog.update_status(status, is_retry=is_retry)
+        self._dialog.update_status(status, is_retry=is_retry)
 
     def _reset_dialog_progress(self, maximum: int) -> None:
-        if (dialog := self._dialog_if_enabled()) is not None:
-            dialog.reset_progress(maximum)
+        self._dialog.reset_progress(maximum)
 
     def _increment_dialog_progress(self, increment: int = 1) -> None:
-        if (dialog := self._dialog_if_enabled()) is not None:
-            dialog.increment_progress(increment)
+        self._dialog.increment_progress(increment)
 
     def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
         media_dir_path = Path(collection_or_error().media.dir())
@@ -418,7 +397,7 @@ class _AnkiHubMediaSync:
         icon = media_sync_error_svg() if status == MediaSyncStatus.ERROR else media_sync_svg()
         # The button is also removed when the feature flag is off, so that it disappears
         # for users who lose access to the feature while Anki is running.
-        if status == MediaSyncStatus.IDLE or not _progress_ui_enabled():
+        if status == MediaSyncStatus.IDLE:
             js = """(() => {
                 const toolbarButton = %(elem_js)s;
                 if(toolbarButton) {
