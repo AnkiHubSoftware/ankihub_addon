@@ -6452,7 +6452,7 @@ class TestAuthAppUrlOnServerChange:
             config.app_url = STAGING_APP_URL
             config.save_token("staging-token")
             config.set_user_details({"id": 1, "email": "staging@example.com"})
-            config.set_feature_flags({"intercom_desktop_enabled": True})
+            config.set_feature_flags({"flag1": True})
             assert config._private_config.auth_app_url == STAGING_APP_URL
 
             config.app_url = DEFAULT_APP_URL
@@ -6471,14 +6471,14 @@ class TestAuthAppUrlOnServerChange:
             config.app_url = DEFAULT_APP_URL
             config.save_token("prod-token")
             config.set_user_details({"id": 2, "email": "prod@example.com"})
-            config.set_feature_flags({"intercom_desktop_enabled": True})
+            config.set_feature_flags({"flag1": True})
 
             config.setup_private_config()
 
             assert config.is_logged_in()
             assert config.token() == "prod-token"
             assert config.get_user_details() == {"id": 2, "email": "prod@example.com"}
-            assert config.get_feature_flags() == {"intercom_desktop_enabled": True}
+            assert config.get_feature_flags() == {"flag1": True}
             assert config._private_config.auth_app_url == DEFAULT_APP_URL
 
     def test_backfills_missing_auth_app_url_without_signing_out(
@@ -6517,7 +6517,6 @@ class TestIntercom:
     @pytest.fixture(autouse=True)
     def _enable_intercom(self, mocker: MockerFixture) -> None:
         mocker.patch.object(config, "is_logged_in", return_value=True)
-        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": True})
         if config.public_config is None:
             config.public_config = {}
         config.public_config["ankihub_support_button"] = True
@@ -6534,30 +6533,23 @@ class TestIntercom:
         )
 
     @pytest.mark.parametrize(
-        "logged_in, feature_flag, preference, expected",
+        "logged_in, preference, expected",
         [
-            (True, True, True, True),
-            (False, True, True, False),
-            (True, False, True, False),
-            (True, True, False, False),
+            (True, True, True),
+            (False, True, False),
+            (True, False, False),
         ],
     )
     def test_is_enabled_for_user(
         self,
         mocker: MockerFixture,
         logged_in: bool,
-        feature_flag: bool,
         preference: bool,
         expected: bool,
     ) -> None:
         from ankihub.gui import intercom
 
         mocker.patch.object(config, "is_logged_in", return_value=logged_in)
-        mocker.patch.object(
-            config,
-            "get_feature_flags",
-            return_value={"intercom_desktop_enabled": feature_flag},
-        )
         config.public_config["ankihub_support_button"] = preference
 
         assert intercom.is_enabled_for_user() is expected
@@ -6615,21 +6607,6 @@ class TestIntercom:
         from ankihub.gui import intercom
 
         config.public_config["ankihub_support_button"] = False
-        web_content = WebContent()
-        web_content.body = ""
-        context = DeckBrowser.__new__(DeckBrowser)
-
-        intercom._inject_intercom(web_content, context)
-
-        assert web_content.body == ""
-
-    def test_inject_intercom_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
-        from aqt.deckbrowser import DeckBrowser
-        from aqt.webview import WebContent
-
-        from ankihub.gui import intercom
-
-        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": False})
         web_content = WebContent()
         web_content.body = ""
         context = DeckBrowser.__new__(DeckBrowser)
