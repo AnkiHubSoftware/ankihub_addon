@@ -12882,28 +12882,10 @@ class TestPromptForOnboardingTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
             assert config.onboarding_tutorial_pending() is True
-
-    def test_returns_early_when_onboarding_tour_feature_flag_is_false(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Test that function returns early when onboarding_tour feature flag is False."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_onboarding_tutorial_pending(False)
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": False})
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-            tutorial.prompt_for_onboarding_tutorial()
-
-            mock_inject.assert_not_called()
 
     def test_injects_assets(
         self,
@@ -12917,7 +12899,6 @@ class TestPromptForOnboardingTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": True})
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
@@ -13010,26 +12991,6 @@ class TestPromptForOnboardingTutorial:
             mock_prompt.assert_not_called()
             assert config.onboarding_tutorial_show_on_sync() is True
 
-    def test_maybe_show_onboarding_tutorial_after_login_still_disables_sync_prompt_when_tour_disabled(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Even when onboarding_tour is off, clear show-on-sync so first sync does not duplicate the prompt."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_onboarding_tutorial_show_on_sync(True)
-            mocker.patch.object(config, "last_deck_sync", return_value=None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": False})
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-
-            _maybe_show_onboarding_tutorial_after_login()
-
-            mock_inject.assert_not_called()
-            assert config.onboarding_tutorial_show_on_sync() is False
-
     def test_maybe_show_onboarding_tutorial_after_login_removes_itself_from_refresh_callbacks(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -13065,20 +13026,12 @@ class TestPromptForOnboardingTutorial:
 class TestSubscribeToIntroDeck:
     @pytest.mark.qt_no_exception_capture
     @pytest.mark.parametrize(
-        "onboarding_tour_enabled, is_first_sync, intro_deck_already_configured, expected_subscribe_called",
+        "is_first_sync, intro_deck_already_configured, expected_subscribe_called",
         [
-            # All conditions met → subscribe_to_deck is called
-            (True, True, False, True),
-            # onboarding_tour feature flag is False → subscribe_to_deck is not called
-            (False, True, False, False),
-            # last_deck_sync is not None (not first sync) → subscribe_to_deck is not called
-            (True, False, False, False),
-            # intro deck is already configured → subscribe_to_deck is not called
-            (True, True, True, False),
-            # Multiple conditions not met
-            (False, False, False, False),
-            (False, True, True, False),
-            (True, False, True, False),
+            (True, False, True),
+            (False, False, False),
+            (True, True, False),
+            (False, True, False),
         ],
     )
     def test_subscribe_to_intro_deck_conditions(
@@ -13088,7 +13041,6 @@ class TestSubscribeToIntroDeck:
         qtbot: QtBot,
         mock_client_methods_called_during_ankihub_sync: None,
         install_ah_deck: InstallAHDeck,
-        onboarding_tour_enabled: bool,
         is_first_sync: bool,
         intro_deck_already_configured: bool,
         expected_subscribe_called: bool,
@@ -13096,11 +13048,6 @@ class TestSubscribeToIntroDeck:
         """Test that subscribe_to_intro_deck is called only when all conditions are met."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": onboarding_tour_enabled},
-            )
             mocker.patch.object(
                 config,
                 "last_deck_sync",
@@ -13129,11 +13076,6 @@ class TestSubscribeToIntroDeck:
         """Test that exceptions from subscribe_to_deck are properly propagated."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": True},
-            )
             mocker.patch.object(config, "last_deck_sync", return_value=None)
             error_message = "Test subscription error"
             mocker.patch.object(
@@ -13159,11 +13101,6 @@ class TestSubscribeToIntroDeck:
         """Test that after successful intro deck subscription, sync continues normally."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": True},
-            )
             mocker.patch.object(config, "last_deck_sync", return_value=None)
             subscribe_mock = mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
             get_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
@@ -13188,29 +13125,11 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
             assert config.step_deck_tutorial_pending() is True
-
-    def test_returns_early_when_step_deck_tour_feature_flag_is_true(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Test that function returns early when step_deck_tour feature flag is False."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_step_deck_tutorial_pending(False)
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-            tutorial.prompt_for_step_deck_tutorial()
-
-            mock_inject.assert_not_called()
 
     def test_returns_early_when_step_deck_is_not_installed(
         self,
@@ -13223,7 +13142,6 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=None)
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
@@ -13241,7 +13159,6 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
@@ -13260,7 +13177,6 @@ class TestPromptForStepDeckTutorial:
             config.set_show_step_deck_tutorial(True)
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
