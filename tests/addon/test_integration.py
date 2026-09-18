@@ -452,6 +452,8 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
     mocker.patch.object(AnkiHubClient, "get_note_types_dict_for_deck", return_value={})
+    # Called on the first sync of a profile to subscribe the user to the intro deck.
+    mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
 
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
@@ -7620,6 +7622,7 @@ class TestSyncWithAnkiHub:
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a client function which is called in sync_with_ankihub to raise an exception.
