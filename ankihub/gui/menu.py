@@ -321,7 +321,6 @@ def _maybe_show_onboarding_tutorial_after_login() -> None:
     This triggers when:
     - The user is logged in
     - `last_deck_sync` is None (no previous sync/tutorial for this profile)
-    - Feature flags/user details have just been refreshed (so feature flag checks work)
     """
     from ..user_state import remove_user_state_refreshed_callback
 
@@ -557,7 +556,7 @@ def _ankihub_help_setup(parent: QMenu):
     help_menu = QMenu("🆘 Help", parent)
 
     tours_submenu = QMenu("Product tours", help_menu)
-    if config.is_logged_in() and config.get_feature_flags().get("onboarding_tour", False):
+    if config.is_logged_in():
         q_onboarding_action = QAction("Onboarding", tours_submenu)
         qconnect(
             q_onboarding_action.triggered,
@@ -565,11 +564,7 @@ def _ankihub_help_setup(parent: QMenu):
         )
         tours_submenu.addAction(q_onboarding_action)
 
-    if (
-        config.is_logged_in()
-        and config.get_feature_flags().get("step_deck_tour", False)
-        and config.deck_config(config.anking_deck_id)
-    ):
+    if config.is_logged_in() and config.deck_config(config.anking_deck_id):
         q_step_tour_action = QAction("AnKing Step Deck", tours_submenu)
         qconnect(
             q_step_tour_action.triggered,

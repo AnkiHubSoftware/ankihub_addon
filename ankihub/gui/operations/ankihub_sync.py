@@ -145,11 +145,7 @@ def _sync_with_ankihub_inner(on_done: Callable[[Future], None], skip_summary: bo
             .run_in_background()
         )
 
-    if (
-        config.get_feature_flags().get("onboarding_tour", False)
-        and config.last_deck_sync() is None
-        and not config.deck_config(config.intro_deck_id)
-    ):
+    if config.last_deck_sync() is None and not config.deck_config(config.intro_deck_id):
         AddonQueryOp(
             op=lambda _: subscribe_to_intro_deck(),
             success=lambda _: get_subscriptions_in_background(),

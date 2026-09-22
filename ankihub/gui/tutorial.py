@@ -570,9 +570,6 @@ class Tutorial:
             inject_tutorial_assets(context, on_script_loaded)
 
     def _track_tutorial(self, event_name: str) -> None:
-        if not config.get_feature_flags().get("tutorial_metrics_tracker", False):
-            return
-
         user_id = str(config.user_id())
         plan = config.plan()
         is_staff = config.is_staff()
@@ -900,9 +897,6 @@ def prompt_for_tutorial(
 def prompt_for_onboarding_tutorial() -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if not config.get_feature_flags().get("onboarding_tour", False):
-        return
-
     config.set_onboarding_tutorial_pending(True)
 
     context_types = (DeckBrowser, DeckBrowserBottomBar, TopToolbar)
@@ -929,7 +923,7 @@ def prompt_for_onboarding_tutorial() -> None:
 def prompt_for_step_deck_tutorial(on_skip: Optional[Callable[[], None]] = None) -> None:
     from aqt.deckbrowser import DeckBrowser, DeckBrowserBottomBar
 
-    if not config.get_feature_flags().get("step_deck_tour", False) or not config.deck_config(config.anking_deck_id):
+    if not config.deck_config(config.anking_deck_id):
         if on_skip:
             on_skip()
         return
