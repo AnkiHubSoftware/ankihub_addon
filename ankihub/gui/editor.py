@@ -71,6 +71,11 @@ def _on_field_unfocus_auto_protect(changed: bool, note: Note, current_field_idx:
     if not ah_did or not config.deck_config(ah_did).auto_protect_fields_when_edited:
         return changed
 
+    # Users can switch an AnkiHub note to one of their own note types, which the
+    # AnkiHub DB has no field names for.
+    if not ankihub_db.is_ankihub_note_type(note.mid):
+        return changed
+
     if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
         return changed
 

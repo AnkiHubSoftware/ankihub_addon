@@ -1381,6 +1381,17 @@ class TestAutoProtectFieldsWhenEdited:
         assert result is False
         assert not any(tag.startswith(f"{TAG_FOR_PROTECTING_FIELDS}::LocalOnly") for tag in note.tags)
 
+    def test_note_with_non_ankihub_note_type_not_protected(self, auto_protect_note):
+        _, note = auto_protect_note
+        local_note_type = aqt.mw.col.models.copy(note.note_type())
+        change_note_types_of_notes([(note.id, local_note_type["id"])])
+        note.load()
+        note["Front"] = "edited value"
+
+        result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+        assert result is False
+        assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
+
 
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture
