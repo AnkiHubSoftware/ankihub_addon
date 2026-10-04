@@ -40,7 +40,7 @@ dev = [
 bundle = [
   "sentry_sdk==1.6.0",
   "tenacity==8.2.2",
-  "structlog==24.1.0",
+  "structlog==25.5.0",
   "peewee==3.18.2",
   "mashumaro",
   # Held below the releases that need Python 3.10: Anki bundles its own interpreter and the builds
