@@ -3765,6 +3765,37 @@ class TestAnkiHubImporter:
             # Only Back had its content emptied; Front was replaced by other content.
             assert importer._cleared_fields.counts == {"Back": 1}
             assert importer._removed_tags.counts == {"Semester-1::Week-1": 1}
+            assert not importer._protect_tags_on_overwritten_notes
+
+    def test_protect_tags_of_notes_with_overwritten_content_are_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """A protect tag that doesn't match a field of the note (e.g. a typo) doesn't protect
+        anything, so it is reported together with the content it failed to protect."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Front"] = "personal front"
+            note["Back"] = "personal back"
+            note.tags = ["AnkiHub_Protect::Bakc", "other_tag"]
+            aqt.mw.col.update_note(note)
+
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value="remote back"),
+            ]
+            note_data.tags = []
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={})
+
+            assert importer._overwritten_fields.counts == {"Front": 1, "Back": 1}
+            assert importer._protect_tags_on_overwritten_notes.counts == {"AnkiHub_Protect::Bakc": 1}
+            assert importer._protect_tags_on_overwritten_notes.sample_nids == {"AnkiHub_Protect::Bakc": [note.id]}
 
     def test_protected_field_content_is_not_overwritten_or_tracked(
         self,
