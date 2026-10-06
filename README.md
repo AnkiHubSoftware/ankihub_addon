@@ -75,6 +75,24 @@ add-on code, restart the debug session and Anki will use the updated add-on code
     This launch configuration sets up an Anki base directory in `ANKI_BASE` if it doesn't exist yet and re-uses it otherwise.
     This means that the AnkiHub add-on configuration and Anki's decks, notes, settings etc. will be retained between launches.
 
+### Debugging webviews
+
+There are two ways to open Chromium DevTools for Anki's webviews (including the add-on's own dialogs):
+
+-   **AnkiWebView Inspector add-on** (recommended): adds an "Inspect" entry to the context menu of webviews.
+    Use the `add-support-for-unknown-windows` branch of [this fork](https://github.com/RisingOrange/anki21-addon-ankiwebview-inspector/tree/add-support-for-unknown-windows).
+    The [AnkiWeb version](https://ankiweb.net/shared/info/31746032) only supports Anki's built-in windows, so it doesn't work in the add-on's dialogs.
+
+    ```
+    git clone -b add-support-for-unknown-windows https://github.com/RisingOrange/anki21-addon-ankiwebview-inspector.git ../anki21-addon-ankiwebview-inspector
+    ln -s "$(realpath ../anki21-addon-ankiwebview-inspector/src)" anki_base/addons21/ankiwebview_inspector
+    ```
+
+    Run the commands from the repository root. If your Anki base is somewhere else, link `src` into its `addons21` directory instead.
+
+-   **Remote debugging**: `.envrc.dev` sets `QTWEBENGINE_REMOTE_DEBUGGING=8080`. While Anki is running, open `chrome://inspect`
+    in Chrome or Chromium, add `localhost:8080` under "Configure...", and pick the webview to inspect.
+
 ## Tests and static checks
 
 The entire test suite and static code checks will be run automatically with
