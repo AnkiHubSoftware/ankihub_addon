@@ -82,6 +82,7 @@ There are two ways to open Chromium DevTools for Anki's webviews (including the 
 -   **AnkiWebView Inspector add-on** (recommended): adds an "Inspect" entry to the context menu of webviews.
     Download `ankiwebview_inspector.ankiaddon` from the [latest release of this fork](https://github.com/RisingOrange/anki21-addon-ankiwebview-inspector/releases/latest)
     and install it via Tools > Add-ons > Install from file.
+    If you installed an earlier version of the inspector, delete it first, otherwise both copies will be loaded.
     The [AnkiWeb version](https://ankiweb.net/shared/info/31746032) only supports Anki's built-in windows, so it doesn't work in the add-on's dialogs.
 
 -   **Remote debugging**: `.envrc.dev` sets `QTWEBENGINE_REMOTE_DEBUGGING=8080`. While Anki is running, open `chrome://inspect`
