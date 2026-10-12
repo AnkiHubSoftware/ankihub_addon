@@ -143,8 +143,6 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.exceptions import DeckDownloadAndInstallError
 from ankihub.gui.media_sync import (
-    MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG,
-    TOOLBAR_BUTTON_ID,
     MediaSyncProgressDialog,
     MediaSyncStatus,
     media_sync,
@@ -519,24 +517,12 @@ def media_sync_dialog_mock() -> Generator[Mock, None, None]:
         media_sync.__dict__["_dialog"] = previous
 
 
-def set_media_sync_progress_ui_flag(mocker: MockerFixture, is_active: bool) -> None:
-    mocker.patch.object(
-        config,
-        "get_feature_flags",
-        return_value={MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG: is_active},
-    )
-
-
 class TestMediaSyncProgressDialogUpdates:
     """Covers that the media sync keeps its progress dialog up to date."""
 
     @pytest.fixture
     def dialog_mock(self, media_sync_dialog_mock: Mock) -> Mock:
         return media_sync_dialog_mock
-
-    @pytest.fixture(autouse=True)
-    def _enable_progress_ui(self, mocker: MockerFixture) -> None:
-        set_media_sync_progress_ui_flag(mocker, is_active=True)
 
     @pytest.fixture(autouse=True)
     def _mock_toolbar_button_status(self, mocker: MockerFixture) -> None:
@@ -634,95 +620,6 @@ class TestMediaSyncProgressDialogUpdates:
         dialog_mock.reset_progress.assert_called_once_with(0)
         assert media_sync._canceling is True
         refresh_sync_status_mock.assert_called_once_with(False)
-
-
-class TestMediaSyncProgressUIFeatureFlag:
-    """Covers that the progress dialog and the toolbar button are gated by the feature flag."""
-
-    def test_dialog_is_not_created_while_the_flag_is_off(self, mocker: MockerFixture):
-        set_media_sync_progress_ui_flag(mocker, is_active=False)
-
-        assert media_sync._dialog_if_enabled() is None
-
-    def test_dialog_is_not_updated_while_the_flag_is_off(self, media_sync_dialog_mock: Mock, mocker: MockerFixture):
-        set_media_sync_progress_ui_flag(mocker, is_active=False)
-        mocker.patch.object(media_sync, "_set_toolbar_button_status")
-        mocker.patch.object(media_sync, "_errors", [])
-
-        media_sync._refresh_media_download_status_inner(is_retry=False)
-        media_sync._on_downloaded_file(future_with_result(None))
-        media_sync._on_media_chunk_uploaded(future_with_result(3))
-
-        assert media_sync_dialog_mock.method_calls == []
-
-    def test_toolbar_button_click_shows_the_dialog_while_the_flag_is_on(
-        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
-    ):
-        set_media_sync_progress_ui_flag(mocker, is_active=True)
-
-        media_sync._on_toolbar_button_clicked()
-
-        media_sync_dialog_mock.show.assert_called_once_with()
-
-    def test_toolbar_button_click_does_not_show_the_dialog_while_the_flag_is_off(
-        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
-    ):
-        set_media_sync_progress_ui_flag(mocker, is_active=False)
-
-        media_sync._on_toolbar_button_clicked()
-
-        media_sync_dialog_mock.show.assert_not_called()
-
-    def test_status_action_does_not_show_the_dialog_while_the_flag_is_off(
-        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
-    ):
-        set_media_sync_progress_ui_flag(mocker, is_active=False)
-        # A sync has to be in progress, otherwise the action doesn't show the dialog anyway.
-        mocker.patch.object(media_sync, "_canceling", False)
-        mocker.patch.object(media_sync, "_download_in_progress", True)
-
-        media_sync._on_status_action_triggered()
-
-        media_sync_dialog_mock.show.assert_not_called()
-
-    def test_toolbar_button_is_added_while_the_flag_is_on(self, mocker: MockerFixture):
-        set_media_sync_progress_ui_flag(mocker, is_active=True)
-        mocker.patch.object(media_sync, "_toolbar_link", f'<a id="{TOOLBAR_BUTTON_ID}"></a>', create=True)
-        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
-
-        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
-
-        js = toolbar_mock.web.eval.call_args.args[0]
-        assert "insertAdjacentHTML" in js
-        assert TOOLBAR_BUTTON_ID in js
-
-    def test_toolbar_button_is_removed_while_the_flag_is_off(self, mocker: MockerFixture):
-        set_media_sync_progress_ui_flag(mocker, is_active=False)
-        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
-
-        media_sync._set_toolbar_button_status(MediaSyncStatus.DOWNLOAD)
-
-        # The button is removed instead of inserted, so that it also disappears for users who
-        # lose access to the feature while Anki is running.
-        js = toolbar_mock.web.eval.call_args.args[0]
-        assert "insertAdjacentHTML" not in js
-        assert ".remove()" in js
-
-    def test_status_refresh_before_the_private_config_is_set_up(
-        self, media_sync_dialog_mock: Mock, mocker: MockerFixture
-    ):
-        # The toolbar is drawn - and with it the status refreshed - before the private config
-        # of the profile exists, so the flag check must not raise there.
-        mocker.patch.object(config, "_private_config", None)
-        toolbar_mock = mocker.patch.object(aqt.mw, "toolbar")
-        mocker.patch.object(media_sync, "_canceling", False)
-        mocker.patch.object(media_sync, "_download_in_progress", True)
-
-        media_sync._refresh_media_download_status_inner(is_retry=False)
-
-        # Without feature flags, the progress UI stays hidden.
-        assert media_sync_dialog_mock.method_calls == []
-        assert "insertAdjacentHTML" not in toolbar_mock.web.eval.call_args.args[0]
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -4048,21 +3945,10 @@ class TestUserDetailsConfig:
 
 
 class TestTutorialProductMetrics:
-    @pytest.fixture(autouse=True)
-    def enable_tutorial_metrics_tracker(self, mocker: MockerFixture, request: pytest.FixtureRequest) -> None:
-        if request.node.name == "test_track_tutorial_skips_when_feature_flag_disabled":
-            return
-        mocker.patch.object(
-            config,
-            "get_feature_flags",
-            return_value={"tutorial_metrics_tracker": True},
-        )
-
     def test_track_tutorial_sends_event(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import Tutorial
 
         mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
-        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": True})
         mocker.patch.object(config, "user_id", return_value=42)
         mocker.patch.object(config, "plan", return_value="core")
         mocker.patch.object(config, "is_staff", return_value=True)
@@ -4083,17 +3969,6 @@ class TestTutorialProductMetrics:
                 "beta_tester": True,
             },
         )
-
-    def test_track_tutorial_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
-        from ankihub.gui.tutorial import Tutorial
-
-        mock_client = mocker.patch("ankihub.gui.tutorial.ProductMetricsClient").return_value
-        mocker.patch.object(config, "get_feature_flags", return_value={"tutorial_metrics_tracker": False})
-        mocker.patch("aqt.mw.taskman.run_in_background", side_effect=lambda fn: fn())
-
-        Tutorial()._track_tutorial("tutorial_start")
-
-        mock_client.track.assert_not_called()
 
     def test_skip_tutorial_tracks_tour_postponed(self, mocker: MockerFixture) -> None:
         from ankihub.gui.tutorial import OnboardingTutorial
@@ -6555,7 +6430,7 @@ class TestAuthAppUrlOnServerChange:
             config.app_url = STAGING_APP_URL
             config.save_token("staging-token")
             config.set_user_details({"id": 1, "email": "staging@example.com"})
-            config.set_feature_flags({"intercom_desktop_enabled": True})
+            config.set_feature_flags({"flag1": True})
             assert config._private_config.auth_app_url == STAGING_APP_URL
 
             config.app_url = DEFAULT_APP_URL
@@ -6574,14 +6449,14 @@ class TestAuthAppUrlOnServerChange:
             config.app_url = DEFAULT_APP_URL
             config.save_token("prod-token")
             config.set_user_details({"id": 2, "email": "prod@example.com"})
-            config.set_feature_flags({"intercom_desktop_enabled": True})
+            config.set_feature_flags({"flag1": True})
 
             config.setup_private_config()
 
             assert config.is_logged_in()
             assert config.token() == "prod-token"
             assert config.get_user_details() == {"id": 2, "email": "prod@example.com"}
-            assert config.get_feature_flags() == {"intercom_desktop_enabled": True}
+            assert config.get_feature_flags() == {"flag1": True}
             assert config._private_config.auth_app_url == DEFAULT_APP_URL
 
     def test_backfills_missing_auth_app_url_without_signing_out(
@@ -6620,7 +6495,6 @@ class TestIntercom:
     @pytest.fixture(autouse=True)
     def _enable_intercom(self, mocker: MockerFixture) -> None:
         mocker.patch.object(config, "is_logged_in", return_value=True)
-        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": True})
         if config.public_config is None:
             config.public_config = {}
         config.public_config["ankihub_support_button"] = True
@@ -6637,30 +6511,23 @@ class TestIntercom:
         )
 
     @pytest.mark.parametrize(
-        "logged_in, feature_flag, preference, expected",
+        "logged_in, preference, expected",
         [
-            (True, True, True, True),
-            (False, True, True, False),
-            (True, False, True, False),
-            (True, True, False, False),
+            (True, True, True),
+            (False, True, False),
+            (True, False, False),
         ],
     )
     def test_is_enabled_for_user(
         self,
         mocker: MockerFixture,
         logged_in: bool,
-        feature_flag: bool,
         preference: bool,
         expected: bool,
     ) -> None:
         from ankihub.gui import intercom
 
         mocker.patch.object(config, "is_logged_in", return_value=logged_in)
-        mocker.patch.object(
-            config,
-            "get_feature_flags",
-            return_value={"intercom_desktop_enabled": feature_flag},
-        )
         config.public_config["ankihub_support_button"] = preference
 
         assert intercom.is_enabled_for_user() is expected
@@ -6718,21 +6585,6 @@ class TestIntercom:
         from ankihub.gui import intercom
 
         config.public_config["ankihub_support_button"] = False
-        web_content = WebContent()
-        web_content.body = ""
-        context = DeckBrowser.__new__(DeckBrowser)
-
-        intercom._inject_intercom(web_content, context)
-
-        assert web_content.body == ""
-
-    def test_inject_intercom_skips_when_feature_flag_disabled(self, mocker: MockerFixture) -> None:
-        from aqt.deckbrowser import DeckBrowser
-        from aqt.webview import WebContent
-
-        from ankihub.gui import intercom
-
-        mocker.patch.object(config, "get_feature_flags", return_value={"intercom_desktop_enabled": False})
         web_content = WebContent()
         web_content.body = ""
         context = DeckBrowser.__new__(DeckBrowser)

@@ -38,6 +38,7 @@ from .note_conversion import (
     get_fields_protected_by_tags,
     is_internal_tag,
     is_optional_tag,
+    is_protect_tag,
 )
 from .note_deletion import TAG_FOR_DELETED_NOTES
 from .subdecks import build_subdecks_and_move_cards_to_them
@@ -142,6 +143,7 @@ class AnkiHubImporter:
         self._overwritten_fields = _OverwriteTally()
         self._cleared_fields = _OverwriteTally()
         self._removed_tags = _OverwriteTally()
+        self._protect_tags_on_overwritten_notes = _OverwriteTally()
         self._overwritten_mids_without_protection: Set[int] = set()
 
         self._ankihub_did: Optional[uuid.UUID] = None
@@ -201,6 +203,7 @@ class AnkiHubImporter:
         self._overwritten_fields = _OverwriteTally()
         self._cleared_fields = _OverwriteTally()
         self._removed_tags = _OverwriteTally()
+        self._protect_tags_on_overwritten_notes = _OverwriteTally()
         self._overwritten_mids_without_protection = set()
 
         self._ankihub_did = ankihub_did
@@ -469,6 +472,10 @@ class AnkiHubImporter:
         Logged at INFO even when content was emptied: a deck maintainer clearing a field is a
         normal update, so this reports what happened rather than that something went wrong.
         `cleared_fields` marks the destructive case for whoever reads the line.
+
+        `protect_tags_on_overwritten_notes` lists the personal protection tags of notes that
+        lost field content anyway, spelled as on the note. A tag naming a field that doesn't
+        exist on the note type (a typo, or a field renamed since) shows up there.
         """
         if not (self._overwritten_fields or self._removed_tags):
             return
@@ -483,6 +490,8 @@ class AnkiHubImporter:
             removed_tags=self._removed_tags.counts,
             removed_tags_sample_nids=self._removed_tags.sample_nids,
             removed_tags_omitted_count=self._removed_tags.omitted_count,
+            protect_tags_on_overwritten_notes=self._protect_tags_on_overwritten_notes.counts,
+            protect_tags_on_overwritten_notes_sample_nids=self._protect_tags_on_overwritten_notes.sample_nids,
             protected_fields=self._protected_fields,
             protected_tags=self._protected_tags,
             overwritten_mids_without_protection=sorted(self._overwritten_mids_without_protection),
@@ -890,6 +899,7 @@ class AnkiHubImporter:
             return False
 
         changed = False
+        overwrote_content = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         protected_fields_for_model = protected_fields.get(aqt.mw.col.models.get(note.mid)["id"], [])
 
@@ -910,8 +920,12 @@ class AnkiHubImporter:
             if current_value != field.value:
                 if current_value:
                     self._record_field_overwrite(note, field, protects_any_field=bool(protected_fields_for_model))
+                    overwrote_content = True
                 note[field.name] = field.value
                 changed = True
+
+        if overwrote_content:
+            self._record_protect_tags_of_overwritten_note(note)
         return changed
 
     def _record_field_overwrite(self, note: Note, field: Field, protects_any_field: bool) -> None:
@@ -931,6 +945,13 @@ class AnkiHubImporter:
             # lost on it. A note type id that isn't a key of protected_fields silently
             # disables global protection for the note, which looks exactly like this.
             self._overwritten_mids_without_protection.add(note.mid)
+
+    def _record_protect_tags_of_overwritten_note(self, note: Note) -> None:
+        """Records the personal protection tags of a note that lost field content, once per note."""
+        nid = NoteId(note.id)
+        for tag in note.tags:
+            if is_protect_tag(tag):
+                self._protect_tags_on_overwritten_notes.record(tag, nid)
 
     def _prepare_tags(
         self,

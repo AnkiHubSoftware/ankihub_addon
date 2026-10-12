@@ -55,8 +55,16 @@ REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
+@pytest.fixture(autouse=True)
+def disable_sound_setup(monkeypatch: MonkeyPatch):
+    """Disable Anki's sound handling to suppress mpv errors."""
+    monkeypatch.setattr("aqt.main.AnkiQt.setup_sound", lambda *args, **kwargs: None)
+
+
 @pytest.fixture
-def anki_session(request: FixtureRequest, qtbot: QtBot) -> Generator[AnkiSession, None, None]:
+def anki_session(
+    request: FixtureRequest, qtbot: QtBot, disable_sound_setup: None
+) -> Generator[AnkiSession, None, None]:
     """Overwrites the anki_session fixture from pytest-anki to disable web debugging by default.
     This is done because web debugging is not used in any tests and it sometimes leads to errors.
     Otherwise the fixture is the same as the original.

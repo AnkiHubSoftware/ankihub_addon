@@ -64,8 +64,8 @@ def setup() -> None:
     from ..user_state import add_user_state_refreshed_callback
 
     aqt.gui_hooks.webview_will_set_content.append(_inject_intercom)
-    # Feature flags / login land asynchronously; re-apply so home screens that
-    # rendered while logged out (or before flags arrived) pick up the launcher.
+    # Login / user details land asynchronously; re-apply so home screens that
+    # rendered while logged out pick up the launcher.
     add_user_state_refreshed_callback(sync_with_user_preference)
 
 
@@ -86,10 +86,8 @@ def close_messenger() -> None:
 
 
 def is_enabled_for_user() -> bool:
-    """Whether Intercom should run for the current user (flag + preference)."""
+    """Whether Intercom should run for the current user (preference)."""
     if not config.is_logged_in():
-        return False
-    if not config.get_feature_flags().get("intercom_desktop_enabled", False):
         return False
     return bool(config.public_config.get("ankihub_support_button", True))
 

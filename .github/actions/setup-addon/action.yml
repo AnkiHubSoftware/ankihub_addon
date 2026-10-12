@@ -29,6 +29,10 @@ runs:
         version: ${{ env.QT_VERSION }}
         setup-python: false
         cache: true
+        # Empty overrides the action default (==1.1.0, Python >=3.10) so pip picks a py7zr
+        # that this job's interpreter can install. setup-python is false, so that is 3.9 on
+        # the legacy lane.
+        py7zrversion: ""
       continue-on-error: true
 
     - name: Install additional Qt6 dependencies

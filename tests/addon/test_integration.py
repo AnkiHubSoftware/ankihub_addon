@@ -192,7 +192,7 @@ from ankihub.gui.js_message_handling import (
     UNSUSPEND_NOTES_PYCMD,
     _post_message_to_ankihub_js,
 )
-from ankihub.gui.media_sync import MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG, media_sync
+from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import (
     AnkiHubLogin,
     _maybe_show_onboarding_tutorial_after_login,
@@ -452,6 +452,8 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
     mocker.patch.object(AnkiHubClient, "get_note_types_dict_for_deck", return_value={})
+    # Called on the first sync of a profile to subscribe the user to the intro deck.
+    mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
 
     deck_updates_mock = Mock()
     deck_updates_mock.notes = []
@@ -1378,6 +1380,17 @@ class TestAutoProtectFieldsWhenEdited:
         result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=local_field_idx)
         assert result is False
         assert not any(tag.startswith(f"{TAG_FOR_PROTECTING_FIELDS}::LocalOnly") for tag in note.tags)
+
+    def test_note_with_non_ankihub_note_type_not_protected(self, auto_protect_note):
+        _, note = auto_protect_note
+        local_note_type = aqt.mw.col.models.copy(note.note_type())
+        change_note_types_of_notes([(note.id, local_note_type["id"])])
+        note.load()
+        note["Front"] = "edited value"
+
+        result = _on_field_unfocus_auto_protect(changed=False, note=note, current_field_idx=0)
+        assert result is False
+        assert not any(tag.startswith(TAG_FOR_PROTECTING_FIELDS) for tag in note.tags)
 
 
 class TestDownloadAndInstallDecks:
@@ -3752,6 +3765,37 @@ class TestAnkiHubImporter:
             # Only Back had its content emptied; Front was replaced by other content.
             assert importer._cleared_fields.counts == {"Back": 1}
             assert importer._removed_tags.counts == {"Semester-1::Week-1": 1}
+            assert not importer._protect_tags_on_overwritten_notes
+
+    def test_protect_tags_of_notes_with_overwritten_content_are_tracked(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ):
+        """A protect tag that doesn't match a field of the note (e.g. a typo) doesn't protect
+        anything, so it is reported together with the content it failed to protect."""
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_data = import_ah_note(ah_did=ah_did)
+
+            note = aqt.mw.col.get_note(ankihub_db.anki_nid_for_ankihub_nid(note_data.ah_nid))
+            note["Front"] = "personal front"
+            note["Back"] = "personal back"
+            note.tags = ["AnkiHub_Protect::Bakc", "other_tag"]
+            aqt.mw.col.update_note(note)
+
+            note_data.fields = [
+                Field(name="Front", value="remote front"),
+                Field(name="Back", value="remote back"),
+            ]
+            note_data.tags = []
+
+            importer = self._import_updated_note(ah_did, note_data, protected_fields={})
+
+            assert importer._overwritten_fields.counts == {"Front": 1, "Back": 1}
+            assert importer._protect_tags_on_overwritten_notes.counts == {"AnkiHub_Protect::Bakc": 1}
+            assert importer._protect_tags_on_overwritten_notes.sample_nids == {"AnkiHub_Protect::Bakc": [note.id]}
 
     def test_protected_field_content_is_not_overwritten_or_tracked(
         self,
@@ -7620,6 +7664,7 @@ class TestSyncWithAnkiHub:
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         qtbot: QtBot,
+        mock_client_methods_called_during_ankihub_sync: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a client function which is called in sync_with_ankihub to raise an exception.
@@ -8479,6 +8524,7 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
@@ -8504,8 +8550,13 @@ class TestMediaSyncMediaDownload:
                 ],
             )
 
-            # Mock the _media_referenced_by_notes method to include the test media
-            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"image.png"})
+            # Add a note to the deck which references the test media
+            import_ah_note(
+                ah_did=ah_did,
+                note_data=NoteInfoFactory.create(
+                    fields=[Field(name="Front", value='<img src="image.png">'), Field(name="Back", value="")],
+                ),
+            )
 
             # Mock the client method for downloading media
             download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
@@ -8567,6 +8618,7 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        import_ah_note: ImportAHNote,
         mocker: MockerFixture,
         qtbot: QtBot,
     ):
@@ -8603,8 +8655,16 @@ class TestMediaSyncMediaDownload:
                 ],
             )
 
-            # Mock the _media_referenced_by_notes method to return only one media file
-            mocker.patch.object(media_sync, "_media_referenced_by_notes", return_value={"referenced_image.png"})
+            # Add a note to the deck which references only one of the media files
+            import_ah_note(
+                ah_did=ah_did,
+                note_data=NoteInfoFactory.create(
+                    fields=[
+                        Field(name="Front", value='<img src="referenced_image.png">'),
+                        Field(name="Back", value=""),
+                    ],
+                ),
+            )
 
             download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
 
@@ -8962,8 +9022,6 @@ class TestSuggestionsWithMedia:
         qtbot: QtBot,
         set_feature_flag_state: SetFeatureFlagState,
     ):
-        set_feature_flag_state(MEDIA_SYNC_PROGRESS_UI_FEATURE_FLAG)
-
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
@@ -12869,28 +12927,10 @@ class TestPromptForOnboardingTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": True})
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
             assert config.onboarding_tutorial_pending() is True
-
-    def test_returns_early_when_onboarding_tour_feature_flag_is_false(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Test that function returns early when onboarding_tour feature flag is False."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_onboarding_tutorial_pending(False)
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": False})
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-            tutorial.prompt_for_onboarding_tutorial()
-
-            mock_inject.assert_not_called()
 
     def test_injects_assets(
         self,
@@ -12904,7 +12944,6 @@ class TestPromptForOnboardingTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_onboarding_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": True})
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_onboarding_tutorial()
 
@@ -12997,26 +13036,6 @@ class TestPromptForOnboardingTutorial:
             mock_prompt.assert_not_called()
             assert config.onboarding_tutorial_show_on_sync() is True
 
-    def test_maybe_show_onboarding_tutorial_after_login_still_disables_sync_prompt_when_tour_disabled(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Even when onboarding_tour is off, clear show-on-sync so first sync does not duplicate the prompt."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_onboarding_tutorial_show_on_sync(True)
-            mocker.patch.object(config, "last_deck_sync", return_value=None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"onboarding_tour": False})
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-
-            _maybe_show_onboarding_tutorial_after_login()
-
-            mock_inject.assert_not_called()
-            assert config.onboarding_tutorial_show_on_sync() is False
-
     def test_maybe_show_onboarding_tutorial_after_login_removes_itself_from_refresh_callbacks(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -13052,20 +13071,12 @@ class TestPromptForOnboardingTutorial:
 class TestSubscribeToIntroDeck:
     @pytest.mark.qt_no_exception_capture
     @pytest.mark.parametrize(
-        "onboarding_tour_enabled, is_first_sync, intro_deck_already_configured, expected_subscribe_called",
+        "is_first_sync, intro_deck_already_configured, expected_subscribe_called",
         [
-            # All conditions met → subscribe_to_deck is called
-            (True, True, False, True),
-            # onboarding_tour feature flag is False → subscribe_to_deck is not called
-            (False, True, False, False),
-            # last_deck_sync is not None (not first sync) → subscribe_to_deck is not called
-            (True, False, False, False),
-            # intro deck is already configured → subscribe_to_deck is not called
-            (True, True, True, False),
-            # Multiple conditions not met
-            (False, False, False, False),
-            (False, True, True, False),
-            (True, False, True, False),
+            (True, False, True),
+            (False, False, False),
+            (True, True, False),
+            (False, True, False),
         ],
     )
     def test_subscribe_to_intro_deck_conditions(
@@ -13075,7 +13086,6 @@ class TestSubscribeToIntroDeck:
         qtbot: QtBot,
         mock_client_methods_called_during_ankihub_sync: None,
         install_ah_deck: InstallAHDeck,
-        onboarding_tour_enabled: bool,
         is_first_sync: bool,
         intro_deck_already_configured: bool,
         expected_subscribe_called: bool,
@@ -13083,11 +13093,6 @@ class TestSubscribeToIntroDeck:
         """Test that subscribe_to_intro_deck is called only when all conditions are met."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": onboarding_tour_enabled},
-            )
             mocker.patch.object(
                 config,
                 "last_deck_sync",
@@ -13116,11 +13121,6 @@ class TestSubscribeToIntroDeck:
         """Test that exceptions from subscribe_to_deck are properly propagated."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": True},
-            )
             mocker.patch.object(config, "last_deck_sync", return_value=None)
             error_message = "Test subscription error"
             mocker.patch.object(
@@ -13146,11 +13146,6 @@ class TestSubscribeToIntroDeck:
         """Test that after successful intro deck subscription, sync continues normally."""
         with anki_session_with_addon_data.profile_loaded():
             config.save_token("test_token")
-            mocker.patch.object(
-                config,
-                "get_feature_flags",
-                return_value={"onboarding_tour": True},
-            )
             mocker.patch.object(config, "last_deck_sync", return_value=None)
             subscribe_mock = mocker.patch.object(AnkiHubClient, "subscribe_to_deck")
             get_subscriptions_mock = mocker.patch.object(AnkiHubClient, "get_deck_subscriptions", return_value=[])
@@ -13175,29 +13170,11 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
 
             assert config.step_deck_tutorial_pending() is True
-
-    def test_returns_early_when_step_deck_tour_feature_flag_is_true(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
-    ):
-        """Test that function returns early when step_deck_tour feature flag is False."""
-        from ankihub.gui import tutorial
-
-        with anki_session_with_addon_data.profile_loaded():
-            config.set_step_deck_tutorial_pending(False)
-            mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": False})
-            mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
-            tutorial.prompt_for_step_deck_tutorial()
-
-            mock_inject.assert_not_called()
 
     def test_returns_early_when_step_deck_is_not_installed(
         self,
@@ -13210,7 +13187,6 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=None)
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
@@ -13228,7 +13204,6 @@ class TestPromptForStepDeckTutorial:
         with anki_session_with_addon_data.profile_loaded():
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mock_inject = mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()
@@ -13247,7 +13222,6 @@ class TestPromptForStepDeckTutorial:
             config.set_show_step_deck_tutorial(True)
             config.set_step_deck_tutorial_pending(False)
             mocker.patch.object(tutorial, "active_tutorial", None)
-            mocker.patch.object(config, "get_feature_flags", return_value={"step_deck_tour": True})
             mocker.patch.object(config, "deck_config", return_value=Mock())
             mocker.patch.object(tutorial, "inject_tutorial_assets")
             tutorial.prompt_for_step_deck_tutorial()

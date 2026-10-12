@@ -448,28 +448,28 @@ class _AnkiHubDB:
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
-        notes = AnkiHubNote.select(AnkiHubNote.anki_note_type_id, AnkiHubNote.fields).filter(
-            NOTE_NOT_DELETED_CONDITION,
-            ankihub_deck_id=ah_did,
+        result: Set[str] = set()
+        note_types: Dict[int, Optional[NotetypeDict]] = {}
+        rows: Iterable[Tuple[int, Optional[Dict[str, str]]]] = (
+            AnkiHubNote.select(AnkiHubNote.anki_note_type_id, AnkiHubNote.fields)
+            .filter(NOTE_NOT_DELETED_CONDITION, ankihub_deck_id=ah_did)
+            .tuples()
+            .iterator()
         )
-        note_type_ids = set(note.anki_note_type_id for note in notes)
-        note_types: Dict[int, NotetypeDict] = {
-            nt.anki_note_type_id: nt.note_type_dict
-            for nt in AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id, AnkiHubNoteType.note_type_dict).filter(
-                anki_note_type_id__in=note_type_ids
-            )
-        }
-        note_type_refs = {
-            name for note_type in note_types.values() for name in get_media_names_from_note_type(note_type)
-        }
-        note_refs = {
-            media_name
-            for note in notes
-            for field_value in (note.fields.values() if note.fields else [])
-            for media_name in get_media_names_from_note_field(field_value, note_types[note.anki_note_type_id])
-        }
+        for mid, fields in rows:
+            if mid not in note_types:
+                note_type = note_types[mid] = self.note_type_dict(NotetypeId(mid))
+                if note_type is not None:
+                    result.update(get_media_names_from_note_type(note_type))
 
-        return {*note_type_refs, *note_refs}
+            note_type = note_types[mid]
+            if note_type is None or not fields:
+                continue
+
+            for field_value in fields.values():
+                result.update(get_media_names_from_note_field(field_value, note_type))
+
+        return result
 
     def media_names_exist_for_ankihub_deck(self, ah_did: uuid.UUID, media_names: Set[str]) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean

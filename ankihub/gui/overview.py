@@ -4,7 +4,7 @@ import json
 from concurrent.futures import Future
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 import aqt
@@ -94,12 +94,8 @@ def _should_add_flashcard_selector_button(ah_did: UUID) -> bool:
     return True
 
 
-def _should_add_step_tour_prompt(ah_did: UUID) -> bool:
-    feature_flags = config.get_feature_flags()
-    if not feature_flags.get("step_deck_tour", False) or ah_did != config.anking_deck_id:
-        return False
-
-    return True
+def _should_add_step_tour_prompt(ah_did: Optional[UUID]) -> bool:
+    return ah_did == config.anking_deck_id
 
 
 @robust_filter
