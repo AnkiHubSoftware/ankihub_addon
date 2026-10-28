@@ -179,12 +179,14 @@ class AnkiHubWebViewDialog(QDialog):
     def _adjust_web_styling(self) -> None:
         # Fallback for QtWebEngine's orange focus ring. It must lose to the page's own focus
         # styles, which Tailwind v4 puts in cascade layers, and unlayered CSS beats every layer.
-        # --border-primary-focus is the web app's theme-aware focus colour.
         focus_css = """
             @layer ankihub-addon-focus {
                 :focus-visible {
-                    outline: 2px solid var(--border-primary-focus, #4f46e5);
+                    outline: 2px solid #4f46e5;
                     outline-offset: 2px;
+                }
+                .dark :focus-visible {
+                    outline-color: #818cf8;
                 }
             }
         """
