@@ -178,7 +178,8 @@ class AnkiHubWebViewDialog(QDialog):
 
     def _adjust_web_styling(self) -> None:
         # Fallback for QtWebEngine's orange focus ring. It must lose to the page's own focus
-        # styles, which Tailwind v4 puts in cascade layers, and unlayered CSS beats every layer.
+        # styles, so it's a cascade layer prepended to <head>: the first-declared layer has the
+        # lowest priority, and unlayered CSS beats every layer.
         focus_css = """
             @layer ankihub-addon-focus {
                 :focus-visible {
@@ -235,7 +236,6 @@ class AnkiHubWebViewDialog(QDialog):
         css_code = f"""
             var focusStyle = document.createElement('style');
             focusStyle.innerHTML = `{focus_css}`;
-            // Prepend, not append: the first-declared layer has the lowest priority.
             document.head.prepend(focusStyle);
 
             var style = document.createElement('style');
