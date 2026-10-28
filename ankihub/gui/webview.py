@@ -177,12 +177,19 @@ class AnkiHubWebViewDialog(QDialog):
         self.web.evalWithCallback("document.body.innerHTML", check_auth_failure_callback)
 
     def _adjust_web_styling(self) -> None:
-        css = """
-            /* Replace focus outline that QtWebEngine uses by default */
-            :focus {
-                outline: 2px !important;
+        # Fallback for QtWebEngine's orange focus ring. It must lose to the page's own focus
+        # styles, which Tailwind v4 puts in cascade layers, and unlayered CSS beats every layer.
+        # --border-primary-focus is the web app's theme-aware focus colour.
+        focus_css = """
+            @layer ankihub-addon-focus {
+                :focus-visible {
+                    outline: 2px solid var(--border-primary-focus, #4f46e5);
+                    outline-offset: 2px;
+                }
             }
+        """
 
+        css = """
             /* Fix checkbox styling */
             input[type="checkbox"]:checked::before {
                 background-color: initial;
@@ -224,6 +231,11 @@ class AnkiHubWebViewDialog(QDialog):
             """
 
         css_code = f"""
+            var focusStyle = document.createElement('style');
+            focusStyle.innerHTML = `{focus_css}`;
+            // Prepend, not append: the first-declared layer has the lowest priority.
+            document.head.prepend(focusStyle);
+
             var style = document.createElement('style');
             style.type = 'text/css';
             style.innerHTML = `{css}`;
