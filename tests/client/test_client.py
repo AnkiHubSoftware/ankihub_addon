@@ -1474,10 +1474,13 @@ class TestDownloadMedia:
 
             assert len(futures) == len(media_names)
 
+    @pytest.mark.parametrize("status_code, raises", [(404, True), (403, False)])
     def test_with_failed_download(
         self,
         requests_mock: Mocker,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        status_code: int,
+        raises: bool,
     ):
         with tempfile.TemporaryDirectory() as temp_dir:
             client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
@@ -1485,7 +1488,7 @@ class TestDownloadMedia:
             deck_id = next_deterministic_uuid()
             requests_mock.get(
                 f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/missing.png",
-                status_code=404,
+                status_code=status_code,
                 reason="Not Found",
             )
 
@@ -1494,12 +1497,15 @@ class TestDownloadMedia:
             client.download_media(media_names=["missing.png"], deck_id=deck_id, on_downloaded_file=futures.append)
 
             assert len(futures) == 1
-            with pytest.raises(AnkiHubMediaDownloadError) as exc_info:
+            if raises:
+                with pytest.raises(AnkiHubMediaDownloadError) as exc_info:
+                    futures[0].result()
+                exception = exc_info.value
+                assert exception.filename == f"/deck_assets/{deck_id}/missing.png"
+                assert exception.response.status_code == status_code
+            else:
                 futures[0].result()
 
-            exception = exc_info.value
-            assert exception.filename == f"/deck_assets/{deck_id}/missing.png"
-            assert exception.response.status_code == 404
             assert not (Path(temp_dir) / "missing.png").exists()
 
     def test_failed_download_doesnt_prevent_other_downloads(
