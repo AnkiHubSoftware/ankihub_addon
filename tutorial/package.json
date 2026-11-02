@@ -12,7 +12,7 @@
     "@types/alpinejs": "^3.13.11",
     "@types/node": "^24.10.1",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.3.2"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
