@@ -681,7 +681,9 @@ class AnkiHubClient(AnkiWebClientMixin):
                 media_remote_path=media_remote_path,
                 status_code=response.status_code,
             )
-            raise AnkiHubMediaDownloadError(response, media_remote_path)
+            # Ignore missing files (e.g. stale media entries in the database)
+            if response.status_code != 403:
+                raise AnkiHubMediaDownloadError(response, media_remote_path)
 
     def stop_background_threads(self) -> None:
         """Can be called to stop all background threads started by this client."""
