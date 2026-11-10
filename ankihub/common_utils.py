@@ -15,32 +15,44 @@ HTML_MEDIA_TAGS = re.compile(
     # the start of the image, audio, object, or source tag
     <\b(?:img|audio|video|object|source)\b
 
-    # any non-`>`, except inside `"` or `'`
+    # any non-`>`, or else allow `>` inside `"` or `'`.
+    # Python's re backtracks, unlike Anki's Rust regex, so a src-less tag followed by many quoted
+    # attributes takes exponential time unless each quote is matchable one way only. The lookahead
+    # plus backreference emulates an atomic group; switch to `(?>...)` once Python < 3.11 is dropped.
     (?:
-        [^>]
+        [^>]+?
     |
-        "[^"]+?"
-    |
-        '[^']+?'
-    )+?
+        (?:
+            (?=(?P<token>
+                [^>"']
+            |
+                "[^"]*"
+            |
+                '[^']*'
+            |
+                ["']
+            ))
+            (?P=token)
+        )+?
+    )
 
     # capture `src` or `data` attribute
     \b(?:src|data)\b=
     (?:
-            # 1: double-quoted filename
+            # double-quoted filename
             "
-            ([^"]+?)
+            (?P<double_quoted>[^"]+?)
             "
             [^>]*>
         |
-            # 2: single-quoted filename
+            # single-quoted filename
             '
-            ([^']+?)
+            (?P<single_quoted>[^']+?)
             '
             [^>]*>
         |
-            # 3: unquoted filename
-            ([^ >]+?)
+            # unquoted filename
+            (?P<unquoted>[^ >]+?)
             (?:
                 # then either a space and the rest
                 \x20[^>]*>
@@ -127,7 +139,7 @@ def _is_local_filename(fname: str) -> bool:
 def _extract_html_media_refs(text: str) -> Set[str]:
     result: Set[str] = set()
     for m in HTML_MEDIA_TAGS.finditer(text):
-        fname = (m.group(1) or m.group(2) or m.group(3) or "").strip()
+        fname = (m.group("double_quoted") or m.group("single_quoted") or m.group("unquoted") or "").strip()
         if fname in ("", '""', "''"):
             continue
         fname_decoded = _decode_entities(fname)
