@@ -26,7 +26,7 @@ jobs:
             python_version: 3.13.5
           - aqt_dependency_group: aqt_legacy
             qt_package: pyqt5
-            python_version: 3.9
+            python_version: 3.11
     timeout-minutes: 30
     steps:
       - name: Checkout ankihub_addon
