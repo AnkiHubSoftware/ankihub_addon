@@ -58,7 +58,7 @@ jobs:
         if: matrix.aqt_dependency_group == 'aqt_legacy'
         run: |
           xvfb-run -a uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} python scripts/check_addon_import.py
-      
+
       - name: Run pytest with coverage
         run: |
           xvfb-run uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} pytest ./tests/addon -n 0 -m sequential --cov --cov-report=xml
