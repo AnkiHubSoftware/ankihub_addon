@@ -23,7 +23,7 @@ jobs:
         include:
           - aqt_dependency_group: aqt
             qt_package: pyqt6
-            python_version: 3.13.5
+            python_version: 3.13.18
           - aqt_dependency_group: aqt_legacy
             qt_package: pyqt5
             python_version: 3.9
@@ -36,9 +36,8 @@ jobs:
         with:
           enable-cache: true
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python_version }}
+      - name: Install Python
+        run: uv python install ${{ matrix.python_version }} --default
 
       - uses: actions/setup-node@v6
         with:
@@ -55,8 +54,8 @@ jobs:
 
       # Only this lane has an Anki-on-3.9 environment. Its own process, because under pytest the
       # bundle is shadowed by the development environment - see scripts/check_addon_import.py.
-      - name: Check the built add-on imports inside Anki on Python 3.9
-        if: ${{ matrix.python_version == '3.9' }}
+      - name: Check the built addon imports inside Anki on Python 3.9
+        if: matrix.aqt_dependency_group == 'aqt_legacy'
         run: |
           xvfb-run -a uv run --exact --group ${{ matrix.aqt_dependency_group }} --python ${{ matrix.python_version }} python scripts/check_addon_import.py
 
