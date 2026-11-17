@@ -10,7 +10,7 @@ from concurrent.futures import Future
 from datetime import datetime, timedelta
 from logging import LogRecord
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, cast
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, Set, Tuple, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import aqt
@@ -4620,6 +4620,36 @@ class TestMediaNameExtraction:
         assert len(result) == 1
         assert list(result)[0].startswith("latex-")
         assert list(result)[0].endswith(".svg" if svg else ".png")
+
+    @pytest.mark.parametrize(
+        "html, expected",
+        [
+            ('<img alt="" src="a.png">', {"a.png"}),
+            ('<img alt="Leopold\'s maneuvers" src="a.png">', {"a.png"}),
+            ('<img alt=it\'s src="a.png">', {"a.png"}),
+            ('<img alt=x" src="a.png">', {"a.png"}),
+            ('<img alt="a>b" src="a.png">', {"a.png"}),
+            ('<img alt=it\'s title="a>b" src="a.png">', {"a.png"}),
+            ('<object data="a.mp3"></object>', {"a.mp3"}),
+            ('<img alt="">', set()),
+        ],
+    )
+    def test_extracts_media_from_html_tags(self, html: str, expected: Set[str]):
+        from ankihub.common_utils import get_media_names_from_note_field
+
+        assert get_media_names_from_note_field(html, {"latexsvg": False}) == expected
+
+    def test_src_less_tag_followed_by_quoted_attributes_is_fast(self):
+        from ankihub.common_utils import get_media_names_from_note_field
+
+        html = (
+            '<img alt=""><table style="a">'
+            + '<tr><td colspan="1" rowspan="1">x</td><td colspan="1" rowspan="1">y</td></tr>' * 12
+            + '</table><img src="a.png">'
+        )
+        start = time.perf_counter()
+        assert get_media_names_from_note_field(html, {"latexsvg": False}) == {"a.png"}
+        assert time.perf_counter() - start < 1
 
 
 class TestGetReviewCountForAHDeckSince:
