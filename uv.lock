@@ -38,11 +38,11 @@ resolution-markers = [
 dependencies = [
     { name = "beautifulsoup4", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "decorator", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "distro", marker = "(python_full_version < '3.10' and sys_platform != 'darwin' and sys_platform != 'win32') or (sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "distro", marker = "(python_full_version < '3.10' and sys_platform != 'darwin' and sys_platform != 'win32') or (sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "markdown", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "orjson", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "protobuf", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "psutil", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "psutil", marker = "python_full_version < '3.10' and sys_platform == 'win32' or (sys_platform == 'win32' or extra == 'group-13-ankihub-addon-aqt') and extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "requests", extra = ["socks"], marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 wheels = [
@@ -64,13 +64,13 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "decorator", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "distro", marker = "(python_full_version >= '3.10' and sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and sys_platform != 'darwin' and sys_platform != 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "markdown", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "orjson", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "protobuf", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "requests", extra = ["socks"], marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "typing-extensions", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "decorator", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "distro", marker = "(python_full_version >= '3.10' and sys_platform != 'darwin' and sys_platform != 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "markdown", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "orjson", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "protobuf", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "requests", extra = ["socks"], marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/9e/d61044b5dd8bd0a215ca58ccf524661a9c5bbc443821101314e8d64cf441/anki-26.5-cp310-abi3-macosx_12_0_arm64.whl", hash = "sha256:f88adc18fbfa6ad721e5a2274cf216a0b78274da2f64ce30ea4da2680f2ba9d9", size = 9827672, upload-time = "2026-06-16T15:44:00.584Z" },
@@ -91,7 +91,7 @@ wheels = [
 
 [[package]]
 name = "ankihub-addon"
-version = "2026.10.8.1"
+version = "2026.11.18.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -116,19 +116,19 @@ bundle = [
     { name = "urllib3" },
 ]
 bundle-modern = [
-    { name = "protobuf-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "protobuf-py", marker = "python_full_version >= '3.10'" },
 ]
 dev = [
     { name = "approvaltests" },
-    { name = "buf-bin", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "buf-bin", marker = "python_full_version >= '3.10'" },
     { name = "coverage" },
-    { name = "django-stubs", version = "5.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django-stubs", version = "5.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django-stubs", version = "5.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "django-stubs", version = "5.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "factory-boy" },
     { name = "faker" },
     { name = "mypy" },
     { name = "pre-commit" },
-    { name = "protoc-gen-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "protoc-gen-py", marker = "python_full_version >= '3.10'" },
     { name = "pytest" },
     { name = "pytest-anki" },
     { name = "pytest-cov" },
@@ -218,8 +218,8 @@ dependencies = [
     { name = "mock" },
     { name = "pyperclip" },
     { name = "pytest" },
-    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "testfixtures", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "testfixtures", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/53/af/8b51b58f99356052fd60df55370e1a251d96e1cb4592179257b0b5eadabc/approvaltests-15.3.2.tar.gz", hash = "sha256:e5bd42517f9b93f371497049af44f11bf5669edadeb31fa7675aa9917697cf15", size = 62456, upload-time = "2025-08-31T19:17:43.442Z" }
@@ -245,12 +245,12 @@ dependencies = [
     { name = "flask", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "flask-cors", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "jsonschema", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "psutil", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pywin32", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "psutil", marker = "python_full_version < '3.10' and sys_platform == 'win32' or (sys_platform == 'win32' or extra == 'group-13-ankihub-addon-aqt') and extra == 'group-13-ankihub-addon-aqt-legacy'" },
+    { name = "pywin32", marker = "python_full_version < '3.10' and sys_platform == 'win32' or (sys_platform == 'win32' or extra == 'group-13-ankihub-addon-aqt') and extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "requests", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "send2trash", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "waitress", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "winrt", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "winrt", marker = "python_full_version < '3.10' and sys_platform == 'win32' or (sys_platform == 'win32' or extra == 'group-13-ankihub-addon-aqt') and extra == 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/af/1a6f2d461f04bd965bd5e791448e1ca12cbb7cf96e7c92dacecb0373bd14/aqt-2.1.56-py3-none-any.whl", hash = "sha256:0bf9d7bfedea4c9b566439c4526e88213596644d017407f9de391dd7de3fabf1", size = 6252046, upload-time = "2023-01-09T01:02:38.891Z" },
@@ -267,19 +267,19 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "anki", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "anki-mac-helper", marker = "(python_full_version >= '3.10' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and sys_platform == 'darwin' and extra != 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "beautifulsoup4", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "flask", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "jsonschema", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "packaging", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6-webengine", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pywin32", marker = "(python_full_version >= '3.10' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and sys_platform == 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "requests", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "send2trash", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "truststore", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "waitress", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "anki", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "anki-mac-helper", marker = "(python_full_version >= '3.10' and sys_platform == 'darwin' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "beautifulsoup4", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "flask", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "jsonschema", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "packaging", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6-webengine", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pywin32", marker = "(python_full_version >= '3.10' and sys_platform == 'win32' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "requests", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "send2trash", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "truststore", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "waitress", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2b/a1/8978e8200afcc9a9b5440366e5d579f9fb1e959147004943cb0ec97cdf0f/aqt-26.5-py3-none-any.whl", hash = "sha256:20da7dfb8cbc776915779996478c790b95699736e73f44d6752fb9188fc2f2b8", size = 4176275, upload-time = "2026-06-16T15:44:14.634Z" },
@@ -299,7 +299,7 @@ name = "asgiref"
 version = "3.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/63/40/f03da1264ae8f7cfdbf9146542e5e7e8100a4c66ab48e791df9a03d3f6c0/asgiref-3.11.1.tar.gz", hash = "sha256:5f184dc43b7e763efe848065441eac62229c9f7b0475f41f80e207a114eda4ce", size = 38550, upload-time = "2026-02-03T13:30:14.33Z" }
 wheels = [
@@ -456,7 +456,7 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "colorama", marker = "(python_full_version < '3.10' and sys_platform == 'win32') or (python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
 wheels = [
@@ -474,7 +474,7 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "colorama", marker = "(python_full_version >= '3.10' and sys_platform == 'win32') or (python_full_version < '3.10' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/46/61/de6cd827efad202d7057d93e0fed9294b96952e188f7384832791c7b2254/click-8.3.0.tar.gz", hash = "sha256:e7b8232224eba16f4ebe410c25ced9f7875cb5f3263ffc93cc3e8da705e229c4", size = 276943, upload-time = "2025-09-18T17:32:23.696Z" }
 wheels = [
@@ -603,7 +603,7 @@ wheels = [
 
 [package.optional-dependencies]
 toml = [
-    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "tomli", marker = "python_full_version <= '3.11'" },
 ]
 
 [[package]]
@@ -640,7 +640,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
-    { name = "tzdata", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/11/b5/f1a53dc68da6429d6e0345bb848161e2381a2e9f02700148911e8582c2b3/django-4.2.30.tar.gz", hash = "sha256:4ebc7a434e3819db6cf4b399fb5b3f536310a30e8486f08b66886840be84b37c", size = 10468707, upload-time = "2026-04-07T14:05:45.57Z" }
 wheels = [
@@ -668,12 +668,12 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "asgiref", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django-stubs-ext", version = "5.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "tomli", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "types-pyyaml", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "typing-extensions", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "asgiref" },
+    { name = "django" },
+    { name = "django-stubs-ext", version = "5.1.3", source = { registry = "https://pypi.org/simple" } },
+    { name = "tomli" },
+    { name = "types-pyyaml" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/dd/48/e733ceff94ed3c4ccba4c2f0708739974bbcdbcfb69efefb87b10780937f/django_stubs-5.1.3.tar.gz", hash = "sha256:8c230bc5bebee6da282ba8a27ad1503c84a0c4cd2f46e63d149e76d2a63e639a", size = 267390, upload-time = "2025-02-07T09:56:59.773Z" }
 wheels = [
@@ -691,11 +691,11 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "django-stubs-ext", version = "5.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "tomli", marker = "python_full_version == '3.10.*' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "types-pyyaml", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django" },
+    { name = "django-stubs-ext", version = "5.2.8", source = { registry = "https://pypi.org/simple" } },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "types-pyyaml" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6c/75/97626224fd8f1787bb6f7f06944efcfddd5da7764bf741cf7f59d102f4a0/django_stubs-5.2.8.tar.gz", hash = "sha256:9bba597c9a8ed8c025cae4696803d5c8be1cf55bfc7648a084cbf864187e2f8b", size = 257709, upload-time = "2025-12-01T08:13:09.569Z" }
 wheels = [
@@ -711,8 +711,8 @@ resolution-markers = [
     "python_full_version < '3.10' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "typing-extensions", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9f/06/7b210e0073c6cb8824bde82afc25f268e8c410a99d3621297f44fa3f6a6c/django_stubs_ext-5.1.3.tar.gz", hash = "sha256:3e60f82337f0d40a362f349bf15539144b96e4ceb4dbd0239be1cd71f6a74ad0", size = 9613, upload-time = "2025-02-07T09:56:22.543Z" }
 wheels = [
@@ -730,8 +730,8 @@ resolution-markers = [
     "python_full_version == '3.10.*' and platform_python_implementation != 'PyPy'",
 ]
 dependencies = [
-    { name = "django", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "django" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/14/a2/d67f4a5200ff7626b104eddceaf529761cba4ed318a73ffdb0677551be73/django_stubs_ext-5.2.8.tar.gz", hash = "sha256:b39938c46d7a547cd84e4a6378dbe51a3dd64d70300459087229e5fee27e5c6b", size = 6487, upload-time = "2025-12-01T08:12:37.486Z" }
 wheels = [
@@ -755,7 +755,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -810,9 +810,9 @@ version = "3.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blinker" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "itsdangerous" },
     { name = "jinja2" },
     { name = "markupsafe" },
@@ -829,7 +829,7 @@ version = "6.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flask", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.10' or (python_full_version == '3.10.*' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version >= '3.11' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.10' or (python_full_version == '3.10.*' or extra == 'group-13-ankihub-addon-aqt') and extra == 'group-13-ankihub-addon-aqt-legacy'" },
     { name = "werkzeug", marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/47/03/4e464a50860f9adf08b5c1d3479cb8ea1f12af2aa69535c7042c6e628135/flask_cors-6.0.5.tar.gz", hash = "sha256:30c5031552cd59f620ac0c8211dac45b345d3b2df310e7721879e4f46ef9c601", size = 101386, upload-time = "2026-06-08T20:20:17.765Z" }
@@ -860,7 +860,7 @@ name = "importlib-metadata"
 version = "8.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a4982d9975a8cbf64f00d4a1ececb53297f1d9a7be1b10/importlib_metadata-8.7.1.tar.gz", hash = "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb", size = 57107, upload-time = "2025-12-21T10:00:19.278Z" }
 wheels = [
@@ -929,7 +929,7 @@ name = "markdown"
 version = "3.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8d/37/02347f6d6d8279247a5837082ebc26fc0d5aaeaf75aa013fcbb433c777ab/markdown-3.9.tar.gz", hash = "sha256:d2900fe1782bd33bdbbd56859defef70c2e78fc46668f8eb9df3128138f2cb6a", size = 364585, upload-time = "2025-09-04T20:25:22.885Z" }
 wheels = [
@@ -1054,7 +1054,7 @@ name = "multidict"
 version = "6.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/80/1e/5492c365f222f907de1039b91f922b93fa4f764c713ee858d235495d8f50/multidict-6.7.0.tar.gz", hash = "sha256:c6e99d9a65ca282e578dfea819cfa9c0a62b2499d8677392e09feaf305e9e6f5", size = 101834, upload-time = "2025-10-06T14:52:30.657Z" }
 wheels = [
@@ -1212,7 +1212,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mypy-extensions" },
     { name = "pathspec" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c0/77/8f0d0001ffad290cef2f7f216f96c814866248a0b92a722365ed54648e7e/mypy-1.18.2.tar.gz", hash = "sha256:06a398102a5f203d7477b2923dda3634c36727fa5c237d8f859ef90c42a9924b", size = 3448846, upload-time = "2025-09-19T00:11:10.519Z" }
@@ -1572,7 +1572,7 @@ name = "protobuf-py"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "protobuf-py-ext", marker = "(python_full_version >= '3.10' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (python_full_version >= '3.10' and platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (python_full_version < '3.10' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and platform_machine == 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (python_full_version < '3.10' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'AMD64' and platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'AMD64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine == 'ARM64' and platform_python_implementation != 'CPython' and sys_platform == 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_machine != 'arm64' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (platform_python_implementation != 'CPython' and sys_platform == 'darwin' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "protobuf-py-ext", marker = "platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin' or (platform_machine == 'aarch64' or platform_machine == 'x86_64') and platform_python_implementation == 'CPython' and sys_platform == 'linux' or (platform_machine == 'AMD64' or platform_machine == 'ARM64') and platform_python_implementation == 'CPython' and sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/56/b93a2ed9588779cd19dff9d62a611a7852987db195a0c9e6ca6d4a66682f/protobuf_py-0.2.0.tar.gz", hash = "sha256:e4f2e08c8c99a0d652f20c7e52d9290e04e14f4f086fc16a83ce728bd509f0ba", size = 148832, upload-time = "2026-07-14T05:15:24.122Z" }
 wheels = [
@@ -1619,7 +1619,7 @@ name = "protoc-gen-py"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "protobuf-py", marker = "python_full_version >= '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "protobuf-py" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9a/a5/a1a91241f305c927d341c13b34771593ecbdf1ab1dba422b1b2fdbd0b37f/protoc_gen_py-0.2.0.tar.gz", hash = "sha256:361d02bdef26ffdad6af07fa61dc85906f727121418f16fa9088efad975396e7", size = 11012, upload-time = "2026-07-14T05:15:25.831Z" }
 wheels = [
@@ -1733,8 +1733,8 @@ name = "pyqt6"
 version = "6.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt6-qt6", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6-sip", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6-qt6", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6-sip", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8b/47/b25c13eca5bebc6505394d0223e46d7ebf0c57dcac2ed908d7d19b18ab6b/pyqt6-6.11.0.tar.gz", hash = "sha256:45dd60aa69976de1918b5ced6b4e7b6a25abd2a919ecef5fd5826ecc76718889", size = 1087430, upload-time = "2026-03-30T09:16:13.543Z" }
 wheels = [
@@ -1795,9 +1795,9 @@ name = "pyqt6-webengine"
 version = "6.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt6", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6-sip", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "pyqt6-webengine-qt6", marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6-sip", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "pyqt6-webengine-qt6", marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9a/c6/b4f777c46ff42a759180dc65ad49a207748ea2e83ac4df21e89eaf4834c3/pyqt6_webengine-6.11.0.tar.gz", hash = "sha256:15cf49efbbbd4c6bc87653b2c4ae80d6049f800e31620b336734ae2e37cbedae", size = 37331, upload-time = "2026-03-30T09:18:15.561Z" }
 wheels = [
@@ -1851,13 +1851,13 @@ name = "pytest"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
 wheels = [
@@ -1870,9 +1870,9 @@ version = "1.0.0b3.post1"
 source = { git = "https://github.com/ankipalace/pytest-anki.git?branch=main#db0da3228510fc9cedc72e5dbd93d501a28178d9" }
 dependencies = [
     { name = "anki", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "anki", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "anki", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "aqt", version = "2.1.56", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or extra == 'group-13-ankihub-addon-aqt-legacy'" },
-    { name = "aqt", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra == 'group-13-ankihub-addon-aqt') or (python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "aqt", version = "26.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and extra != 'group-13-ankihub-addon-aqt-legacy') or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
     { name = "pytest" },
     { name = "pytest-forked" },
     { name = "pytest-qt" },
@@ -1901,7 +1901,7 @@ version = "1.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1f/31/27f28431a16b83cab7a636dce59cf397517807d247caa38ee67d65e71ef8/pytest_env-1.1.5.tar.gz", hash = "sha256:91209840aa0e43385073ac464a554ad2947cc2fd663a9debf88d03b01e0cc1cf", size = 8911, upload-time = "2024-09-17T22:39:18.566Z" }
 wheels = [
@@ -2125,7 +2125,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "rpds-py" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2f/db/98b5c277be99dd18bfd91dd04e1b759cad18d1a338188c936e92f921c7e2/referencing-0.36.2.tar.gz", hash = "sha256:df2e89862cd09deabbdba16944cc3f10feb6b3e6f18e902f7cc25609a34775aa", size = 74744, upload-time = "2025-01-25T08:48:16.138Z" }
 wheels = [
@@ -2503,7 +2503,7 @@ name = "typeguard"
 version = "4.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata", marker = "python_full_version < '3.10' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203, upload-time = "2025-06-18T09:56:07.624Z" }
@@ -2604,7 +2604,7 @@ dependencies = [
     { name = "distlib" },
     { name = "filelock" },
     { name = "platformdirs" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-13-ankihub-addon-aqt' and extra == 'group-13-ankihub-addon-aqt-legacy')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/14/37fcdba2808a6c615681cd216fecae00413c9dab44fb2e57805ecf3eaee3/virtualenv-20.34.0.tar.gz", hash = "sha256:44815b2c9dee7ed86e387b842a84f20b93f7f417f95886ca1996a72a4138eb1a", size = 6003808, upload-time = "2025-08-13T14:24:07.464Z" }
 wheels = [
